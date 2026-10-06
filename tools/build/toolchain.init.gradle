@@ -54,18 +54,21 @@ gradle.projectsEvaluated {
                 .getField('ANDROID_GRADLE_PLUGIN_VERSION').get(null)
             def receipt = [gradle: gradle.gradleVersion, agp: agpVersion,
                 javaRuntime: System.getProperty('java.runtime.version'),
+                javaMajor: System.getProperty('java.specification.version'),
                 javaVendor: System.getProperty('java.vendor'),
                 loadedKgp: [file: kgpJar.name, sha256: digest(kgpJar)],
                 artifacts: rows.sort { a, b -> a.toString() <=> b.toString() }]
             def output = new File(gradle.rootProject.projectDir, 'evidence/resolved-toolchain.json')
             output.parentFile.mkdirs()
             output.text = JsonOutput.prettyPrint(JsonOutput.toJson(receipt)) + '\n'
-            // Only Gradle/AGP supersede historical M0; every other assertion stays.
+            // Gradle/AGP amendment remains historical; current installation policy in m1.md
+            // additionally authorizes Temurin major17 and named SDK packages.
             def approved = new JsonSlurper().parse(new File(gradle.rootProject.projectDir,
                 'docs/build/m1-toolchain-amendment.json'))
             assert receipt.gradle == approved.gradle.version
             assert receipt.agp == approved.agp.version
-            assert receipt.javaRuntime == '17.0.20.1+1'
+            assert receipt.javaMajor == '17'
+            assert receipt.javaRuntime ==~ /17(?:[.+-].*)?/
             assert receipt.javaVendor == 'Eclipse Adoptium'
             // Gradle may instrument the loaded jar; the resolved original is in artifacts.
             assert kgpJar.name ==~ /(?:instrumented-)?kotlin-gradle-plugin-2[.]4[.]20(?:-[a-zA-Z0-9_.]+)?[.]jar/ : kgpJar

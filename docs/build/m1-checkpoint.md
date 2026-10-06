@@ -380,3 +380,50 @@ proof. Keep setup/restore/save, native preparation/boot, workload, validation/
 upload, queue and end-to-end timings distinct; require repeatable material benefit
 without cached task results or reports. A partial green run, warning-only save
 failure, different commit/test set or source-only check cannot close this campaign.
+
+
+---
+
+## October 6, 2026 latest installation-policy amendment (not acceptance)
+
+The original historical sections and earlier partial-Actions amendment above
+are preserved verbatim. The owner's latest decision **supersedes exact JDK patch/
+archive selection and manual SDK archives**, including the original M0 selections
+and earlier Gradle/AGP-only amendment's unchanged-installation wording. Current
+policy is Temurin **major17** through setup-java directly and stable named
+**`platforms;android-37.0` / `build-tools;36.0.0`** through sdkmanager. It does not
+change wrapper9.8.0/AGP9.4.1/Kotlin2.4.20/dependencies/compileAPI37.0 or the API36
+phone native target; the Build Tools25 example is not a requested downgrade.
+
+Both jobs use pinned setup-java v6.0.1 with `distribution: temurin`,
+`java-version: '17'` and normal Action/tool-cache behavior. Both bootstrap pinned
+setup-android v4.0.4/build15859902/tools22 in their isolated SDK before a bounded
+version probe and named-package install, with empty default packages. No manual
+JDK/archive downloads, provider alias, hardcoded patch assertions, force-download
+or bespoke package.xml production path remain. The old installer path is now
+verification-only, retaining actual runtime/vendor, installed SDK properties/XML
+and binary-hash evidence. SDK platform revision is observed and may change at the
+same API; archive receipts are intentionally absent, never fabricated. The
+historical metadata adapter is moved byte-for-byte to a test-only fixture; its
+old production path is intentionally absent and never reinstated by an installer.
+
+Run **37490753881, attempt1**, on source
+`26aaa5af95006664140bc0ec01b7b852ee26bbcb` and base
+`f1d0cf2b014bfa62e68dad18c7aae926cc234d65`, passed strict checkpoint/zero-issue
+lint/all8JVM. It failed in sdkmanager preparing the API36 Google APIs x86_64
+system-image ZIP (`SeekableByteChannel`) before any native test; root cause is
+not established. Checkpoint cache miss was saved; native miss was not saved
+because Gradle cache directories were never created. There is no hit campaign.
+This historical run used the earlier archive policy, so it is **not acceptance
+of the simplified installation** or the native landscape fix.
+
+Current candidate remains uncommitted, quick-source-checked only. Fresh
+independent whole-diff review and full hosted CI must prove Temurin17/tools22,
+sdkmanager decimal-platform installation/discovery, all8JVM/all3native including
+geometry/TextLayoutResult, source/merged/installed/aapt no-INTERNET gates, and
+successful miss/save plus two same-candidate full-workflow hits. Cache/basic,
+same-repo writable/fork-read-only homes, strict364/602 audited verification,
+no-build-cache/no-config-cache/rerun-tasks and emulator libpulse/KVM/disk/logs/
+traps/bounds are retained. No TDD/RED order or heavy local ladder is reintroduced.
+If named decimal-platform installation fails, retain exact logs and seek the
+owner's decision; no manual-archive fallback or downgrade is authorized.

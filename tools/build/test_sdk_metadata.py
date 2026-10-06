@@ -1,4 +1,4 @@
-"""Offline regressions for installed SDK metadata; fixtures are synthetic."""
+"""Historical archive-metadata regressions only; never current SDK installation."""
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -6,7 +6,7 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-from write_sdk_package_metadata import COMMON, SDK, XSI, local_package_xml, main
+from fixtures.sdk_metadata_historical import COMMON, SDK, XSI, local_package_xml, main
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = ROOT / "docs/research/m0/toolchain.json"

@@ -29,7 +29,7 @@ class ToolchainContract(unittest.TestCase):
         self.assertIn("gradle-" + approved["gradle"]["version"] + "-bin.zip", wrapper)
         self.assertIn("distributionSha256Sum=" + approved["gradle"]["distributionSha256"], wrapper)
 
-    def test_only_owner_approved_gradle_agp_override_m0(self):
+    def test_historical_gradle_agp_amendment_and_current_install_policy(self):
         baseline = json.loads((ROOT / "docs/research/m0/toolchain.json").read_text())
         approved = json.loads((ROOT / "docs/build/m1-toolchain-amendment.json").read_text())
         historical = approved["historicalBaseline"]
@@ -55,13 +55,20 @@ class ToolchainContract(unittest.TestCase):
                         "buildToolsVersion '36.0.0'", "compose-bom:2026.09.00", "ui:1.12.1",
                         "material3:1.4.0", "kotlinx-coroutines-android:1.11.0"):
             self.assertIn(snippet, app)
-        self.assertIn(baseline["jdk"]["sha256"], installer)
-        self.assertIn(baseline["jdk"]["linuxX64Archive"], workflow)
-        for package in baseline["sdkPackages"].values():
-            archive = next(a for a in package["archives"] if a["os"] in ("all", "linux"))
-            self.assertIn(archive["archive"], installer)
-            self.assertIn(archive["checksum"], installer)
+        # M0 archive/patch selections are frozen historical evidence, not current install policy.
+        self.assertIn("distribution: temurin", workflow)
+        self.assertIn("java-version: '17'", workflow)
+        for path in baseline["sdkPackages"]:
+            self.assertIn("'" + path + "'", workflow)
         self.assertIn("Pkg.Revision", installer)
+        self.assertIn("installed-toolchain.json", installer)
+        self.assertFalse((ROOT / "tools/build/write_sdk_package_metadata.py").exists())
+        fixture = ROOT / "tools/build/fixtures/sdk_metadata_historical.py"
+        self.assertEqual(hashlib.sha256(fixture.read_bytes()).hexdigest(),
+                         "64392f3e3b4e2555c26f83d624f5f6c847bcbebc0c43e056a6e4a681a144bcad")
+        for obsolete in (baseline["jdk"]["sha256"], baseline["jdk"]["linuxX64Archive"],
+                         "write_sdk_package_metadata.py", "installed-archives.sha256"):
+            self.assertNotIn(obsolete, installer + workflow)
 
     def test_receipt_assertions_and_lint_remain_strict(self):
         inventory = (ROOT / "tools/build/toolchain.init.gradle").read_text()
@@ -71,7 +78,9 @@ class ToolchainContract(unittest.TestCase):
         for module in ("kotlin-gradle-plugin", "kotlin-compiler-embeddable",
                        "kotlin-compose-compiler-plugin-embeddable"):
             self.assertIn("'" + module + "', '2.4.20'", inventory)
-        self.assertIn("assert receipt.javaRuntime == '17.0.20.1+1'", inventory)
+        self.assertIn("assert receipt.javaMajor == '17'", inventory)
+        self.assertIn("assert receipt.javaRuntime ==~ /17(?:[.+-].*)?/", inventory)
+        self.assertNotIn('17.0.20', inventory)
         self.assertIn("assert receipt.javaVendor == 'Eclipse Adoptium'", inventory)
         self.assertIn("assert kgpJar.name ==~", inventory)
         self.assertIn("actual.every { it.version == expected[2] }", inventory)
@@ -163,7 +172,7 @@ class ToolchainContract(unittest.TestCase):
             "actions/upload-artifact": ("ea165f8d65b6e75b540449e92b4886f43607fa02", "v4.6.2", 2),
             "actions/setup-java": ("de7274f081f381c8f8158605e0321c36c376e2e6", "v6.0.1", 2),
             "gradle/actions/setup-gradle": ("3f5f9adaf7d9fecd50b5935e54106014257a94e6", "v6.4.0", 2),
-            "android-actions/setup-android": ("be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd", "v4.0.4", 1),
+            "android-actions/setup-android": ("be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd", "v4.0.4", 2),
         }
         uses = re.findall(r"(?m)^\s*-?\s*uses: (\S+) # (v[\d.]+)$", workflow)
         self.assertEqual(len(uses), len(re.findall(r"(?m)^\s*-?\s*uses:", workflow)))
@@ -172,10 +181,8 @@ class ToolchainContract(unittest.TestCase):
             self.assertEqual(uses.count((action + "@" + sha, version)), count, action)
         configured = {
             "actions/setup-java": {
-                "distribution": "jdkfile", "java-version": "17.0.20+101", "java-package": "jdk",
-                "architecture": "x64", "jdk-file": "${{ runner.temp }}/m1-jdk.tar.gz",
-                "force-download": "true", "check-latest": "false", "set-default": "true",
-                "cache-jdk": "false", "overwrite-settings": "false",
+                "distribution": "temurin", "java-version": "17", "java-package": "jdk",
+                "architecture": "x64", "overwrite-settings": "false",
             },
             "gradle/actions/setup-gradle": {
                 "cache-provider": "basic", "cache-disabled": "false",
@@ -201,24 +208,34 @@ class ToolchainContract(unittest.TestCase):
             steps = re.split(r"(?m)^      - ", step_text)[1:]
             for action, inputs in configured.items():
                 found = [step for step in steps if "uses: " + action + "@" in step]
-                if action == "android-actions/setup-android" and job == "checkpoint":
-                    self.assertEqual(found, [])
-                    continue
                 self.assertEqual(len(found), 1, action)
                 self.assertNotRegex(found[0], r"(?m)^        (?:if|continue-on-error):")
                 actual = {key: value.split(" #", 1)[0].strip().strip("'\"")
                           for key, value in re.findall(r"(?m)^          ([\w-]+): (.*)$", found[0])}
                 self.assertEqual(actual, inputs, action)
-            download = body.index("name: Download and verify exact approved JDK archive")
             java = body.index("uses: actions/setup-java@")
-            sdk = body.index("run: bash tools/build/install-hosted-toolchain.sh")
+            isolated = body.index("name: Select isolated Android SDK")
+            android = body.index("uses: android-actions/setup-android@")
+            sdk = body.index("name: Install named project SDK packages")
             gradle = body.index("uses: gradle/actions/setup-gradle@")
-            self.assertLess(download, java)
-            self.assertLess(java, sdk)
+            self.assertLess(java, isolated)
+            self.assertLess(isolated, android)
+            self.assertLess(android, sdk)
             self.assertLess(sdk, gradle)
-            self.assertIn("--max-time 180", body[download:java])
-            self.assertIn("3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e", body[download:java])
-            self.assertIn("sha256sum --check", body[download:java])
+            self.assertIn('"$RUNNER_TEMP/m1-sdk" "$RUNNER_TEMP/m1-sdk" >> "$GITHUB_ENV"', body[isolated:android])
+            install = body[sdk:gradle]
+            self.assertNotRegex(install, r"(?m)^        (?:if|continue-on-error):")
+            self.assertIn('set -euo pipefail', install)
+            self.assertIn('timeout 30 "$sdkmanager" --version', install)
+            self.assertIn('timeout --signal=TERM --kill-after=30s 10m "$sdkmanager"', install)
+            self.assertIn('--sdk_root="$ANDROID_HOME" --channel=0', install)
+            self.assertEqual(install.split('--install ', 1)[1].split('2>&1', 1)[0].strip(),
+                             "'platforms;android-37.0' 'build-tools;36.0.0'")
+            self.assertIn('bash tools/build/install-hosted-toolchain.sh', install)
+            for obsolete in ('jdkfile', 'jdk-file:', 'force-download:', 'cache-jdk:', 'cache: gradle',
+                             '17.0.20', 'm1-jdk.tar.gz', 'curl ', 'unzip ', 'write_sdk_package_metadata.py',
+                             'android-emulator-runner', 'build-tools;37.0.0'):
+                self.assertNotIn(obsolete, body)
             self.assertIn("setup-timings.txt", body)
             self.assertNotIn("steps.gradle.outputs.cache", body)
 
@@ -228,8 +245,16 @@ class ToolchainContract(unittest.TestCase):
             ("cache-provider: basic", "cache-provider: enhanced"),
             ("cache-disabled: false", "cache-disabled: true"),
             ("cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}", "cache-read-only: true"),
-            ("force-download: true", "force-download: false"),
-            ("java-version: '17.0.20+101'", "java-version: '17.0.20.1+1'"),
+            ("distribution: temurin", "distribution: jdkfile"),
+            ("java-version: '17'", "java-version: '17.0.20.1+1'"),
+            ("architecture: x64", "architecture: x64\n          force-download: true"),
+            ("'platforms;android-37.0' 'build-tools;36.0.0'", "'platforms;android-37' 'build-tools;25.0.0'"),
+            ('timeout 30 "$sdkmanager" --version', '"$sdkmanager" --version'),
+            ('timeout --signal=TERM --kill-after=30s 10m "$sdkmanager"', '"$sdkmanager"'),
+            ('--sdk_root="$ANDROID_HOME" --channel=0', '--sdk_root="$ANDROID_HOME" --channel=3'),
+            ('name: Install named project SDK packages and verify observed toolchain\n',
+             'name: Install named project SDK packages and verify observed toolchain\n        if: false\n'),
+            ("uses: android-actions/setup-android@", "uses: invalid/setup-android@"),
             ("packages: ''", "packages: 'build-tools;37.0.0'"),
             ("cache-provider: basic", "cache-provider: basic\n          cache-write-only: true"),
             ("m1-gradle-native-strict\n", "unrestored-home\n"),
@@ -279,7 +304,7 @@ class ToolchainContract(unittest.TestCase):
         self.assertIn("c.name.toLowerCase().contains('debug')", inventory)
         self.assertIn("digest(artifact.file)", inventory)
         self.assertIn("actual.every { it.version == expected[2] }", inventory)
-        self.assertIn("write_sdk_package_metadata.py", (ROOT / "tools/build/install-hosted-toolchain.sh").read_text())
+        self.assertNotIn("write_sdk_package_metadata.py", (ROOT / "tools/build/install-hosted-toolchain.sh").read_text())
 
     def test_no_network_permission_and_honest_four_state_shell(self):
         ns = "{http://schemas.android.com/apk/res/android}"

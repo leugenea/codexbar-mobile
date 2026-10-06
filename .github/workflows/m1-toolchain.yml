@@ -35,33 +35,42 @@ jobs:
             "$(date -u +%FT%TZ)" "$GRADLE_USER_HOME" > evidence/setup-timings.txt
       - name: Cheap offline scaffold contract
         run: python3 -B -m unittest discover -s tools/build -p 'test_*.py' -v
-      - name: Download and verify exact approved JDK archive
-        timeout-minutes: 5
-        run: |
-          set -euo pipefail
-          curl --fail --location --retry 3 --max-time 180 \
-            --output "$RUNNER_TEMP/m1-jdk.tar.gz" \
-            'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz'
-          printf '%s\n' "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e  $RUNNER_TEMP/m1-jdk.tar.gz" | sha256sum --check
-      - name: Set up exact verified JDK
+      - name: Set up Temurin JDK 17
         id: java
         timeout-minutes: 5
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
-          distribution: jdkfile
-          java-version: '17.0.20+101' # Adoptium alias; actual runtime must remain 17.0.20.1+1
+          distribution: temurin
+          java-version: '17'
           java-package: jdk
           architecture: x64
-          jdk-file: ${{ runner.temp }}/m1-jdk.tar.gz
-          force-download: true
-          check-latest: false
-          set-default: true
-          cache-jdk: false
           overwrite-settings: false
-      - name: Install exact SDK archives and verify actual JDK
+      - name: Select isolated Android SDK
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/m1-sdk"
+          printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' \
+            "$RUNNER_TEMP/m1-sdk" "$RUNNER_TEMP/m1-sdk" >> "$GITHUB_ENV"
+      - name: Set up Android command-line tools
+        id: android
+        timeout-minutes: 5
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          cmdline-tools-version: '15859902' # Build ID maps to tools directory 22.0
+          packages: ''
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+      - name: Install named project SDK packages and verify observed toolchain
         id: install
-        timeout-minutes: 15
-        run: bash tools/build/install-hosted-toolchain.sh
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          sdkmanager="$ANDROID_HOME/cmdline-tools/22.0/bin/sdkmanager"
+          timeout 30 "$sdkmanager" --version > evidence/sdkmanager-version.txt 2>&1
+          timeout --signal=TERM --kill-after=30s 10m "$sdkmanager" --sdk_root="$ANDROID_HOME" --channel=0 \
+            --install 'platforms;android-37.0' 'build-tools;36.0.0' 2>&1 | tee evidence/sdk-install.log
+          bash tools/build/install-hosted-toolchain.sh
       - name: Set up Gradle dependency cache and wrapper validation
         id: gradle
         timeout-minutes: 5
@@ -95,10 +104,11 @@ jobs:
           JAVA_SETUP_OUTCOME: ${{ steps.java.outcome }}
           SDK_SETUP_OUTCOME: ${{ steps.install.outcome }}
           GRADLE_SETUP_OUTCOME: ${{ steps.gradle.outcome }}
+          ANDROID_SETUP_OUTCOME: ${{ steps.android.outcome }}
         run: |
           mkdir -p evidence
-          printf 'evidence_bound_utc=%s\njava_setup_outcome=%s\nsdk_setup_outcome=%s\ngradle_setup_outcome=%s\n' \
-            "$(date -u +%FT%TZ)" "$JAVA_SETUP_OUTCOME" "$SDK_SETUP_OUTCOME" "$GRADLE_SETUP_OUTCOME" >> evidence/setup-timings.txt
+          printf 'evidence_bound_utc=%s\njava_setup_outcome=%s\nsdk_setup_outcome=%s\ngradle_setup_outcome=%s\nandroid_setup_outcome=%s\n' \
+            "$(date -u +%FT%TZ)" "$JAVA_SETUP_OUTCOME" "$SDK_SETUP_OUTCOME" "$GRADLE_SETUP_OUTCOME" "$ANDROID_SETUP_OUTCOME" >> evidence/setup-timings.txt
           # Post-action saves happen after upload; this is not a cache-save receipt.
           python3 tools/build/write_m1_evidence.py manifest
       - name: Upload exact strict/build evidence (all outcomes)
@@ -138,33 +148,42 @@ jobs:
             "$(date -u +%FT%TZ)" "$GRADLE_USER_HOME" > evidence/setup-timings.txt
           cp gradle/verification-metadata.xml evidence/committed-verification-metadata.xml
           cp docs/build/m1-integrity.json evidence/committed-integrity-provenance.json
-      - name: Download and verify exact approved JDK archive
-        timeout-minutes: 5
-        run: |
-          set -euo pipefail
-          curl --fail --location --retry 3 --max-time 180 \
-            --output "$RUNNER_TEMP/m1-jdk.tar.gz" \
-            'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz'
-          printf '%s\n' "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e  $RUNNER_TEMP/m1-jdk.tar.gz" | sha256sum --check
-      - name: Set up exact verified JDK
+      - name: Set up Temurin JDK 17
         id: java
         timeout-minutes: 5
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
-          distribution: jdkfile
-          java-version: '17.0.20+101' # Adoptium alias; actual runtime must remain 17.0.20.1+1
+          distribution: temurin
+          java-version: '17'
           java-package: jdk
           architecture: x64
-          jdk-file: ${{ runner.temp }}/m1-jdk.tar.gz
-          force-download: true
-          check-latest: false
-          set-default: true
-          cache-jdk: false
           overwrite-settings: false
-      - name: Install exact SDK archives and verify actual JDK
+      - name: Select isolated Android SDK
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/m1-sdk"
+          printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' \
+            "$RUNNER_TEMP/m1-sdk" "$RUNNER_TEMP/m1-sdk" >> "$GITHUB_ENV"
+      - name: Set up Android command-line tools
+        id: android
+        timeout-minutes: 5
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          cmdline-tools-version: '15859902' # Build ID maps to tools directory 22.0
+          packages: ''
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+      - name: Install named project SDK packages and verify observed toolchain
         id: install
-        timeout-minutes: 15
-        run: bash tools/build/install-hosted-toolchain.sh
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          sdkmanager="$ANDROID_HOME/cmdline-tools/22.0/bin/sdkmanager"
+          timeout 30 "$sdkmanager" --version > evidence/sdkmanager-version.txt 2>&1
+          timeout --signal=TERM --kill-after=30s 10m "$sdkmanager" --sdk_root="$ANDROID_HOME" --channel=0 \
+            --install 'platforms;android-37.0' 'build-tools;36.0.0' 2>&1 | tee evidence/sdk-install.log
+          bash tools/build/install-hosted-toolchain.sh
       - name: Set up Gradle dependency cache and wrapper validation
         id: gradle
         timeout-minutes: 5
@@ -179,15 +198,6 @@ jobs:
           build-scan-publish: false
           add-job-summary: always
           add-job-summary-as-pr-comment: never
-      - name: Set up native Android command-line tools
-        id: android
-        timeout-minutes: 5
-        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
-        with:
-          cmdline-tools-version: '15859902' # Build ID maps to tools directory 22.0
-          packages: ''
-          accept-android-sdk-licenses: true
-          log-accepted-android-sdk-licenses: false
       - name: Prepare hosted emulator client library
         timeout-minutes: 5
         run: |

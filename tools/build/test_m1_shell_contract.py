@@ -114,20 +114,31 @@ class M1Contracts(unittest.TestCase):
             self.assertIn(contract, script)
         self.assertEqual(script.split("--install ", 1)[1].split("2>&1", 1)[0].strip(),
                          'platform-tools emulator "$image"')
-        for contract in ('${JAVA_HOME:?}', 'JAVA_RUNTIME_VERSION="17.0.20.1+1"',
-                         'IMPLEMENTOR="Eclipse Adoptium"', '"$JAVA_HOME/release" evidence/jdk-release.txt',
-                         '"$(command -v java)"', "m1-jdk.tar.gz' | sha256sum --check",
-                         "installed-archives.sha256", "evidence/java-version.txt", "ANDROID_SDK_ROOT=%s"):
-            self.assertIn(contract, installer)
-        for obsolete in ("tar -x", "export JAVA_HOME=", "GITHUB_PATH", "curl --fail --location --retry 3 --output m1-jdk"):
+        for contract in ('${JAVA_HOME:?}', '${ANDROID_HOME:?}', '${ANDROID_SDK_ROOT:?}',
+                         "observed['java.specification.version'] == '17'",
+                         "release['IMPLEMENTOR'] == observed['java.vendor'] == 'Eclipse Adoptium'",
+                         '"$JAVA_HOME/release" evidence/jdk-release.txt', '"$(command -v java)"',
+                         'timeout 30 java -XshowSettings:properties -version', 'installed-toolchain.json',
+                         'installed-binaries.sha256', 'platform-package.xml', 'build-tools-package.xml'):
+            # Package receipt names are produced from the observed package name.
+            if contract in ('platform-package.xml', 'build-tools-package.xml'):
+                self.assertIn("name + '-package.xml'", installer)
+            else:
+                self.assertIn(contract, installer)
+        for obsolete in ('curl ', 'unzip ', 'tar -x', 'export JAVA_HOME=', 'GITHUB_PATH',
+                         '17.0.20', 'installed-archives.sha256', 'sdk-archives.sha1',
+                         'write_sdk_package_metadata.py', '--install', 'GITHUB_ENV'):
             self.assertNotIn(obsolete, installer)
-        native = workflow.split("  native:\n", 1)[1]
-        self.assertLess(native.index("bash tools/build/install-hosted-toolchain.sh"),
-                        native.index("uses: android-actions/setup-android@"))
-        self.assertLess(native.index("uses: android-actions/setup-android@"),
-                        native.index("bash tools/build/run-hosted-native-smoke.sh"))
+        for job in ('checkpoint', 'native'):
+            body = workflow.split('  ' + job + ':\n', 1)[1].split('\n  native:\n', 1)[0]
+            self.assertLess(body.index('uses: actions/setup-java@'), body.index('uses: android-actions/setup-android@'))
+            self.assertLess(body.index('uses: android-actions/setup-android@'),
+                            body.index('bash tools/build/install-hosted-toolchain.sh'))
+        native = workflow.split('  native:\n', 1)[1]
+        self.assertLess(native.index('bash tools/build/install-hosted-toolchain.sh'),
+                        native.index('bash tools/build/run-hosted-native-smoke.sh'))
 
-    def test_cached_execution_preserves_strict_real_gates_and_exact_sdk_receipts(self):
+    def test_cached_execution_preserves_strict_real_gates_and_observed_sdk_receipts(self):
         self.assert_cached_execution(
             (ROOT / ".github/workflows/m1-toolchain.yml").read_text(),
             (ROOT / "tools/build/run-hosted-native-smoke.sh").read_text(),
@@ -148,8 +159,10 @@ class M1Contracts(unittest.TestCase):
             (1, 'timeout 30 "$sdkmanager" --version', '"$sdkmanager" --version'),
             (1, 'cmdline-tools-binaries.sha256', 'missing-binary-receipt'),
             (1, 'Pkg.Revision[[:space:]]*=[[:space:]]*22\\.0', 'Pkg.Revision.*'),
-            (2, 'JAVA_RUNTIME_VERSION="17.0.20.1+1"', 'JAVA_RUNTIME_VERSION="17.0.20+101"'),
-            (2, 'installed-archives.sha256', 'missing-archive-receipt'),
+            (2, "observed['java.specification.version'] == '17'", "observed['java.specification.version'] == '21'"),
+            (2, 'installed-toolchain.json', 'missing-toolchain-receipt'),
+            (2, 'timeout 30 java -XshowSettings:properties -version', 'java -version'),
+            (2, '# Verification/receipts only;', '# curl manual installer;'),
         ]
         for target, old, new in mutations:
             with self.subTest(target=target, mutation=old):
@@ -158,6 +171,102 @@ class M1Contracts(unittest.TestCase):
                 texts[target] = texts[target].replace(old, new, 1)
                 with self.assertRaises(AssertionError):
                     self.assert_cached_execution(*texts)
+
+    def installed_verifiers(self):
+        # Execute only the shipped verifier's pure helpers, never Java/SDK/Gradle.
+        script = (ROOT / "tools/build/install-hosted-toolchain.sh").read_text()
+        helpers = script.split("python3 - <<'PY'\n", 1)[1].split("# The functions above", 1)[0]
+        namespace = {}
+        exec(compile(helpers, "hosted-verifier-pure-helpers", "exec"), namespace)
+        return namespace['verify_jdk'], namespace['verify_sdk']
+
+    def synthetic_installed_package(self, path, revision):
+        props = {'Pkg.Revision': revision}
+        root = ET.Element('repository')
+        local = ET.SubElement(root, 'localPackage', path=path)
+        xml_revision = ET.SubElement(local, 'revision')
+        for name, number in zip(('major', 'minor', 'micro'), revision.split('.')):
+            ET.SubElement(xml_revision, name).text = number
+        if path.startswith('platforms;'):
+            props.update({'AndroidVersion.ApiLevel': '37.0', 'AndroidVersion.MinorApiLevel': '0'})
+            details = ET.SubElement(local, 'type-details', {
+                '{http://www.w3.org/2001/XMLSchema-instance}type': 'sdk:platformDetailsType'})
+            ET.SubElement(details, 'api-level').text = '37.0'
+        return props, root
+
+    def test_installed_verifier_accepts_observed_17_patches_and_platform_revisions(self):
+        verify_jdk, verify_sdk = self.installed_verifiers()
+        for runtime in ('17.0.19+7', '17.0.20.1+1', '17.0.21+9'):
+            with self.subTest(synthetic_runtime=runtime):
+                receipt = verify_jdk({'IMPLEMENTOR': 'Eclipse Adoptium', 'JAVA_RUNTIME_VERSION': runtime},
+                                     {'java.vendor': 'Eclipse Adoptium', 'java.specification.version': '17',
+                                      'java.runtime.version': runtime})
+                self.assertEqual(receipt['javaRuntime'], runtime)
+        for revision in ('2', '3', '4.1'):
+            with self.subTest(synthetic_platform_revision=revision):
+                props, metadata = self.synthetic_installed_package('platforms;android-37.0', revision)
+                receipt = verify_sdk('platforms;android-37.0', props, metadata)
+                self.assertEqual(receipt['revision'], revision)
+        props, metadata = self.synthetic_installed_package('build-tools;36.0.0', '36.0.0')
+        self.assertEqual(verify_sdk('build-tools;36.0.0', props, metadata)['revision'], '36.0.0')
+
+    def test_installed_verifier_rejects_wrong_major_vendor_runtime_api_and_metadata(self):
+        verify_jdk, verify_sdk = self.installed_verifiers()
+        for mutation in ('major', 'vendor', 'runtime', 'release-major'):
+            with self.subTest(jdk_mutation=mutation):
+                release = {'IMPLEMENTOR': 'Eclipse Adoptium', 'JAVA_RUNTIME_VERSION': '17.0.21+9'}
+                observed = {'java.vendor': 'Eclipse Adoptium', 'java.specification.version': '17',
+                            'java.runtime.version': '17.0.21+9'}
+                if mutation == 'major':
+                    observed['java.specification.version'] = '21'
+                elif mutation == 'vendor':
+                    observed['java.vendor'] = 'Other vendor'
+                elif mutation == 'runtime':
+                    observed['java.runtime.version'] = '17.0.19+7'
+                else:
+                    release['JAVA_RUNTIME_VERSION'] = observed['java.runtime.version'] = '21.0.1+1'
+                with self.assertRaises(AssertionError):
+                    verify_jdk(release, observed)
+        for mutation in ('api', 'minor', 'preview', 'xml-api', 'xml-revision', 'path',
+                         'duplicate', 'no-metadata', 'empty-revision', 'preview-revision',
+                         'xml-type', 'build-tools'):
+            with self.subTest(sdk_mutation=mutation):
+                path = 'platforms;android-37.0'
+                props, metadata = self.synthetic_installed_package(path, '3')
+                local = metadata.find('localPackage')
+                assert local is not None
+                details = local.find('type-details')
+                api = local.find('type-details/api-level')
+                major = local.find('revision/major')
+                assert details is not None and api is not None and major is not None
+                if mutation == 'api':
+                    props['AndroidVersion.ApiLevel'] = '36'
+                elif mutation == 'minor':
+                    props['AndroidVersion.MinorApiLevel'] = '1'
+                elif mutation == 'preview':
+                    props['AndroidVersion.CodeName'] = 'Preview'
+                elif mutation == 'xml-api':
+                    api.text = '37.1'
+                elif mutation == 'xml-revision':
+                    major.text = '4'
+                elif mutation == 'path':
+                    local.set('path', 'platforms;android-37')
+                elif mutation == 'duplicate':
+                    metadata.append(ET.fromstring(ET.tostring(local)))
+                elif mutation == 'no-metadata':
+                    metadata.remove(local)
+                elif mutation == 'empty-revision':
+                    props['Pkg.Revision'] = ''
+                elif mutation == 'preview-revision':
+                    props['Pkg.Revision'] = '3 rc1'
+                elif mutation == 'xml-type':
+                    details.set('{http://www.w3.org/2001/XMLSchema-instance}type',
+                                                  'generic:genericDetailsType')
+                else:
+                    path = 'build-tools;36.0.0'
+                    props, metadata = self.synthetic_installed_package(path, '37.0.0')
+                with self.assertRaises(AssertionError):
+                    verify_sdk(path, props, metadata)
 
     def assert_host_emulator_prerequisite(self, workflow):
         checkpoint, native = workflow.split("  native:\n", 1)
