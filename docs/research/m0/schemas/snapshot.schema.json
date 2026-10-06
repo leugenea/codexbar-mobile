@@ -1,0 +1,284 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:codexbar-mobile:m0:draft:snapshot:v1",
+  "title": "M0 normalized synthetic research contract — not provider wire schema or production parser",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "evidenceKind",
+    "caseId",
+    "observedAtEpochSeconds",
+    "evaluatedAtEpochSeconds",
+    "freshness",
+    "session",
+    "transportState",
+    "providerAllowed",
+    "providerLimitReached",
+    "planTypeRaw",
+    "windows",
+    "bankedResets"
+  ],
+  "properties": {
+    "contractVersion": {
+      "const": "m0-draft/v1"
+    },
+    "evidenceKind": {
+      "const": "synthetic_test_vector"
+    },
+    "caseId": {
+      "type": "string"
+    },
+    "observedAtEpochSeconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluatedAtEpochSeconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "freshness": {
+      "enum": [
+        "fresh",
+        "stale",
+        "unknown"
+      ]
+    },
+    "session": {
+      "enum": [
+        "connected",
+        "expired",
+        "unsupported",
+        "unknown"
+      ]
+    },
+    "transportState": {
+      "enum": [
+        "ok",
+        "session_expired",
+        "forbidden",
+        "unsupported",
+        "network_error",
+        "schema_error"
+      ]
+    },
+    "providerAllowed": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "providerLimitReached": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "planTypeRaw": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "windows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fiveHour",
+        "weekly"
+      ],
+      "properties": {
+        "fiveHour": {
+          "$ref": "#/$defs/window"
+        },
+        "weekly": {
+          "$ref": "#/$defs/window"
+        }
+      }
+    },
+    "bankedResets": {
+      "$ref": "#/$defs/bank"
+    }
+  },
+  "$defs": {
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason",
+        "usedPercent",
+        "windowSeconds",
+        "resetAtEpochSeconds",
+        "resetAfterSecondsRaw",
+        "resetSource",
+        "sourceSlot"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "unavailable",
+            "malformed",
+            "available",
+            "exhausted",
+            "reset_due",
+            "unsupported"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "usedPercent": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "windowSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "resetAtEpochSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "resetAfterSecondsRaw": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "resetSource": {
+          "enum": [
+            "provider_absolute",
+            "provider_relative_derived",
+            "unknown"
+          ]
+        },
+        "sourceSlot": {
+          "enum": [
+            "primary_window",
+            "secondary_window",
+            null
+          ]
+        }
+      }
+    },
+    "bank": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reportedAvailableCount",
+        "summaryAvailableCount",
+        "items",
+        "inventoryCompleteness",
+        "reason"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "unavailable",
+            "malformed",
+            "available",
+            "unsupported"
+          ]
+        },
+        "reportedAvailableCount": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "summaryAvailableCount": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "resetType",
+              "providerStatus",
+              "grantedAtEpochSeconds",
+              "expiresAtEpochSeconds",
+              "expiryKnowledge",
+              "locallyExpired"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "pattern": "^fixture-[a-z0-9-]+$"
+              },
+              "resetType": {
+                "type": "string"
+              },
+              "providerStatus": {
+                "type": "string"
+              },
+              "grantedAtEpochSeconds": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "expiresAtEpochSeconds": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "expiryKnowledge": {
+                "enum": [
+                  "known",
+                  "unknown",
+                  "malformed"
+                ]
+              },
+              "locallyExpired": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "inventoryCompleteness": {
+          "enum": [
+            "complete",
+            "partial",
+            "unknown"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

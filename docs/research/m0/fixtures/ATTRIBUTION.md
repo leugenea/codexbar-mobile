@@ -1,0 +1,9 @@
+# Mock fixture attribution and modification notice
+
+The two upstream fixtures and locally authored vectors are offline examples, never captured live account responses. `owner-reported-live.json` is separately labeled owner-supplied sanitized evidence, not an HTTP body/capture; its observation times are unknown. See `provenance.json` for exact commits, source paths/line ranges, hashes and transformations.
+
+- `upstream-test-weekly-only.json` is extracted from steipete/CodexBar at `335d2a506f9be2c503ed1d287b24ef09c08c1c5a`, `Tests/CodexBarTests/CodexOAuthTests.swift`, lines 269–283. Payload fields are unchanged. Copyright (c) 2026 Peter Steinberger; MIT license retained in `licenses/CodexBar-MIT.txt`.
+- `upstream-test-reset-details.json` is extracted and **modified** from openai/codex at `4ad985e2caaf877b96dafd8138dae2def467e01e`, `codex-rs/backend-client/src/client/rate_limit_resets_tests.rs`, lines 103–128. This standalone version removes `credits[0].profile_image_url` and `credits[0].profile_user_id`; retained IDs are upstream mock placeholders, not real account identifiers. Copyright 2025 OpenAI; Apache-2.0 license and upstream NOTICE retained in `licenses/Codex-Apache-2.0.txt` and `licenses/Codex-NOTICE.txt`. Retaining the upstream NOTICE does not claim Ratatui application code was copied.
+- `synthetic-vectors.json` and the draft schemas are locally authored research artifacts. Their named behaviors are informed by the pinned source/test evidence described in the research document. Provider flags and missing-plan expectations were corrected in this repository copy as documented in provenance; historical scratch drafts are preserved.
+
+The repository's MIT license does not replace the applicable upstream license on copied examples. This independent project is not endorsed by OpenAI or CodexBar; licensing does not confer service or OAuth-client authorization.

@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "m0-owner-receipt/v1",
+  "evidenceKind": "owner_reported_live",
+  "retrievalDate": "2026-10-06",
+  "observedAt": null,
+  "limitations": [
+    "Owner supplied sanitized local Mac probe output; not captured raw HTTP traffic or independently repeated live calls",
+    "Token exchange is not validated account/workspace identity",
+    "No refresh, logout or Android execution proof"
+  ],
+  "auth": {
+    "httpStatus": 200,
+    "state": "exchange_succeeded_identity_unverified",
+    "clientKind": "upstream_codex_public_client",
+    "identityVerified": false,
+    "grantScope": "unverified",
+    "workspace": "unverified",
+    "accountHeader": "omitted",
+    "mobileSuitability": "unverified"
+  },
+  "usage": {
+    "httpStatus": 200,
+    "allowed": true,
+    "limitReached": false,
+    "bankedSummaryCount": 2,
+    "primaryWindow": {
+      "windowSeconds": 604800,
+      "usedPercent": 5,
+      "resetAfterSeconds": 488197,
+      "resetAtEpochSeconds": 1791756793
+    },
+    "secondaryWindow": "unavailable",
+    "observedAt": null
+  },
+  "resets": {
+    "httpStatus": 200,
+    "availableCount": 2,
+    "inventoryCount": 2,
+    "inventoryValid": true,
+    "truncated": false,
+    "observedAt": null,
+    "items": [
+      {
+        "providerStatus": "available",
+        "shapeValid": true,
+        "expiryKnowledge": "known",
+        "expiryFormat": "iso8601_utc",
+        "expiryInputType": "string",
+        "expiryInput": "2026-10-22T20:31:56.833553Z",
+        "expiresAtEpochSeconds": 1792701116
+      },
+      {
+        "providerStatus": "available",
+        "shapeValid": true,
+        "expiryKnowledge": "known",
+        "expiryFormat": "iso8601_utc",
+        "expiryInputType": "string",
+        "expiryInput": "2026-10-29T18:58:37.564252Z",
+        "expiresAtEpochSeconds": 1793300317
+      }
+    ]
+  }
+}

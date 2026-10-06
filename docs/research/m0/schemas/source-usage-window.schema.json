@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Observed upstream usage TEST shape, not a normative provider API schema",
+  "type": "object",
+  "properties": {
+    "plan_type": {
+      "type": "string"
+    },
+    "rate_limit": {
+      "type": "object",
+      "properties": {
+        "primary_window": {
+          "type": "object",
+          "properties": {
+            "used_percent": {
+              "type": "integer"
+            },
+            "limit_window_seconds": {
+              "type": "integer"
+            },
+            "reset_at": {
+              "type": "integer"
+            },
+            "reset_after_seconds": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "used_percent",
+            "limit_window_seconds",
+            "reset_at"
+          ]
+        },
+        "secondary_window": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "used_percent": {
+                  "type": "integer"
+                },
+                "limit_window_seconds": {
+                  "type": "integer"
+                },
+                "reset_at": {
+                  "type": "integer"
+                },
+                "reset_after_seconds": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "used_percent",
+                "limit_window_seconds",
+                "reset_at"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

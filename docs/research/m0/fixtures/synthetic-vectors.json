@@ -1,0 +1,1006 @@
+{
+  "evidenceKind": "synthetic_test_vectors_not_live_API_evidence",
+  "vectors": [
+    {
+      "caseId": "absent-windows",
+      "rawUsage": {
+        "plan_type": "plus"
+      },
+      "rawResetDetails": null,
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "absent-windows",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": "plus",
+        "windows": {
+          "fiveHour": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "unavailable",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "not_fetched"
+        }
+      }
+    },
+    {
+      "caseId": "null-windows",
+      "rawUsage": {
+        "plan_type": "plus",
+        "rate_limit": {
+          "primary_window": null,
+          "secondary_window": null
+        }
+      },
+      "rawResetDetails": null,
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "null-windows",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": "plus",
+        "windows": {
+          "fiveHour": {
+            "state": "unavailable",
+            "reason": "provider_null",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "provider_null",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "unavailable",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "not_fetched"
+        }
+      }
+    },
+    {
+      "caseId": "weekly-in-primary",
+      "rawUsage": {
+        "plan_type": "free",
+        "rate_limit": {
+          "allowed": true,
+          "limit_reached": false,
+          "primary_window": {
+            "used_percent": 12,
+            "limit_window_seconds": 604800,
+            "reset_at": 1791241200
+          }
+        }
+      },
+      "rawResetDetails": null,
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "weekly-in-primary",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": true,
+        "providerLimitReached": false,
+        "planTypeRaw": "free",
+        "windows": {
+          "fiveHour": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          },
+          "weekly": {
+            "state": "available",
+            "reason": null,
+            "usedPercent": 12,
+            "windowSeconds": 604800,
+            "resetAtEpochSeconds": 1791241200,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "provider_absolute",
+            "sourceSlot": "primary_window"
+          }
+        },
+        "bankedResets": {
+          "state": "unavailable",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "not_fetched"
+        }
+      }
+    },
+    {
+      "caseId": "malformed-independent-window",
+      "rawUsage": {
+        "rate_limit": {
+          "primary_window": {
+            "used_percent": "oops",
+            "limit_window_seconds": 18000
+          },
+          "secondary_window": {
+            "used_percent": 22,
+            "limit_window_seconds": 604800,
+            "reset_at": 1791241200
+          }
+        }
+      },
+      "rawResetDetails": null,
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "malformed-independent-window",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "malformed",
+            "reason": "wrong_type",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": "primary_window"
+          },
+          "weekly": {
+            "state": "available",
+            "reason": null,
+            "usedPercent": 22,
+            "windowSeconds": 604800,
+            "resetAtEpochSeconds": 1791241200,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "provider_absolute",
+            "sourceSlot": "secondary_window"
+          }
+        },
+        "bankedResets": {
+          "state": "unavailable",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "not_fetched"
+        }
+      }
+    },
+    {
+      "caseId": "exhausted-not-authority",
+      "rawUsage": {
+        "rate_limit": {
+          "allowed": true,
+          "limit_reached": false,
+          "primary_window": {
+            "used_percent": 100,
+            "limit_window_seconds": 18000,
+            "reset_at": 1791158400
+          }
+        }
+      },
+      "rawResetDetails": null,
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "exhausted-not-authority",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": true,
+        "providerLimitReached": false,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "exhausted",
+            "reason": null,
+            "usedPercent": 100,
+            "windowSeconds": 18000,
+            "resetAtEpochSeconds": 1791158400,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "provider_absolute",
+            "sourceSlot": "primary_window"
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "unavailable",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "not_fetched"
+        }
+      }
+    },
+    {
+      "caseId": "zero-not-permission",
+      "rawUsage": {
+        "rate_limit": {
+          "allowed": false,
+          "limit_reached": true,
+          "primary_window": {
+            "used_percent": 0,
+            "limit_window_seconds": 18000,
+            "reset_at": 1791158400
+          }
+        }
+      },
+      "rawResetDetails": null,
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "zero-not-permission",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": false,
+        "providerLimitReached": true,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "available",
+            "reason": null,
+            "usedPercent": 0,
+            "windowSeconds": 18000,
+            "resetAtEpochSeconds": 1791158400,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "provider_absolute",
+            "sourceSlot": "primary_window"
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "unavailable",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "not_fetched"
+        }
+      }
+    },
+    {
+      "caseId": "reset-due-not-zero",
+      "rawUsage": {
+        "rate_limit": {
+          "primary_window": {
+            "used_percent": 83,
+            "limit_window_seconds": 18000,
+            "reset_at": 1791154799
+          }
+        }
+      },
+      "rawResetDetails": null,
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "reset-due-not-zero",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "stale",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "reset_due",
+            "reason": "refresh_required",
+            "usedPercent": 83,
+            "windowSeconds": 18000,
+            "resetAtEpochSeconds": 1791154799,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "provider_absolute",
+            "sourceSlot": "primary_window"
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "unavailable",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "not_fetched"
+        }
+      }
+    },
+    {
+      "caseId": "stale-data",
+      "rawUsage": {
+        "rate_limit": {
+          "primary_window": {
+            "used_percent": 33,
+            "limit_window_seconds": 18000,
+            "reset_at": 1791158400
+          }
+        }
+      },
+      "rawResetDetails": null,
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "stale-data",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791155701,
+        "freshness": "stale",
+        "session": "connected",
+        "transportState": "network_error",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "available",
+            "reason": null,
+            "usedPercent": 33,
+            "windowSeconds": 18000,
+            "resetAtEpochSeconds": 1791158400,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "provider_absolute",
+            "sourceSlot": "primary_window"
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "unavailable",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "not_fetched"
+        }
+      }
+    },
+    {
+      "caseId": "unsupported-plan",
+      "rawUsage": {
+        "plan_type": "future_plan",
+        "explicitProviderError": "subscription_sharing_user_not_eligible"
+      },
+      "rawResetDetails": null,
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "unsupported-plan",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "unsupported",
+        "transportState": "unsupported",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": "future_plan",
+        "windows": {
+          "fiveHour": {
+            "state": "unsupported",
+            "reason": "explicit_provider_ineligibility",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          },
+          "weekly": {
+            "state": "unsupported",
+            "reason": "explicit_provider_ineligibility",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "unavailable",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "not_fetched"
+        }
+      }
+    },
+    {
+      "caseId": "session-expiry",
+      "rawUsage": {
+        "http_status": 401,
+        "refresh_error": "refresh_token_expired"
+      },
+      "rawResetDetails": null,
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "session-expiry",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "unknown",
+        "session": "expired",
+        "transportState": "session_expired",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "unavailable",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "not_fetched"
+        }
+      }
+    },
+    {
+      "caseId": "unknown-reset",
+      "rawUsage": {
+        "rate_limit": {
+          "primary_window": {
+            "used_percent": 22,
+            "limit_window_seconds": 18000
+          }
+        }
+      },
+      "rawResetDetails": null,
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "unknown-reset",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "available",
+            "reason": "reset_unknown",
+            "usedPercent": 22,
+            "windowSeconds": 18000,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": "primary_window"
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "unavailable",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "not_fetched"
+        }
+      }
+    },
+    {
+      "caseId": "subhour-reset",
+      "rawUsage": {
+        "rate_limit": {
+          "primary_window": {
+            "used_percent": 22,
+            "limit_window_seconds": 18000,
+            "reset_after_seconds": 59,
+            "reset_at": 1791154859
+          }
+        }
+      },
+      "rawResetDetails": null,
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "subhour-reset",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "available",
+            "reason": null,
+            "usedPercent": 22,
+            "windowSeconds": 18000,
+            "resetAtEpochSeconds": 1791154859,
+            "resetAfterSecondsRaw": 59,
+            "resetSource": "provider_absolute",
+            "sourceSlot": "primary_window"
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "unavailable",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "not_fetched"
+        }
+      }
+    },
+    {
+      "caseId": "banked-distinct-from-purchased",
+      "rawUsage": {
+        "credits": {
+          "has_credits": true,
+          "balance": "200"
+        },
+        "rate_limit_reset_credits": {
+          "available_count": 2
+        }
+      },
+      "rawResetDetails": {
+        "credits": [
+          {
+            "id": "fixture-reset-a",
+            "reset_type": "codex_rate_limits",
+            "status": "available",
+            "granted_at": "2026-10-03T23:00:00Z",
+            "expires_at": "2026-10-05T23:00:00Z"
+          },
+          {
+            "id": "fixture-reset-b",
+            "reset_type": "codex_rate_limits",
+            "status": "available",
+            "granted_at": "2026-10-03T23:00:00Z",
+            "expires_at": null
+          }
+        ],
+        "available_count": 2
+      },
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "banked-distinct-from-purchased",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "available",
+          "reportedAvailableCount": 2,
+          "summaryAvailableCount": 2,
+          "items": [
+            {
+              "key": "fixture-reset-a",
+              "resetType": "codex_rate_limits",
+              "providerStatus": "available",
+              "grantedAtEpochSeconds": 1791068400,
+              "expiresAtEpochSeconds": 1791241200,
+              "expiryKnowledge": "known",
+              "locallyExpired": false
+            },
+            {
+              "key": "fixture-reset-b",
+              "resetType": "codex_rate_limits",
+              "providerStatus": "available",
+              "grantedAtEpochSeconds": 1791068400,
+              "expiresAtEpochSeconds": null,
+              "expiryKnowledge": "unknown",
+              "locallyExpired": null
+            }
+          ],
+          "inventoryCompleteness": "complete",
+          "reason": null
+        }
+      }
+    },
+    {
+      "caseId": "expiry-reported-count-conflict",
+      "rawUsage": {
+        "rate_limit_reset_credits": {
+          "available_count": 1
+        }
+      },
+      "rawResetDetails": {
+        "credits": [
+          {
+            "id": "fixture-expired",
+            "reset_type": "codex_rate_limits",
+            "status": "available",
+            "granted_at": "2026-10-03T23:00:00Z",
+            "expires_at": "2026-10-04T23:00:00Z"
+          }
+        ],
+        "available_count": 1
+      },
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "expiry-reported-count-conflict",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "available",
+          "reportedAvailableCount": 1,
+          "summaryAvailableCount": 1,
+          "items": [
+            {
+              "key": "fixture-expired",
+              "resetType": "codex_rate_limits",
+              "providerStatus": "available",
+              "grantedAtEpochSeconds": 1791068400,
+              "expiresAtEpochSeconds": 1791154800,
+              "expiryKnowledge": "known",
+              "locallyExpired": true
+            }
+          ],
+          "inventoryCompleteness": "complete",
+          "reason": "reported_count_expiry_conflict"
+        }
+      }
+    },
+    {
+      "caseId": "banked-malformed-count",
+      "rawUsage": {},
+      "rawResetDetails": {
+        "credits": [],
+        "available_count": -1
+      },
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "banked-malformed-count",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "malformed",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "negative_available_count"
+        }
+      }
+    },
+    {
+      "caseId": "banked-unavailable-not-zero",
+      "rawUsage": {},
+      "rawResetDetails": {
+        "http_status": 403
+      },
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "banked-unavailable-not-zero",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "forbidden",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "unsupported",
+          "reportedAvailableCount": null,
+          "summaryAvailableCount": null,
+          "items": [],
+          "inventoryCompleteness": "unknown",
+          "reason": "endpoint_not_authorized"
+        }
+      }
+    },
+    {
+      "caseId": "unknown-entitlement-status",
+      "rawUsage": {},
+      "rawResetDetails": {
+        "credits": [
+          {
+            "id": "fixture-future",
+            "reset_type": "codex_rate_limits",
+            "status": "future_status",
+            "granted_at": "2026-10-03T23:00:00Z",
+            "expires_at": "2026-10-05T23:00:00Z"
+          }
+        ],
+        "available_count": 0
+      },
+      "expected": {
+        "contractVersion": "m0-draft/v1",
+        "evidenceKind": "synthetic_test_vector",
+        "caseId": "unknown-entitlement-status",
+        "observedAtEpochSeconds": 1791154800,
+        "evaluatedAtEpochSeconds": 1791154800,
+        "freshness": "fresh",
+        "session": "connected",
+        "transportState": "ok",
+        "providerAllowed": null,
+        "providerLimitReached": null,
+        "planTypeRaw": null,
+        "windows": {
+          "fiveHour": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          },
+          "weekly": {
+            "state": "unavailable",
+            "reason": "missing",
+            "usedPercent": null,
+            "windowSeconds": null,
+            "resetAtEpochSeconds": null,
+            "resetAfterSecondsRaw": null,
+            "resetSource": "unknown",
+            "sourceSlot": null
+          }
+        },
+        "bankedResets": {
+          "state": "available",
+          "reportedAvailableCount": 0,
+          "summaryAvailableCount": null,
+          "items": [
+            {
+              "key": "fixture-future",
+              "resetType": "codex_rate_limits",
+              "providerStatus": "future_status",
+              "grantedAtEpochSeconds": 1791068400,
+              "expiresAtEpochSeconds": 1791241200,
+              "expiryKnowledge": "known",
+              "locallyExpired": false
+            }
+          ],
+          "inventoryCompleteness": "complete",
+          "reason": "unknown_provider_status"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "status": "selected_M0_baseline_not_resolved_or_built",
+  "selectionDate": "2026-10-06",
+  "minSdk": 26,
+  "compileSdk": 37,
+  "targetSdk": 37,
+  "jdk": {
+    "vendor": "Eclipse Temurin",
+    "version": "17.0.20.1+1",
+    "linuxX64Archive": "OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz",
+    "sha256": "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e",
+    "sourceIds": [
+      100,
+      101
+    ]
+  },
+  "gradle": {
+    "version": "9.5.0",
+    "distributionSha256": "553c78f50dafcd54d65b9a444649057857469edf836431389695608536d6b746",
+    "sourceId": 95
+  },
+  "agp": {
+    "version": "9.3.1",
+    "pomSha256": "310b87ad50d932c7ce88a424e9828d460536a524a2f91c2b1656915183c426dd",
+    "sourceIds": [
+      49,
+      68
+    ]
+  },
+  "kotlin": {
+    "version": "2.4.20",
+    "composeCompilerPlugin": "2.4.20",
+    "integration": "AGP built-in Kotlin, explicit higher KGP classpath; no kotlin-android plugin",
+    "sourceIds": [
+      31,
+      52,
+      84,
+      99
+    ]
+  },
+  "coroutines": {
+    "version": "1.11.0",
+    "pomSha256": "dd54b97aa3fab91fc24f5df2916c22be9429a339d2f45b7ff092332f6c19dc39",
+    "sourceId": 94
+  },
+  "compose": {
+    "bom": "2026.09.00",
+    "material3": "1.4.0",
+    "ui": "1.12.1",
+    "pomSha256": "74791c31313009659bd0bf09008bd514a163aa04452dd4cb82df2fb971c757c3",
+    "sourceId": 54
+  },
+  "sdkPackages": {
+    "platforms;android-37.0": {
+      "revision": "2",
+      "archives": [
+        {
+          "os": "all",
+          "archive": "platform-37.0_r02.zip",
+          "checksumAlgorithm": "sha1",
+          "checksum": "ed8ebf7f8822a4de5686d427f237d2fa30ff7410"
+        }
+      ],
+      "sourceId": 56
+    },
+    "build-tools;36.0.0": {
+      "revision": "36.0.0",
+      "archives": [
+        {
+          "os": "linux",
+          "archive": "build-tools_r36_linux.zip",
+          "checksumAlgorithm": "sha1",
+          "checksum": "b0b6376977657e8ad9b969bacf4093601da2c6fb"
+        },
+        {
+          "os": "windows",
+          "archive": "build-tools_r36_windows.zip",
+          "checksumAlgorithm": "sha1",
+          "checksum": "f16ccffd34de8790dede813a6c7d8e2c11a27b50"
+        },
+        {
+          "os": "macosx",
+          "archive": "build-tools_r36_macosx.zip",
+          "checksumAlgorithm": "sha1",
+          "checksum": "199ae0047ee61e842f8ee0c6d3918e44fb9a1f83"
+        }
+      ],
+      "sourceId": 56
+    }
+  },
+  "futureAcceptance": [
+    "M1 exact hosted dependency resolution and minimal assembly/lint; no local Android installation or emulator",
+    "Wrapper distribution checksum and Gradle dependency verification of the complete selected graph with fresh Gradle home",
+    "Verify SDK Pkg.Revision and pinned archives; upstream SDK repository supplies SHA-1, not SHA-256",
+    "M2 full app CI/JVM/native/compatible JaCoCo instruction-union gates",
+    "M3a first native auth/account/storage/lifecycle/read-endpoint stop/go gate"
+  ]
+}

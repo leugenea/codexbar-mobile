@@ -1,0 +1,74 @@
+{
+  "kind": "sanitized_upstream_authored_tests_NOT_live_account_responses",
+  "files": [
+    {
+      "file": "upstream-test-weekly-only.json",
+      "sourceCommit": "335d2a506f9be2c503ed1d287b24ef09c08c1c5a",
+      "sourcePath": "Tests/CodexBarTests/CodexOAuthTests.swift",
+      "sourceLines": "269-283",
+      "sanitization": [],
+      "sourceRepository": "steipete/CodexBar",
+      "sourceUrl": "https://github.com/steipete/CodexBar/blob/335d2a506f9be2c503ed1d287b24ef09c08c1c5a/Tests/CodexBarTests/CodexOAuthTests.swift",
+      "evidenceKind": "upstream_authored_mock_not_live_response",
+      "license": "MIT",
+      "modificationNotice": "Extracted test JSON into a standalone file; no payload fields altered",
+      "sha256": "9436c22e7a8f6ae5027ed95a17881f84d69a66ee13f057317512509232323362"
+    },
+    {
+      "file": "upstream-test-reset-details.json",
+      "sourceCommit": "4ad985e2caaf877b96dafd8138dae2def467e01e",
+      "sourcePath": "codex-rs/backend-client/src/client/rate_limit_resets_tests.rs",
+      "sourceLines": "103-128",
+      "sanitization": [
+        "credits[0].profile_image_url",
+        "credits[0].profile_user_id"
+      ],
+      "sourceRepository": "openai/codex",
+      "sourceUrl": "https://github.com/openai/codex/blob/4ad985e2caaf877b96dafd8138dae2def467e01e/codex-rs/backend-client/src/client/rate_limit_resets_tests.rs",
+      "evidenceKind": "upstream_authored_mock_not_live_response",
+      "license": "Apache-2.0",
+      "modificationNotice": "Extracted test JSON into a standalone file; removed profile_image_url/profile_user_id fields",
+      "sha256": "91a454e6dc42c24977a865ccb7b18a02330a41b86a80fca0f77b1e5d9f097317"
+    }
+  ],
+  "contractStatus": "M0 research fixtures; not provider schemas, production parser outputs or captured HTTP traffic",
+  "synthetic": {
+    "file": "synthetic-vectors.json",
+    "evidenceKind": "synthetic_test_vectors_not_live_API_evidence",
+    "vectorCount": 17,
+    "source": "Locally authored scenarios informed by pinned source/test behavior, not captured account responses",
+    "transformations": [
+      "Preserved original 17 case IDs and synthetic clock scenarios",
+      "Normalized expected providerAllowed/providerLimitReached from rawUsage.rate_limit flags rather than default null",
+      "Normalized expected planTypeRaw from rawUsage.plan_type; absent raw plan is null, not assumed plus"
+    ],
+    "limitations": [
+      "Expected snapshots are assertions, not outputs of an executed production parser",
+      "Connected/expired session strings are synthetic scenario metadata",
+      "Common observation/evaluation clock is synthetic; real usage/detail observations require distinct clocks",
+      "Snapshot fixture-only keys/evidenceKind are not a live identity model"
+    ]
+  },
+  "historicalAuthorLiveAccountObservations": 0,
+  "ownerReceipt": {
+    "file": "owner-reported-live.json",
+    "evidenceKind": "owner_reported_live",
+    "retrievalDate": "2026-10-06",
+    "observedAt": null,
+    "source": "Owner-provided final sanitized local Mac probe JSON, transcribed into an allowlisted normalized receipt; not author-executed or captured HTTP body",
+    "sha256": "f1ba4b840dfda0827958afbc8f027d2606e2694cf48046d86a7f92eeb1bfef57",
+    "transformations": [
+      "Safe fields renamed to camelCase and reduced to auth status/limits/counts/expiry diagnostics",
+      "No profile ID, email, device code, token, verifier or authorization code retained",
+      "Two exact owner-opted-in UTC expiry input strings retained with normalized integer epochs",
+      "Missing observation timestamps explicitly null, retrieval date never used as observation clock"
+    ],
+    "probeArchiveSha256": "c4f9f812bbe3238c868881657ea5c0ab92c8792a2b0500bd2450e4bd105806a7"
+  },
+  "policyVectors": {
+    "file": "policy-vectors.json",
+    "evidenceKind": "synthetic_policy_vectors_not_live",
+    "caseCount": 7,
+    "source": "Locally authored research GET status/lifecycle policies, not provider response bodies"
+  }
+}

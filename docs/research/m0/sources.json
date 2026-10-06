@@ -1,0 +1,950 @@
+{
+  "version": 1,
+  "researchSnapshot": "2026-10-04",
+  "revisionDate": "2026-10-06",
+  "sources": [
+    {
+      "id": 3,
+      "url": "https://developers.openai.com/siwc/token-sharing-open-source.md",
+      "title": "siwc-oss",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "each issued `client_id` is bound to the authenticated user and the workspace selected during registration.",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "7c916a3136973625481fe21673c2f342e97fe5a70153bc71e068d5b11be83ebd",
+      "retrieved_at_utc": "2026-10-04T22:57:01.113474+00:00",
+      "evidence_tier": "official_documentation",
+      "evidenceArtifact": "siwc-oss.txt"
+    },
+    {
+      "id": 4,
+      "url": "https://developers.openai.com/siwc/token-sharing-open-source/token-reference.md",
+      "title": "siwc-tokens",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "Access tokens are valid for one hour",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "d48d4bee9f15062bf4cde08fe33fd32aab2a8df1a304dde70969eb528e07d0a1",
+      "retrieved_at_utc": "2026-10-04T22:57:03.647252+00:00",
+      "evidence_tier": "official_documentation",
+      "evidenceArtifact": "siwc-tokens.txt"
+    },
+    {
+      "id": 7,
+      "url": "https://github.com/openai/codex/blob/4ad985e2caaf877b96dafd8138dae2def467e01e/codex-rs/backend-client/src/client/rate_limit_resets.rs",
+      "title": "codex-resets",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "pub async fn list_rate_limit_reset_credits",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "a85485c84698f3c86ac51529f9ccbab7790f5e1120ff4fe8d6172d11dc6b7450",
+      "retrieved_at_utc": "2026-10-04T22:57:11.053820+00:00",
+      "evidence_tier": "pinned_implementation",
+      "evidenceArtifact": "codex-resets.txt"
+    },
+    {
+      "id": 8,
+      "url": "https://github.com/openai/codex/blob/4ad985e2caaf877b96dafd8138dae2def467e01e/codex-rs/backend-client/src/client/rate_limit_resets_tests.rs",
+      "title": "codex-reset-tests",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "\"reset_type\": \"codex_rate_limits\",\n                \"status\": \"available\",",
+          "added": "2026-10-04"
+        }
+      ],
+      "evidence_tier": "pinned_upstream_mock_or_source"
+    },
+    {
+      "id": 10,
+      "url": "https://developers.openai.com/siwc/token-sharing-open-source/sign-in.md",
+      "title": "siwc-signin",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "This direct flow needs neither a client secret nor a partner API key.",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "94e9158385ba3048ad3454785940c97c92d9d2dcf8dfda66b0f4418643d146a5",
+      "retrieved_at_utc": "2026-10-04T23:01:43.774448+00:00",
+      "evidence_tier": "official_documentation",
+      "evidenceArtifact": "siwc-signin.txt"
+    },
+    {
+      "id": 11,
+      "url": "https://developers.openai.com/siwc/token-sharing-open-source/profiles-and-sessions.md",
+      "title": "siwc-sessions",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "Stop using the tokens and clear them locally after revocation.",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "ab3eb6b64956e7ca22edbe4eb70f67ab2245cf9aea197902b16c639a6cf8dfc1",
+      "retrieved_at_utc": "2026-10-04T23:01:44.110138+00:00",
+      "evidence_tier": "official_documentation",
+      "evidenceArtifact": "siwc-sessions.txt"
+    },
+    {
+      "id": 12,
+      "url": "https://developers.openai.com/siwc/token-sharing-open-source/errors-and-recovery.md",
+      "title": "siwc-errors",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "support for another client type or route is not permission to use it here.",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "0b7f6d6a7a07ba4d81967858ca9f64264e2be017dfaed1e25297969a57a2c005",
+      "retrieved_at_utc": "2026-10-04T23:01:44.523632+00:00",
+      "evidence_tier": "official_documentation",
+      "evidenceArtifact": "siwc-errors.txt"
+    },
+    {
+      "id": 14,
+      "url": "https://github.com/openai/codex/blob/4ad985e2caaf877b96dafd8138dae2def467e01e/codex-rs/backend-client/src/types.rs",
+      "title": "codex-codex-rs_backend-client_src_types.rs",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "pub struct RateLimitResetCreditsDetails {",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "e456b3b88e993b0db6bddb798de42a15f5e47a60d492556cbecdaf0a7230787b",
+      "retrieved_at_utc": "2026-10-04T23:01:45.340177+00:00",
+      "evidence_tier": "pinned_implementation",
+      "evidenceArtifact": "codex-codex-rs_backend-client_src_types.rs.txt"
+    },
+    {
+      "id": 15,
+      "url": "https://github.com/openai/codex/blob/4ad985e2caaf877b96dafd8138dae2def467e01e/codex-rs/backend-client/src/client.rs",
+      "title": "codex-codex-rs_backend-client_src_client.rs",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "h.insert(name, hv);\n        }",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "e1d166ceb5f6f9a433907d74dc91eaa9e3900d2a43e588c21c3e2b149bca0643",
+      "retrieved_at_utc": "2026-10-04T23:01:45.588118+00:00",
+      "evidence_tier": "pinned_implementation",
+      "evidenceArtifact": "codex-codex-rs_backend-client_src_client.rs.txt"
+    },
+    {
+      "id": 16,
+      "url": "https://github.com/openai/codex/blob/4ad985e2caaf877b96dafd8138dae2def467e01e/codex-rs/codex-backend-openapi-models/src/models/rate_limit_window_snapshot.rs",
+      "title": "codex-codex-rs_codex-backend-openapi-models_src_models_rate_limit_window_snapshot.rs",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "pub reset_after_seconds: i32,\n    #[serde(rename = \"reset_at\")]",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "f667756c00e512c779cb0f593737094b1292990494624492f0c0bb48dcd6918b",
+      "retrieved_at_utc": "2026-10-04T23:01:45.775605+00:00",
+      "evidence_tier": "pinned_implementation",
+      "evidenceArtifact": "codex-codex-rs_codex-backend-openapi-models_src_models_rate_limit_window_snapshot.rs.txt"
+    },
+    {
+      "id": 17,
+      "url": "https://github.com/openai/codex/blob/4ad985e2caaf877b96dafd8138dae2def467e01e/codex-rs/codex-backend-openapi-models/src/models/rate_limit_status_details.rs",
+      "title": "codex-codex-rs_codex-backend-openapi-models_src_models_rate_limit_status_details.rs",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "pub allowed: bool,\n    #[serde(rename = \"limit_reached\")]",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "38935bb0f24cbb60bb9def3426fdd44bdec75dee92d8c0396698e851f122c00a",
+      "retrieved_at_utc": "2026-10-04T23:01:45.899541+00:00",
+      "evidence_tier": "pinned_implementation",
+      "evidenceArtifact": "codex-codex-rs_codex-backend-openapi-models_src_models_rate_limit_status_details.rs.txt"
+    },
+    {
+      "id": 18,
+      "url": "https://github.com/openai/codex/blob/4ad985e2caaf877b96dafd8138dae2def467e01e/codex-rs/login/src/device_code_auth.rs",
+      "title": "codex-codex-rs_login_src_device_code_auth.rs",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "device code login is not enabled for this Codex server.",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "a66f531d5cc5257ba99ec796f69e02f78bab1812bbde57b5aa809237910b3829",
+      "retrieved_at_utc": "2026-10-04T23:01:46.148565+00:00",
+      "evidence_tier": "pinned_implementation",
+      "evidenceArtifact": "codex-codex-rs_login_src_device_code_auth.rs.txt"
+    },
+    {
+      "id": 19,
+      "url": "https://github.com/openai/codex/blob/4ad985e2caaf877b96dafd8138dae2def467e01e/codex-rs/login/src/auth/manager.rs",
+      "title": "codex-codex-rs_login_src_auth_manager.rs",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "pub const CLIENT_ID: &str =",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "d2081e3e4f2f339a7a1aa52ea62d8485e7785c2b0a12dde1a7f470019d56dc2a",
+      "retrieved_at_utc": "2026-10-04T23:01:46.368346+00:00",
+      "evidence_tier": "pinned_implementation",
+      "evidenceArtifact": "codex-codex-rs_login_src_auth_manager.rs.txt"
+    },
+    {
+      "id": 22,
+      "url": "https://github.com/openai/codex/blob/4ad985e2caaf877b96dafd8138dae2def467e01e/LICENSE",
+      "title": "codex-LICENSE",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "Apache License\n                           Version 2.0",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "d17f227e4df5da1600391338865ce0f3055211760a36688f816941d58232d8dc",
+      "retrieved_at_utc": "2026-10-04T23:01:47.216651+00:00",
+      "evidence_tier": "pinned_implementation",
+      "evidenceArtifact": "codex-LICENSE.txt"
+    },
+    {
+      "id": 23,
+      "url": "https://github.com/openai/codex/blob/4ad985e2caaf877b96dafd8138dae2def467e01e/NOTICE",
+      "title": "codex-NOTICE",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "This project includes code derived from",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "9d71575ecfd9a843fc1677b0efb08053c6ba9fd686a0de1a6f5382fd3c220915",
+      "retrieved_at_utc": "2026-10-04T23:01:47.297266+00:00",
+      "evidence_tier": "pinned_implementation",
+      "evidenceArtifact": "codex-NOTICE.txt"
+    },
+    {
+      "id": 24,
+      "url": "https://github.com/steipete/CodexBar/blob/335d2a506f9be2c503ed1d287b24ef09c08c1c5a/Sources/CodexBarCore/Providers/Codex/CodexOAuth/CodexOAuthUsageFetcher.swift",
+      "title": "bar-Sources_CodexBarCore_Providers_Codex_CodexOAuth_CodexOAuthUsageFetcher.swift",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "request.setValue(\"codex-1\", forHTTPHeaderField: \"OpenAI-Beta\")\n        request.setValue(\"Codex Desktop\", forHTTPHeaderField: \"originator\")",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "8de3281bf3e091b5d3573710c2faf270375399b6b7f6f1613c108d2588796f6e",
+      "retrieved_at_utc": "2026-10-04T23:01:48.369717+00:00",
+      "evidence_tier": "pinned_implementation",
+      "evidenceArtifact": "bar-Sources_CodexBarCore_Providers_Codex_CodexOAuth_CodexOAuthUsageFetcher.swift.txt"
+    },
+    {
+      "id": 26,
+      "url": "https://github.com/steipete/CodexBar/blob/335d2a506f9be2c503ed1d287b24ef09c08c1c5a/LICENSE",
+      "title": "bar-LICENSE",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "The above copyright notice and this permission notice shall be included in all",
+          "added": "2026-10-04"
+        }
+      ],
+      "sha256": "14293556b79940745123d0160c71d27ed0e9fe9b8a848093f3ed78f4853caafe",
+      "retrieved_at_utc": "2026-10-04T23:01:48.802711+00:00",
+      "evidence_tier": "pinned_implementation",
+      "evidenceArtifact": "bar-LICENSE.txt"
+    },
+    {
+      "id": 28,
+      "url": "https://github.com/steipete/CodexBar/blob/335d2a506f9be2c503ed1d287b24ef09c08c1c5a/Sources/CodexBarCore/Providers/Codex/CodexRateWindowNormalizer.swift",
+      "title": "bar-window-normalizer",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "switch window.windowMinutes {",
+          "added": "2026-10-04"
+        }
+      ],
+      "evidence_tier": "pinned_upstream_mock_or_source"
+    },
+    {
+      "id": 29,
+      "url": "https://github.com/steipete/CodexBar/blob/335d2a506f9be2c503ed1d287b24ef09c08c1c5a/Tests/CodexBarTests/CodexOAuthTests.swift",
+      "title": "bar-usage-tests",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "maps free weekly only window into secondary",
+          "added": "2026-10-04"
+        }
+      ],
+      "evidence_tier": "pinned_upstream_mock_or_source"
+    },
+    {
+      "id": 31,
+      "url": "https://kotlinlang.org/docs/gradle-configure-project.html",
+      "title": "Configure a Gradle project | Kotlin Documentation",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "2.4.20\n\n7.6.3\u20139.7.0\n\n8.5.2\u20139.3.1",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://kotlinlang.org/docs/gradle-configure-project.html",
+      "retrieved_at_utc": "2026-10-04T22:16:30.478105+00:00",
+      "raw_sha256": "ceef1f32c3a8fb3aa1b8e7114c1e7e2bcc65a594f8e123566871978229289757",
+      "text_sha256": "8d61eb0f09277cb7ff9c3cce291e11c81fc50dae0782489f6d85f0687d8f50b9",
+      "last_modified_header": "Fri, 02 Oct 2026 08:54:03 GMT",
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "kotlin_compat.txt",
+      "rawEvidenceArtifact": "kotlin_compat.html",
+      "current_retrieval": {
+        "final_url": "https://kotlinlang.org/docs/gradle-configure-project.html",
+        "sha256": "f99a26cd2a28dcfc39b552a4bcdb36364ccecef995c92908775cb851b9063ea8",
+        "retrieved_at_utc": "2026-10-06T06:47:57.908788+00:00",
+        "bytes": 87947
+      }
+    },
+    {
+      "id": 36,
+      "url": "https://www.jacoco.org/jacoco/trunk/doc/counters.html",
+      "title": "JaCoCo - Coverage Counter",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "The smallest unit JaCoCo counts are single Java byte code instructions.",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://www.jacoco.org/jacoco/trunk/doc/counters.html",
+      "retrieved_at_utc": "2026-10-04T22:16:34.265028+00:00",
+      "raw_sha256": "088a551038cf83288914b7068b0249c00132464c4c753d9293dc6660ca748fea",
+      "text_sha256": "e2d578bfb14241f64322aef93b232d4fd1f9986f8ba7e9c9732ff733360a8029",
+      "last_modified_header": "Tue, 15 Sep 2026 22:34:35 GMT",
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "jacoco_counters.txt",
+      "rawEvidenceArtifact": "jacoco_counters.html"
+    },
+    {
+      "id": 38,
+      "url": "https://developer.android.com/jetpack/androidx/releases/security",
+      "title": "Security &nbsp;|&nbsp; Jetpack &nbsp;|&nbsp; Android Developers",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "Deprecated all APIs in favour of existing platform APIs and direct use of Android Keystore.",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://developer.android.com/jetpack/androidx/releases/security",
+      "retrieved_at_utc": "2026-10-04T22:16:34.497897+00:00",
+      "raw_sha256": "fddd8015a2823040d0ee5682d2fb5a18d014df70ca1f435d80ec505154e40bcf",
+      "text_sha256": "20b3d82370c778c1d1c7c3cc41a6070449fc6343a407faba522c9ea043c57ed0",
+      "last_modified_header": null,
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "security_crypto.txt",
+      "rawEvidenceArtifact": "security_crypto.html"
+    },
+    {
+      "id": 40,
+      "url": "https://developer.android.com/privacy-and-security/keystore",
+      "title": "Android Keystore system &nbsp;|&nbsp; Security &nbsp;|&nbsp; Android Developers",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "Key material can be bound to the secure hardware of the Android device",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://developer.android.com/privacy-and-security/keystore",
+      "retrieved_at_utc": "2026-10-04T22:16:34.271378+00:00",
+      "raw_sha256": "68c78bb17b23985889852742418f06850c66ca6784d34ff812549814aed31d4d",
+      "text_sha256": "535dd31772ff8015be604a411ed399e095493813adc7b9e24e433597696e76ac",
+      "last_modified_header": null,
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "keystore.txt",
+      "rawEvidenceArtifact": "keystore.html"
+    },
+    {
+      "id": 41,
+      "url": "https://developer.android.com/identity/data/autobackup",
+      "title": "Back up user data with Auto Backup &nbsp;|&nbsp; Identity &nbsp;|&nbsp; Android Developers",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "Files in directories returned by getCacheDir(), getCodeCacheDir(), or\ngetNoBackupFilesDir() are always excluded even if you try to include them.",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://developer.android.com/identity/data/autobackup",
+      "retrieved_at_utc": "2026-10-04T22:16:34.272655+00:00",
+      "raw_sha256": "9ab1233f836cb4fca5adcad5e154dec5baaf1f796b654281d4e2efbb1dbc57e5",
+      "text_sha256": "ae04f35ec1eef75e7c226d8810052348f941e61591f4d012cb95fb02996b060e",
+      "last_modified_header": null,
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "backup.txt",
+      "rawEvidenceArtifact": "backup.html"
+    },
+    {
+      "id": 42,
+      "url": "https://developer.android.com/privacy-and-security/cryptography",
+      "title": "Cryptography &nbsp;|&nbsp; Security &nbsp;|&nbsp; Android Developers",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "AES in either CBC or GCM mode with 256-bit keys (such as AES/GCM/NoPadding)",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://developer.android.com/privacy-and-security/cryptography",
+      "retrieved_at_utc": "2026-10-04T22:16:34.317777+00:00",
+      "raw_sha256": "254ba4ece4bb1519744758de5fcde88ae5e3637a53bfcb7f06ea0efd0412c281",
+      "text_sha256": "4e65d29816296001ceace742764499a9623110f4d32a17df01590f877a539411",
+      "last_modified_header": null,
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "cryptography.txt",
+      "rawEvidenceArtifact": "cryptography.html"
+    },
+    {
+      "id": 45,
+      "url": "https://www.jacoco.org/jacoco/trunk/doc/classids.html",
+      "title": "JaCoCo - Class Ids",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "Class ids are identical for the exact same class file only (byte-by-byte).",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://www.jacoco.org/jacoco/trunk/doc/classids.html",
+      "retrieved_at_utc": "2026-10-04T22:16:37.400513+00:00",
+      "raw_sha256": "64b67a1c01548e9d6b10a32a466a15f078195233f8efba270d3f57abc4292948",
+      "text_sha256": "4af18aa7d6090d4c63df151980243ce63d5b96e2153b4427a5a807796e54a19d",
+      "last_modified_header": "Tue, 15 Sep 2026 22:34:35 GMT",
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "jacoco_identity.txt",
+      "rawEvidenceArtifact": "jacoco_identity.html"
+    },
+    {
+      "id": 47,
+      "url": "https://api.github.com/repos/Kotlin/kotlinx.coroutines/releases/latest",
+      "title": "coroutines_latest",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "\"tag_name\": \"1.11.0\",\n  \"target_commitish\":",
+          "added": "2026-10-04"
+        },
+        {
+          "text": "\"prerelease\": false,\n  \"created_at\":",
+          "added": "2026-10-04"
+        },
+        {
+          "text": "\"published_at\": \"2026-05-08T12:49:29Z\",\n  \"assets\":",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://api.github.com/repos/Kotlin/kotlinx.coroutines/releases/latest",
+      "retrieved_at_utc": "2026-10-04T22:34:23.979982+00:00",
+      "raw_sha256": "6d45a94b3bbf36f7b7ac39e69bb3c11a5bcd59c1963deaf55000b6bb542a18d9",
+      "text_sha256": "f8374893c9cbe745a704cee87855b5616574b436898a1a914a23926de95ae4ac",
+      "last_modified_header": "Mon, 11 May 2026 07:27:56 GMT",
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "coroutines_latest.txt",
+      "rawEvidenceArtifact": "coroutines_latest.raw"
+    },
+    {
+      "id": 49,
+      "url": "https://developer.android.com/build/releases/agp-9-3-0-release-notes",
+      "title": "Android Gradle plugin 9.3.0 (July 2026) &nbsp;|&nbsp; Android Studio &nbsp;|&nbsp; Android Developers",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "Gradle\n\n9.5.0\n\n9.5.0",
+          "added": "2026-10-04"
+        },
+        {
+          "text": "SDK Build Tools\n\n36.0.0\n\n36.0.0",
+          "added": "2026-10-04"
+        },
+        {
+          "text": "JDK\n\n17\n\n17",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://developer.android.com/build/releases/agp-9-3-0-release-notes",
+      "retrieved_at_utc": "2026-10-04T22:18:39.405878+00:00",
+      "raw_sha256": "cfa3cc960dc6c40a272a761adea59672f29c2727d1ace24ddfc9803c844c3ae2",
+      "text_sha256": "3d4764ad0d87a7b202051176f604cc6c0f65b3ef812e467a77b7b3a13b305d40",
+      "last_modified_header": null,
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "agp93.txt",
+      "rawEvidenceArtifact": "agp93.html",
+      "current_retrieval": {
+        "final_url": "https://developer.android.com/build/releases/agp-9-3-0-release-notes",
+        "sha256": "0e2344e61658da9dc78cb6a6ee40bf1f42c38fb4a3e531147642de2507c6f750",
+        "retrieved_at_utc": "2026-10-06T06:47:58.577433+00:00",
+        "bytes": 297541
+      }
+    },
+    {
+      "id": 51,
+      "url": "https://developer.android.com/build/kotlin-support",
+      "title": "AGP, D8, and R8 versions required for Kotlin versions &nbsp;|&nbsp; Android Studio &nbsp;|&nbsp; Android Developers",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "2.4\n\n8.5.2+\n\n9.1.29",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://developer.android.com/build/kotlin-support",
+      "retrieved_at_utc": "2026-10-04T22:18:39.408010+00:00",
+      "raw_sha256": "324d349656a3df2cb5c5bc52a188b4a6c6a83d8c6694c21fd3b41a454c7355bc",
+      "text_sha256": "881cfa7653533a499fc6138708d8e60c88a1d601e5313968550703eefda63dd4",
+      "last_modified_header": null,
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "kotlin_android_support.txt",
+      "rawEvidenceArtifact": "kotlin_android_support.html"
+    },
+    {
+      "id": 52,
+      "url": "https://developer.android.com/build/migrate-to-built-in-kotlin",
+      "title": "Migrate to built-in Kotlin &nbsp;|&nbsp; Android Studio &nbsp;|&nbsp; Android Developers",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "Android Gradle plugin 9.0 introduces built-in Kotlin support and enables it\nby default.",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://developer.android.com/build/migrate-to-built-in-kotlin",
+      "retrieved_at_utc": "2026-10-04T22:18:39.408956+00:00",
+      "raw_sha256": "0f525e8f92514d94fee9efbf2361133de1011603115cdf367598e766ed50308e",
+      "text_sha256": "8de7b88ae46a212f7d719912fe9100b99f3f60e67e960fff98f60b4794019b2e",
+      "last_modified_header": null,
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "builtin_kotlin.txt",
+      "rawEvidenceArtifact": "builtin_kotlin.html",
+      "current_retrieval": {
+        "final_url": "https://developer.android.com/build/migrate-to-built-in-kotlin",
+        "sha256": "b458636f42c8e3fd76991e8939d75e0ea87f95f714c26e26b0437746c2cb94a9",
+        "retrieved_at_utc": "2026-10-06T06:47:59.092272+00:00",
+        "bytes": 326570
+      }
+    },
+    {
+      "id": 54,
+      "url": "https://dl.google.com/dl/android/maven2/androidx/compose/compose-bom/2026.09.00/compose-bom-2026.09.00.pom",
+      "title": "compose_bom_pom",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "<artifactId>material3</artifactId>\n\t\t\t\t<version>1.4.0</version>\n\t\t\t</dependency>",
+          "added": "2026-10-04"
+        },
+        {
+          "text": "<artifactId>ui</artifactId>\n\t\t\t\t<version>1.12.1</version>\n\t\t\t</dependency>",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://dl.google.com/dl/android/maven2/androidx/compose/compose-bom/2026.09.00/compose-bom-2026.09.00.pom",
+      "retrieved_at_utc": "2026-10-04T22:18:43.838698+00:00",
+      "raw_sha256": "74791c31313009659bd0bf09008bd514a163aa04452dd4cb82df2fb971c757c3",
+      "text_sha256": "74791c31313009659bd0bf09008bd514a163aa04452dd4cb82df2fb971c757c3",
+      "last_modified_header": "Wed, 09 Sep 2026 17:10:57 GMT",
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "compose_bom_pom.txt",
+      "rawEvidenceArtifact": "compose_bom_pom.raw",
+      "current_retrieval": {
+        "final_url": "https://dl.google.com/dl/android/maven2/androidx/compose/compose-bom/2026.09.00/compose-bom-2026.09.00.pom",
+        "sha256": "74791c31313009659bd0bf09008bd514a163aa04452dd4cb82df2fb971c757c3",
+        "retrieved_at_utc": "2026-10-06T06:47:58.090921+00:00",
+        "bytes": 41126
+      }
+    },
+    {
+      "id": 56,
+      "url": "https://dl.google.com/android/repository/repository2-3.xml",
+      "title": "sdk_repository",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "path=\"platforms;android-37.2\">\n    <type-details xsi:type=\"sdk:platformDetailsType\">",
+          "added": "2026-10-04"
+        },
+        {
+          "text": "path=\"platforms;android-37.0\">\n    <type-details xsi:type=\"sdk:platformDetailsType\">",
+          "added": "2026-10-04"
+        },
+        {
+          "text": "path=\"build-tools;37.0.0\">\n    <type-details xsi:type=\"generic:genericDetailsType\"/>",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://dl.google.com/android/repository/repository2-3.xml",
+      "retrieved_at_utc": "2026-10-04T22:18:44.963275+00:00",
+      "raw_sha256": "c9e2f9e8b118dcc9c5584904ea27cbcefb217a5807029cedadfaa0b2f842fa8d",
+      "text_sha256": "c9e2f9e8b118dcc9c5584904ea27cbcefb217a5807029cedadfaa0b2f842fa8d",
+      "last_modified_header": "Thu, 01 Oct 2026 14:57:05 GMT",
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "sdk_repository.txt",
+      "rawEvidenceArtifact": "sdk_repository.raw",
+      "current_retrieval": {
+        "final_url": "https://dl.google.com/android/repository/repository2-3.xml",
+        "sha256": "c9e2f9e8b118dcc9c5584904ea27cbcefb217a5807029cedadfaa0b2f842fa8d",
+        "retrieved_at_utc": "2026-10-06T06:47:58.356049+00:00",
+        "bytes": 419185
+      }
+    },
+    {
+      "id": 64,
+      "url": "https://developer.android.com/jetpack/androidx/releases/compose-runtime",
+      "title": "Compose Runtime &nbsp;|&nbsp; Jetpack &nbsp;|&nbsp; Android Developers",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "Moving the default minSdk from API 21 to API 23",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://developer.android.com/jetpack/androidx/releases/compose-runtime",
+      "retrieved_at_utc": "2026-10-04T22:18:48.083883+00:00",
+      "raw_sha256": "da9d614e59af36e23f302e700c1a58dfe8382669f7e985e82f771b9a3a68a09a",
+      "text_sha256": "c5c80ba617fda77d9c3c6f6133bdb8d660a1c851e78a32394097ae285b43ebd8",
+      "last_modified_header": null,
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "compose_runtime.txt",
+      "rawEvidenceArtifact": "compose_runtime.html"
+    },
+    {
+      "id": 68,
+      "url": "https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/9.3.1/gradle-9.3.1.pom",
+      "title": "agp931_pom",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "<artifactId>kotlin-gradle-plugin</artifactId>\n      <version>2.2.10</version>\n      <scope>runtime</scope>",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/9.3.1/gradle-9.3.1.pom",
+      "retrieved_at_utc": "2026-10-04T22:20:30.453526+00:00",
+      "raw_sha256": "310b87ad50d932c7ce88a424e9828d460536a524a2f91c2b1656915183c426dd",
+      "text_sha256": "310b87ad50d932c7ce88a424e9828d460536a524a2f91c2b1656915183c426dd",
+      "last_modified_header": "Thu, 23 Jul 2026 14:07:17 GMT",
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "agp931_pom.txt",
+      "rawEvidenceArtifact": "agp931_pom.raw",
+      "current_retrieval": {
+        "final_url": "https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/9.3.1/gradle-9.3.1.pom",
+        "sha256": "310b87ad50d932c7ce88a424e9828d460536a524a2f91c2b1656915183c426dd",
+        "retrieved_at_utc": "2026-10-06T06:47:58.046564+00:00",
+        "bytes": 9034
+      }
+    },
+    {
+      "id": 77,
+      "url": "https://developer.android.com/reference/android/security/keystore/KeyGenParameterSpec",
+      "title": "KeyGenParameterSpec &nbsp;|&nbsp; API reference &nbsp;|&nbsp; Android Developers",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "Example: AES key for encryption/decryption in GCM mode",
+          "added": "2026-10-04"
+        },
+        {
+          "text": "Cipher.getInstance(\"AES/GCM/NoPadding\");\ncipher.init(Cipher.ENCRYPT_MODE, key);",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://developer.android.com/reference/android/security/keystore/KeyGenParameterSpec",
+      "retrieved_at_utc": "2026-10-04T22:21:34.541557+00:00",
+      "raw_sha256": "d634f8603e1e4157566f6f23c0101967b788f6d6a7a32c2360716ab1300a4657",
+      "text_sha256": "4844ac86b384441f5e7c62d37efdfca2747820320305b25e29e319b03a64698e",
+      "last_modified_header": null,
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "keygen_spec.txt",
+      "rawEvidenceArtifact": "keygen_spec.html"
+    },
+    {
+      "id": 84,
+      "url": "https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler",
+      "title": "Set up the Compose Compiler Gradle plugin &nbsp;|&nbsp; Jetpack Compose &nbsp;|&nbsp; Android Developers",
+      "accessed": "2026-10-04",
+      "quotes": [
+        {
+          "text": "this version matches your Kotlin version",
+          "added": "2026-10-04"
+        }
+      ],
+      "final_url": "https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler",
+      "retrieved_at_utc": "2026-10-04T22:22:51.552927+00:00",
+      "raw_sha256": "772b2530cc0d5cdcaed61c4ebd679c464c3c8cb03b838f2fdfe57d83a8a27f86",
+      "text_sha256": "98f9230afdbb2a69605b4e47d87d10381b9ed6d6c4baaa506ddb098e73bc4434",
+      "last_modified_header": null,
+      "evidence_tier": "official_platform_documentation",
+      "evidenceArtifact": "compose_compiler_canonical.txt",
+      "rawEvidenceArtifact": "compose_compiler_canonical.html"
+    },
+    {
+      "id": 86,
+      "url": "https://help.openai.com/en/articles/20001498-how-banked-codex-resets-work",
+      "title": "Banked resets Help lead \u2014 search excerpts plus reviewer-reported full retrieval",
+      "accessed": "2026-10-05",
+      "evidence_tier": "search_excerpt_only_with_reviewer_reported_full_retrieval",
+      "full_page_retrieval": "Independent reviewer success reported by parent; author full-body receipt unavailable, retry WAF blocked",
+      "sha256": "808040a389981adcc42184c0426fbc9cc682527fe2dc2201d322019d4e8346d6",
+      "quotes": [
+        {
+          "text": "It is not purchased credit",
+          "added": "2026-10-05",
+          "scope": "preserved official-page search excerpt, not article-body receipt"
+        }
+      ],
+      "lead_supplied_by": "assistant_not_owner",
+      "retrieval_history": [
+        {
+          "date": "2026-10-04",
+          "result": "direct/recovery/browser 403/WAF; search snippets only"
+        },
+        {
+          "date": "2026-10-05",
+          "result": "parent reports independent reviewer full-browser retrieval; handed-off banked-live-browser.txt inspected as empty"
+        },
+        {
+          "date": "2026-10-05",
+          "result": "documentation author browser WAF; extractor search-only; deferred web.run not found"
+        }
+      ],
+      "evidenceArtifact": "search-evidence.json"
+    },
+    {
+      "id": 87,
+      "url": "https://raw.githubusercontent.com/NousResearch/hermes-agent/79af3f6cea8067284a7ea5725078578b3f790adb/hermes_cli/auth_codex.py",
+      "title": "hermes_auth",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "final_url": "https://raw.githubusercontent.com/NousResearch/hermes-agent/79af3f6cea8067284a7ea5725078578b3f790adb/hermes_cli/auth_codex.py",
+        "sha256": "85c4644c052f5f5b3d4dc0f862592b5f13f286bf48d4d239015c3c74ae3f8e91",
+        "retrieved_at_utc": "2026-10-06T06:47:58.198059+00:00",
+        "bytes": 60040
+      },
+      "evidence_tier": "public_pinned_source"
+    },
+    {
+      "id": 88,
+      "url": "https://raw.githubusercontent.com/NousResearch/hermes-agent/79af3f6cea8067284a7ea5725078578b3f790adb/hermes_cli/auth_constants.py",
+      "title": "hermes_constants",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "final_url": "https://raw.githubusercontent.com/NousResearch/hermes-agent/79af3f6cea8067284a7ea5725078578b3f790adb/hermes_cli/auth_constants.py",
+        "sha256": "013aefc7b82452728cfd654d3acb08f0250b38168f15ab6f4460e09c79a5a3c2",
+        "retrieved_at_utc": "2026-10-06T06:47:58.210284+00:00",
+        "bytes": 8959
+      },
+      "evidence_tier": "public_pinned_source"
+    },
+    {
+      "id": 89,
+      "url": "https://raw.githubusercontent.com/openai/codex/7c2ce90716335c889a5076ded9a630459f9c9899/codex-rs/backend-client/src/types.rs",
+      "title": "codex_types",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "final_url": "https://raw.githubusercontent.com/openai/codex/7c2ce90716335c889a5076ded9a630459f9c9899/codex-rs/backend-client/src/types.rs",
+        "sha256": "e456b3b88e993b0db6bddb798de42a15f5e47a60d492556cbecdaf0a7230787b",
+        "retrieved_at_utc": "2026-10-06T06:47:57.916381+00:00",
+        "bytes": 20796
+      },
+      "evidence_tier": "public_pinned_source"
+    },
+    {
+      "id": 90,
+      "url": "https://raw.githubusercontent.com/steipete/CodexBar/6a26b2e9b1b60471970deb6fe663f9e5f284e2ce/docs/codex.md",
+      "title": "bar_docs",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "final_url": "https://raw.githubusercontent.com/steipete/CodexBar/6a26b2e9b1b60471970deb6fe663f9e5f284e2ce/docs/codex.md",
+        "sha256": "57eda3defe7e89b16553e1b51815456458e1a11c7bbef7599bf3ae0b86d39169",
+        "retrieved_at_utc": "2026-10-06T06:47:57.948663+00:00",
+        "bytes": 48108
+      },
+      "evidence_tier": "public_pinned_source"
+    },
+    {
+      "id": 91,
+      "url": "https://raw.githubusercontent.com/steipete/CodexBar/6a26b2e9b1b60471970deb6fe663f9e5f284e2ce/Sources/CodexBarCore/Providers/Codex/CodexOAuth/CodexOAuthUsageFetcher.swift",
+      "title": "bar_fetcher",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "final_url": "https://raw.githubusercontent.com/steipete/CodexBar/6a26b2e9b1b60471970deb6fe663f9e5f284e2ce/Sources/CodexBarCore/Providers/Codex/CodexOAuth/CodexOAuthUsageFetcher.swift",
+        "sha256": "8de3281bf3e091b5d3573710c2faf270375399b6b7f6f1613c108d2588796f6e",
+        "retrieved_at_utc": "2026-10-06T06:47:57.954794+00:00",
+        "bytes": 34171
+      },
+      "evidence_tier": "public_pinned_source"
+    },
+    {
+      "id": 92,
+      "url": "https://learn.chatgpt.com/docs/auth.md",
+      "title": "auth_docs",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "final_url": "https://learn.chatgpt.com/docs/auth.md",
+        "sha256": "3d2f0ed91fa09de11cabe38cb37a76e0833f71205cae6589c46c7f5ae9ad62f0",
+        "retrieved_at_utc": "2026-10-06T06:47:57.877133+00:00",
+        "bytes": 16776
+      },
+      "evidence_tier": "official_documentation_or_repository_metadata"
+    },
+    {
+      "id": 93,
+      "url": "https://developer.android.com/reference/java/time/package-summary",
+      "title": "java_time",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "final_url": "https://developer.android.com/reference/java/time/package-summary",
+        "sha256": "a006c174a091872951bbfcf90331aeb103bedb6d9166858a5e4cbbf6cacf2bb0",
+        "retrieved_at_utc": "2026-10-06T06:48:00.168115+00:00",
+        "bytes": 2274059
+      },
+      "evidence_tier": "official_documentation_or_repository_metadata"
+    },
+    {
+      "id": 94,
+      "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0.pom",
+      "title": "coroutines_pom",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "final_url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0.pom",
+        "sha256": "dd54b97aa3fab91fc24f5df2916c22be9429a339d2f45b7ff092332f6c19dc39",
+        "retrieved_at_utc": "2026-10-06T06:47:58.255129+00:00",
+        "bytes": 2168
+      },
+      "evidence_tier": "official_documentation_or_repository_metadata"
+    },
+    {
+      "id": 95,
+      "url": "https://services.gradle.org/distributions/gradle-9.5.0-bin.zip.sha256",
+      "title": "gradle_sha",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "final_url": "https://downloads.gradle.org/distributions/gradle-9.5.0-bin.zip.sha256",
+        "sha256": "5c6511f0eb55c9ac101ace457e3a410fb720d26d44bce2b1a9907b2eda8ef5fa",
+        "retrieved_at_utc": "2026-10-06T06:47:58.508715+00:00",
+        "bytes": 64
+      },
+      "evidence_tier": "official_documentation_or_repository_metadata"
+    },
+    {
+      "id": 96,
+      "url": "https://api.github.com/repos/actions/checkout/git/ref/tags/v4.3.0",
+      "title": "checkout_tag",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "final_url": "https://api.github.com/repos/actions/checkout/git/ref/tags/v4.3.0",
+        "sha256": "bf8f7fff5dcd63a3aa6c00e8b853d18810e78e56ab4f9c2b7e71d2d5ed931ca8",
+        "retrieved_at_utc": "2026-10-06T06:47:58.517982+00:00",
+        "bytes": 341
+      },
+      "evidence_tier": "official_documentation_or_repository_metadata"
+    },
+    {
+      "id": 97,
+      "url": "https://api.github.com/repos/actions/setup-python/git/ref/tags/v5.6.0",
+      "title": "setup_tag",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "final_url": "https://api.github.com/repos/actions/setup-python/git/ref/tags/v5.6.0",
+        "sha256": "b813d175a12f103ba0b8abe5efa2bb8851980bb3b4ce4692ad138207e795e51c",
+        "retrieved_at_utc": "2026-10-06T06:47:58.517802+00:00",
+        "bytes": 349
+      },
+      "evidence_tier": "official_documentation_or_repository_metadata"
+    },
+    {
+      "id": 98,
+      "url": "https://hermes-agent.nousresearch.com/docs/integrations/providers",
+      "title": "hermes_docs",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "final_url": "https://hermes-agent.nousresearch.com/docs/integrations/providers",
+        "sha256": "5f9b38894b6987a284d25bd967fbdb4cf7034ef56f35cc0981e29c2a44f988f0",
+        "retrieved_at_utc": "2026-10-06T06:47:59.176343+00:00",
+        "bytes": 339792
+      },
+      "evidence_tier": "official_documentation_or_repository_metadata"
+    },
+    {
+      "id": 99,
+      "url": "https://developer.android.com/build/releases/agp-9-0-0-release-notes",
+      "title": "agp90",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "sha256": "8589adff826080c1aec557ad7b568a10a23be7926dde41140e130aeada60a518",
+        "bytes": 371215,
+        "retrieval_date": "2026-10-06"
+      },
+      "evidence_tier": "official_platform_documentation"
+    },
+    {
+      "id": 100,
+      "url": "https://api.github.com/repos/adoptium/temurin17-binaries/releases/tags/jdk-17.0.20.1%2B1",
+      "title": "jdk_release",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "sha256": "b9f1438885e7f9d9fa8444ea3b5ccdc146aa81f8f8628f4acef198111b95c7e3",
+        "bytes": 484747,
+        "retrieval_date": "2026-10-06"
+      },
+      "evidence_tier": "public_release_metadata"
+    },
+    {
+      "id": 101,
+      "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz.sha256.txt",
+      "title": "jdk_sha",
+      "accessed": "2026-10-06",
+      "current_retrieval": {
+        "sha256": "355528c6d0728db298aa55e0b4f9be9ed617c83edd3c1dea7cd73a4525b92365",
+        "bytes": 118,
+        "retrieval_date": "2026-10-06"
+      },
+      "evidence_tier": "public_release_metadata"
+    },
+    {
+      "id": 102,
+      "url": "https://raw.githubusercontent.com/openai/codex/7c2ce90716335c889a5076ded9a630459f9c9899/codex-rs/app-server-protocol/src/protocol/v2/account.rs",
+      "title": "Codex app-server transformed account protocol (not HTTP wire)",
+      "accessed": "2026-10-06",
+      "evidence_tier": "public_pinned_source",
+      "current_retrieval": {
+        "sha256": "f52c03c9f98f8fd496824616ec1669954f35470cbd2ff15101ce4b7e6a57b2ad",
+        "bytes": 31165,
+        "retrieval_date": "2026-10-06"
+      }
+    }
+  ],
+  "historicalLiveAccountObservations": 0,
+  "authorLiveExecutions": 0,
+  "ownerReportedLiveReceipts": 1,
+  "ledgerNote": "Historical IDs preserved. Only entries with current_retrieval were fetched on October 6; old quotes/hashes retain their original context. No raw authenticated traffic is recorded."
+}
