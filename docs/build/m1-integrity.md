@@ -61,14 +61,19 @@ manifest hash for correlation; the original diagnostic files remain in the
 
 ## Follow-up graph deltas
 
-The final workflow must retire the bootstrap marker and all discovery routes.
-Every normal PR/push/manual run must use committed strict verification and fresh
-separate Gradle homes, with no cache or metadata generation. A missing checksum is a real failure:
-retain exact candidate/run/attempt/logs, isolate the bounded new identity/hash delta,
-independently compare primary published evidence/original bytes and obtain review
-before amending metadata and this record. Never add an alternate checksum just to
-make resolution succeed or use discovery as acceptance. Replay the full strict
-build/lint/JVM/native graph on the amended candidate.
+The bootstrap marker and all discovery routes are retired. The October 6, 2026
+[owner-approved cache amendment](m1.md#owner-approved-setup-actions-and-dependency-cache-amendment)
+supersedes the final fresh-home/no-cache policy, not historical cold receipts.
+Every normal PR/push/manual run uses committed strict verification and inherits
+its separate job-level Gradle home with setup-gradle's basic dependency/wrapper
+cache; no metadata generation is allowed. Every actual gate retains
+`--no-build-cache --no-configuration-cache --rerun-tasks` to force real task
+execution, not reuse of cached outputs or reports. A missing checksum is a real
+failure: retain exact candidate/run/attempt/logs, isolate the bounded new
+identity/hash delta, independently compare primary published evidence/original
+bytes and obtain review before amending metadata and this record. Never add an
+alternate checksum just to make resolution succeed or use discovery as acceptance.
+Replay the unchanged full strict build/lint/JVM/native graph on the amended candidate.
 
 This import is not a passing replay. Hosted strict execution, real Activity smoke
 and an independent review of the complete base-to-head candidate remain required.

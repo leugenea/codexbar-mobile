@@ -45,7 +45,7 @@ class ToolchainContract(unittest.TestCase):
         self.assertEqual(approved["agp"]["pomSha256"], approved["agp"]["publishedPomSha256"])
         root = (ROOT / "build.gradle").read_text()
         app = (ROOT / "app/build.gradle").read_text()
-        installer = (ROOT / "tools/build/install-hosted-toolchain.sh").read_text()
+        verifier = (ROOT / "tools/build/verify-hosted-toolchain.sh").read_text()
         workflow = (ROOT / ".github/workflows/m1-toolchain.yml").read_text()
         self.assertIn("id 'com.android.application' version '" + approved["agp"]["version"] + "'", root)
         self.assertIn("kotlin-gradle-plugin:" + baseline["kotlin"]["version"], root)
@@ -60,15 +60,15 @@ class ToolchainContract(unittest.TestCase):
         self.assertIn("java-version: '17'", workflow)
         for path in baseline["sdkPackages"]:
             self.assertIn("'" + path + "'", workflow)
-        self.assertIn("Pkg.Revision", installer)
-        self.assertIn("installed-toolchain.json", installer)
+        self.assertIn("Pkg.Revision", verifier)
+        self.assertIn("installed-toolchain.json", verifier)
         self.assertFalse((ROOT / "tools/build/write_sdk_package_metadata.py").exists())
         fixture = ROOT / "tools/build/fixtures/sdk_metadata_historical.py"
         self.assertEqual(hashlib.sha256(fixture.read_bytes()).hexdigest(),
                          "64392f3e3b4e2555c26f83d624f5f6c847bcbebc0c43e056a6e4a681a144bcad")
         for obsolete in (baseline["jdk"]["sha256"], baseline["jdk"]["linuxX64Archive"],
                          "write_sdk_package_metadata.py", "installed-archives.sha256"):
-            self.assertNotIn(obsolete, installer + workflow)
+            self.assertNotIn(obsolete, verifier + workflow)
 
     def test_receipt_assertions_and_lint_remain_strict(self):
         inventory = (ROOT / "tools/build/toolchain.init.gradle").read_text()
@@ -231,7 +231,7 @@ class ToolchainContract(unittest.TestCase):
             self.assertIn('--sdk_root="$ANDROID_HOME" --channel=0', install)
             self.assertEqual(install.split('--install ', 1)[1].split('2>&1', 1)[0].strip(),
                              "'platforms;android-37.0' 'build-tools;36.0.0'")
-            self.assertIn('bash tools/build/install-hosted-toolchain.sh', install)
+            self.assertIn('bash tools/build/verify-hosted-toolchain.sh', install)
             for obsolete in ('jdkfile', 'jdk-file:', 'force-download:', 'cache-jdk:', 'cache: gradle',
                              '17.0.20', 'm1-jdk.tar.gz', 'curl ', 'unzip ', 'write_sdk_package_metadata.py',
                              'android-emulator-runner', 'build-tools;37.0.0'):
@@ -304,7 +304,7 @@ class ToolchainContract(unittest.TestCase):
         self.assertIn("c.name.toLowerCase().contains('debug')", inventory)
         self.assertIn("digest(artifact.file)", inventory)
         self.assertIn("actual.every { it.version == expected[2] }", inventory)
-        self.assertNotIn("write_sdk_package_metadata.py", (ROOT / "tools/build/install-hosted-toolchain.sh").read_text())
+        self.assertNotIn("write_sdk_package_metadata.py", (ROOT / "tools/build/verify-hosted-toolchain.sh").read_text())
 
     def test_no_network_permission_and_honest_four_state_shell(self):
         ns = "{http://schemas.android.com/apk/res/android}"

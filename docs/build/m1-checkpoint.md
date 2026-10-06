@@ -427,3 +427,35 @@ no-build-cache/no-config-cache/rerun-tasks and emulator libpulse/KVM/disk/logs/
 traps/bounds are retained. No TDD/RED order or heavy local ladder is reintroduced.
 If named decimal-platform installation fails, retain exact logs and seek the
 owner's decision; no manual-archive fallback or downgrade is authorized.
+
+---
+
+## October 6, 2026 published draft first-attempt evidence and clarity follow-up
+
+The preceding “Current candidate remains uncommitted” paragraph records the
+pre-publication snapshot, not the Git or acceptance status after publication.
+[PR #13 remains a draft](https://github.com/leugenea/codexbar-mobile/pull/13).
+Its committed source
+[`1f65dd176ec4958a89cc9216b1fd82b5eab2b075`](https://github.com/leugenea/codexbar-mobile/commit/1f65dd176ec4958a89cc9216b1fd82b5eab2b075)
+received independent whole-candidate source approval.
+[Run 37495621385, attempt 1](https://github.com/leugenea/codexbar-mobile/actions/runs/37495621385/attempts/1)
+passed all first-attempt gates: direct Temurin17/tools22/named platform37.0 and
+Build Tools36.0.0 installation/discovery, strict build and both test-source
+compilations, zero-issue lint, **8/8 JVM and 3/3 native tests, zero failures/errors/
+skips**, including both landscape text-layout oracles and Activity recreation,
+and source/merged/installed/APK no-INTERNET checks. Hash-bound artifacts identify
+base `f1d0cf2b014bfa62e68dad18c7aae926cc234d65` and synthetic merge checkout
+`191ca22fb2bce3cd06c2431128584bd98cb79181`, with source tree
+`ac3d55bd55b8fe7823cc1408429222f1ec8e8db8` identical to the committed head.
+Both basic job caches were **MISS → SAVED**, verified from completed post-action
+logs and cache records with their distinct path-derived versions.
+
+**Two full exact-head/exact-key cache-hit repeats and comparable performance
+acceptance remain pending; this is not complete M1 acceptance or merge approval.**
+The clarity-only follow-up renames the verification-only script to
+`verify-hosted-toolchain.sh`, updates current callers and aligns current cache/
+status documentation without rewriting the historical sections above. This
+changed candidate needs fresh independent review and exact-head hosted validation;
+run 37495621385 does not establish that the cleanup candidate is green. Every
+existing runtime gate, audited364/602 identity set, task-execution flag and native
+lifecycle/bound remains required; no heavy local execution or TDD/RED order is added.

@@ -80,7 +80,7 @@ class M1Contracts(unittest.TestCase):
         installation = script.split("--install ", 1)[1].split("2>&1", 1)[0]
         self.assertEqual(installation.strip(), 'platform-tools emulator "$image"')
 
-    def assert_cached_execution(self, workflow, script, installer):
+    def assert_cached_execution(self, workflow, script, verifier):
         strict = workflow.split("- name: Strict committed verification", 1)[1].split("- name: Bind evidence", 1)[0]
         connected = script.split("./gradlew ", 1)[1].split("2>&1", 1)[0]
         for command in (strict, connected):
@@ -122,33 +122,33 @@ class M1Contracts(unittest.TestCase):
                          'installed-binaries.sha256', 'platform-package.xml', 'build-tools-package.xml'):
             # Package receipt names are produced from the observed package name.
             if contract in ('platform-package.xml', 'build-tools-package.xml'):
-                self.assertIn("name + '-package.xml'", installer)
+                self.assertIn("name + '-package.xml'", verifier)
             else:
-                self.assertIn(contract, installer)
+                self.assertIn(contract, verifier)
         for obsolete in ('curl ', 'unzip ', 'tar -x', 'export JAVA_HOME=', 'GITHUB_PATH',
                          '17.0.20', 'installed-archives.sha256', 'sdk-archives.sha1',
                          'write_sdk_package_metadata.py', '--install', 'GITHUB_ENV'):
-            self.assertNotIn(obsolete, installer)
+            self.assertNotIn(obsolete, verifier)
         for job in ('checkpoint', 'native'):
             body = workflow.split('  ' + job + ':\n', 1)[1].split('\n  native:\n', 1)[0]
             self.assertLess(body.index('uses: actions/setup-java@'), body.index('uses: android-actions/setup-android@'))
             self.assertLess(body.index('uses: android-actions/setup-android@'),
-                            body.index('bash tools/build/install-hosted-toolchain.sh'))
+                            body.index('bash tools/build/verify-hosted-toolchain.sh'))
         native = workflow.split('  native:\n', 1)[1]
-        self.assertLess(native.index('bash tools/build/install-hosted-toolchain.sh'),
+        self.assertLess(native.index('bash tools/build/verify-hosted-toolchain.sh'),
                         native.index('bash tools/build/run-hosted-native-smoke.sh'))
 
     def test_cached_execution_preserves_strict_real_gates_and_observed_sdk_receipts(self):
         self.assert_cached_execution(
             (ROOT / ".github/workflows/m1-toolchain.yml").read_text(),
             (ROOT / "tools/build/run-hosted-native-smoke.sh").read_text(),
-            (ROOT / "tools/build/install-hosted-toolchain.sh").read_text(),
+            (ROOT / "tools/build/verify-hosted-toolchain.sh").read_text(),
         )
 
     def test_cached_execution_rejects_synthetic_regressions(self):
         original = [(ROOT / path).read_text() for path in (
             ".github/workflows/m1-toolchain.yml", "tools/build/run-hosted-native-smoke.sh",
-            "tools/build/install-hosted-toolchain.sh")]
+            "tools/build/verify-hosted-toolchain.sh")]
         mutations = [(target, flag, "") for target in (0, 1) for flag in (
             "--no-build-cache", "--no-configuration-cache", "--rerun-tasks")]
         mutations += [
@@ -174,7 +174,7 @@ class M1Contracts(unittest.TestCase):
 
     def installed_verifiers(self):
         # Execute only the shipped verifier's pure helpers, never Java/SDK/Gradle.
-        script = (ROOT / "tools/build/install-hosted-toolchain.sh").read_text()
+        script = (ROOT / "tools/build/verify-hosted-toolchain.sh").read_text()
         helpers = script.split("python3 - <<'PY'\n", 1)[1].split("# The functions above", 1)[0]
         namespace = {}
         exec(compile(helpers, "hosted-verifier-pure-helpers", "exec"), namespace)

@@ -70,7 +70,7 @@ jobs:
           timeout 30 "$sdkmanager" --version > evidence/sdkmanager-version.txt 2>&1
           timeout --signal=TERM --kill-after=30s 10m "$sdkmanager" --sdk_root="$ANDROID_HOME" --channel=0 \
             --install 'platforms;android-37.0' 'build-tools;36.0.0' 2>&1 | tee evidence/sdk-install.log
-          bash tools/build/install-hosted-toolchain.sh
+          bash tools/build/verify-hosted-toolchain.sh
       - name: Set up Gradle dependency cache and wrapper validation
         id: gradle
         timeout-minutes: 5
@@ -183,7 +183,7 @@ jobs:
           timeout 30 "$sdkmanager" --version > evidence/sdkmanager-version.txt 2>&1
           timeout --signal=TERM --kill-after=30s 10m "$sdkmanager" --sdk_root="$ANDROID_HOME" --channel=0 \
             --install 'platforms;android-37.0' 'build-tools;36.0.0' 2>&1 | tee evidence/sdk-install.log
-          bash tools/build/install-hosted-toolchain.sh
+          bash tools/build/verify-hosted-toolchain.sh
       - name: Set up Gradle dependency cache and wrapper validation
         id: gradle
         timeout-minutes: 5
