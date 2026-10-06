@@ -68,10 +68,17 @@ def validate_inputs(context, inventory, now, identity):
         raise ValueError("Missing JVM exec or native ec dataset")
     probe_counts = {}
     for dataset in datasets:
-        if dataset["modifiedMillis"] < context["startedMillis"] or not dataset["bytes"]:
+        native = dataset["kind"] == "native"
+        # adb pull can preserve the device's mtime; native session times also use
+        # the device clock. prepare() removes the entire native output directory,
+        # and ctime records the subsequent local write on the runner's clock.
+        # Read it from the filesystem, not device-derived inventory metadata.
+        fresh_millis = Path(dataset["path"]).stat().st_ctime_ns // 1_000_000 if native else dataset["modifiedMillis"]
+        if fresh_millis < context["startedMillis"] or not dataset["bytes"]:
             raise ValueError(f"Stale/empty execution data: {dataset['path']}")
-        if not dataset.get("sessions") or any(s["startMillis"] < context["startedMillis"] - 2000 or
-                                               s["dumpMillis"] < s["startMillis"] for s in dataset["sessions"]):
+        if not dataset.get("sessions") or any(s["dumpMillis"] < s["startMillis"] or
+                                               (not native and s["startMillis"] < context["startedMillis"] - 2000)
+                                               for s in dataset["sessions"]):
             raise ValueError(f"Stale/invalid JaCoCo session: {dataset['path']}")
         matched = 0
         for record in dataset["records"]:

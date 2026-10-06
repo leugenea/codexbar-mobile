@@ -29,6 +29,13 @@ class CoverageContracts(unittest.TestCase):
                           "records": [{"name": "synthetic/Activity", "classId": "a123", "probes": 7}]}
                          for kind, ext in (("jvm", "exec"), ("native", "ec"))],
         }
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        temporary = tempfile.TemporaryDirectory(dir=SCRATCH)
+        self.addCleanup(temporary.cleanup)
+        self.native_path = Path(temporary.name) / "app/build/outputs/code_coverage/debugAndroidTest/connected/synthetic.ec"
+        self.native_path.parent.mkdir(parents=True)
+        self.native_path.write_bytes(b"SYNTHETIC execution data")
+        self.inventory["datasets"][1]["path"] = str(self.native_path)
 
     def validate(self, context=None, inventory=None):
         return coverage_gate.validate_inputs(context or self.context, inventory or self.inventory, 7000, self.identity)
@@ -74,6 +81,61 @@ class CoverageContracts(unittest.TestCase):
 
     def test_compatible_complete_union_inputs(self):
         self.assertEqual(set(self.validate()), {"synthetic/Activity"})
+
+    def test_native_device_clock_can_lag_after_prepare_removes_old_outputs(self):
+        build = self.native_path.parents[4]
+        coverage = build / "coverage-gate"
+        with patch.object(coverage_gate, "BUILD", build), patch.object(coverage_gate, "COVERAGE", coverage), patch.object(
+                coverage_gate, "current_identity", return_value=self.identity), patch.object(
+                coverage_gate.time, "time_ns", return_value=5_000_000_000):
+            coverage_gate.prepare()
+        context = json.loads((coverage / "context.json").read_text())
+        self.assertFalse(self.native_path.exists())
+        self.assertFalse((build / "outputs/code_coverage/debugAndroidTest").exists())
+        with self.assertRaises(FileNotFoundError):
+            self.validate()
+        # Model a new adb pull preserving an earlier device mtime and sessions.
+        self.native_path.parent.mkdir(parents=True)
+        self.native_path.write_bytes(b"SYNTHETIC newly pulled execution data")
+        os.utime(self.native_path, ns=(1_000_000_000, 1_000_000_000))
+        native = self.inventory["datasets"][1]
+        native["modifiedMillis"] = self.native_path.stat().st_mtime_ns // 1_000_000
+        native["sessions"] = [{"startMillis": 1, "dumpMillis": 1000}]
+        self.assertLess(native["modifiedMillis"], context["startedMillis"])
+        self.assertGreaterEqual(self.native_path.stat().st_ctime_ns // 1_000_000, context["startedMillis"])
+        jvm = self.inventory["datasets"][0]
+        jvm["modifiedMillis"] = context["startedMillis"]
+        jvm["sessions"] = [{"startMillis": context["startedMillis"], "dumpMillis": context["startedMillis"]}]
+        self.assertEqual(set(coverage_gate.validate_inputs(
+            context, self.inventory, context["startedMillis"] + 1000, self.identity)), {"synthetic/Activity"})
+
+    def test_native_runner_ctime_before_start_rejects_even_with_fresh_device_times(self):
+        started = self.native_path.stat().st_ctime_ns // 1_000_000 + 1
+        context = dict(self.context, startedMillis=started)
+        for dataset in self.inventory["datasets"]:
+            dataset["modifiedMillis"] = started + 1000
+            dataset["sessions"] = [{"startMillis": started, "dumpMillis": started + 1000}]
+        with self.assertRaisesRegex(ValueError, "Stale/empty execution data"):
+            coverage_gate.validate_inputs(context, self.inventory, started + 2000, self.identity)
+
+    def test_native_nonempty_sessions_and_compatibility_remain_required(self):
+        for mutation in ("empty-data", "no-sessions", "invalid-session", "wrong-class-id", "no-matching-class", "probe-count"):
+            inventory = copy.deepcopy(self.inventory)
+            native = inventory["datasets"][1]
+            if mutation == "empty-data":
+                native["bytes"] = 0
+            elif mutation == "no-sessions":
+                native["sessions"] = []
+            elif mutation == "invalid-session":
+                native["sessions"] = [{"startMillis": 1000, "dumpMillis": 1}]
+            elif mutation == "wrong-class-id":
+                native["records"][0]["classId"] = "bad"
+            elif mutation == "no-matching-class":
+                native["records"] = []
+            else:
+                native["records"][0]["probes"] = 8
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.validate(inventory=inventory)
 
     def test_missing_empty_stale_and_incompatible_inputs_reject(self):
         for mutation in ("missing-jvm", "missing-native", "empty-classes", "duplicate-classes", "zero-denominator",
