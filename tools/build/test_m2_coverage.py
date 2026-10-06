@@ -1,6 +1,7 @@
 """Quick offline M2 contracts. Every runtime-like value here is explicitly synthetic."""
 import copy
 import itertools
+import json
 import os
 from pathlib import Path
 import re
@@ -31,6 +32,45 @@ class CoverageContracts(unittest.TestCase):
 
     def validate(self, context=None, inventory=None):
         return m2.validate_inputs(context or self.context, inventory or self.inventory, 7000, self.identity)
+
+    def test_identity_binds_actual_checkout_pr_head_run_and_attempt_without_receipt(self):
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as temporary:
+            event = Path(temporary) / "event.json"
+            event.write_text(json.dumps({"pull_request": {"head": {"sha": "SYNTHETIC-source-head"}}}))
+            environment = {"GITHUB_ACTIONS": "true", "GITHUB_EVENT_PATH": str(event),
+                           "GITHUB_SHA": "SYNTHETIC-event-merge", "GITHUB_RUN_ID": "SYNTHETIC-run",
+                           "GITHUB_RUN_ATTEMPT": "2"}
+            with patch.dict(os.environ, environment, clear=True), patch.object(
+                    m2.subprocess, "check_output", return_value="SYNTHETIC-actual-checkout\n"):
+                self.assertEqual(m2.current_identity(), {
+                    "checkoutSha": "SYNTHETIC-actual-checkout", "sourceHeadSha": "SYNTHETIC-source-head",
+                    "GITHUB_RUN_ID": "SYNTHETIC-run", "GITHUB_RUN_ATTEMPT": "2"})
+                event.write_text("{}")
+                self.assertEqual(m2.current_identity()["sourceHeadSha"], "SYNTHETIC-event-merge")
+                os.environ["GITHUB_RUN_ATTEMPT"] = "3"
+                self.assertEqual(m2.current_identity()["GITHUB_RUN_ATTEMPT"], "3")
+                event.write_text("invalid JSON")
+                with self.assertRaises(json.JSONDecodeError):
+                    m2.current_identity()
+
+    def test_hosted_identity_requires_event_and_run_context(self):
+        environment = {"GITHUB_ACTIONS": "true", "GITHUB_EVENT_PATH": "SYNTHETIC-unused",
+                       "GITHUB_SHA": "SYNTHETIC-head", "GITHUB_RUN_ID": "SYNTHETIC-run",
+                       "GITHUB_RUN_ATTEMPT": "1"}
+        for key in ("GITHUB_EVENT_PATH", "GITHUB_SHA", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT"):
+            incomplete = {name: value for name, value in environment.items() if name != key}
+            with self.subTest(missing=key), patch.dict(os.environ, incomplete, clear=True), patch.object(
+                    m2.subprocess, "check_output", return_value="SYNTHETIC-checkout"), patch.object(
+                    Path, "read_text", return_value="{}"), self.assertRaises(KeyError):
+                m2.current_identity()
+
+    def test_local_identity_uses_checkout_without_actions_context(self):
+        with patch.dict(os.environ, {}, clear=True), patch.object(
+                m2.subprocess, "check_output", return_value="SYNTHETIC-local-checkout"):
+            self.assertEqual(m2.current_identity(), {
+                "checkoutSha": "SYNTHETIC-local-checkout", "sourceHeadSha": "SYNTHETIC-local-checkout",
+                "GITHUB_RUN_ID": None, "GITHUB_RUN_ATTEMPT": None})
 
     def test_compatible_complete_union_inputs(self):
         self.assertEqual(set(self.validate()), {"synthetic/Activity"})

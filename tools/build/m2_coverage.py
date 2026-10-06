@@ -23,14 +23,17 @@ def digest(path):
 
 def current_identity():
     checkout = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    provenance = Path("evidence/provenance.json")
-    identity = json.loads(provenance.read_text()) if provenance.exists() else {"checkoutSha": checkout, "sourceHeadSha": checkout}
-    if identity["checkoutSha"] != checkout:
-        raise ValueError("Coverage provenance checkout differs from actual HEAD")
-    for key in ("GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT"):
-        if identity.get(key) != os.environ.get(key):
-            raise ValueError(f"Coverage provenance differs from current {key}")
-    return {key: identity.get(key) for key in IDENTITY_KEYS}
+    # Bind directly to the checkout and Actions event, not a generated receipt.
+    hosted = os.environ.get("GITHUB_ACTIONS") == "true"
+    def environment(key):
+        return os.environ[key] if hosted else os.environ.get(key)
+    event_path = environment("GITHUB_EVENT_PATH")
+    event = json.loads(Path(event_path).read_text()) if event_path else {}
+    pr = event.get("pull_request")
+    source_head = pr["head"]["sha"] if pr else environment("GITHUB_SHA") or checkout
+    return {"checkoutSha": checkout, "sourceHeadSha": source_head,
+            "GITHUB_RUN_ID": environment("GITHUB_RUN_ID"),
+            "GITHUB_RUN_ATTEMPT": environment("GITHUB_RUN_ATTEMPT")}
 
 
 def prepare():

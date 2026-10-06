@@ -25,14 +25,9 @@ jobs:
       - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           persist-credentials: false
-      - name: Record exact candidate and audited metadata
-        run: |
-          mkdir -p evidence
-          cp gradle/verification-metadata.xml evidence/committed-verification-metadata.xml
-          cp docs/build/m1-integrity.json evidence/committed-integrity-provenance.json
-          python3 tools/build/write_m1_evidence.py provenance
-          printf 'setup_started_utc=%s\ngradle_user_home=%s\ncache_provider=basic\n' \
-            "$(date -u +%FT%TZ)" "$GRADLE_USER_HOME" > evidence/setup-timings.txt
+          fetch-depth: 2
+      - name: Initialize build diagnostics
+        run: mkdir -p evidence
       - name: Cheap offline scaffold contract
         run: python3 -B -m unittest discover -s tools/build -p 'test_*.py' -v
       - name: Set up Temurin JDK 17
@@ -88,7 +83,6 @@ jobs:
       - name: Strict committed verification (mandatory; no metadata generation)
         if: steps.install.outcome == 'success'
         run: |
-          printf 'setup_completed_utc=%s\n' "$(date -u +%FT%TZ)" >> evidence/setup-timings.txt
           set -o pipefail
           ./gradlew --no-daemon --dependency-verification strict --no-build-cache --no-configuration-cache --rerun-tasks \
             --stacktrace --info --continue \
@@ -98,20 +92,7 @@ jobs:
             2>&1 | tee evidence/strict.log
           python3 tools/build/verify_m1_manifests.py
           python3 tools/build/verify_m1_test_reports.py jvm
-      - name: Bind evidence to exact files (all outcomes)
-        if: always()
-        env:
-          JAVA_SETUP_OUTCOME: ${{ steps.java.outcome }}
-          SDK_SETUP_OUTCOME: ${{ steps.install.outcome }}
-          GRADLE_SETUP_OUTCOME: ${{ steps.gradle.outcome }}
-          ANDROID_SETUP_OUTCOME: ${{ steps.android.outcome }}
-        run: |
-          mkdir -p evidence
-          printf 'evidence_bound_utc=%s\njava_setup_outcome=%s\nsdk_setup_outcome=%s\ngradle_setup_outcome=%s\nandroid_setup_outcome=%s\n' \
-            "$(date -u +%FT%TZ)" "$JAVA_SETUP_OUTCOME" "$SDK_SETUP_OUTCOME" "$GRADLE_SETUP_OUTCOME" "$ANDROID_SETUP_OUTCOME" >> evidence/setup-timings.txt
-          # Post-action saves happen after upload; this is not a cache-save receipt.
-          python3 tools/build/write_m1_evidence.py manifest
-      - name: Upload exact strict/build evidence (all outcomes)
+      - name: Upload strict logs and build outputs (all outcomes)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -139,15 +120,10 @@ jobs:
       - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           persist-credentials: false
-      - name: Record source identity and setup start
+      - name: Initialize native diagnostics
         run: |
           mkdir -p evidence/native
           : > evidence/native/emulator.log
-          python3 tools/build/write_m1_evidence.py provenance
-          printf 'setup_started_utc=%s\ngradle_user_home=%s\ncache_provider=basic\n' \
-            "$(date -u +%FT%TZ)" "$GRADLE_USER_HOME" > evidence/setup-timings.txt
-          cp gradle/verification-metadata.xml evidence/committed-verification-metadata.xml
-          cp docs/build/m1-integrity.json evidence/committed-integrity-provenance.json
       - name: Set up Temurin JDK 17
         id: java
         timeout-minutes: 5
@@ -239,22 +215,11 @@ jobs:
       - name: Run complete M1 native graph on API 36 phone (strict cached dependencies)
         timeout-minutes: 35
         run: |
-          printf 'setup_completed_utc=%s\n' "$(date -u +%FT%TZ)" >> evidence/setup-timings.txt
           timeout --signal=TERM --kill-after=30s 32m bash tools/build/run-hosted-native-smoke.sh
-      - name: Bind native evidence and exact APK/report bytes (all outcomes)
+      - name: Record native task outcomes (all outcomes)
         if: always()
-        env:
-          JAVA_SETUP_OUTCOME: ${{ steps.java.outcome }}
-          SDK_SETUP_OUTCOME: ${{ steps.install.outcome }}
-          GRADLE_SETUP_OUTCOME: ${{ steps.gradle.outcome }}
-          ANDROID_SETUP_OUTCOME: ${{ steps.android.outcome }}
-        run: |
-          printf 'evidence_bound_utc=%s\njava_setup_outcome=%s\nsdk_setup_outcome=%s\ngradle_setup_outcome=%s\nandroid_setup_outcome=%s\n' \
-            "$(date -u +%FT%TZ)" "$JAVA_SETUP_OUTCOME" "$SDK_SETUP_OUTCOME" "$GRADLE_SETUP_OUTCOME" "$ANDROID_SETUP_OUTCOME" >> evidence/setup-timings.txt
-          # Post-action saves happen after upload; this is not a cache-save receipt.
-          python3 tools/build/m2_coverage.py phases
-          python3 tools/build/write_m1_evidence.py manifest
-      - name: Upload native evidence (all outcomes; screenshots diagnostic only)
+        run: python3 tools/build/m2_coverage.py phases
+      - name: Upload native logs and build outputs (all outcomes; screenshots diagnostic only)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
