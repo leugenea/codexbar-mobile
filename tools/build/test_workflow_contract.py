@@ -50,6 +50,111 @@ class WorkflowContracts(unittest.TestCase):
             with self.subTest(mutation=old), self.assertRaises(AssertionError):
                 self.assert_descriptive_workflow_names(android.replace(old, new, 1), research)
 
+    def assert_code_metrics_contract(self, text):
+        self.assertTrue(text.startswith("name: Code metrics\n"))
+        header, jobs_text = text.split("jobs:\n", 1)
+        self.assertIn("  pull_request:\n", header)
+        self.assertIn("  push:\n    branches: [main]\n", header)
+        self.assertIn("  workflow_dispatch:\n", header)
+        self.assertIn("permissions:\n  contents: read\n", header)
+        self.assertIn("github.workflow", header)
+        self.assertIn("github.event_name", header)
+        self.assertIn("github.event_name == 'push' && github.run_id", header)
+        self.assertIn("github.event.pull_request.number || github.ref", header)
+        jobs = dict(re.findall(r"(?ms)^  (\w+):\n(.*?)(?=^  \w+:\n|\Z)", jobs_text))
+        self.assertEqual(set(jobs), {"erosion", "duplication", "history", "pages"})
+        names = {"erosion": "Code erosion (Kotlin complexity)",
+                 "duplication": "Code duplication (jscpd)",
+                 "history": "Publish code metric history", "pages": "Deploy code metric chart"}
+        permissions = {"erosion": {"contents": "read"}, "duplication": {"contents": "read"},
+                       "history": {"contents": "write"},
+                       "pages": {"contents": "read", "pages": "write", "id-token": "write"}}
+        for job, body in jobs.items():
+            self.assertTrue(body.startswith("    name: " + names[job] + "\n"))
+            self.assertIn("runs-on: ubuntu-24.04", body)
+            # Read the six-space permission fields, stopping at the next job key.
+            permission_text = re.search(r"(?ms)^    permissions:\n((?:      [^\n]+\n)+)", body).group(1)
+            self.assertEqual(dict(re.findall(r"      ([\w-]+): (\w+)\n", permission_text)), permissions[job])
+            self.assertIn("persist-credentials: false", body)
+            steps = re.findall(r"(?m)^      - (.+)$", body)
+            self.assertTrue(all(step.startswith("name: ") for step in steps))
+        for unsafe in ("secrets.", "self-hosted", "pull_request_target", "continue-on-error", "paths:", "lizard"):
+            self.assertNotIn(unsafe, text)
+        self.assertNotRegex(text, r"\b[Mm][0-5]\b|[Mm][0-5][_-]|[Mm][0-5][A-Z]")
+        self.assertEqual(text.count("persist-credentials: false"), 4)
+        uses = re.findall(r"(?m)^\s*uses: ([\w/-]+)@([0-9a-f]{40}) # (v[\d.]+)$", text)
+        self.assertEqual(len(re.findall(r"(?m)^\s*uses:", text)), len(uses))
+        pins = {
+            "actions/checkout": ("08eba0b27e820071cde6df949e0beb9ba4906955", "v4.3.0"),
+            "actions/setup-python": ("5fda3b95a4ea91299a34e894583c3862153e4b97", "v7.0.0"),
+            "actions/upload-artifact": ("ea165f8d65b6e75b540449e92b4886f43607fa02", "v4.6.2"),
+            "actions/download-artifact": ("d3f86a106a0bac45b974a628896c90dbdf5c8093", "v4.3.0"),
+            "benchmark-action/github-action-benchmark": ("4322e5726e6334590d251fc4f92bec0efafc45dc", "v1.22.2"),
+            "actions/upload-pages-artifact": ("fc324d3547104276b827a68afc52ff2a11cc49c9", "v5.0.0"),
+            "actions/deploy-pages": ("368f82528645a54fb793d4d04e342629a3f51346", "v5.0.1"),
+        }
+        self.assertEqual({action for action, _, _ in uses}, set(pins))
+        for action, sha, version in uses:
+            self.assertEqual((sha, version), pins[action])
+        for job, artifact in (("erosion", "code-erosion"), ("duplication", "code-duplication")):
+            body = jobs[job]
+            self.assertNotRegex(body, r"(?m)^    (?:if|needs):")
+            self.assertIn("-m unittest discover -s tools/metrics", body)
+            self.assertIn("name: " + artifact, body)
+            self.assertIn("report.json", body)
+            self.assertIn("report.md", body)
+            self.assertIn('>> "$GITHUB_STEP_SUMMARY"', body)
+            self.assertIn("if-no-files-found: error", body)
+        self.assertIn("--require-hashes --no-deps -r .github/requirements-metrics.txt", jobs["erosion"])
+        duplicate = jobs["duplication"]
+        self.assertIn("97259f222ea7f6d51a0f2faa98ed5889430233e0fb8d2c129f23d84aff4b93b2", duplicate)
+        self.assertLess(duplicate.index("sha256sum -c -"), duplicate.index("tar -xzf"))
+        self.assertIn("--threshold 100 --fail-on-empty", duplicate)
+        history, pages = jobs["history"], jobs["pages"]
+        for body in (history, pages):
+            condition = re.search(r"(?m)^    if: (.+)$", body).group(1)
+            self.assertIn("github.event_name == 'push'", condition)
+            self.assertIn("github.ref == 'refs/heads/main'", condition)
+            self.assertIn("queue: max", body)
+            self.assertIn("cancel-in-progress: false", body)
+        self.assertIn("needs: [erosion, duplication]", history)
+        self.assertIn("needs: history", pages)
+        for value in ("tool: customSmallerIsBetter", "gh-pages-branch: gh-pages",
+                      "benchmark-data-dir-path: dev/bench", "auto-push: true",
+                      'alert-threshold: "110%"', "comment-on-alert: true", "fail-on-alert: false"):
+            self.assertEqual(history.count(value), 2, value)
+        self.assertIn("name: Code erosion", history)
+        self.assertIn("name: Code duplication", history)
+        self.assertIn("name: github-pages", pages)
+        self.assertIn("ref: gh-pages", pages)
+        self.assertIn("touch .nojekyll", pages)
+        self.assertIn("name: github-pages-${{ github.run_attempt }}", pages)
+        self.assertIn("artifact_name: github-pages-${{ github.run_attempt }}", pages)
+
+    def test_code_metrics_are_informational_and_privilege_is_main_only(self):
+        self.assert_code_metrics_contract((ROOT / ".github/workflows/code-metrics.yml").read_text())
+        android = (ROOT / ".github/workflows/android.yml").read_text()
+        self.assertIn("needs: [build, instrumented]", android)
+        self.assertNotIn("erosion", android)
+        self.assertNotIn("duplication", android)
+        for path in (ROOT / ".github/workflows").glob("*.y*ml"):
+            text = path.read_text()
+            self.assertEqual(len(re.findall(r"(?m)^\s*uses:", text)),
+                             len(re.findall(r"(?m)^\s*uses: [\w/-]+@[0-9a-f]{40} # v[\d.]+$", text)))
+
+    def test_code_metrics_contract_rejects_privilege_and_history_regressions(self):
+        original = (ROOT / ".github/workflows/code-metrics.yml").read_text()
+        for old, new in (("      contents: read", "      contents: write"),
+                         ("queue: max", "queue: single"),
+                         ("github.event_name == 'push' && github.run_id", "github.ref"),
+                         ("github.ref == 'refs/heads/main'", "true"),
+                         ("fail-on-alert: false", "fail-on-alert: true"),
+                         ("persist-credentials: false", "persist-credentials: true"),
+                         ("artifact_name: github-pages-${{ github.run_attempt }}", "artifact_name: github-pages"),
+                         ("# v4.3.0", "# unversioned")):
+            with self.subTest(mutation=old), self.assertRaises(AssertionError):
+                self.assert_code_metrics_contract(original.replace(old, new, 1))
+
     def test_all_required_real_tests_are_declared_and_placeholders_removed(self):
         for kind, tree, filename in (
             ("jvm", "test", "OfflineShellStateTest.kt"),

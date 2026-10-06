@@ -1,0 +1,5 @@
+# Hash-pinned Linux x86_64 wheels for Python 3.11–3.14.
+# Only Kotlin counter runtime dependencies; no source distributions.
+--only-binary=:all:
+tree-sitter==0.25.2 --hash=sha256:3e65ae456ad0d210ee71a89ee112ac7e72e6c2e5aac1b95846ecc7afa68a194c --hash=sha256:b43a9e4c89d4d0839de27cd4d6902d33396de700e9ff4c5ab7631f277a85ead9 --hash=sha256:b878e296e63661c8e124177cc3084b041ba3f5936b43076d57c487822426f614 --hash=sha256:260586381b23be33b6191a07cea3d44ecbd6c01aa4c6b027a0439145fcbc3358
+tree-sitter-kotlin==1.1.0 --hash=sha256:9a92afe24b634cf914c5812af0f5c53184b1c18bdf6ee5505c83afac81f6bf6c
