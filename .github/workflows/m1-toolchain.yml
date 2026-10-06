@@ -252,6 +252,7 @@ jobs:
           printf 'evidence_bound_utc=%s\njava_setup_outcome=%s\nsdk_setup_outcome=%s\ngradle_setup_outcome=%s\nandroid_setup_outcome=%s\n' \
             "$(date -u +%FT%TZ)" "$JAVA_SETUP_OUTCOME" "$SDK_SETUP_OUTCOME" "$GRADLE_SETUP_OUTCOME" "$ANDROID_SETUP_OUTCOME" >> evidence/setup-timings.txt
           # Post-action saves happen after upload; this is not a cache-save receipt.
+          python3 tools/build/m2_coverage.py phases
           python3 tools/build/write_m1_evidence.py manifest
       - name: Upload native evidence (all outcomes; screenshots diagnostic only)
         if: always()
@@ -263,9 +264,29 @@ jobs:
             build/reports/
             app/build/reports/
             app/build/test-results/
+            app/build/outputs/unit_test_code_coverage/
+            app/build/outputs/code_coverage/
+            app/build/m2-coverage/
             app/build/outputs/androidTest-results/
             app/build/outputs/apk/
             app/build/intermediates/merged_manifests/
           if-no-files-found: error
           retention-days: 7
           include-hidden-files: false
+
+  # Adapted from leugenea/qmix .github/workflows/android.yml at
+  # 0cc3f1eb8bfb1902ac8e2fae7fba729ef53cc9f0; MIT notice in app/build.gradle.
+  # Target policy requires both jobs to succeed; no allowed skips or routes.
+  result:
+    name: M2 Android result
+    if: always()
+    needs: [checkpoint, native]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require genuine success of every mandatory Android job
+        env:
+          CHECKPOINT_RESULT: ${{ needs.checkpoint.result }}
+          NATIVE_RESULT: ${{ needs.native.result }}
+        run: |
+          [[ "$CHECKPOINT_RESULT" == success && "$NATIVE_RESULT" == success ]]

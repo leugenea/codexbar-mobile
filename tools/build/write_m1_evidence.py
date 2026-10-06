@@ -9,7 +9,8 @@ from typing import Any
 
 DIRECTORIES = ("evidence", "build/reports", "app/build/reports", "app/build/test-results",
                "app/build/outputs/apk", "app/build/outputs/androidTest-results",
-               "app/build/intermediates/merged_manifests")
+               "app/build/intermediates/merged_manifests", "app/build/outputs/unit_test_code_coverage",
+               "app/build/outputs/code_coverage", "app/build/m2-coverage")
 
 
 def provenance() -> dict:
