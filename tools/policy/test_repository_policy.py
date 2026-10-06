@@ -60,6 +60,99 @@ class RepositoryPolicyTests(unittest.TestCase):
             with self.subTest(mutation=old), self.assertRaises(ValueError):
                 workflow_policy(original.replace(old, new, 1), "repository-policy.yml")
 
+    def test_pr_rejects_every_secret_context_reference(self):
+        original = (ROOT / ".github/workflows/repository-policy.yml").read_text()
+        for expression in (
+            "SECRETS.REVIEW_TEST", "SeCrEtS.REVIEW_TEST", "toJSON(secrets)",
+            "toJSON(SeCrEtS)", "secrets['REVIEW_TEST']", "SECRETS['REVIEW_TEST']",
+            "secrets", "format('{0}', secrets)", "format('}}', secrets.REVIEW_TEST)",
+            "format('it''s }}', SECRETS.REVIEW_TEST)",
+            "github.ref }} ${{ toJSON(SECRETS)",
+        ):
+            fixture = original + "\nenv:\n  REVIEW_VALUE: ${{ " + expression + " }}\n"
+            with self.subTest(expression=expression), self.assertRaisesRegex(ValueError, "must not use secrets"):
+                workflow_policy(fixture, "fixture.yaml")
+        # Inspect decoded YAML values, not only their source spelling.
+        encoded = original + '\nenv:\n  REVIEW_VALUE: "${{ \\u0073ecrets.REVIEW_TEST }}"\n'
+        with self.assertRaisesRegex(ValueError, "must not use secrets"):
+            workflow_policy(encoded, "fixture.yaml")
+        for key in ("secrets", "SECRETS", "SeCrEtS"):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "must not use secrets"):
+                workflow_policy(original + f"\n{key}: inherit\n", "fixture.yaml")
+        for condition in ("SECRETS.REVIEW_TEST != ''", "contains(toJSON(secrets), 'x')",
+                          "contains(toJSON(SECRETS), '${{')"):
+            for old, new in (
+                ("  policy:\n", "  policy:\n    if: " + condition + "\n"),
+                ("persist-credentials: false", "persist-credentials: false\n        if: " + condition),
+            ):
+                fixture = original.replace(old, new, 1)
+                with self.subTest(condition=condition, placement=old), self.assertRaisesRegex(
+                    ValueError, "must not use secrets"
+                ):
+                    workflow_policy(fixture, "fixture.yaml")
+        folded = original + "\nenv:\n  REVIEW_VALUE: >-\n    ${{ toJSON(\n    SECRETS) }}\n"
+        with self.assertRaisesRegex(ValueError, "must not use secrets"):
+            workflow_policy(folded, "fixture.yaml")
+
+    def test_non_secret_expressions_and_literal_names_remain_allowed(self):
+        original = (ROOT / ".github/workflows/repository-policy.yml").read_text()
+        for expression in (
+            "github.token", "GITHUB.TOKEN", "env.secrets", "github.event.secrets",
+            "vars['secrets']", "format('secrets', github.ref)", "'it''s SECRETS'",
+            "'secrets.REVIEW_TEST'", "format('}}', github.ref)",
+            "'secrets' }} ${{ github.ref",
+        ):
+            fixture = original + "\nenv:\n  REVIEW_VALUE: ${{ " + expression + " }}\n"
+            with self.subTest(expression=expression):
+                workflow_policy(fixture, "fixture.yaml")
+        workflow_policy(original + "\n# Document the secrets context without using it.\n", "fixture.yaml")
+        workflow_policy(original + "\nenv:\n  REVIEW_VALUE: secrets.REVIEW_TEST\n", "fixture.yaml")
+        for condition in ("contains('secrets', github.ref)", "contains('${{', github.ref)",
+                          "${{ github.ref != '' }}"):
+            fixture = original.replace("  policy:\n", "  policy:\n    if: " + condition + "\n", 1)
+            with self.subTest(condition=condition):
+                workflow_policy(fixture, "fixture.yaml")
+
+    def test_checkout_identity_is_case_insensitive_and_includes_subpaths(self):
+        original = (ROOT / ".github/workflows/repository-policy.yml").read_text()
+        checkout = load_yaml(original)["jobs"]["policy"]["steps"][0]["uses"]
+        revision = checkout.split("@", 1)[1]
+        for identity in ("Actions/Checkout", "ACTIONS/CHECKOUT", "actions/checkout/subpath", "Actions/Checkout/subpath"):
+            fixture = original.replace(checkout, f"{identity}@{revision}", 1)
+            with self.subTest(identity=identity):
+                workflow_policy(fixture, "fixture.yaml")
+            for credentials in ("persist-credentials: true", "persist-credentials: 'false'", "fetch-depth: 1"):
+                with self.subTest(identity=identity, credentials=credentials), self.assertRaisesRegex(
+                    ValueError, "checkout must use persist-credentials: false"
+                ):
+                    workflow_policy(fixture.replace("persist-credentials: false", credentials, 1), "fixture.yaml")
+
+    def test_local_docker_and_traversal_action_references_cannot_masquerade_as_pins(self):
+        for identity in ("./checkout", "./actions/checkout", "../actions/checkout",
+                         "docker://alpine", "Docker://alpine", "DOCKER://alpine",
+                         "actions/checkout/../other", "actions/checkout/./subpath"):
+            reference = identity + "@" + "a" * 40
+            with self.subTest(reference=reference), self.assertRaisesRegex(ValueError, "external Action"):
+                action_policy(f"- uses: {reference} # v4.3.0\n")
+        action_policy("- uses: OWNER/Repository/Subpath@" + "A" * 40 + " # v1.2.3\n")
+
+    def test_permission_and_runner_case_variants_fail_closed(self):
+        original = (ROOT / ".github/workflows/repository-policy.yml").read_text()
+        for old, new in (
+            ("permissions:\n  contents: read", "permissions: WRITE-ALL"),
+            ("permissions:\n  contents: read", "permissions: Write-All"),
+            ("permissions:\n  contents: read", "permissions:\n  CONTENTS: read"),
+            ("permissions:\n  contents: read", "permissions:\n  contents: READ"),
+            ("    permissions: {}", "    permissions: WRITE-ALL"),
+            ("    permissions: {}", "    permissions:\n      Contents: Write"),
+            ("    runs-on: ubuntu-24.04", "    runs-on: Self-Hosted"),
+            ("    runs-on: ubuntu-24.04", "    runs-on: [SELF-HOSTED, linux]"),
+            ("    runs-on: ubuntu-24.04", "    runs-on: {labels: [Self-Hosted, Linux]}"),
+        ):
+            self.assertIn(old, original)
+            with self.subTest(mutation=new), self.assertRaises(ValueError):
+                workflow_policy(original.replace(old, new, 1), "fixture.yaml")
+
     def test_only_metric_history_and_pages_can_write_and_only_on_main_push(self):
         original = (ROOT / ".github/workflows/code-metrics.yml").read_text()
         workflow_policy(original, "code-metrics.yml")

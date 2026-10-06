@@ -42,6 +42,13 @@ SCHEMA_SHA256 = "57efbbcba05d2c26ad8e00b2ab295f797931652174d4e7d5272615069ecea61
 ACTION_USE = re.compile(
     r"^\s*-?\s*uses:\s+(?P<reference>[^\s#]+)(?:\s+#\s+(?P<comment>\S+))?\s*$"
 )
+ACTION_REFERENCE = re.compile(
+    r"[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*@[0-9a-fA-F]{40}"
+)
+# Single-quoted expression literals escape quotes by doubling them. Delimiters
+# inside those literals must not end the expression or expose fake identifiers.
+EXPRESSION = re.compile(r"\$\{\{((?:'(?:[^']|'')*'|[^'])*?)\}\}", re.DOTALL)
+EXPRESSION_TOKEN = re.compile(r"'(?:[^']|'')*'|[A-Za-z_][A-Za-z0-9_-]*|[^\s]")
 WRITERS = {
     "history": (
         {"contents": "write"},
@@ -91,6 +98,11 @@ def workflow_files(directory):
     return sorted((*directory.glob("*.yml"), *directory.glob("*.yaml")))
 
 
+def action_identity(reference):
+    """Canonical owner/repository identity, independent of subpath and revision."""
+    return "/".join(reference.split("@", 1)[0].split("/")[:2]).casefold()
+
+
 def action_policy(text):
     """Offline pin/comment syntax, not proof of release-to-SHA correspondence."""
     lines = text.splitlines()
@@ -115,7 +127,8 @@ def action_policy(text):
                 if match is None:
                     raise ValueError(f"line {number}: malformed uses entry")
                 reference = match.group("reference")
-                require(re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-fA-F]{40}", reference),
+                require(ACTION_REFERENCE.fullmatch(reference)
+                        and not {".", ".."}.intersection(reference.split("@", 1)[0].split("/")),
                         f"line {number}: external Action must use a full 40-character SHA")
                 require(re.fullmatch(r"v\d+(?:\.\d+){0,2}", match.group("comment") or ""),
                         f"line {number}: Action needs an adjacent semver release comment")
@@ -123,9 +136,32 @@ def action_policy(text):
 
 def contains_key(value, key):
     if isinstance(value, dict):
-        return key in value or any(contains_key(child, key) for child in value.values())
+        return any(str(name).casefold() == key.casefold() for name in value) or any(
+            contains_key(child, key) for child in value.values()
+        )
     if isinstance(value, list):
         return any(contains_key(child, key) for child in value)
+    return False
+
+
+def contains_secrets_context(value):
+    """Inspect decoded YAML expressions, not comments, literals or property names."""
+    if isinstance(value, dict):
+        for name, child in value.items():
+            # GitHub evaluates job/step if conditions even without ${{ }}.
+            if str(name).casefold() == "if" and isinstance(child, str):
+                child = "${{ " + child + " }}"
+            if contains_secrets_context(name) or contains_secrets_context(child):
+                return True
+    if isinstance(value, list):
+        return any(contains_secrets_context(child) for child in value)
+    if isinstance(value, str):
+        for expression in EXPRESSION.finditer(value):
+            previous = None
+            for token in EXPRESSION_TOKEN.findall(expression.group(1)):
+                if token.casefold() == "secrets" and previous != ".":
+                    return True
+                previous = token
     return False
 
 
@@ -139,7 +175,7 @@ def workflow_policy(text, filename):
     require(isinstance(triggers, (dict, list, str)), "missing workflow events")
     require("pull_request_target" not in triggers, "pull_request_target is prohibited")
     if "pull_request" in triggers:
-        require(not re.search(r"\bsecrets\s*(?:\.|\[)", text) and not contains_key(workflow, "secrets"),
+        require(not contains_secrets_context(workflow) and not contains_key(workflow, "secrets"),
                 "PR workflow must not use secrets")
     jobs = workflow.get("jobs")
     require(isinstance(jobs, dict) and jobs, "workflow must have jobs")
@@ -157,7 +193,7 @@ def workflow_policy(text, filename):
         else:
             require(permission in ({}, {"contents": "read"}), f"{name}: job permissions must be read-only")
         for step in job.get("steps", []):
-            if str(step.get("uses", "")).startswith("actions/checkout@"):
+            if action_identity(str(step.get("uses", ""))) == "actions/checkout":
                 require(step.get("with", {}).get("persist-credentials") is False,
                         f"{name}: checkout must use persist-credentials: false")
 
