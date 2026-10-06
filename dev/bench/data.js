@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791326968115,
+  "lastUpdate": 1791330582474,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -57,6 +57,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/3fcbdcac9e10560d4995b19938a67dad7f4348cf"
         },
         "date": 1791326964625,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7ff439f25996cfdaff21b96949a9e5d7a0cff20b",
+          "message": "fix(ci): diagnose truncated instrumented coverage and retry once after ADB disconnect (#34)\n\n* fix(ci): use runner-clock evidence for instrumented coverage freshness (#32)\n\n* fix(ci): diagnose truncated instrumented coverage and retry once after ADB disconnect (#32)",
+          "timestamp": "2026-10-07T02:49:19+03:00",
+          "tree_id": "948d3a9b8a9558057045707f7da6eb486aa09780",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/7ff439f25996cfdaff21b96949a9e5d7a0cff20b"
+        },
+        "date": 1791330581742,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
