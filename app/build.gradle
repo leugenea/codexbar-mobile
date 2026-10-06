@@ -104,9 +104,29 @@ abstract class DebugCoverageInputs extends DefaultTask {
             if (!unit.isFile() || nativeFiles.empty) throw new GradleException('Missing JVM exec or native ec coverage data')
             def union = newInstance('org.jacoco.core.tools.ExecFileLoader')
             def datasets = ([unit] + nativeFiles).collect { file ->
-                union.load(file) // also rejects conflicting probe counts within the union
+                def kind = file == unit ? 'jvm' : 'native'
+                def relative = base.toPath().relativize(file.toPath()).toString()
+                // AGP's exec-out collector can return exit=0 on a disconnected
+                // transport with zero/truncated stdout. Record the exact failure
+                // before rejecting it; never let an incomplete dataset reach the report.
+                def rejectCollection = { reason ->
+                    new File(output.parentFile, 'collection-failure.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
+                        kind: kind, reason: reason, path: relative, bytes: file.length(),
+                        modifiedMillis: file.lastModified(),
+                        sha256: MessageDigest.getInstance('SHA-256').digest(file.bytes).encodeHex().toString()])) + '\n'
+                }
+                if (file.length() == 0) {
+                    rejectCollection('empty')
+                    throw new GradleException("Empty ${kind} execution data (0 bytes): ${relative}")
+                }
                 def execution = newInstance('org.jacoco.core.tools.ExecFileLoader')
-                execution.load(file)
+                try {
+                    execution.load(file)
+                } catch (java.io.EOFException failure) {
+                    rejectCollection('truncated')
+                    throw new GradleException("Truncated ${kind} JaCoCo execution data (${file.length()} bytes): ${relative}", failure)
+                }
+                union.load(file) // also rejects conflicting probe counts within the union
                 [kind: file == unit ? 'jvm' : 'native', path: base.toPath().relativize(file.toPath()).toString(),
                  bytes: file.length(), modifiedMillis: file.lastModified(),
                  sessions: execution.sessionInfoStore.infos.collect { session ->
@@ -297,7 +317,7 @@ tasks.register('jacocoDebugCoverageVerification', JacocoCoverageVerification) {
 // terminal task states, not inferred from banners or the aggregate process exit.
 gradle.taskGraph.afterTask { task, state ->
     if (task.path in [':app:testDebugUnitTest', ':app:connectedDebugAndroidTest',
-                     ':app:jacocoDebugReport', ':app:jacocoDebugCoverageVerification']) {
+                     ':app:collectDebugCoverageInputs', ':app:jacocoDebugReport', ':app:jacocoDebugCoverageVerification']) {
         def outcome = state.failure ? 'FAILED' : state.noSource ? 'NO_SOURCE' :
             state.upToDate ? 'UP_TO_DATE' : state.skipped ? 'SKIPPED' : 'SUCCESS'
         logger.lifecycle("COVERAGE_TASK_OUTCOME ${task.path} ${outcome}")

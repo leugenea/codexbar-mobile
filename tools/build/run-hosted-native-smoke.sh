@@ -150,16 +150,56 @@ logcat_pid=$!
 : > evidence/native/boot-success.txt
 printf '%s\n' 'boundary=strict-native-tests' >> evidence/native/boundaries.txt
 # The complete native test task, no class/method filters and no metadata bypass/generation.
-set +e
-timeout --signal=TERM --kill-after=30s 15m ./gradlew --no-daemon --dependency-verification strict \
-  --no-build-cache --no-configuration-cache --rerun-tasks \
-  --stacktrace --info --console=plain -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
-  :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest \
-  :app:connectedDebugAndroidTest :app:jacocoDebugCoverageVerification \
-  2>&1 | tee evidence/native/strict-connected.log
-test_status=$?
-printf 'graph_task_exit=%s\n' "$test_status" > evidence/native/graph-exit-status.txt
+# Keep the original 15-minute graph budget across both attempts. A retry is
+# allowed only for empty/truncated native coverage AND ADB-offline evidence after
+# passing suites. It reruns the whole graph: JVM/native data must share compilation.
+graph_deadline=$((SECONDS + 900))
+coverage_attempt=1
+while :; do
+  attempt_dir="evidence/native/attempt-$coverage_attempt"
+  mkdir -p "$attempt_dir"
+  printf 'coverage_graph_attempt=%s\n' "$coverage_attempt" >> evidence/native/boundaries.txt
+  remaining=$((graph_deadline - SECONDS))
+  (( remaining > 0 )) || exit 124
+  set +e
+  timeout --signal=TERM --kill-after=30s "${remaining}s" ./gradlew --no-daemon --dependency-verification strict \
+    --no-build-cache --no-configuration-cache --rerun-tasks \
+    --stacktrace --info --console=plain -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
+    :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest \
+    :app:connectedDebugAndroidTest :app:jacocoDebugCoverageVerification \
+    2>&1 | tee evidence/native/strict-connected.log "$attempt_dir/strict-connected.log"
+  test_status=$?
+  set -e
+  printf 'graph_task_exit=%s\n' "$test_status" | tee evidence/native/graph-exit-status.txt "$attempt_dir/graph-exit-status.txt"
+  python3 tools/build/coverage_gate.py phases > "$attempt_dir/phases.log" 2>&1
+  cp evidence/native/task-phase-outcomes.json "$attempt_dir/task-phase-outcomes.json"
+  if (( test_status == 0 || coverage_attempt == 2 )); then break; fi
+  if ! python3 -B tools/build/native_coverage_retry.py --exit "$test_status" \
+      > evidence/native/retry-decision.log 2>&1; then break; fi
+  printf '%s\n' 'Retrying the full coverage graph once after ADB-offline incomplete coverage; attempt 1 is preserved.' >&2
+  timeout 15 "$adb" -s "$ANDROID_SERIAL" logcat -d -v threadtime \
+    > "$attempt_dir/logcat-at-retry.txt" 2>&1 || true
+  # Reconnection, not a blind delay. No force-stop/pm clear/emulator teardown
+  # occurs before AGP has finished collection and the failed data is archived.
+  retry_ready=false
+  retry_deadline=$((SECONDS + 60))
+  while (( SECONDS < retry_deadline && SECONDS < graph_deadline )); do
+    if ! kill -0 "$emulator_pid"; then break; fi
+    state=$(timeout 5 "$adb" -s "$ANDROID_SERIAL" get-state 2>/dev/null || true)
+    boot=$(timeout 5 "$adb" -s "$ANDROID_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
+    printf 'state=%s boot=%s elapsed=%s\n' "$state" "$boot" "$SECONDS" >> evidence/native/retry-readiness.log
+    if [[ "$state" == device && "$boot" == 1 ]] &&
+        timeout 5 "$adb" -s "$ANDROID_SERIAL" shell pm path android >> evidence/native/retry-readiness.log 2>&1; then
+      retry_ready=true
+      break
+    fi
+    sleep 1
+  done
+  [[ "$retry_ready" == true ]] || exit "$test_status"
+  coverage_attempt=2
+done
 # Evaluate the actual suites even if a later coverage task failed.
+set +e
 python3 tools/build/verify_manifests.py
 manifest_status=$?
 python3 tools/build/verify_test_reports.py native
