@@ -1,4 +1,4 @@
-"""Cheap M1 source/workflow contracts and explicitly synthetic report-parser tests."""
+"""Cheap build source/workflow contracts and explicitly synthetic report-parser tests."""
 import os
 from pathlib import Path
 import re
@@ -7,14 +7,49 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-from verify_m1_manifests import check_manifest
-from verify_m1_test_reports import CLASS, EXPECTED, verify_reports
+from verify_manifests import check_manifest
+from verify_test_reports import CLASS, EXPECTED, verify_reports
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRATCH = Path(os.environ.get("RUNNER_TEMP", os.environ.get("M1_CONTRACT_SCRATCH", tempfile.gettempdir())))
+SCRATCH = Path(os.environ.get("RUNNER_TEMP", os.environ.get("BUILD_CONTRACT_SCRATCH", tempfile.gettempdir())))
 
 
-class M1Contracts(unittest.TestCase):
+class WorkflowContracts(unittest.TestCase):
+    def assert_descriptive_workflow_names(self, android, research):
+        expected = {
+            "Android": {
+                "build": "Build, lint and unit tests (strict dependency verification)",
+                "instrumented": "Instrumented tests and coverage (API 36 emulator)",
+                "result": "Android CI result",
+            },
+            "Research contract": {"contract": "Validate research fixtures and schemas"},
+        }
+        for workflow, text in (("Android", android), ("Research contract", research)):
+            self.assertTrue(text.startswith("name: " + workflow + "\n"))
+            jobs = dict(re.findall(r"(?m)^  (\w+):\n    name: (.+)$", text))
+            self.assertEqual(jobs, expected[workflow])
+            steps = re.findall(r"(?m)^      - (.+)$", text)
+            self.assertTrue(steps)
+            self.assertTrue(all(step.startswith("name: ") for step in steps),
+                            "Every CI step must have a descriptive display name")
+            self.assertNotRegex(text, r"\b[Mm][0-5]\b|[Mm][0-5][_-]|[Mm][0-5][A-Z]")
+
+    def test_stable_check_names_and_descriptive_workflows_and_steps(self):
+        self.assert_descriptive_workflow_names(
+            (ROOT / ".github/workflows/android.yml").read_text(),
+            (ROOT / ".github/workflows/research-contract.yml").read_text(),
+        )
+
+    def test_name_contract_rejects_ambiguous_checks_and_unnamed_steps(self):
+        android = (ROOT / ".github/workflows/android.yml").read_text()
+        research = (ROOT / ".github/workflows/research-contract.yml").read_text()
+        for old, new in (("name: Android\n", "name: Pipeline\n"),
+                         ("name: Android CI result", "name: Result"),
+                         ("  build:\n", "  checkpoint:\n"),
+                         ("      - name: Check out repository\n        uses:", "      - uses:")):
+            with self.subTest(mutation=old), self.assertRaises(AssertionError):
+                self.assert_descriptive_workflow_names(android.replace(old, new, 1), research)
+
     def test_all_required_real_tests_are_declared_and_placeholders_removed(self):
         for kind, tree, filename in (
             ("jvm", "test", "OfflineShellStateTest.kt"),
@@ -50,15 +85,15 @@ class M1Contracts(unittest.TestCase):
         self.assertIn("LiveRegionMode.Polite", source)
 
     def test_native_job_is_narrow_strict_read_only_and_observable(self):
-        workflow = (ROOT / ".github/workflows/m1-toolchain.yml").read_text()
-        native = workflow.split("  native:\n", 1)[1]
-        self.assertIn("name: M1 native offline smoke", native)
-        self.assertIn("needs: checkpoint", native)
+        workflow = (ROOT / ".github/workflows/android.yml").read_text()
+        native = workflow.split("  instrumented:\n", 1)[1]
+        self.assertIn("name: Instrumented tests and coverage (API 36 emulator)", native)
+        self.assertIn("needs: build", native)
         self.assertIn("runs-on: ubuntu-24.04", native)
         self.assertIn("timeout-minutes: 50", native)
         self.assertIn("sudo chmod a+rw /dev/kvm", native)
         self.assertIn("if: always()", native)
-        self.assertIn("m1-native-${{ github.run_id }}-${{ github.run_attempt }}", native)
+        self.assertIn("android-instrumented-${{ github.run_id }}-${{ github.run_attempt }}", native)
         self.assertIn("app/build/outputs/androidTest-results/", native)
         for unsafe in ("secrets.", "self-hosted", "continue-on-error", "--dependency-verification off"):
             self.assertNotIn(unsafe, native)
@@ -67,7 +102,7 @@ class M1Contracts(unittest.TestCase):
                          "15 * 1024 ** 3", "kill -0", "deadline=$((SECONDS + 300))",
                          "sys.boot_completed", "cmd input keyevent", '[[ "$api" == 36 ]]',
                          "--dependency-verification strict", '${GRADLE_USER_HOME:?}',
-                         ":app:connectedDebugAndroidTest", "verify_m1_test_reports.py native",
+                         ":app:connectedDebugAndroidTest", "verify_test_reports.py native",
                          "diagnostic-screen.png", "logcat-live.txt", "project-sdk-before.sha256",
                          "system-images;android-36;google_apis;x86_64", "--channel=0"):
             self.assertIn(contract, script)
@@ -78,7 +113,7 @@ class M1Contracts(unittest.TestCase):
         self.assertEqual(installation.strip(), 'platform-tools emulator "$image"')
 
     def assert_cached_execution(self, workflow, script, verifier):
-        strict = workflow.split("- name: Strict committed verification", 1)[1].split("- name: Upload", 1)[0]
+        strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
         connected = script.split("./gradlew ", 1)[1].split("2>&1", 1)[0]
         for command in (strict, connected):
             for flag in ("--no-daemon", "--dependency-verification strict", "--no-build-cache",
@@ -89,11 +124,11 @@ class M1Contracts(unittest.TestCase):
                            "--gradle-user-home", " -g "):
                 self.assertNotIn(unsafe, command)
         self.assertEqual(re.findall(r":app:(\w+)", strict), [
-            "m1ToolchainCheckpoint", "lintDebug", "assembleDebug", "compileDebugUnitTestKotlin",
+            "verifyResolvedToolchain", "lintDebug", "assembleDebug", "compileDebugUnitTestKotlin",
             "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest",
         ])
         self.assertEqual(re.findall(r":app:(\w+)", connected), [
-            "m1ToolchainCheckpoint", "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
+            "verifyResolvedToolchain", "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
             "testDebugUnitTest", "connectedDebugAndroidTest", "jacocoDebugCoverageVerification",
         ])
         self.assertIn('${GRADLE_USER_HOME:?}', script)
@@ -126,25 +161,25 @@ class M1Contracts(unittest.TestCase):
                          '17.0.20', 'installed-archives.sha256', 'sdk-archives.sha1',
                          'write_sdk_package_metadata.py', '--install', 'GITHUB_ENV'):
             self.assertNotIn(obsolete, verifier)
-        for job in ('checkpoint', 'native'):
-            body = workflow.split('  ' + job + ':\n', 1)[1].split('\n  native:\n', 1)[0]
+        for job in ('build', 'instrumented'):
+            body = workflow.split('  ' + job + ':\n', 1)[1].split('\n  instrumented:\n', 1)[0]
             self.assertLess(body.index('uses: actions/setup-java@'), body.index('uses: android-actions/setup-android@'))
             self.assertLess(body.index('uses: android-actions/setup-android@'),
                             body.index('bash tools/build/verify-hosted-toolchain.sh'))
-        native = workflow.split('  native:\n', 1)[1]
+        native = workflow.split('  instrumented:\n', 1)[1]
         self.assertLess(native.index('bash tools/build/verify-hosted-toolchain.sh'),
                         native.index('bash tools/build/run-hosted-native-smoke.sh'))
 
     def test_cached_execution_preserves_strict_real_gates_and_observed_sdk_receipts(self):
         self.assert_cached_execution(
-            (ROOT / ".github/workflows/m1-toolchain.yml").read_text(),
+            (ROOT / ".github/workflows/android.yml").read_text(),
             (ROOT / "tools/build/run-hosted-native-smoke.sh").read_text(),
             (ROOT / "tools/build/verify-hosted-toolchain.sh").read_text(),
         )
 
     def test_cached_execution_rejects_synthetic_regressions(self):
         original = [(ROOT / path).read_text() for path in (
-            ".github/workflows/m1-toolchain.yml", "tools/build/run-hosted-native-smoke.sh",
+            ".github/workflows/android.yml", "tools/build/run-hosted-native-smoke.sh",
             "tools/build/verify-hosted-toolchain.sh")]
         mutations = [(target, flag, "") for target in (0, 1) for flag in (
             "--no-build-cache", "--no-configuration-cache", "--rerun-tasks")]
@@ -266,8 +301,8 @@ class M1Contracts(unittest.TestCase):
                     verify_sdk(path, props, metadata)
 
     def assert_host_emulator_prerequisite(self, workflow):
-        checkpoint, native = workflow.split("  native:\n", 1)
-        self.assertNotIn("apt-get", checkpoint)
+        build, native = workflow.split("  instrumented:\n", 1)
+        self.assertNotIn("apt-get", build)
         self.assertIn("runs-on: ubuntu-24.04", native)
         steps = re.split(r"(?m)^      - ", native)[1:]
         setup = [index for index, step in enumerate(steps)
@@ -306,17 +341,17 @@ class M1Contracts(unittest.TestCase):
             self.assertNotIn(unsafe, commands)
 
     def test_host_emulator_prerequisite_is_bounded_observable_and_fail_closed(self):
-        self.assert_host_emulator_prerequisite((ROOT / ".github/workflows/m1-toolchain.yml").read_text())
+        self.assert_host_emulator_prerequisite((ROOT / ".github/workflows/android.yml").read_text())
 
     def test_host_emulator_prerequisite_contract_rejects_synthetic_regressions(self):
         # Pure source controls: never install host packages or invoke an emulator here.
-        workflow = (ROOT / ".github/workflows/m1-toolchain.yml").read_text()
+        workflow = (ROOT / ".github/workflows/android.yml").read_text()
         setup_match = re.search(r"(?ms)^      - name: Prepare hosted emulator client library\n.*?"
                                 r"(?=^      - )", workflow)
         assert setup_match is not None, "Missing hosted emulator prerequisite"
         setup = setup_match.group()
         missing = workflow.replace(setup, "", 1)
-        invocation_match = re.search(r"(?ms)^      - name: Run complete M1 native graph.*?(?=^      - )", missing)
+        invocation_match = re.search(r"(?ms)^      - name: Run unit and instrumented tests with coverage.*?(?=^      - )", missing)
         assert invocation_match is not None, "Missing native invocation"
         invocation = invocation_match.group()
         for name, mutation in (

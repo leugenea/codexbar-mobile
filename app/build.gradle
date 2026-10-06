@@ -20,7 +20,7 @@ plugins {
     id 'jacoco'
 }
 
-abstract class M2CoverageInputs extends DefaultTask {
+abstract class DebugCoverageInputs extends DefaultTask {
     @InputFiles @PathSensitive(PathSensitivity.RELATIVE)
     abstract ListProperty<RegularFile> getClassJars()
     @InputFiles @PathSensitive(PathSensitivity.RELATIVE)
@@ -135,7 +135,7 @@ abstract class M2CoverageInputs extends DefaultTask {
                 tooling: tooling, analyzerVersion: analyzerVersion, jacocoVersion: '0.8.15', scopedInputs: [jars: classJars.get()*.asFile*.toString(),
                 directories: classDirs.get()*.asFile*.toString()]]
             new File(output.parentFile, 'inventory.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(inventory)) + '\n'
-            execOperations.exec { workingDir base; commandLine 'python3', 'tools/build/m2_coverage.py', 'inputs' }
+            execOperations.exec { workingDir base; commandLine 'python3', 'tools/build/coverage_gate.py', 'inputs' }
         } finally {
             loader.close()
         }
@@ -204,14 +204,14 @@ configurations.configureEach {
     resolutionStrategy.eachDependency { dependency ->
         if (dependency.requested.group == 'org.jacoco') {
             dependency.useVersion('0.8.15')
-            dependency.because('M2 audited compatible JVM/native JaCoCo union')
+            dependency.because('Audited compatible JVM/native JaCoCo union')
         }
     }
 }
 
-def prepareCoverage = tasks.register('m2PrepareDebugCoverage', Exec) {
+def prepareCoverage = tasks.register('prepareDebugCoverage', Exec) {
     workingDir rootProject.projectDir
-    commandLine 'python3', 'tools/build/m2_coverage.py', 'prepare'
+    commandLine 'python3', 'tools/build/coverage_gate.py', 'prepare'
 }
 tasks.configureEach { task ->
     if (task.name in ['testDebugUnitTest', 'connectedDebugAndroidTest']) {
@@ -219,16 +219,16 @@ tasks.configureEach { task ->
     }
 }
 
-def coverageInputs = tasks.register('m2DebugCoverageInputs', M2CoverageInputs) {
+def coverageInputs = tasks.register('collectDebugCoverageInputs', DebugCoverageInputs) {
     dependsOn 'testDebugUnitTest', 'connectedDebugAndroidTest'
     analyzerClasspath.from configurations.jacocoAnt
-    snapshot.set(layout.buildDirectory.dir('m2-coverage/classes'))
+    snapshot.set(layout.buildDirectory.dir('coverage-gate/classes'))
 }
 androidComponents.onVariants(androidComponents.selector().withBuildType('debug')) { variant ->
     variant.artifacts.forScope(ScopedArtifacts.Scope.PROJECT).use(coverageInputs).toGet(
         ScopedArtifact.CLASSES.INSTANCE, { it.classJars }, { it.classDirs })
 }
-def debugClasses = fileTree(layout.buildDirectory.dir('m2-coverage/classes')) { include '**/*.class' }
+def debugClasses = fileTree(layout.buildDirectory.dir('coverage-gate/classes')) { include '**/*.class' }
 def debugCoverageData = files(
     layout.buildDirectory.file('outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec'),
     fileTree(layout.buildDirectory.dir('outputs/code_coverage/debugAndroidTest/connected')) { include '**/*.ec' })
@@ -289,7 +289,7 @@ tasks.register('jacocoDebugCoverageVerification', JacocoCoverageVerification) {
     doFirst {
         providers.exec {
             workingDir rootProject.projectDir
-            commandLine 'python3', 'tools/build/m2_coverage.py', 'report'
+            commandLine 'python3', 'tools/build/coverage_gate.py', 'report'
         }.result.get().assertNormalExitValue()
     }
 }
@@ -300,6 +300,6 @@ gradle.taskGraph.afterTask { task, state ->
                      ':app:jacocoDebugReport', ':app:jacocoDebugCoverageVerification']) {
         def outcome = state.failure ? 'FAILED' : state.noSource ? 'NO_SOURCE' :
             state.upToDate ? 'UP_TO_DATE' : state.skipped ? 'SKIPPED' : 'SUCCESS'
-        logger.lifecycle("M2_TASK_OUTCOME ${task.path} ${outcome}")
+        logger.lifecycle("COVERAGE_TASK_OUTCOME ${task.path} ${outcome}")
     }
 }

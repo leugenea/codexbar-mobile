@@ -6,7 +6,7 @@ set -euo pipefail
 mkdir -p evidence/native
 # Create this before any infrastructure setup, so every failure has an artifact.
 : > evidence/native/emulator.log
-export ANDROID_USER_HOME="$RUNNER_TEMP/m1-android-user"
+export ANDROID_USER_HOME="$RUNNER_TEMP/android-user"
 export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
 export ADB_VENDOR_KEYS="$ANDROID_USER_HOME"
 export ANDROID_SERIAL=emulator-5554
@@ -14,7 +14,7 @@ export ANDROID_SERIAL=emulator-5554
 printf 'gradle_user_home=%s\n' "$GRADLE_USER_HOME" > evidence/native/gradle-home.txt
 mkdir -p "$ANDROID_AVD_HOME"
 image='system-images;android-36;google_apis;x86_64'
-avd='m1-api36-phone'
+avd='android-api36-phone'
 emulator_pid=''
 logcat_pid=''
 adb="$ANDROID_HOME/platform-tools/adb"
@@ -38,7 +38,7 @@ cleanup() {
     fi
   done
   if [[ -x "$adb" ]]; then timeout 15 "$adb" kill-server >> evidence/native/cleanup.log 2>&1; fi
-  python3 tools/build/m2_coverage.py phases --exit "$status"
+  python3 tools/build/coverage_gate.py phases --exit "$status"
   receipt_status=$?
   if (( status == 0 && receipt_status != 0 )); then status=$receipt_status; fi
   printf 'native_script_exit=%s\n' "$status" > evidence/native/exit-status.txt
@@ -153,18 +153,18 @@ printf '%s\n' 'boundary=strict-native-tests' >> evidence/native/boundaries.txt
 set +e
 timeout --signal=TERM --kill-after=30s 15m ./gradlew --no-daemon --dependency-verification strict \
   --no-build-cache --no-configuration-cache --rerun-tasks \
-  --stacktrace --info --console=plain -I tools/build/toolchain.init.gradle :app:m1ToolchainCheckpoint \
+  --stacktrace --info --console=plain -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
   :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest \
   :app:connectedDebugAndroidTest :app:jacocoDebugCoverageVerification \
   2>&1 | tee evidence/native/strict-connected.log
 test_status=$?
 printf 'graph_task_exit=%s\n' "$test_status" > evidence/native/graph-exit-status.txt
 # Evaluate the actual suites even if a later coverage task failed.
-python3 tools/build/verify_m1_manifests.py
+python3 tools/build/verify_manifests.py
 manifest_status=$?
-python3 tools/build/verify_m1_test_reports.py native
+python3 tools/build/verify_test_reports.py native
 native_report_status=$?
-python3 tools/build/verify_m1_test_reports.py jvm
+python3 tools/build/verify_test_reports.py jvm
 jvm_report_status=$?
 "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions app/build/outputs/apk/debug/app-debug.apk \
   > evidence/native/apk-permissions.txt

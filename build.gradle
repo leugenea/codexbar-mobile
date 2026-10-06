@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // Official higher-KGP mechanism for AGP built-in Kotlin (M0 selection).
+        // Official higher-KGP mechanism for AGP built-in Kotlin (research selection).
         classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.20'
     }
 }
