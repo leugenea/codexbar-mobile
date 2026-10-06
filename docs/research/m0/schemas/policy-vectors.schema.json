@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidenceKind",
+    "cases"
+  ],
+  "properties": {
+    "evidenceKind": {
+      "const": "synthetic_policy_vectors_not_live"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "caseId",
+          "httpStatus",
+          "terminalRefresh",
+          "expectedOutcome"
+        ],
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "httpStatus": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 100,
+            "maximum": 599
+          },
+          "terminalRefresh": {
+            "type": "boolean"
+          },
+          "expectedOutcome": {
+            "enum": [
+              "ok",
+              "one_serialized_refresh",
+              "reauthorize",
+              "forbidden_not_plan_or_zero",
+              "retry_after_preserve_credentials",
+              "transient_keep_last_success"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

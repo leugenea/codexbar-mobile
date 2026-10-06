@@ -1,0 +1,248 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "evidenceKind",
+    "retrievalDate",
+    "observedAt",
+    "limitations",
+    "auth",
+    "usage",
+    "resets"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "m0-owner-receipt/v1"
+    },
+    "evidenceKind": {
+      "const": "owner_reported_live"
+    },
+    "retrievalDate": {
+      "const": "2026-10-06"
+    },
+    "observedAt": {
+      "const": null
+    },
+    "limitations": {
+      "const": [
+        "Owner supplied sanitized local Mac probe output; not captured raw HTTP traffic or independently repeated live calls",
+        "Token exchange is not validated account/workspace identity",
+        "No refresh, logout or Android execution proof"
+      ]
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "httpStatus",
+        "state",
+        "clientKind",
+        "identityVerified",
+        "grantScope",
+        "workspace",
+        "accountHeader",
+        "mobileSuitability"
+      ],
+      "properties": {
+        "httpStatus": {
+          "const": 200
+        },
+        "state": {
+          "const": "exchange_succeeded_identity_unverified"
+        },
+        "clientKind": {
+          "const": "upstream_codex_public_client"
+        },
+        "identityVerified": {
+          "const": false
+        },
+        "grantScope": {
+          "const": "unverified"
+        },
+        "workspace": {
+          "const": "unverified"
+        },
+        "accountHeader": {
+          "const": "omitted"
+        },
+        "mobileSuitability": {
+          "const": "unverified"
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "httpStatus",
+        "allowed",
+        "limitReached",
+        "bankedSummaryCount",
+        "primaryWindow",
+        "secondaryWindow",
+        "observedAt"
+      ],
+      "properties": {
+        "httpStatus": {
+          "const": 200
+        },
+        "allowed": {
+          "const": true
+        },
+        "limitReached": {
+          "const": false
+        },
+        "bankedSummaryCount": {
+          "const": 2
+        },
+        "primaryWindow": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "windowSeconds",
+            "usedPercent",
+            "resetAfterSeconds",
+            "resetAtEpochSeconds"
+          ],
+          "properties": {
+            "windowSeconds": {
+              "const": 604800
+            },
+            "usedPercent": {
+              "const": 5
+            },
+            "resetAfterSeconds": {
+              "const": 488197
+            },
+            "resetAtEpochSeconds": {
+              "const": 1791756793
+            }
+          }
+        },
+        "secondaryWindow": {
+          "const": "unavailable"
+        },
+        "observedAt": {
+          "const": null
+        }
+      }
+    },
+    "resets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "httpStatus",
+        "availableCount",
+        "inventoryCount",
+        "inventoryValid",
+        "truncated",
+        "observedAt",
+        "items"
+      ],
+      "properties": {
+        "httpStatus": {
+          "const": 200
+        },
+        "availableCount": {
+          "const": 2
+        },
+        "inventoryCount": {
+          "const": 2
+        },
+        "inventoryValid": {
+          "const": true
+        },
+        "truncated": {
+          "const": false
+        },
+        "observedAt": {
+          "const": null
+        },
+        "items": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "providerStatus",
+                "shapeValid",
+                "expiryKnowledge",
+                "expiryFormat",
+                "expiryInputType",
+                "expiryInput",
+                "expiresAtEpochSeconds"
+              ],
+              "properties": {
+                "providerStatus": {
+                  "const": "available"
+                },
+                "shapeValid": {
+                  "const": true
+                },
+                "expiryKnowledge": {
+                  "const": "known"
+                },
+                "expiryFormat": {
+                  "const": "iso8601_utc"
+                },
+                "expiryInputType": {
+                  "const": "string"
+                },
+                "expiryInput": {
+                  "const": "2026-10-22T20:31:56.833553Z"
+                },
+                "expiresAtEpochSeconds": {
+                  "const": 1792701116
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "providerStatus",
+                "shapeValid",
+                "expiryKnowledge",
+                "expiryFormat",
+                "expiryInputType",
+                "expiryInput",
+                "expiresAtEpochSeconds"
+              ],
+              "properties": {
+                "providerStatus": {
+                  "const": "available"
+                },
+                "shapeValid": {
+                  "const": true
+                },
+                "expiryKnowledge": {
+                  "const": "known"
+                },
+                "expiryFormat": {
+                  "const": "iso8601_utc"
+                },
+                "expiryInputType": {
+                  "const": "string"
+                },
+                "expiryInput": {
+                  "const": "2026-10-29T18:58:37.564252Z"
+                },
+                "expiresAtEpochSeconds": {
+                  "const": 1793300317
+                }
+              }
+            }
+          ],
+          "items": false
+        }
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:codexbar-mobile:m0:owner-receipt:v1",
+  "title": "Exact sanitized owner receipt, not provider wire schema"
+}

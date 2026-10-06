@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Observed upstream reset TEST shape, not a normative provider API schema",
+  "type": "object",
+  "required": [
+    "available_count",
+    "credits"
+  ],
+  "properties": {
+    "available_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "credits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "reset_type",
+          "status",
+          "granted_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reset_type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "granted_at": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "evidenceKind": "synthetic_policy_vectors_not_live",
+  "cases": [
+    {
+      "caseId": "read-401",
+      "httpStatus": 401,
+      "terminalRefresh": false,
+      "expectedOutcome": "one_serialized_refresh"
+    },
+    {
+      "caseId": "terminal-401",
+      "httpStatus": 401,
+      "terminalRefresh": true,
+      "expectedOutcome": "reauthorize"
+    },
+    {
+      "caseId": "read-403",
+      "httpStatus": 403,
+      "terminalRefresh": false,
+      "expectedOutcome": "forbidden_not_plan_or_zero"
+    },
+    {
+      "caseId": "read-429",
+      "httpStatus": 429,
+      "terminalRefresh": false,
+      "expectedOutcome": "retry_after_preserve_credentials"
+    },
+    {
+      "caseId": "network-failure",
+      "httpStatus": null,
+      "terminalRefresh": false,
+      "expectedOutcome": "transient_keep_last_success"
+    },
+    {
+      "caseId": "read-503",
+      "httpStatus": 503,
+      "terminalRefresh": false,
+      "expectedOutcome": "transient_keep_last_success"
+    },
+    {
+      "caseId": "read-ok",
+      "httpStatus": 200,
+      "terminalRefresh": false,
+      "expectedOutcome": "ok"
+    }
+  ]
+}
