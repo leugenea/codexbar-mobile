@@ -1,7 +1,10 @@
 # Gradle / Kotlin / Android generated output
 .gradle/
 .kotlin/
-**/build/
+# Keep source tooling in tools/build/ trackable.
+/build/
+/app/build/
+/buildSrc/build/
 .externalNativeBuild/
 .cxx/
 local.properties

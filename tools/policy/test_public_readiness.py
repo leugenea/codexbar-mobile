@@ -2,6 +2,7 @@
 from decimal import Decimal
 from pathlib import Path
 import re
+import subprocess
 import unittest
 from urllib.parse import unquote, urlsplit
 
@@ -110,6 +111,32 @@ def safe_form(form):
 
 
 class PublicReadinessTests(unittest.TestCase):
+    def test_gitignore_does_not_match_tracked_files(self):
+        ignored = subprocess.run(
+            ["git", "ls-files", "-ci", "--exclude-standard"],
+            cwd=ROOT, check=True, capture_output=True, text=True)
+        self.assertEqual(ignored.stdout, "", f"Tracked files are ignored:\n{ignored.stdout}")
+
+    def test_gitignore_allows_new_source_files(self):
+        for file in ("tools/build/new_test.py", "tools/policy/new_test.py",
+                     "docs/new-guide.md", ".github/workflows/new-workflow.yml",
+                     "app/src/main/java/NewSource.kt", "gradle/new-config.gradle"):
+            with self.subTest(file=file):
+                ignored = subprocess.run(
+                    ["git", "check-ignore", "-q", "--no-index", file],
+                    cwd=ROOT, capture_output=True, text=True)
+                self.assertEqual(ignored.returncode, 1,
+                                 f"Source path is ignored or Git failed: {file}: {ignored.stderr}")
+
+    def test_gitignore_still_excludes_gradle_build_outputs(self):
+        for file in ("build/generated.txt", "app/build/generated.txt", "buildSrc/build/generated.txt"):
+            with self.subTest(file=file):
+                ignored = subprocess.run(
+                    ["git", "check-ignore", "-q", "--no-index", file],
+                    cwd=ROOT, capture_output=True, text=True)
+                self.assertEqual(ignored.returncode, 0,
+                                 f"Build output is not ignored or Git failed: {file}: {ignored.stderr}")
+
     def test_named_files_are_present_and_nonempty(self):
         for file in REQUIRED_FILES:
             with self.subTest(file=file):
