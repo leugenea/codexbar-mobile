@@ -1,7 +1,38 @@
+# Gradle / Kotlin / Android generated output
 .gradle/
 .kotlin/
-/build/
-/app/build/
+**/build/
+.externalNativeBuild/
+.cxx/
 local.properties
+captures/
+*.apk
+*.aab
+
+# IDE / host-local settings
 .idea/
 *.iml
+.vscode/
+.DS_Store
+Thumbs.db
+*~
+*.swp
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local credentials/signing; never commit secrets
+.env
+.env.*
+*.jks
+*.keystore
+keystore.properties
+
+# Generated diagnostics are CI artifacts or external scratch, not history
+/evidence/
