@@ -1,18 +1,18 @@
 {
-  "gradleVersion": "9.5.0",
-  "releaseTag": "v9.5.0",
-  "releaseCommit": "3fe117d68f3907790f3809f121aa36303a9151f8",
-  "tagApi": "https://api.github.com/repos/gradle/gradle/git/ref/tags/v9.5.0",
-  "sourceBase": "https://raw.githubusercontent.com/gradle/gradle/3fe117d68f3907790f3809f121aa36303a9151f8/",
-  "wrapperJarPublishedChecksumUrl": "https://services.gradle.org/distributions/gradle-9.5.0-wrapper.jar.sha256",
+  "gradleVersion": "9.8.0",
+  "releaseTag": "v9.8.0",
+  "releaseCommit": "a927be5e08efe79e0b87ada06c762dde6bb9f8b8",
+  "tagApi": "https://api.github.com/repos/gradle/gradle/git/ref/tags/v9.8.0",
+  "sourceBase": "https://raw.githubusercontent.com/gradle/gradle/a927be5e08efe79e0b87ada06c762dde6bb9f8b8/",
+  "wrapperJarPublishedChecksumUrl": "https://services.gradle.org/distributions/gradle-9.8.0-wrapper.jar.sha256",
   "files": {
-    "gradle/wrapper/gradle-wrapper.jar": "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7",
-    "gradlew": "45bda8deaef01b732f07bd317f962a736e349c6faa6662829bc0f41293b51212",
-    "gradlew.bat": "9e62ee9a1c6eb7cecc90e55acc3ff09a1631ccfe3edddf180538a1e42b1532dc"
+    "gradle/wrapper/gradle-wrapper.jar": "238e777fcddd7e34f9708186085def2abd6e08e658505b38718d79d74c21abd5",
+    "gradlew": "e01b5c97892572c82405c02b96a3382379100e7d825ce7c48883d95c26928750",
+    "gradlew.bat": "ad2fac6060c5b929bed15d428e09483e52747d0120874346861ad4ec324af64c"
   },
   "actionReleaseMappings": {
     "actions/checkout@v4.3.0": "08eba0b27e820071cde6df949e0beb9ba4906955",
     "actions/upload-artifact@v4.6.2": "ea165f8d65b6e75b540449e92b4886f43607fa02"
   },
-  "verificationStatus": "Wrapper JAR independently matched official published checksum; scripts matched exact official release source; Action tag refs returned commit objects and pinned action.yml inputs were inspected. Dependency graph still UNTRUSTED, not resolved locally."
+  "verificationStatus": "2026-10-06 owner-approved M1 Gradle override. Release tag commit matched official current-release commit. Wrapper JAR independently matched official published checksum; scripts matched exact official release source. Action mappings unchanged. New AGP 9.4.1 dependency graph remains UNTRUSTED pending hosted discovery and independent audit."
 }

@@ -1,4 +1,5 @@
 import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import java.security.MessageDigest
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 
@@ -59,8 +60,11 @@ gradle.projectsEvaluated {
             def output = new File(gradle.rootProject.projectDir, 'evidence/resolved-toolchain.json')
             output.parentFile.mkdirs()
             output.text = JsonOutput.prettyPrint(JsonOutput.toJson(receipt)) + '\n'
-            assert receipt.gradle == '9.5.0'
-            assert receipt.agp == '9.3.1'
+            // Only Gradle/AGP supersede historical M0; every other assertion stays.
+            def approved = new JsonSlurper().parse(new File(gradle.rootProject.projectDir,
+                'docs/build/m1-toolchain-amendment.json'))
+            assert receipt.gradle == approved.gradle.version
+            assert receipt.agp == approved.agp.version
             assert receipt.javaRuntime == '17.0.20.1+1'
             assert receipt.javaVendor == 'Eclipse Adoptium'
             // Gradle may instrument the loaded jar; the resolved original is in artifacts.

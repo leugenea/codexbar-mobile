@@ -12,24 +12,41 @@ ROOT = Path(__file__).resolve().parents[2]
 class ToolchainContract(unittest.TestCase):
     def test_wrapper_source_and_independent_jar_checksum(self):
         expected = {
-            "gradle/wrapper/gradle-wrapper.jar": "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7",
-            "gradlew": "45bda8deaef01b732f07bd317f962a736e349c6faa6662829bc0f41293b51212",
-            "gradlew.bat": "9e62ee9a1c6eb7cecc90e55acc3ff09a1631ccfe3edddf180538a1e42b1532dc",
+            "gradle/wrapper/gradle-wrapper.jar": "238e777fcddd7e34f9708186085def2abd6e08e658505b38718d79d74c21abd5",
+            "gradlew": "e01b5c97892572c82405c02b96a3382379100e7d825ce7c48883d95c26928750",
+            "gradlew.bat": "ad2fac6060c5b929bed15d428e09483e52747d0120874346861ad4ec324af64c",
         }
+        source = json.loads((ROOT / "docs/build/wrapper-source.json").read_text())
+        approved = json.loads((ROOT / "docs/build/m1-toolchain-amendment.json").read_text())
+        self.assertEqual(source["files"], expected)
+        self.assertEqual(source["gradleVersion"], approved["gradle"]["version"])
+        self.assertEqual(source["releaseCommit"], approved["gradle"]["releaseCommit"])
+        self.assertEqual(approved["gradle"]["wrapperJarSha256"], expected["gradle/wrapper/gradle-wrapper.jar"])
         for path, digest in expected.items():
             self.assertEqual(hashlib.sha256((ROOT / path).read_bytes()).hexdigest(), digest, path)
         self.assertTrue((ROOT / "gradlew").stat().st_mode & 0o111)
-        baseline = json.loads((ROOT / "docs/research/m0/toolchain.json").read_text())
         wrapper = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()
-        self.assertIn("gradle-" + baseline["gradle"]["version"] + "-bin.zip", wrapper)
-        self.assertIn("distributionSha256Sum=" + baseline["gradle"]["distributionSha256"], wrapper)
+        self.assertIn("gradle-" + approved["gradle"]["version"] + "-bin.zip", wrapper)
+        self.assertIn("distributionSha256Sum=" + approved["gradle"]["distributionSha256"], wrapper)
 
-    def test_m0_selected_versions_not_silently_amended(self):
+    def test_only_owner_approved_gradle_agp_override_m0(self):
         baseline = json.loads((ROOT / "docs/research/m0/toolchain.json").read_text())
+        approved = json.loads((ROOT / "docs/build/m1-toolchain-amendment.json").read_text())
+        historical = approved["historicalBaseline"]
+        self.assertEqual(historical["path"], "docs/research/m0/toolchain.json")
+        self.assertEqual(historical["sha256"], "f94673e8a80883e8a08922ff7c5a78574db3d7a670aae55164a24b56e5b0fbf6")
+        self.assertEqual(hashlib.sha256((ROOT / historical["path"]).read_bytes()).hexdigest(), historical["sha256"])
+        self.assertEqual(approved["approvedOverrideFields"], ["gradle", "agp"])
+        self.assertEqual(approved["ownerDecision"]["response"], "Давай")
+        self.assertEqual(approved["gradle"]["version"], "9.8.0")
+        self.assertEqual(approved["agp"]["version"], "9.4.1")
+        for field in ("gradle", "agp"):
+            self.assertEqual(approved[field]["previousVersion"], baseline[field]["version"])
+        self.assertEqual(approved["agp"]["pomSha256"], approved["agp"]["publishedPomSha256"])
         root = (ROOT / "build.gradle").read_text()
         app = (ROOT / "app/build.gradle").read_text()
         installer = (ROOT / "tools/build/install-hosted-toolchain.sh").read_text()
-        self.assertIn("version '" + baseline["agp"]["version"] + "'", root)
+        self.assertIn("id 'com.android.application' version '" + approved["agp"]["version"] + "'", root)
         self.assertIn("kotlin-gradle-plugin:" + baseline["kotlin"]["version"], root)
         self.assertIn("plugin.compose' version '" + baseline["kotlin"]["composeCompilerPlugin"] + "'", root)
         self.assertNotIn("org.jetbrains.kotlin.android", root + app)
@@ -44,6 +61,100 @@ class ToolchainContract(unittest.TestCase):
             self.assertIn(archive["archive"], installer)
             self.assertIn(archive["checksum"], installer)
         self.assertIn("Pkg.Revision", installer)
+
+    def test_receipt_assertions_and_lint_remain_strict(self):
+        inventory = (ROOT / "tools/build/toolchain.init.gradle").read_text()
+        self.assertIn("docs/build/m1-toolchain-amendment.json", inventory)
+        self.assertIn("assert receipt.gradle == approved.gradle.version", inventory)
+        self.assertIn("assert receipt.agp == approved.agp.version", inventory)
+        for module in ("kotlin-gradle-plugin", "kotlin-compiler-embeddable",
+                       "kotlin-compose-compiler-plugin-embeddable"):
+            self.assertIn("'" + module + "', '2.4.20'", inventory)
+        self.assertIn("assert receipt.javaRuntime == '17.0.20.1+1'", inventory)
+        self.assertIn("assert receipt.javaVendor == 'Eclipse Adoptium'", inventory)
+        self.assertIn("assert kgpJar.name ==~", inventory)
+        self.assertIn("actual.every { it.version == expected[2] }", inventory)
+        app = (ROOT / "app/build.gradle").read_text()
+        lint_match = re.search(r"\blint\s*\{([^{}]*)\}", app)
+        assert lint_match is not None, "Missing strict lint configuration"
+        lint = lint_match.group(1)
+        self.assertIn("abortOnError true", lint)
+        self.assertIn("warningsAsErrors true", lint)
+        for weakening in ("disable", "ignore", "baseline", "checkOnly", "warning", "fatal"):
+            self.assertNotRegex(lint, r"(?m)^\s*" + weakening + r"\b")
+        for path in (ROOT / "app/src/main").rglob("*"):
+            if path.suffix in (".xml", ".kt"):
+                self.assertNotRegex(path.read_text(), r'tools:ignore\s*=|@SuppressLint\s*\(')
+
+    def assert_backup_policy(self, manifest, legacy, extraction):
+        ns = "{http://schemas.android.com/apk/res/android}"
+        application = manifest.find("application")
+        assert application is not None, "Missing application declaration"
+        self.assertEqual(application.get(ns + "allowBackup"), "false")
+        self.assertEqual(application.get(ns + "fullBackupContent"), "@xml/backup_rules")
+        self.assertEqual(application.get(ns + "dataExtractionRules"), "@xml/data_extraction_rules")
+        self.assertEqual(legacy.tag, "full-backup-content")
+        self.assertEqual(extraction.tag, "data-extraction-rules")
+        self.assertEqual([section.tag for section in extraction], ["cloud-backup", "device-transfer"])
+        domains = {"root", "file", "database", "sharedpref", "external", "device_root",
+                   "device_file", "device_database", "device_sharedpref"}
+        for section in (legacy, *extraction):
+            self.assertEqual(len(section), len(domains))
+            self.assertEqual({entry.get("domain") for entry in section}, domains)
+            for entry in section:
+                self.assertEqual(entry.tag, "exclude")
+                self.assertEqual(entry.attrib, {"domain": entry.get("domain"), "path": "."})
+
+    def test_explicit_legacy_cloud_and_device_transfer_exclusions(self):
+        self.assert_backup_policy(
+            ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot(),
+            ET.parse(ROOT / "app/src/main/res/xml/backup_rules.xml").getroot(),
+            ET.parse(ROOT / "app/src/main/res/xml/data_extraction_rules.xml").getroot(),
+        )
+
+    def test_backup_contract_rejects_policy_weakening(self):
+        # Synthetic mutations test source policy only, not Android backup execution.
+        for mutation in ("allow_backup", "missing_reference", "missing_cloud", "missing_transfer",
+                         "legacy_domain", "cloud_domain", "transfer_domain", "narrow_path", "include"):
+            with self.subTest(mutation=mutation):
+                manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
+                legacy = ET.parse(ROOT / "app/src/main/res/xml/backup_rules.xml").getroot()
+                extraction = ET.parse(ROOT / "app/src/main/res/xml/data_extraction_rules.xml").getroot()
+                ns = "{http://schemas.android.com/apk/res/android}"
+                application = manifest.find("application")
+                assert application is not None
+                if mutation == "allow_backup":
+                    application.set(ns + "allowBackup", "true")
+                elif mutation == "missing_reference":
+                    del application.attrib[ns + "dataExtractionRules"]
+                elif mutation == "missing_cloud":
+                    extraction.remove(extraction[0])
+                elif mutation == "missing_transfer":
+                    extraction.remove(extraction[1])
+                elif mutation == "legacy_domain":
+                    legacy.remove(legacy[-1])
+                elif mutation == "cloud_domain":
+                    extraction[0].remove(extraction[0][-1])
+                elif mutation == "transfer_domain":
+                    extraction[1].remove(extraction[1][-1])
+                elif mutation == "narrow_path":
+                    extraction[1][0].set("path", "placeholder")
+                else:
+                    extraction[1][0].tag = "include"
+                with self.assertRaises(AssertionError):
+                    self.assert_backup_policy(manifest, legacy, extraction)
+
+    def test_single_min26_adaptive_icon_includes_monochrome(self):
+        resources = ROOT / "app/src/main/res"
+        self.assertEqual(sorted(p.relative_to(resources).as_posix() for p in resources.glob("mipmap-*/ic_launcher.xml")),
+                         ["mipmap-anydpi/ic_launcher.xml"])
+        icon = ET.parse(resources / "mipmap-anydpi/ic_launcher.xml").getroot()
+        self.assertEqual(icon.tag, "adaptive-icon")
+        self.assertEqual([layer.tag for layer in icon], ["background", "foreground", "monochrome"])
+        ns = "{http://schemas.android.com/apk/res/android}"
+        self.assertEqual(icon[0].get(ns + "drawable"), "@color/launcher_background")
+        for layer in icon[1:]:
+            self.assertEqual(layer.get(ns + "drawable"), "@drawable/ic_launcher_foreground")
 
     def test_phase1_verification_is_explicitly_empty_not_claimed_reviewed(self):
         ns = {"v": "https://schema.gradle.org/dependency-verification"}

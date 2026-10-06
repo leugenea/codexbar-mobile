@@ -7,11 +7,16 @@ been performed locally. The four disconnected/loading/error/demo states and
 meaningful JVM/native behavior tests are still pending. The two small Kotlin tests
 are explicitly **linkage/compilation placeholders**, not final smoke evidence.
 
-## Selected baseline
+## Current M1 pins and historical M0 baseline
 
-`docs/research/m0/toolchain.json` remains unchanged and authoritative: min 26,
+`docs/research/m0/toolchain.json` is preserved as historical M0 evidence. The
+owner-approved **October 6, 2026** M1 amendment in
+`docs/build/m1-toolchain-amendment.json` supersedes **only Gradle and AGP** with
+**9.8.0 / 9.4.1**. Root plugin and wrapper build pins are checked against that
+receipt, and the hosted inventory asserts the actual loaded/resolved versions.
+The unchanged inputs remain: min 26,
 compile/target 37, SDK `platforms;android-37.0` revision 2, Build Tools 36.0.0,
-Temurin 17.0.20.1+1, Gradle 9.5.0, AGP 9.3.1, Kotlin/Compose compiler 2.4.20,
+Temurin 17.0.20.1+1, Kotlin/Compose compiler 2.4.20,
 Coroutines 1.11.0, Compose BOM 2026.09.00/UI 1.12.1/Material3 1.4.0.
 The explicit `release(37)`/minor level 0 SDK DSL selects the pinned 37.0 package.
 AGP built-in Kotlin uses the documented higher-KGP root `buildscript` classpath;
@@ -24,11 +29,15 @@ KGP origin, actual resolved compiler/Compose compiler modules, AGP, Gradle, JDK,
 Coroutines and UI/Material3; compile `--info` logs must also be reviewed. A version
 string in build configuration is not a resolved/compiler-executed receipt.
 
-**Stop condition:** M0 documents AGP issue 522845800 (JDK 17
-`JavaDocParser` / `java.util.List.removeLast()` lint crash; fixed in AGP 9.3.2).
-The selected 9.3.1/17 versions are retained. Hosted lint is mandatory and its
-failure is preserved. If it fails or compatibility remains unresolved, stop for
-an owner baseline decision; do not upgrade, suppress, ignore or weaken lint.
+**Compatibility is still a hosted gate, not an assumption.** AGP 9.4 documents
+API 37, minimum Gradle 9.6.0, Build Tools 36.0.0 and JDK 17. Kotlin 2.4.20's
+current table lists fully supported maxima Gradle 9.7.0 / AGP 9.3.1; it permits
+newer releases with caveats. This candidate is outside that fully supported
+range. Keep Kotlin/compiler 2.4.20 and the loaded-KGP/all-artifact assertions;
+stop on unresolved incompatibility rather than silently changing another pin.
+M0's issue 522845800 (`JavaDocParser` / `List.removeLast()` on JDK 17) remains
+historical risk evidence; run 37449844957 below did not observe that crash.
+The owner override does not weaken mandatory lint or permit suppressions.
 
 ## First draft PR: diagnostic discovery, strict gate still red
 
@@ -72,6 +81,9 @@ replay and native smoke pass. Inspect SDK source.properties (`Pkg.Revision`),
 JDK release, actual resolved-toolchain JSON and all discovery exit statuses/logs.
 
 ## First hosted diagnosis and bounded setup corrections
+
+This section records the **historical 9.5.0 / 9.3.1** setup diagnosis and fixes;
+it is not a current Gradle/AGP selection or proof of the amended toolchain.
 
 Run **37447243358, attempt 1**, checked out PR merge
 `787cbf70e3702c2b718618c6011b6e414086b316` for candidate
@@ -117,7 +129,7 @@ from the **actual retrieved Google records** also passed XML Schema validation
 against SDK/repository XSDs extracted from AGP's published sdklib/repository
 32.3.1 JARs (local import locations only). This proves schema/metadata shape, not
 an executed SDK load. No local SDK install, Gradle build or emulator was run.
-The next hosted candidate must prove target loading, the complete receipt and
+The then-next hosted candidate had to prove target loading, the complete receipt and
 actual lint execution. Both 2.4.0 and 2.4.20 compiler downloads appear in the first
 resolution log; the existing all-row 2.4.20 assertion is retained and any actual
 receipt mismatch must be investigated, not hidden by filtering versions.
@@ -138,10 +150,67 @@ Primary implementation sources inspected (exact versions, not `main`):
 - `https://docs.gradle.org/9.5.0/userguide/artifact_views.html` — documented
   `ModuleComponentIdentifier` component filter, without leniency/reselection.
 
-The M0 baseline, compile SDK DSL, lint severity, verification metadata, diagnostic
-marker/route and all mandatory workflow tasks are unchanged. A real
-`JavaDocParser`/`List.removeLast()` lint crash or unresolved selected baseline
-compatibility still triggers the owner stop condition above.
+Those setup corrections left the M0 pins, SDK DSL, lint severity, metadata,
+diagnostic marker/route and mandatory workflow tasks unchanged. The subsequent
+owner-approved version amendment below is explicit, not a rewrite of M0 evidence.
+
+## Second hosted diagnosis and owner-approved M1 amendment
+
+Run **37449844957, attempt 1**, checked out PR merge
+`7639c374e07c90085e83c21ac6be885f5c473e11` for source candidate
+`19b8466a675981db780c6fb24a054ca6e4b97e7b`. All **44** artifact-manifest hashes
+were verified before interpreting the evidence. Discovery returned resolution 0,
+lint 1, build 0 and connected dry-run 0. The 9.5.0 / 9.3.1 receipt observed loaded
+KGP 2.4.20 and passed all compiler/version assertions. Both test source sets,
+app/test APK packaging and the JVM linkage placeholder ran; no native test ran.
+Lint executed and reported exactly four errors, not the historical parser crash:
+
+- `AndroidGradlePluginVersion`: Gradle 9.8.0 available. The owner's reply
+  **“Давай”** approves Gradle 9.8.0 / AGP 9.4.1 only. Gradle's current-release
+  record and exact `v9.8.0` release commit agree; Google Maven's largest numeric
+  stable AGP is 9.4.1, despite a `release` field naming 9.5.0-alpha08.
+- `DataExtractionRules`: keep `allowBackup=false`, add explicit legacy full-backup
+  rules and Android 12+ cloud-backup/device-transfer rules excluding all nine
+  supported app-data domains at `.` (normal/device-protected roots, files,
+  databases, preferences and external files). This is declarative backup policy;
+  no credential store exists and backup/restore behavior is not runtime-proven.
+  No cross-platform transfer/export or platform-specific identity is configured.
+- `ObsoleteSdkInt`: move the adaptive icon from redundant `mipmap-anydpi-v26`
+  to `mipmap-anydpi`, valid at min SDK 26.
+- `MonochromeLauncherIcon`: the single default adaptive icon now carries the
+  existing foreground drawable as its monochrome layer; remove the redundant v33
+  copy. AOSP API 26's inflater ignores unrecognized child tags; API 33 recognizes
+  `monochrome`. This source check is not native launcher/tint acceptance.
+
+The amendment and wrapper-source receipt record independently retrieved official
+sources/hashes. The wrapper JAR matches the separately published Gradle SHA-256,
+both scripts are byte-exact official release sources (including batch CRLF),
+and the AGP POM matches Google's published SHA-256 and SHA-1. POM integrity is
+not binary or complete dependency-graph trust. The Gradle distribution SHA-256
+is pinned; the distribution itself will be downloaded/verified by hosted CI.
+
+**Required next checkpoint:** publish this diagnostic candidate, bind/download
+the new exact-head/attempt artifact, verify its manifest, and review new loaded
+KGP/compiler 2.4.20, JDK/SDK receipts, lint, compilation and command exit statuses.
+Keep empty/unreviewed committed metadata and the diagnostic marker until the
+new **9.8.0 / 9.4.1 graph** is independently audited. Do not copy the old 9.3.1
+graph or call discovery PASS strict acceptance. The mandatory strict gate is
+still expected red. Only reviewed new-graph metadata plus fresh-home strict
+replay can clear it. Full UI states/tests and native smoke remain subsequent M1
+work; no gate is disabled, baselined or reduced here.
+
+Additional primary references checked on October 6, 2026:
+
+- Gradle release/current, wrapper/distribution checksums and exact release-source
+  URLs: `docs/build/m1-toolchain-amendment.json`, `docs/build/wrapper-source.json`.
+- AGP compatibility: https://developer.android.com/build/releases/agp-9-4-0-release-notes
+- Kotlin supported ranges/caveats: https://kotlinlang.org/docs/gradle-configure-project.html
+- Legacy/new backup syntax and domains: https://developer.android.com/identity/data/autobackup
+- AOSP API 26/33 `AdaptiveIconDrawable.inflateLayers`:
+  `https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r1/graphics/java/android/graphics/drawable/AdaptiveIconDrawable.java`,
+  `https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/graphics/java/android/graphics/drawable/AdaptiveIconDrawable.java`.
+- AOSP API 31 backup-domain/path parsing:
+  `https://android.googlesource.com/platform/frameworks/base/+/android-12.0.0_r1/core/java/android/app/backup/FullBackup.java`.
 
 ## Independent integrity review and strict replay
 
@@ -155,7 +224,7 @@ compatibility still triggers the owner stop condition above.
    version for the complete selected graph, including plugins, compiler, AARs,
    JVM/native-test dependencies and lint. Compare to independent primary
    publication checksums/signatures where available and independently retrieved
-   originals; record provenance and investigate discrepancies. M0's three POM
+   originals; record provenance and investigate discrepancies. M0's retained POM
    hashes are useful cross-checks, not binary or whole-graph trust. A self-generated
    inventory, a duplicate mirror download or a successful build alone is not an
    independent review. Do not blindly copy discovery output into a reviewed file.
@@ -206,7 +275,7 @@ manifest/APK or native launcher/accessibility execution.
 - Kotlin migration/DSL: https://developer.android.com/build/migrate-to-built-in-kotlin
 - Compile SDK release/minor API: https://developer.android.com/reference/tools/gradle-api/9.3/com/android/build/api/dsl/CompileSdkSpec
 - Selected lint hazard: https://developer.android.com/build/releases/agp-9-3-0-release-notes
-- Gradle verification bootstrap/trust limitations: https://docs.gradle.org/9.5.0/userguide/dependency_verification.html
+- Gradle verification bootstrap/trust limitations: https://docs.gradle.org/9.8.0/userguide/dependency_verification.html
 - Dispatch default-branch requirement: https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow
 - AndroidX supplemental exact versions: official Google Maven metadata/POMs,
   `https://dl.google.com/dl/android/maven2/`.
