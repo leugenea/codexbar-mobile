@@ -18,6 +18,9 @@ jobs:
     name: M1 strict toolchain checkpoint
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      # runner.temp is unavailable in job env; keep the cache outside checkout.
+      GRADLE_USER_HOME: ${{ github.workspace }}/../m1-gradle-strict
     steps:
       - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
@@ -28,19 +31,58 @@ jobs:
           cp gradle/verification-metadata.xml evidence/committed-verification-metadata.xml
           cp docs/build/m1-integrity.json evidence/committed-integrity-provenance.json
           python3 tools/build/write_m1_evidence.py provenance
+          printf 'setup_started_utc=%s\ngradle_user_home=%s\ncache_provider=basic\n' \
+            "$(date -u +%FT%TZ)" "$GRADLE_USER_HOME" > evidence/setup-timings.txt
       - name: Cheap offline scaffold contract
         run: python3 -B -m unittest discover -s tools/build -p 'test_*.py' -v
-      - name: Install and verify exact M0 JDK and SDK archives
+      - name: Download and verify exact approved JDK archive
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --max-time 180 \
+            --output "$RUNNER_TEMP/m1-jdk.tar.gz" \
+            'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz'
+          printf '%s\n' "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e  $RUNNER_TEMP/m1-jdk.tar.gz" | sha256sum --check
+      - name: Set up exact verified JDK
+        id: java
+        timeout-minutes: 5
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: jdkfile
+          java-version: '17.0.20+101' # Adoptium alias; actual runtime must remain 17.0.20.1+1
+          java-package: jdk
+          architecture: x64
+          jdk-file: ${{ runner.temp }}/m1-jdk.tar.gz
+          force-download: true
+          check-latest: false
+          set-default: true
+          cache-jdk: false
+          overwrite-settings: false
+      - name: Install exact SDK archives and verify actual JDK
         id: install
+        timeout-minutes: 15
         run: bash tools/build/install-hosted-toolchain.sh
+      - name: Set up Gradle dependency cache and wrapper validation
+        id: gradle
+        timeout-minutes: 5
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: basic
+          cache-disabled: false
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          validate-wrappers: true
+          allow-snapshot-wrappers: false
+          dependency-graph: disabled
+          build-scan-publish: false
+          add-job-summary: always
+          add-job-summary-as-pr-comment: never
       - name: Strict committed verification (mandatory; no metadata generation)
         if: steps.install.outcome == 'success'
-        env:
-          GRADLE_USER_HOME: ${{ runner.temp }}/m1-gradle-strict
         run: |
-          [[ ! -e "$GRADLE_USER_HOME" ]] || { printf '%s\n' 'Strict Gradle home must start fresh' >&2; exit 1; }
+          printf 'setup_completed_utc=%s\n' "$(date -u +%FT%TZ)" >> evidence/setup-timings.txt
           set -o pipefail
-          ./gradlew --no-daemon --dependency-verification strict --stacktrace --info --continue \
+          ./gradlew --no-daemon --dependency-verification strict --no-build-cache --no-configuration-cache --rerun-tasks \
+            --stacktrace --info --continue \
             -I tools/build/toolchain.init.gradle :app:m1ToolchainCheckpoint \
             :app:lintDebug :app:assembleDebug :app:compileDebugUnitTestKotlin \
             :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
@@ -49,8 +91,15 @@ jobs:
           python3 tools/build/verify_m1_test_reports.py jvm
       - name: Bind evidence to exact files (all outcomes)
         if: always()
+        env:
+          JAVA_SETUP_OUTCOME: ${{ steps.java.outcome }}
+          SDK_SETUP_OUTCOME: ${{ steps.install.outcome }}
+          GRADLE_SETUP_OUTCOME: ${{ steps.gradle.outcome }}
         run: |
           mkdir -p evidence
+          printf 'evidence_bound_utc=%s\njava_setup_outcome=%s\nsdk_setup_outcome=%s\ngradle_setup_outcome=%s\n' \
+            "$(date -u +%FT%TZ)" "$JAVA_SETUP_OUTCOME" "$SDK_SETUP_OUTCOME" "$GRADLE_SETUP_OUTCOME" >> evidence/setup-timings.txt
+          # Post-action saves happen after upload; this is not a cache-save receipt.
           python3 tools/build/write_m1_evidence.py manifest
       - name: Upload exact strict/build evidence (all outcomes)
         if: always()
@@ -73,21 +122,72 @@ jobs:
     needs: checkpoint
     runs-on: ubuntu-24.04
     timeout-minutes: 50
+    env:
+      # Same home is inherited by setup-gradle and every wrapper invocation.
+      GRADLE_USER_HOME: ${{ github.workspace }}/../m1-gradle-native-strict
     steps:
       - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           persist-credentials: false
-      - name: Record source identity and host SDK location
+      - name: Record source identity and setup start
         run: |
           mkdir -p evidence/native
           : > evidence/native/emulator.log
           python3 tools/build/write_m1_evidence.py provenance
-          printf 'HOST_ANDROID_HOME=%s\n' "$ANDROID_HOME" >> "$GITHUB_ENV"
+          printf 'setup_started_utc=%s\ngradle_user_home=%s\ncache_provider=basic\n' \
+            "$(date -u +%FT%TZ)" "$GRADLE_USER_HOME" > evidence/setup-timings.txt
           cp gradle/verification-metadata.xml evidence/committed-verification-metadata.xml
           cp docs/build/m1-integrity.json evidence/committed-integrity-provenance.json
-      - name: Install unchanged exact project JDK and SDK archives
+      - name: Download and verify exact approved JDK archive
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --max-time 180 \
+            --output "$RUNNER_TEMP/m1-jdk.tar.gz" \
+            'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz'
+          printf '%s\n' "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e  $RUNNER_TEMP/m1-jdk.tar.gz" | sha256sum --check
+      - name: Set up exact verified JDK
+        id: java
+        timeout-minutes: 5
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: jdkfile
+          java-version: '17.0.20+101' # Adoptium alias; actual runtime must remain 17.0.20.1+1
+          java-package: jdk
+          architecture: x64
+          jdk-file: ${{ runner.temp }}/m1-jdk.tar.gz
+          force-download: true
+          check-latest: false
+          set-default: true
+          cache-jdk: false
+          overwrite-settings: false
+      - name: Install exact SDK archives and verify actual JDK
+        id: install
         timeout-minutes: 15
         run: bash tools/build/install-hosted-toolchain.sh
+      - name: Set up Gradle dependency cache and wrapper validation
+        id: gradle
+        timeout-minutes: 5
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: basic
+          cache-disabled: false
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          validate-wrappers: true
+          allow-snapshot-wrappers: false
+          dependency-graph: disabled
+          build-scan-publish: false
+          add-job-summary: always
+          add-job-summary-as-pr-comment: never
+      - name: Set up native Android command-line tools
+        id: android
+        timeout-minutes: 5
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          cmdline-tools-version: '15859902' # Build ID maps to tools directory 22.0
+          packages: ''
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
       - name: Prepare hosted emulator client library
         timeout-minutes: 5
         run: |
@@ -126,12 +226,23 @@ jobs:
           test -c /dev/kvm
           sudo chmod a+rw /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
-      - name: Run complete M1 native graph on API 36 phone (strict fresh home)
+      - name: Run complete M1 native graph on API 36 phone (strict cached dependencies)
         timeout-minutes: 35
-        run: timeout --signal=TERM --kill-after=30s 32m bash tools/build/run-hosted-native-smoke.sh
+        run: |
+          printf 'setup_completed_utc=%s\n' "$(date -u +%FT%TZ)" >> evidence/setup-timings.txt
+          timeout --signal=TERM --kill-after=30s 32m bash tools/build/run-hosted-native-smoke.sh
       - name: Bind native evidence and exact APK/report bytes (all outcomes)
         if: always()
-        run: python3 tools/build/write_m1_evidence.py manifest
+        env:
+          JAVA_SETUP_OUTCOME: ${{ steps.java.outcome }}
+          SDK_SETUP_OUTCOME: ${{ steps.install.outcome }}
+          GRADLE_SETUP_OUTCOME: ${{ steps.gradle.outcome }}
+          ANDROID_SETUP_OUTCOME: ${{ steps.android.outcome }}
+        run: |
+          printf 'evidence_bound_utc=%s\njava_setup_outcome=%s\nsdk_setup_outcome=%s\ngradle_setup_outcome=%s\nandroid_setup_outcome=%s\n' \
+            "$(date -u +%FT%TZ)" "$JAVA_SETUP_OUTCOME" "$SDK_SETUP_OUTCOME" "$GRADLE_SETUP_OUTCOME" "$ANDROID_SETUP_OUTCOME" >> evidence/setup-timings.txt
+          # Post-action saves happen after upload; this is not a cache-save receipt.
+          python3 tools/build/write_m1_evidence.py manifest
       - name: Upload native evidence (all outcomes; screenshots diagnostic only)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

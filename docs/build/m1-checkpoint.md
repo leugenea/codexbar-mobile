@@ -318,3 +318,65 @@ manifest/APK or native launcher/accessibility execution.
   `https://dl.google.com/dl/android/maven2/`.
 
 Existing M0 documentation, fixtures, tests and workflow are unchanged.
+
+---
+
+## October 6, 2026 cold replay and owner-approved CI/cache amendment
+
+The historical sections above remain unchanged, including their fresh-home and
+no-cache instructions. This amendment supersedes those instructions for final
+M1 verification; it does not rewrite historical results or the Gradle/AGP-only
+project-toolchain amendment.
+
+Run **37480311646, attempt 1**, used source
+`0d985d2531721fde8589e68339d445ab85e18376`, base
+`f1d0cf2b014bfa62e68dad18c7aae926cc234d65` and synthetic merge checkout
+`55afeef26473c7c72941b0ee0129c5c87a4a75d7` (the same source tree).
+The cold strict checkpoint passed exact loaded toolchain assertions, assembly,
+both test-source compilations, zero-issue lint and **8/8 JVM tests, zero skips**.
+The API36 native job passed libpulse/KVM/boot/ADB/input setup and executed all
+**three** native tests: two passed, the landscape case failed at the unchanged
+`hasVisualOverflow` oracle for “Unofficial · offline demo”. The second disclaimer,
+landscape reset and post-task native manifest/aapt gates were not reached.
+This is cold-build evidence, **not full native acceptance**. The subsequent
+two-Text width correction and same-result failure diagnostics are a preserved
+uncommitted candidate, not a claim that the new layout ran.
+
+The owner now explicitly expands M1 to setup Actions and **cross-run Gradle
+dependency caching**, retiring final fresh-home guards because cold build was
+already proven. Current work remains CI-first: only quick local Python/bash/
+ShellCheck/actionlint checks, no local Android SDK/Gradle/JVM/emulator ladder,
+and no mandatory TDD/RED checkpoint. Meaningful regressions, independent review
+of the full combined candidate and every hosted acceptance gate are retained.
+
+The candidate pins setup-java **v6.0.1**, setup-gradle **v6.4.0** and native-only
+setup-android **v4.0.4** to full execution SHAs, with their exact responsibilities
+and limitations documented in [m1.md](m1.md). setup-java owns extraction and
+environment for the fixed-hash local JDK archive, using Adoptium's SemVer alias
+**17.0.20+101** solely as an Action label; actual runtime/vendor assertions stay
+**17.0.20.1+1 / Eclipse Adoptium**. Exact SDK platform37.0r2/Build Tools36 archives
+and their metadata adapter remain. setup-android acquires build15859902/tools22
+inside the isolated SDK; no copied host tools or emulator-runner is introduced.
+JDK17/tools22 execution is still a hosted compatibility boundary.
+
+setup-gradle explicitly uses the **basic** GitHub cache provider. Job-level
+workspace-sibling Gradle homes are set before setup and inherited unchanged by
+every wrapper call; `runner.temp` cannot appear in job-level env expressions.
+Same-repository PR cache saves are enabled, fork PRs stay read-only. Every actual
+wrapper gate adds **--no-build-cache --no-configuration-cache --rerun-tasks** to
+strict verification, preserving the exact tasks, lint severity, all8JVM/all3native
+tests and source/merged/installed/APK no-INTERNET checks. The **364 components /
+602 audited identity–SHA256 pairs**, wrapper, project pins and M0 bytes stay fixed.
+
+**Final cached campaign is pending, not accepted:** freeze one combined candidate
+for independent source review concurrent with hosted CI. Require a full green
+exact-key miss with a successful completed post-action save, then two full green
+whole-workflow reruns with exact-key hits on the same checkout/head/base and test
+set. Bind reports/artifacts and actual toolchain hashes for every attempt; verify
+cache key/version/ref from completed setup/post logs, summary and cache API.
+There is no setup-gradle cache-hit output, and its post-action save happens after
+the all-outcome artifact uploads. Setup timing/outcome receipts are not save
+proof. Keep setup/restore/save, native preparation/boot, workload, validation/
+upload, queue and end-to-end timings distinct; require repeatable material benefit
+without cached task results or reports. A partial green run, warning-only save
+failure, different commit/test set or source-only check cannot close this campaign.

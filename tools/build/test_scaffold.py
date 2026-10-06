@@ -46,6 +46,7 @@ class ToolchainContract(unittest.TestCase):
         root = (ROOT / "build.gradle").read_text()
         app = (ROOT / "app/build.gradle").read_text()
         installer = (ROOT / "tools/build/install-hosted-toolchain.sh").read_text()
+        workflow = (ROOT / ".github/workflows/m1-toolchain.yml").read_text()
         self.assertIn("id 'com.android.application' version '" + approved["agp"]["version"] + "'", root)
         self.assertIn("kotlin-gradle-plugin:" + baseline["kotlin"]["version"], root)
         self.assertIn("plugin.compose' version '" + baseline["kotlin"]["composeCompilerPlugin"] + "'", root)
@@ -55,7 +56,7 @@ class ToolchainContract(unittest.TestCase):
                         "material3:1.4.0", "kotlinx-coroutines-android:1.11.0"):
             self.assertIn(snippet, app)
         self.assertIn(baseline["jdk"]["sha256"], installer)
-        self.assertIn(baseline["jdk"]["linuxX64Archive"], installer)
+        self.assertIn(baseline["jdk"]["linuxX64Archive"], workflow)
         for package in baseline["sdkPackages"].values():
             archive = next(a for a in package["archives"] if a["os"] in ("all", "linux"))
             self.assertIn(archive["archive"], installer)
@@ -156,7 +157,91 @@ class ToolchainContract(unittest.TestCase):
         for layer in icon[1:]:
             self.assertEqual(layer.get(ns + "drawable"), "@drawable/ic_launcher_foreground")
 
-    def test_read_only_routes_require_fresh_strict_verification_only(self):
+    def assert_cached_actions_setup(self, workflow):
+        pins = {
+            "actions/checkout": ("08eba0b27e820071cde6df949e0beb9ba4906955", "v4.3.0", 2),
+            "actions/upload-artifact": ("ea165f8d65b6e75b540449e92b4886f43607fa02", "v4.6.2", 2),
+            "actions/setup-java": ("de7274f081f381c8f8158605e0321c36c376e2e6", "v6.0.1", 2),
+            "gradle/actions/setup-gradle": ("3f5f9adaf7d9fecd50b5935e54106014257a94e6", "v6.4.0", 2),
+            "android-actions/setup-android": ("be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd", "v4.0.4", 1),
+        }
+        uses = re.findall(r"(?m)^\s*-?\s*uses: (\S+) # (v[\d.]+)$", workflow)
+        self.assertEqual(len(uses), len(re.findall(r"(?m)^\s*-?\s*uses:", workflow)))
+        self.assertEqual(len(uses), sum(value[2] for value in pins.values()))
+        for action, (sha, version, count) in pins.items():
+            self.assertEqual(uses.count((action + "@" + sha, version)), count, action)
+        configured = {
+            "actions/setup-java": {
+                "distribution": "jdkfile", "java-version": "17.0.20+101", "java-package": "jdk",
+                "architecture": "x64", "jdk-file": "${{ runner.temp }}/m1-jdk.tar.gz",
+                "force-download": "true", "check-latest": "false", "set-default": "true",
+                "cache-jdk": "false", "overwrite-settings": "false",
+            },
+            "gradle/actions/setup-gradle": {
+                "cache-provider": "basic", "cache-disabled": "false",
+                "cache-read-only": "${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}",
+                "validate-wrappers": "true", "allow-snapshot-wrappers": "false",
+                "dependency-graph": "disabled", "build-scan-publish": "false",
+                "add-job-summary": "always", "add-job-summary-as-pr-comment": "never",
+            },
+            "android-actions/setup-android": {
+                "cmdline-tools-version": "15859902", "packages": "",
+                "accept-android-sdk-licenses": "true", "log-accepted-android-sdk-licenses": "false",
+            },
+        }
+        for job, home in (("checkpoint", "m1-gradle-strict"), ("native", "m1-gradle-native-strict")):
+            body = workflow.split("  " + job + ":\n", 1)[1].split("\n  native:\n", 1)[0]
+            header, step_text = body.split("    steps:\n", 1)
+            self.assertIn("      GRADLE_USER_HOME: ${{ github.workspace }}/../" + home + "\n", header)
+            self.assertNotIn("${{ runner.temp }}", header)
+            self.assertNotRegex(step_text, r"(?m)^\s*GRADLE_USER_HOME:")
+            self.assertNotRegex(step_text, r"\bGRADLE_USER_HOME=")
+            self.assertNotIn("must start fresh", body)
+            self.assertNotIn('[[ ! -e "$GRADLE_USER_HOME" ]]', body)
+            steps = re.split(r"(?m)^      - ", step_text)[1:]
+            for action, inputs in configured.items():
+                found = [step for step in steps if "uses: " + action + "@" in step]
+                if action == "android-actions/setup-android" and job == "checkpoint":
+                    self.assertEqual(found, [])
+                    continue
+                self.assertEqual(len(found), 1, action)
+                self.assertNotRegex(found[0], r"(?m)^        (?:if|continue-on-error):")
+                actual = {key: value.split(" #", 1)[0].strip().strip("'\"")
+                          for key, value in re.findall(r"(?m)^          ([\w-]+): (.*)$", found[0])}
+                self.assertEqual(actual, inputs, action)
+            download = body.index("name: Download and verify exact approved JDK archive")
+            java = body.index("uses: actions/setup-java@")
+            sdk = body.index("run: bash tools/build/install-hosted-toolchain.sh")
+            gradle = body.index("uses: gradle/actions/setup-gradle@")
+            self.assertLess(download, java)
+            self.assertLess(java, sdk)
+            self.assertLess(sdk, gradle)
+            self.assertIn("--max-time 180", body[download:java])
+            self.assertIn("3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e", body[download:java])
+            self.assertIn("sha256sum --check", body[download:java])
+            self.assertIn("setup-timings.txt", body)
+            self.assertNotIn("steps.gradle.outputs.cache", body)
+
+    def test_actions_cache_contract_rejects_synthetic_regressions(self):
+        workflow = (ROOT / ".github/workflows/m1-toolchain.yml").read_text()
+        for old, new in (
+            ("cache-provider: basic", "cache-provider: enhanced"),
+            ("cache-disabled: false", "cache-disabled: true"),
+            ("cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}", "cache-read-only: true"),
+            ("force-download: true", "force-download: false"),
+            ("java-version: '17.0.20+101'", "java-version: '17.0.20.1+1'"),
+            ("packages: ''", "packages: 'build-tools;37.0.0'"),
+            ("cache-provider: basic", "cache-provider: basic\n          cache-write-only: true"),
+            ("m1-gradle-native-strict\n", "unrestored-home\n"),
+            ("          set -o pipefail", "          export GRADLE_USER_HOME=/unrestored\n          set -o pipefail"),
+            ("# v6.4.0", "# v6.3.0"),
+        ):
+            with self.subTest(mutation=new):
+                self.assertIn(old, workflow)
+                with self.assertRaises(AssertionError):
+                    self.assert_cached_actions_setup(workflow.replace(old, new, 1))
+
+    def test_read_only_routes_require_cached_homes_and_real_strict_execution(self):
         workflow = (ROOT / ".github/workflows/m1-toolchain.yml").read_text()
         self.assertIn("  pull_request:", workflow)
         self.assertIn("  push:", workflow)
@@ -169,11 +254,11 @@ class ToolchainContract(unittest.TestCase):
                        "discover_dependencies", "m1-bootstrap-diagnostic", "m1-gradle-discovery",
                        "--write-verification-metadata", "--dependency-verification off", "actions/cache"):
             self.assertNotIn(unsafe, workflow)
-        self.assertEqual(len(re.findall(r"uses: [\w/-]+@[a-f0-9]{40} # v[\d.]+", workflow)), 4)
+        self.assert_cached_actions_setup(workflow)
         strict = workflow.split("- name: Strict committed verification", 1)[1].split("- name: Bind evidence", 1)[0]
         self.assertIn("--dependency-verification strict", strict)
-        self.assertIn('[[ ! -e "$GRADLE_USER_HOME" ]]', strict)
-        self.assertIn("m1-gradle-strict", strict)
+        for flag in ("--no-build-cache", "--no-configuration-cache", "--rerun-tasks"):
+            self.assertIn(flag, strict)
         for task in ("lintDebug", "assembleDebug", "compileDebugUnitTestKotlin",
                      "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest"):
             self.assertIn(":app:" + task, strict)

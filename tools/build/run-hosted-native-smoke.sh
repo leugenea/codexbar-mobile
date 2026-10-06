@@ -2,7 +2,7 @@
 # Hosted-only API 36 phone smoke. SDK build inputs remain the reviewed project pins.
 set -euo pipefail
 [[ "${GITHUB_ACTIONS:-}" == true ]] || { printf '%s\n' 'Hosted runner only' >&2; exit 1; }
-: "${RUNNER_TEMP:?}" "${ANDROID_HOME:?}" "${HOST_ANDROID_HOME:?}"
+: "${RUNNER_TEMP:?}" "${ANDROID_HOME:?}" "${GRADLE_USER_HOME:?}"
 mkdir -p evidence/native
 # Create this before any infrastructure setup, so every failure has an artifact.
 : > evidence/native/emulator.log
@@ -10,8 +10,8 @@ export ANDROID_USER_HOME="$RUNNER_TEMP/m1-android-user"
 export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
 export ADB_VENDOR_KEYS="$ANDROID_USER_HOME"
 export ANDROID_SERIAL=emulator-5554
-export GRADLE_USER_HOME="$RUNNER_TEMP/m1-gradle-native-strict"
-[[ ! -e "$GRADLE_USER_HOME" ]] || { printf '%s\n' 'Native strict Gradle home must start fresh' >&2; exit 1; }
+# setup-gradle restores/saves this job-level home; never override it here.
+printf 'gradle_user_home=%s\n' "$GRADLE_USER_HOME" > evidence/native/gradle-home.txt
 mkdir -p "$ANDROID_AVD_HOME"
 image='system-images;android-36;google_apis;x86_64'
 avd='m1-api36-phone'
@@ -52,26 +52,18 @@ minimum = 15 * 1024 ** 3
 pathlib.Path('evidence/native/disk-check.txt').write_text(f'free_bytes={free}\nminimum_bytes={minimum}\n')
 assert free >= minimum, f'Insufficient disk before image installation: {free} < {minimum}'
 PY
-# No third-party emulator action or self-hosted runner. Use the runner's available tools,
-# recording their effective revisions rather than pretending they are project version pins.
-if command -v sdkmanager >/dev/null; then
-  sdkmanager=$(command -v sdkmanager)
-else
-  sdkmanager="$HOST_ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-fi
-host_tools=$(dirname "$(dirname "$(readlink -f "$sdkmanager")")")
-[[ -f "$host_tools/source.properties" ]]
-mkdir -p "$ANDROID_HOME/cmdline-tools"
-host_tools_name=$(basename "$host_tools")
-cp -R "$host_tools" "$ANDROID_HOME/cmdline-tools/$host_tools_name"
-sdkmanager="$ANDROID_HOME/cmdline-tools/$host_tools_name/bin/sdkmanager"
-avdmanager="$ANDROID_HOME/cmdline-tools/$host_tools_name/bin/avdmanager"
+# setup-android's explicit build 15859902 installs tools22 in the isolated SDK.
+# Device infrastructure is observed separately from unchanged project version pins.
+sdkmanager="$ANDROID_HOME/cmdline-tools/22.0/bin/sdkmanager"
+avdmanager="$ANDROID_HOME/cmdline-tools/22.0/bin/avdmanager"
 [[ -x "$sdkmanager" && -x "$avdmanager" ]]
 printf '%s\n' "$sdkmanager" > evidence/native/sdkmanager-path.txt
-cp "$ANDROID_HOME/cmdline-tools/$host_tools_name/source.properties" evidence/native/cmdline-tools-source.properties
+printf '%s\n' "$avdmanager" > evidence/native/avdmanager-path.txt
+cp "$ANDROID_HOME/cmdline-tools/22.0/source.properties" evidence/native/cmdline-tools-source.properties
+grep -Ex 'Pkg.Revision[[:space:]]*=[[:space:]]*22\.0' evidence/native/cmdline-tools-source.properties
+sha256sum "$sdkmanager" "$avdmanager" > evidence/native/cmdline-tools-binaries.sha256
 timeout 30 "$sdkmanager" --version > evidence/native/sdkmanager-version.txt 2>&1
-[[ -d "$HOST_ANDROID_HOME/licenses" ]]
-cp -R "$HOST_ANDROID_HOME/licenses" "$ANDROID_HOME/licenses"
+[[ -d "$ANDROID_HOME/licenses" ]]
 # Explicit device infrastructure only: never install another compile platform or Build Tools.
 sha256sum "$ANDROID_HOME/platforms/android-37.0/source.properties" \
   "$ANDROID_HOME/platforms/android-37.0/package.xml" \
@@ -156,6 +148,7 @@ printf '%s\n' 'boundary=strict-native-tests' >> evidence/native/boundaries.txt
 # The complete native test task, no class/method filters and no metadata bypass/generation.
 set +e
 timeout --signal=TERM --kill-after=30s 15m ./gradlew --no-daemon --dependency-verification strict \
+  --no-build-cache --no-configuration-cache --rerun-tasks \
   --stacktrace --info -I tools/build/toolchain.init.gradle :app:m1ToolchainCheckpoint \
   :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin :app:connectedDebugAndroidTest \
   2>&1 | tee evidence/native/strict-connected.log

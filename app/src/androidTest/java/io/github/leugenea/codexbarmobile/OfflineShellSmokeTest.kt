@@ -141,7 +141,15 @@ class OfflineShellSmokeTest {
         val layouts = mutableListOf<TextLayoutResult>()
         compose.onNodeWithText(text).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         assertTrue("No native text layout for $text", layouts.isNotEmpty())
-        layouts.forEach { assertFalse("Clipped native text: $text", it.hasVisualOverflow) }
+        layouts.forEach {
+            // Keep the strict oracle; retain native dimensions if the hosted assertion fails.
+            val geometry = "size=${it.size}; paragraph=${it.multiParagraph.width}x${it.multiParagraph.height}; " +
+                "constraints=${it.layoutInput.constraints}; " +
+                "overflowWidth=${it.didOverflowWidth}; overflowHeight=${it.didOverflowHeight}; " +
+                "lines=${it.lineCount}; exceededMaxLines=${it.multiParagraph.didExceedMaxLines}; " +
+                "density=${it.layoutInput.density.density}; fontScale=${it.layoutInput.density.fontScale}"
+            assertFalse("Clipped native text: $text; $geometry", it.hasVisualOverflow)
+        }
     }
 
     private fun awaitState(step: String, preview: Preview) {

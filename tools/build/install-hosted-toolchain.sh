@@ -1,22 +1,17 @@
 #!/usr/bin/env bash
-# Hosted-only exact M0 archives; no sdkmanager/latest package substitution.
+# Hosted-only exact SDK archives; setup-java owns JDK extraction/environment.
 set -euo pipefail
 [[ "${GITHUB_ACTIONS:-}" == true ]] || { printf '%s\n' 'Hosted runner only' >&2; exit 1; }
-: "${RUNNER_TEMP:?}" "${GITHUB_ENV:?}" "${GITHUB_PATH:?}"
+: "${RUNNER_TEMP:?}" "${GITHUB_ENV:?}" "${JAVA_HOME:?}"
 mkdir -p evidence "$RUNNER_TEMP/m1-sdk/platforms" "$RUNNER_TEMP/m1-sdk/build-tools"
 cd "$RUNNER_TEMP"
-curl --fail --location --retry 3 --output m1-jdk.tar.gz \
-  'https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz'
+# Independently recheck the workflow-downloaded archive and the Action's actual JDK.
 printf '%s\n' '3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e  m1-jdk.tar.gz' | sha256sum --check
-mkdir -p m1-jdk
-tar -xzf m1-jdk.tar.gz --strip-components=1 -C m1-jdk
-export JAVA_HOME="$RUNNER_TEMP/m1-jdk"
-export PATH="$JAVA_HOME/bin:$PATH"
 grep -Fx 'JAVA_RUNTIME_VERSION="17.0.20.1+1"' "$JAVA_HOME/release"
 grep -Fx 'IMPLEMENTOR="Eclipse Adoptium"' "$JAVA_HOME/release"
-printf 'JAVA_HOME=%s\nANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' \
-  "$JAVA_HOME" "$RUNNER_TEMP/m1-sdk" "$RUNNER_TEMP/m1-sdk" >> "$GITHUB_ENV"
-printf '%s\n' "$JAVA_HOME/bin" >> "$GITHUB_PATH"
+[[ "$(readlink -f "$(command -v java)")" == "$(readlink -f "$JAVA_HOME/bin/java")" ]]
+printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' \
+  "$RUNNER_TEMP/m1-sdk" "$RUNNER_TEMP/m1-sdk" >> "$GITHUB_ENV"
 curl --fail --location --retry 3 --output m1-platform.zip \
   'https://dl.google.com/android/repository/platform-37.0_r02.zip'
 curl --fail --location --retry 3 --output m1-build-tools.zip \

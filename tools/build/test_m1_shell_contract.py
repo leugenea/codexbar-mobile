@@ -69,7 +69,7 @@ class M1Contracts(unittest.TestCase):
         for contract in ("Hosted runner only", "trap cleanup EXIT", "-accel on", "-accel-check",
                          "15 * 1024 ** 3", "kill -0", "deadline=$((SECONDS + 300))",
                          "sys.boot_completed", "cmd input keyevent", '[[ "$api" == 36 ]]',
-                         "--dependency-verification strict", "m1-gradle-native-strict",
+                         "--dependency-verification strict", '${GRADLE_USER_HOME:?}',
                          ":app:connectedDebugAndroidTest", "verify_m1_test_reports.py native",
                          "diagnostic-screen.png", "logcat-live.txt", "project-sdk-before.sha256",
                          "system-images;android-36;google_apis;x86_64", "--channel=0"):
@@ -79,6 +79,85 @@ class M1Contracts(unittest.TestCase):
             self.assertNotIn(unsafe, script)
         installation = script.split("--install ", 1)[1].split("2>&1", 1)[0]
         self.assertEqual(installation.strip(), 'platform-tools emulator "$image"')
+
+    def assert_cached_execution(self, workflow, script, installer):
+        strict = workflow.split("- name: Strict committed verification", 1)[1].split("- name: Bind evidence", 1)[0]
+        connected = script.split("./gradlew ", 1)[1].split("2>&1", 1)[0]
+        for command in (strict, connected):
+            for flag in ("--no-daemon", "--dependency-verification strict", "--no-build-cache",
+                         "--no-configuration-cache", "--rerun-tasks", "--stacktrace", "--info"):
+                self.assertIn(flag, command)
+            for unsafe in ("--build-cache", "--configuration-cache", "--dry-run", "--tests ",
+                           "testInstrumentationRunnerArguments", "--write-verification-metadata",
+                           "--gradle-user-home", " -g "):
+                self.assertNotIn(unsafe, command)
+        self.assertEqual(re.findall(r":app:(\w+)", strict), [
+            "m1ToolchainCheckpoint", "lintDebug", "assembleDebug", "compileDebugUnitTestKotlin",
+            "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest",
+        ])
+        self.assertEqual(re.findall(r":app:(\w+)", connected), [
+            "m1ToolchainCheckpoint", "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
+            "connectedDebugAndroidTest",
+        ])
+        self.assertIn('${GRADLE_USER_HOME:?}', script)
+        self.assertNotRegex(script, r"(?m)^\s*(?:export\s+)?GRADLE_USER_HOME=")
+        self.assertNotIn("must start fresh", script)
+        for obsolete in ("HOST_ANDROID_HOME", "host_tools", "command -v sdkmanager", "cmdline-tools/latest"):
+            self.assertNotIn(obsolete, script + workflow)
+        for contract in ('sdkmanager="$ANDROID_HOME/cmdline-tools/22.0/bin/sdkmanager"',
+                         'avdmanager="$ANDROID_HOME/cmdline-tools/22.0/bin/avdmanager"',
+                         "cmdline-tools-source.properties", "cmdline-tools-binaries.sha256",
+                         "sdkmanager-path.txt", "avdmanager-path.txt", "gradle-home.txt",
+                         "Pkg.Revision[[:space:]]*=[[:space:]]*22\\.0",
+                         'timeout 30 "$sdkmanager" --version', '[[ -d "$ANDROID_HOME/licenses" ]]',
+                         "sha256sum --check evidence/native/project-sdk-before.sha256"):
+            self.assertIn(contract, script)
+        self.assertEqual(script.split("--install ", 1)[1].split("2>&1", 1)[0].strip(),
+                         'platform-tools emulator "$image"')
+        for contract in ('${JAVA_HOME:?}', 'JAVA_RUNTIME_VERSION="17.0.20.1+1"',
+                         'IMPLEMENTOR="Eclipse Adoptium"', '"$JAVA_HOME/release" evidence/jdk-release.txt',
+                         '"$(command -v java)"', "m1-jdk.tar.gz' | sha256sum --check",
+                         "installed-archives.sha256", "evidence/java-version.txt", "ANDROID_SDK_ROOT=%s"):
+            self.assertIn(contract, installer)
+        for obsolete in ("tar -x", "export JAVA_HOME=", "GITHUB_PATH", "curl --fail --location --retry 3 --output m1-jdk"):
+            self.assertNotIn(obsolete, installer)
+        native = workflow.split("  native:\n", 1)[1]
+        self.assertLess(native.index("bash tools/build/install-hosted-toolchain.sh"),
+                        native.index("uses: android-actions/setup-android@"))
+        self.assertLess(native.index("uses: android-actions/setup-android@"),
+                        native.index("bash tools/build/run-hosted-native-smoke.sh"))
+
+    def test_cached_execution_preserves_strict_real_gates_and_exact_sdk_receipts(self):
+        self.assert_cached_execution(
+            (ROOT / ".github/workflows/m1-toolchain.yml").read_text(),
+            (ROOT / "tools/build/run-hosted-native-smoke.sh").read_text(),
+            (ROOT / "tools/build/install-hosted-toolchain.sh").read_text(),
+        )
+
+    def test_cached_execution_rejects_synthetic_regressions(self):
+        original = [(ROOT / path).read_text() for path in (
+            ".github/workflows/m1-toolchain.yml", "tools/build/run-hosted-native-smoke.sh",
+            "tools/build/install-hosted-toolchain.sh")]
+        mutations = [(target, flag, "") for target in (0, 1) for flag in (
+            "--no-build-cache", "--no-configuration-cache", "--rerun-tasks")]
+        mutations += [
+            (1, '${GRADLE_USER_HOME:?}', 'unused-home'),
+            (1, 'image=', 'export GRADLE_USER_HOME="$RUNNER_TEMP/unrestored"\nimage='),
+            (1, 'platform-tools emulator "$image"', 'platform-tools emulator "platforms;android-37" "$image"'),
+            (1, 'cmdline-tools/22.0/bin/sdkmanager', 'cmdline-tools/latest/bin/sdkmanager'),
+            (1, 'timeout 30 "$sdkmanager" --version', '"$sdkmanager" --version'),
+            (1, 'cmdline-tools-binaries.sha256', 'missing-binary-receipt'),
+            (1, 'Pkg.Revision[[:space:]]*=[[:space:]]*22\\.0', 'Pkg.Revision.*'),
+            (2, 'JAVA_RUNTIME_VERSION="17.0.20.1+1"', 'JAVA_RUNTIME_VERSION="17.0.20+101"'),
+            (2, 'installed-archives.sha256', 'missing-archive-receipt'),
+        ]
+        for target, old, new in mutations:
+            with self.subTest(target=target, mutation=old):
+                texts = original.copy()
+                self.assertIn(old, texts[target])
+                texts[target] = texts[target].replace(old, new, 1)
+                with self.assertRaises(AssertionError):
+                    self.assert_cached_execution(*texts)
 
     def assert_host_emulator_prerequisite(self, workflow):
         checkpoint, native = workflow.split("  native:\n", 1)
@@ -137,7 +216,7 @@ class M1Contracts(unittest.TestCase):
         for name, mutation in (
             ("missing", missing),
             ("misordered", missing.replace(invocation, invocation + setup, 1)),
-            ("fail-open", workflow.replace("          set -euo pipefail\n", "          set -uo pipefail\n", 1)),
+            ("fail-open", workflow.replace(setup, setup.replace("          set -euo pipefail\n", "          set -uo pipefail\n", 1), 1)),
             ("conditional", workflow.replace(setup, setup.replace("        run: |", "        if: false\n        run: |"), 1)),
         ):
             with self.subTest(mutation=name):

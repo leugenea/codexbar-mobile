@@ -81,12 +81,12 @@ private fun OfflineShell(state: OfflineShellState, onStateChange: (OfflineShellS
                 Text(
                     stringResource(R.string.demo_identity),
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.testTag("demo-identity"),
+                    modifier = Modifier.fillMaxWidth().testTag("demo-identity"),
                 )
                 Text(
                     stringResource(R.string.connection_identity),
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.testTag("connection-identity"),
+                    modifier = Modifier.fillMaxWidth().testTag("connection-identity"),
                 )
             }
         },
