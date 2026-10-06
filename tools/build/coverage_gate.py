@@ -1,4 +1,4 @@
-"""Fail-closed M2 coverage/evidence contracts. Never substitutes fixtures for runtime data."""
+"""Fail-closed coverage/evidence contracts. Never substitutes fixtures for runtime data."""
 import argparse
 import hashlib
 import json
@@ -11,7 +11,7 @@ import time
 import xml.etree.ElementTree as ET
 
 BUILD = Path("app/build")
-COVERAGE = BUILD / "m2-coverage"
+COVERAGE = BUILD / "coverage-gate"
 PHASES = {"jvm": "testDebugUnitTest", "instrumentation": "connectedDebugAndroidTest",
           "report": "jacocoDebugReport", "verification": "jacocoDebugCoverageVerification"}
 IDENTITY_KEYS = ("checkoutSha", "sourceHeadSha", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT")
@@ -152,7 +152,7 @@ def check_report():
 def phase_outcomes(log):
     # --console=plain plus an afterTask listener records real task outcomes, not start banners.
     observed = {}
-    for path, state in re.findall(r"^M2_TASK_OUTCOME (\S+) (SUCCESS|FAILED|SKIPPED|NO_SOURCE|UP_TO_DATE|FROM_CACHE)$", log, re.M):
+    for path, state in re.findall(r"^COVERAGE_TASK_OUTCOME (\S+) (SUCCESS|FAILED|SKIPPED|NO_SOURCE|UP_TO_DATE|FROM_CACHE)$", log, re.M):
         if path in observed:
             raise ValueError(f"Duplicate task outcome: {path}")
         observed[path] = state
@@ -160,9 +160,9 @@ def phase_outcomes(log):
 
 
 def result_truth_table(needs):
-    mandatory = {"checkpoint", "native"}
+    mandatory = {"build", "instrumented"}
     if set(needs) != mandatory or any(needs[name].get("result") != "success" for name in mandatory):
-        raise ValueError(f"Mandatory M2 jobs did not all succeed: {needs}")
+        raise ValueError(f"Mandatory Android jobs did not all succeed: {needs}")
 
 
 def main():
@@ -177,7 +177,7 @@ def main():
     elif args.mode == "report":
         check_report()
     elif args.mode == "result":
-        result_truth_table(json.loads(os.environ["M2_NEEDS"]))
+        result_truth_table(json.loads(os.environ["ANDROID_JOB_RESULTS"]))
     else:
         log = Path("evidence/native/strict-connected.log")
         data = phase_outcomes(log.read_text(errors="replace") if log.exists() else "")
@@ -192,7 +192,7 @@ def main():
         script_receipt = Path("evidence/native/exit-status.txt")
         if args.exit is None and script_receipt.exists():
             data["scriptExit"] = int(script_receipt.read_text().strip().split("=", 1)[1])
-        write_json("evidence/native/m2-phase-outcomes.json", data)
+        write_json("evidence/native/task-phase-outcomes.json", data)
         if args.exit == 0 and (data["boot"] != "SUCCESS" or any(data[p] != "SUCCESS" for p in PHASES)):
             raise ValueError(f"Zero script exit without genuine success of all phases: {data}")
 

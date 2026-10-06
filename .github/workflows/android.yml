@@ -1,4 +1,4 @@
-name: M1 toolchain checkpoint
+name: Android
 
 on:
   pull_request:
@@ -14,21 +14,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checkpoint:
-    name: M1 strict toolchain checkpoint
+  build:
+    name: Build, lint and unit tests (strict dependency verification)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       # runner.temp is unavailable in job env; keep the cache outside checkout.
-      GRADLE_USER_HOME: ${{ github.workspace }}/../m1-gradle-strict
+      GRADLE_USER_HOME: ${{ github.workspace }}/../android-gradle-build
     steps:
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - name: Check out repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           persist-credentials: false
           fetch-depth: 2
       - name: Initialize build diagnostics
         run: mkdir -p evidence
-      - name: Cheap offline scaffold contract
+      - name: Validate offline build and workflow contracts
         run: python3 -B -m unittest discover -s tools/build -p 'test_*.py' -v
       - name: Set up Temurin JDK 17
         id: java
@@ -43,9 +44,9 @@ jobs:
       - name: Select isolated Android SDK
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/m1-sdk"
+          mkdir -p "$RUNNER_TEMP/android-sdk"
           printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' \
-            "$RUNNER_TEMP/m1-sdk" "$RUNNER_TEMP/m1-sdk" >> "$GITHUB_ENV"
+            "$RUNNER_TEMP/android-sdk" "$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
       - name: Set up Android command-line tools
         id: android
         timeout-minutes: 5
@@ -80,23 +81,23 @@ jobs:
           build-scan-publish: false
           add-job-summary: always
           add-job-summary-as-pr-comment: never
-      - name: Strict committed verification (mandatory; no metadata generation)
+      - name: Build, lint and unit tests with strict verification
         if: steps.install.outcome == 'success'
         run: |
           set -o pipefail
           ./gradlew --no-daemon --dependency-verification strict --no-build-cache --no-configuration-cache --rerun-tasks \
             --stacktrace --info --continue \
-            -I tools/build/toolchain.init.gradle :app:m1ToolchainCheckpoint \
+            -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
             :app:lintDebug :app:assembleDebug :app:compileDebugUnitTestKotlin \
             :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
             2>&1 | tee evidence/strict.log
-          python3 tools/build/verify_m1_manifests.py
-          python3 tools/build/verify_m1_test_reports.py jvm
-      - name: Upload strict logs and build outputs (all outcomes)
+          python3 tools/build/verify_manifests.py
+          python3 tools/build/verify_test_reports.py jvm
+      - name: Upload build logs and outputs (all outcomes)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: m1-toolchain-${{ github.run_id }}-${{ github.run_attempt }}
+          name: android-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             evidence/
             build/reports/
@@ -108,16 +109,17 @@ jobs:
           retention-days: 7
           include-hidden-files: false
 
-  native:
-    name: M1 native offline smoke
-    needs: checkpoint
+  instrumented:
+    name: Instrumented tests and coverage (API 36 emulator)
+    needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     env:
       # Same home is inherited by setup-gradle and every wrapper invocation.
-      GRADLE_USER_HOME: ${{ github.workspace }}/../m1-gradle-native-strict
+      GRADLE_USER_HOME: ${{ github.workspace }}/../android-gradle-instrumented
     steps:
-      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - name: Check out repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
         with:
           persist-credentials: false
       - name: Initialize native diagnostics
@@ -137,9 +139,9 @@ jobs:
       - name: Select isolated Android SDK
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/m1-sdk"
+          mkdir -p "$RUNNER_TEMP/android-sdk"
           printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' \
-            "$RUNNER_TEMP/m1-sdk" "$RUNNER_TEMP/m1-sdk" >> "$GITHUB_ENV"
+            "$RUNNER_TEMP/android-sdk" "$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
       - name: Set up Android command-line tools
         id: android
         timeout-minutes: 5
@@ -212,18 +214,18 @@ jobs:
           test -c /dev/kvm
           sudo chmod a+rw /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
-      - name: Run complete M1 native graph on API 36 phone (strict cached dependencies)
+      - name: Run unit and instrumented tests with coverage (API 36)
         timeout-minutes: 35
         run: |
           timeout --signal=TERM --kill-after=30s 32m bash tools/build/run-hosted-native-smoke.sh
       - name: Record native task outcomes (all outcomes)
         if: always()
-        run: python3 tools/build/m2_coverage.py phases
-      - name: Upload native logs and build outputs (all outcomes; screenshots diagnostic only)
+        run: python3 tools/build/coverage_gate.py phases
+      - name: Upload instrumented logs and outputs (all outcomes)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: m1-native-${{ github.run_id }}-${{ github.run_attempt }}
+          name: android-instrumented-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             evidence/
             build/reports/
@@ -231,7 +233,7 @@ jobs:
             app/build/test-results/
             app/build/outputs/unit_test_code_coverage/
             app/build/outputs/code_coverage/
-            app/build/m2-coverage/
+            app/build/coverage-gate/
             app/build/outputs/androidTest-results/
             app/build/outputs/apk/
             app/build/intermediates/merged_manifests/
@@ -243,15 +245,15 @@ jobs:
   # 0cc3f1eb8bfb1902ac8e2fae7fba729ef53cc9f0; MIT notice in app/build.gradle.
   # Target policy requires both jobs to succeed; no allowed skips or routes.
   result:
-    name: M2 Android result
+    name: Android CI result
     if: always()
-    needs: [checkpoint, native]
+    needs: [build, instrumented]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Require genuine success of every mandatory Android job
+      - name: Require successful build and instrumented tests
         env:
-          CHECKPOINT_RESULT: ${{ needs.checkpoint.result }}
-          NATIVE_RESULT: ${{ needs.native.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          INSTRUMENTED_RESULT: ${{ needs.instrumented.result }}
         run: |
-          [[ "$CHECKPOINT_RESULT" == success && "$NATIVE_RESULT" == success ]]
+          [[ "$BUILD_RESULT" == success && "$INSTRUMENTED_RESULT" == success ]]

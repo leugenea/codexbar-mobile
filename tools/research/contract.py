@@ -1,4 +1,4 @@
-"""Offline M0 fixture checks and small research models, NOT app production code.
+"""Offline research fixture checks and small research models, NOT app production code.
 
 No authentication, network, storage or Android implementation is included.
 """

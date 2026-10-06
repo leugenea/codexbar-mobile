@@ -244,8 +244,10 @@ class FixtureTests(unittest.TestCase):
             self.assertRegex(toolchain[component][key],r"^[0-9a-f]{64}$")
 
     def test_ci_narrow_read_only_full_sha_contract(self):
-        text = (ROOT / ".github/workflows/m0-contract.yml").read_text()
-        self.assertIn("name: M0 contract",text)
+        text = (ROOT / ".github/workflows/research-contract.yml").read_text()
+        self.assertTrue(text.startswith("name: Research contract\n"))
+        self.assertEqual(re.findall(r"^    name: (.+)$", text, re.M),
+                         ["Validate research fixtures and schemas"])
         self.assertIn("runs-on: ubuntu-24.04",text)
         self.assertIn("timeout-minutes: 5",text)
         self.assertIn("  contents: read",text)

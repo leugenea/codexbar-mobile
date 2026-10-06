@@ -12,10 +12,11 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 NS = "{https://schema.gradle.org/dependency-verification}"
 METADATA_PATH = "gradle/verification-metadata.xml"
-# Full reviewed union: M1's 602 pairs + the 17 JaCoCo pairs approved in PR #17.
+# Full reviewed union: 602 base toolchain pairs + the 17 JaCoCo pairs approved in PR #17.
 # Dependency updates must review the XML pair delta and update this digest in
 # the same PR. No parallel artifact list or audit receipt is maintained.
 APPROVED_METADATA_SHA256 = "ba94604993d8d03d66d6e8b48fcdeb258aec36b62c3e851da32a6bed064434a3"
+# Historical origin labels must match the unchanged, independently audited XML.
 APPROVED_ORIGINS = {
     f"Independent {milestone} audit: {evidence}; not authenticated publisher identity"
     for milestone in ("M1", "M2")
@@ -95,7 +96,7 @@ def integrity_failure(pairs, baseline_pairs):
     lines = [
         f"Unapproved dependency identities/checksums: new semantic SHA-256={digest}",
         "Review every added/removed (group, name, version, file, sha256) pair against publisher sources.",
-        "Only after approval, update APPROVED_METADATA_SHA256 in tools/build/test_m1_integrity.py",
+        "Only after approval, update APPROVED_METADATA_SHA256 in tools/build/test_dependency_integrity.py",
         "in the same dependency PR (including Dependabot); never regenerate a receipt or auto-approve.",
     ]
     if baseline_pairs is None:

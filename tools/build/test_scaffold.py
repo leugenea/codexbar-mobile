@@ -28,7 +28,7 @@ class ToolchainContract(unittest.TestCase):
         root = (ROOT / "build.gradle").read_text()
         app = (ROOT / "app/build.gradle").read_text()
         verifier = (ROOT / "tools/build/verify-hosted-toolchain.sh").read_text()
-        workflow = (ROOT / ".github/workflows/m1-toolchain.yml").read_text()
+        workflow = (ROOT / ".github/workflows/android.yml").read_text()
         self.assertIn("id 'com.android.application' version '9.4.1'", root)
         self.assertIn("kotlin-gradle-plugin:" + baseline["kotlin"]["version"], root)
         self.assertIn("plugin.compose' version '" + baseline["kotlin"]["composeCompilerPlugin"] + "'", root)
@@ -37,7 +37,7 @@ class ToolchainContract(unittest.TestCase):
                         "buildToolsVersion '36.0.0'", "compose-bom:2026.09.00", "ui:1.12.1",
                         "material3:1.4.0", "kotlinx-coroutines-android:1.11.0"):
             self.assertIn(snippet, app)
-        # M0 archive/patch selections are frozen historical evidence, not current install policy.
+        # Research archive/patch selections are frozen historical evidence, not current install policy.
         self.assertIn("distribution: temurin", workflow)
         self.assertIn("java-version: '17'", workflow)
         for path in baseline["sdkPackages"]:
@@ -174,8 +174,8 @@ class ToolchainContract(unittest.TestCase):
                 "accept-android-sdk-licenses": "true", "log-accepted-android-sdk-licenses": "false",
             },
         }
-        for job, home in (("checkpoint", "m1-gradle-strict"), ("native", "m1-gradle-native-strict")):
-            body = workflow.split("  " + job + ":\n", 1)[1].split("\n  native:\n", 1)[0]
+        for job, home in (("build", "android-gradle-build"), ("instrumented", "android-gradle-instrumented")):
+            body = workflow.split("  " + job + ":\n", 1)[1].split("\n  instrumented:\n", 1)[0]
             header, step_text = body.split("    steps:\n", 1)
             self.assertIn("      GRADLE_USER_HOME: ${{ github.workspace }}/../" + home + "\n", header)
             self.assertNotIn("${{ runner.temp }}", header)
@@ -200,7 +200,7 @@ class ToolchainContract(unittest.TestCase):
             self.assertLess(isolated, android)
             self.assertLess(android, sdk)
             self.assertLess(sdk, gradle)
-            self.assertIn('"$RUNNER_TEMP/m1-sdk" "$RUNNER_TEMP/m1-sdk" >> "$GITHUB_ENV"', body[isolated:android])
+            self.assertIn('"$RUNNER_TEMP/android-sdk" "$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"', body[isolated:android])
             install = body[sdk:gradle]
             self.assertNotRegex(install, r"(?m)^        (?:if|continue-on-error):")
             self.assertIn('set -euo pipefail', install)
@@ -210,6 +210,7 @@ class ToolchainContract(unittest.TestCase):
             self.assertEqual(install.split('--install ', 1)[1].split('2>&1', 1)[0].strip(),
                              "'platforms;android-37.0' 'build-tools;36.0.0'")
             self.assertIn('bash tools/build/verify-hosted-toolchain.sh', install)
+            # Retired filenames below are absence guards, not active CI references.
             for obsolete in ('jdkfile', 'jdk-file:', 'force-download:', 'cache-jdk:', 'cache: gradle',
                              '17.0.20', 'm1-jdk.tar.gz', 'curl ', 'unzip ', 'write_sdk_package_metadata.py',
                              'android-emulator-runner', 'build-tools;37.0.0'):
@@ -217,7 +218,7 @@ class ToolchainContract(unittest.TestCase):
             self.assertNotIn("steps.gradle.outputs.cache", body)
 
     def test_actions_cache_contract_rejects_synthetic_regressions(self):
-        workflow = (ROOT / ".github/workflows/m1-toolchain.yml").read_text()
+        workflow = (ROOT / ".github/workflows/android.yml").read_text()
         for old, new in (
             ("cache-provider: basic", "cache-provider: enhanced"),
             ("cache-disabled: false", "cache-disabled: true"),
@@ -234,7 +235,7 @@ class ToolchainContract(unittest.TestCase):
             ("uses: android-actions/setup-android@", "uses: invalid/setup-android@"),
             ("packages: ''", "packages: 'build-tools;37.0.0'"),
             ("cache-provider: basic", "cache-provider: basic\n          cache-write-only: true"),
-            ("m1-gradle-native-strict\n", "unrestored-home\n"),
+            ("android-gradle-instrumented\n", "unrestored-home\n"),
             ("          set -o pipefail", "          export GRADLE_USER_HOME=/unrestored\n          set -o pipefail"),
             ("# v6.4.0", "# v6.3.0"),
         ):
@@ -244,34 +245,35 @@ class ToolchainContract(unittest.TestCase):
                     self.assert_cached_actions_setup(workflow.replace(old, new, 1))
 
     def test_read_only_routes_require_cached_homes_and_real_strict_execution(self):
-        workflow = (ROOT / ".github/workflows/m1-toolchain.yml").read_text()
+        workflow = (ROOT / ".github/workflows/android.yml").read_text()
         self.assertIn("  pull_request:", workflow)
         self.assertIn("  push:", workflow)
         self.assertIn("  workflow_dispatch:", workflow)
         self.assertIn("runs-on: ubuntu-24.04", workflow)
         self.assertIn("  contents: read", workflow)
         self.assertEqual(workflow.count("persist-credentials: false"), 2)
+        # Preserve absence guards for the retired dependency-bootstrap paths.
         self.assertFalse((ROOT / "gradle/m1-bootstrap-diagnostic").exists())
         for unsafe in ("pull_request_target", "self-hosted", "secrets.", "continue-on-error:", "paths:",
                        "discover_dependencies", "m1-bootstrap-diagnostic", "m1-gradle-discovery",
                        "--write-verification-metadata", "--dependency-verification off", "actions/cache"):
             self.assertNotIn(unsafe, workflow)
         self.assert_cached_actions_setup(workflow)
-        strict = workflow.split("- name: Strict committed verification", 1)[1].split("- name: Upload", 1)[0]
+        strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
         self.assertIn("--dependency-verification strict", strict)
         for flag in ("--no-build-cache", "--no-configuration-cache", "--rerun-tasks"):
             self.assertIn(flag, strict)
         for task in ("lintDebug", "assembleDebug", "compileDebugUnitTestKotlin",
                      "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest"):
             self.assertIn(":app:" + task, strict)
-        self.assertIn("verify_m1_manifests.py", strict)
-        self.assertIn("verify_m1_test_reports.py jvm", strict)
+        self.assertIn("verify_manifests.py", strict)
+        self.assertIn("verify_test_reports.py jvm", strict)
         self.assertIn("if: always()", workflow.split("- name: Upload", 1)[1])
 
     def assert_real_output_uploads(self, workflow):
-        checkpoint, native = workflow.split("  native:\n", 1)
-        self.assertIn("fetch-depth: 2", checkpoint)
-        for body, name in ((checkpoint, "m1-toolchain"), (native, "m1-native")):
+        build, native = workflow.split("  instrumented:\n", 1)
+        self.assertIn("fetch-depth: 2", build)
+        for body, name in ((build, "android-build"), (native, "android-instrumented")):
             steps = re.split(r"(?m)^      - ", body)[1:]
             uploads = [step for step in steps if "uses: actions/upload-artifact@" in step]
             self.assertEqual(len(uploads), 1)
@@ -283,17 +285,17 @@ class ToolchainContract(unittest.TestCase):
                 self.assertIn("            " + path + "\n", upload)
             self.assertIn("if-no-files-found: error", upload)
         outcomes = next(step for step in re.split(r"(?m)^      - ", native)[1:]
-                        if "m2_coverage.py phases" in step)
+                        if "coverage_gate.py phases" in step)
         self.assertIn("        if: always()\n", outcomes)
         for path in ("app/build/outputs/unit_test_code_coverage/", "app/build/outputs/code_coverage/",
-                     "app/build/m2-coverage/", "app/build/outputs/androidTest-results/"):
+                     "app/build/coverage-gate/", "app/build/outputs/androidTest-results/"):
             self.assertIn("            " + path + "\n", native)
 
     def test_always_uploads_real_reports_apks_coverage_and_diagnostics(self):
-        self.assert_real_output_uploads((ROOT / ".github/workflows/m1-toolchain.yml").read_text())
+        self.assert_real_output_uploads((ROOT / ".github/workflows/android.yml").read_text())
 
     def test_output_upload_contract_rejects_missing_reports_and_conditional_uploads(self):
-        workflow = (ROOT / ".github/workflows/m1-toolchain.yml").read_text()
+        workflow = (ROOT / ".github/workflows/android.yml").read_text()
         for old, new in (("app/build/reports/", "unused/reports/"),
                          ("app/build/outputs/code_coverage/", "unused/coverage/"),
                          ("        if: always()", "        if: success()"),

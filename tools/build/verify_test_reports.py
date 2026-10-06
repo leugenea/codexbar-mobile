@@ -1,4 +1,4 @@
-"""M1-only real test-result gate. Synthetic unit tests validate this parser, not Android."""
+"""Real offline-shell test-result gate. Synthetic unit tests validate this parser, not Android."""
 import argparse
 import json
 from pathlib import Path
@@ -51,7 +51,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
     actual = {case["name"] for case in cases if case["class"] == CLASS[kind]}
     missing = EXPECTED[kind] - actual
     if missing:
-        raise ValueError(f"Missing real {kind} M1 tests: {sorted(missing)}")
+        raise ValueError(f"Missing real {kind} offline-shell tests: {sorted(missing)}")
     if not cases:
         raise ValueError(f"No executed {kind} tests")
     return {"kind": kind, "testCount": len(cases), "reports": [str(p) for p in reports], "testcases": cases}
@@ -67,7 +67,7 @@ def main() -> None:
     destination = ROOT / "evidence" / ("native" if args.kind == "native" else "jvm")
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "executed-tests.json").write_text(json.dumps(receipt, indent=2) + "\n")
-    print(f"{args.kind}: {receipt['testCount']} executed tests, all required M1 cases present; no failures/errors/skips")
+    print(f"{args.kind}: {receipt['testCount']} executed tests, all required offline-shell cases present; no failures/errors/skips")
 
 
 if __name__ == "__main__":

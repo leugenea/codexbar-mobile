@@ -15,7 +15,7 @@ def check_manifest(path: Path) -> dict:
     permissions = [node.get(ANDROID + "name") for node in manifest
                    if node.tag in ("uses-permission", "uses-permission-sdk-23")]
     if "android.permission.INTERNET" in permissions:
-        raise ValueError(f"Offline M1 APK requests INTERNET: {path}")
+        raise ValueError(f"Offline APK requests INTERNET: {path}")
     return {"manifest": str(path), "requestedPermissions": permissions}
 
 
