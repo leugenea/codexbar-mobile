@@ -75,6 +75,26 @@ class CoverageContracts(unittest.TestCase):
     def test_compatible_complete_union_inputs(self):
         self.assertEqual(set(self.validate()), {"synthetic/Activity"})
 
+    def test_native_empty_stale_and_session_failures_have_distinct_diagnostics(self):
+        mutations = {
+            "empty": (r"Empty execution data \(0 bytes\)", {"bytes": 0}),
+            "stale-file": ("Stale execution data", {"modifiedMillis": 4999}),
+            "no-session": ("No JaCoCo sessions", {"sessions": []}),
+            "stale-session": ("Stale JaCoCo session", {"sessions": [{"startMillis": 1, "dumpMillis": 6000}]}),
+            "session-order": ("Invalid JaCoCo session ordering", {"sessions": [{"startMillis": 5500, "dumpMillis": 1}]}),
+        }
+        for mutation, (message, changes) in mutations.items():
+            inventory = copy.deepcopy(self.inventory)
+            inventory["datasets"][1].update(changes)
+            with self.subTest(mutation=mutation), self.assertRaisesRegex(ValueError, message):
+                self.validate(inventory=inventory)
+
+    def test_empty_native_file_is_reported_as_empty_even_without_sessions(self):
+        inventory = copy.deepcopy(self.inventory)
+        inventory["datasets"][1].update(bytes=0, sessions=[], records=[])
+        with self.assertRaisesRegex(ValueError, r"Empty execution data \(0 bytes\): synthetic.ec"):
+            self.validate(inventory=inventory)
+
     def test_missing_empty_stale_and_incompatible_inputs_reject(self):
         for mutation in ("missing-jvm", "missing-native", "empty-classes", "duplicate-classes", "zero-denominator",
                          "empty-data", "stale-data", "wrong-class-id", "no-matching-class", "probe-count",
