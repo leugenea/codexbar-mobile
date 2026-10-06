@@ -1,5 +1,4 @@
 """Cheap M1 source/workflow contracts and explicitly synthetic report-parser tests."""
-import hashlib
 import os
 from pathlib import Path
 import re
@@ -7,11 +6,9 @@ import subprocess
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
-from unittest.mock import patch
 
 from verify_m1_manifests import check_manifest
 from verify_m1_test_reports import CLASS, EXPECTED, verify_reports
-from write_m1_evidence import artifact_manifest, provenance
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRATCH = Path(os.environ.get("RUNNER_TEMP", os.environ.get("M1_CONTRACT_SCRATCH", tempfile.gettempdir())))
@@ -81,7 +78,7 @@ class M1Contracts(unittest.TestCase):
         self.assertEqual(installation.strip(), 'platform-tools emulator "$image"')
 
     def assert_cached_execution(self, workflow, script, verifier):
-        strict = workflow.split("- name: Strict committed verification", 1)[1].split("- name: Bind evidence", 1)[0]
+        strict = workflow.split("- name: Strict committed verification", 1)[1].split("- name: Upload", 1)[0]
         connected = script.split("./gradlew ", 1)[1].split("2>&1", 1)[0]
         for command in (strict, connected):
             for flag in ("--no-daemon", "--dependency-verification strict", "--no-build-cache",
@@ -420,31 +417,6 @@ class SyntheticReportTests(unittest.TestCase):
             check_manifest(manifest)
         with self.assertRaises(FileNotFoundError):
             check_manifest(self.directory / "missing.xml")
-
-    def test_exact_identity_and_manifest_are_not_event_sha_guesses(self):
-        import json
-        event = self.directory / "event.json"
-        event.write_text(json.dumps({"pull_request": {"head": {"sha": "synthetic-source-head"},
-                                                      "base": {"sha": "synthetic-base"}}}))
-        environment = {name: "synthetic" for name in ("GITHUB_SHA", "GITHUB_REF", "GITHUB_EVENT_NAME", "GITHUB_RUN_ID",
-                                                      "GITHUB_RUN_ATTEMPT", "GITHUB_REPOSITORY", "RUNNER_OS", "RUNNER_ARCH")}
-        environment["GITHUB_EVENT_PATH"] = str(event)
-        with patch.dict(os.environ, environment), patch("write_m1_evidence.subprocess.check_output", return_value="synthetic-merge\n"):
-            identity = provenance()
-        self.assertEqual(identity["checkoutSha"], "synthetic-merge")
-        self.assertEqual(identity["sourceHeadSha"], "synthetic-source-head")
-        self.assertEqual(identity["baseSha"], "synthetic-base")
-        previous = Path.cwd()
-        try:
-            os.chdir(self.directory)
-            evidence = Path("evidence")
-            evidence.mkdir()
-            (evidence / "receipt.txt").write_text("synthetic fixture bytes")
-            (evidence / "artifact-files.sha256.json").write_text("old manifest excluded")
-            self.assertEqual(artifact_manifest(), {"evidence/receipt.txt": hashlib.sha256(b"synthetic fixture bytes").hexdigest()})
-        finally:
-            os.chdir(previous)
-
 
 if __name__ == "__main__":
     unittest.main()
