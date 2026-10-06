@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CodexBar Mobile (unofficial demo)</string>
+    <string name="shell_title">CodexBar Mobile</string>
+    <string name="demo_identity">Unofficial · offline demo</string>
+    <string name="connection_identity">Not authenticated · not connected</string>
+    <string name="preview_heading">Preview a screen</string>
+    <string name="preview_disconnected">Disconnected</string>
+    <string name="preview_loading">Loading</string>
+    <string name="preview_error">Error</string>
+    <string name="preview_demo">Demo usage</string>
+    <string name="disconnected_title">No account connected</string>
+    <string name="disconnected_detail">Explore the interface with sample data. This build cannot sign in or contact a provider.</string>
+    <string name="show_fixture">Show offline sample</string>
+    <string name="loading_title">Loading preview</string>
+    <string name="loading_detail">Simulated loading only. No request is running. Choose when to show the sample.</string>
+    <string name="finish_preview">Finish with sample data</string>
+    <string name="error_title">Example error</string>
+    <string name="error_detail">Simulated failure, not a provider response. Retry opens the offline loading preview; it does not make a request.</string>
+    <string name="retry_preview">Retry preview</string>
+    <string name="fixture_title">Demo usage · sample only</string>
+    <string name="fixture_detail">Hand-authored fixed values, not your account or captured usage. These samples do not grant or deny access.</string>
+    <string name="five_hour_sample">Five-hour window · sample</string>
+    <string name="weekly_sample">Weekly window · sample</string>
+    <string name="sample_used_percent">Sample: %1$d%% used</string>
+    <string name="reset_sample">Reset information is not available in this demo. There is no live countdown, banked-reset inventory or provider observation.</string>
+    <string name="reset_preview">Return to disconnected</string>
+    <string name="no_live_features">Only the preview selection is saved for screen recreation. No credentials, account history or live connection are stored.</string>
+</resources>

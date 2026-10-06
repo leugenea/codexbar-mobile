@@ -1,0 +1,87 @@
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import java.security.MessageDigest
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+
+// Observation/assertions only. Does not change dependency versions or verification.
+gradle.projectsEvaluated {
+    def app = gradle.rootProject.project(':app')
+    app.tasks.register('m1ToolchainCheckpoint') {
+        doLast {
+            def digest = { file ->
+                def sha = MessageDigest.getInstance('SHA-256')
+                file.withInputStream { stream ->
+                    byte[] buffer = new byte[65536]
+                    int length
+                    while ((length = stream.read(buffer)) > 0) sha.update(buffer, 0, length)
+                }
+                sha.digest().encodeHex().toString()
+            }
+            def rows = []
+            def collect = { owner, configuration ->
+                // Filter before artifact selection: AGP's tested-app self-project
+                // publishes several artifact types. This inventory only hashes
+                // external originals; real compile/package tasks select app artifacts.
+                configuration.incoming.artifactView { view ->
+                    view.componentFilter { component ->
+                        component instanceof ModuleComponentIdentifier
+                    }
+                }.artifacts.artifacts.each { artifact ->
+                    def id = artifact.id.componentIdentifier
+                    if (id instanceof ModuleComponentIdentifier) {
+                        rows.add([configuration: owner + ':' + configuration.name,
+                                  group: id.group, module: id.module, version: id.version,
+                                  file: artifact.file.name, sha256: digest(artifact.file)])
+                    }
+                }
+            }
+            collect('root-buildscript', gradle.rootProject.buildscript.configurations.classpath)
+            collect('app-buildscript', app.buildscript.configurations.classpath)
+            // Full debug + JVM/native test and compiler/lint resolvable classpaths.
+            app.configurations.findAll { c ->
+                c.canBeResolved && (c.name.toLowerCase().contains('debug') ||
+                    c.name.toLowerCase().contains('kotlincompiler') ||
+                    c.name.toLowerCase().contains('lint'))
+            }.sort { it.name }.each { collect('app', it) }
+            def kotlinClass = app.tasks.named('compileDebugKotlin').get().class
+            while (kotlinClass != null && kotlinClass.name != 'org.jetbrains.kotlin.gradle.tasks.KotlinCompile') {
+                kotlinClass = kotlinClass.superclass
+            }
+            assert kotlinClass != null : 'Cannot observe loaded KotlinCompile class'
+            def kgpJar = new File(kotlinClass.protectionDomain.codeSource.location.toURI())
+            def agpLoader = app.plugins.findPlugin('com.android.application').class.classLoader
+            def agpVersion = agpLoader.loadClass('com.android.Version')
+                .getField('ANDROID_GRADLE_PLUGIN_VERSION').get(null)
+            def receipt = [gradle: gradle.gradleVersion, agp: agpVersion,
+                javaRuntime: System.getProperty('java.runtime.version'),
+                javaMajor: System.getProperty('java.specification.version'),
+                javaVendor: System.getProperty('java.vendor'),
+                loadedKgp: [file: kgpJar.name, sha256: digest(kgpJar)],
+                artifacts: rows.sort { a, b -> a.toString() <=> b.toString() }]
+            def output = new File(gradle.rootProject.projectDir, 'evidence/resolved-toolchain.json')
+            output.parentFile.mkdirs()
+            output.text = JsonOutput.prettyPrint(JsonOutput.toJson(receipt)) + '\n'
+            // Gradle/AGP amendment remains historical; current installation policy in m1.md
+            // additionally authorizes Temurin major17 and named SDK packages.
+            def approved = new JsonSlurper().parse(new File(gradle.rootProject.projectDir,
+                'docs/build/m1-toolchain-amendment.json'))
+            assert receipt.gradle == approved.gradle.version
+            assert receipt.agp == approved.agp.version
+            assert receipt.javaMajor == '17'
+            assert receipt.javaRuntime ==~ /17(?:[.+-].*)?/
+            assert receipt.javaVendor == 'Eclipse Adoptium'
+            // Gradle may instrument the loaded jar; the resolved original is in artifacts.
+            assert kgpJar.name ==~ /(?:instrumented-)?kotlin-gradle-plugin-2[.]4[.]20(?:-[a-zA-Z0-9_.]+)?[.]jar/ : kgpJar
+            [['org.jetbrains.kotlin', 'kotlin-gradle-plugin', '2.4.20'],
+             ['org.jetbrains.kotlin', 'kotlin-compiler-embeddable', '2.4.20'],
+             ['org.jetbrains.kotlin', 'kotlin-compose-compiler-plugin-embeddable', '2.4.20'],
+             ['org.jetbrains.kotlinx', 'kotlinx-coroutines-android', '1.11.0'],
+             ['androidx.compose.ui', 'ui-android', '1.12.1'],
+             ['androidx.compose.material3', 'material3-android', '1.4.0']].each { expected ->
+                def actual = rows.findAll { it.group == expected[0] && it.module == expected[1] }
+                assert !actual.empty && actual.every { it.version == expected[2] } : "${expected}: ${actual}"
+            }
+            println "M1 resolved metadata: ${output} (not native/runtime acceptance)"
+        }
+    }
+}
