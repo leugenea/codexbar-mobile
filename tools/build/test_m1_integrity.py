@@ -40,6 +40,31 @@ def validate_metadata(xml, record):
     assert hashlib.sha256(encoded).hexdigest() == SEMANTIC_SHA256
 
 
+def validate_extended_metadata(xml, record):
+    """Preserve M1 while leaving new checksum pins solely in Gradle's metadata."""
+    assert [node.tag for node in xml] == [NS + "configuration", NS + "components"]
+    configuration = xml.find(NS + "configuration")
+    assert [node.tag for node in configuration] == [NS + "verify-metadata", NS + "verify-signatures"]
+    assert [node.text for node in configuration] == ["true", "false"]
+    pairs = {}
+    for component in xml.find(NS + "components"):
+        assert component.tag == NS + "component"
+        assert set(component.attrib) == {"group", "name", "version"}
+        assert len(component) > 0
+        for artifact in component:
+            assert artifact.tag == NS + "artifact" and set(artifact.attrib) == {"name"}
+            assert len(artifact) == 1
+            checksum = artifact[0]
+            assert checksum.tag == NS + "sha256" and set(checksum.attrib) == {"value", "origin"}
+            value = checksum.get("value")
+            assert len(value) == 64 and all(char in "0123456789abcdef" for char in value)
+            identity = tuple(component.get(key) for key in ("group", "name", "version")) + (artifact.get("name"),)
+            assert identity not in pairs
+            pairs[identity] = value
+    for row in record["artifacts"]:
+        assert pairs.get(tuple(row[:4])) == row[4]
+
+
 class AuditedImportTests(unittest.TestCase):
     def setUp(self):
         self.path = ROOT / "gradle/verification-metadata.xml"
@@ -62,58 +87,42 @@ class AuditedImportTests(unittest.TestCase):
         self.assertEqual(self.record["inputs"]["resolved-toolchain.json"]["sha256"],
                          "d0390bf6c3d3229b315cb84c3e8660644e9e70997d94b615621f5c662498cae5")
 
-    def test_exact_m1_base_plus_independently_approved_m2_delta(self):
-        delta_path = ROOT / "docs/build/m2-coverage-integrity.json"
-        delta = json.loads(delta_path.read_text())
-        self.assertEqual(hashlib.sha256(delta_path.read_bytes()).hexdigest(),
-                         "22fec472348cc62a2e774459ac7a9be3f482a7c9011e63e24f9ce278d0aeaf36")
-        full = ET.fromstring(self.full_bytes)
-        base_ids = {tuple(row[:4]) for row in self.record["artifacts"]}
-        delta_ids = {tuple(row[:4]) for row in delta["artifacts"]}
-        self.assertFalse(base_ids & delta_ids)
-        self.assertEqual(len(delta_ids), 17)
-        self.assertEqual(len({tuple(row[:3]) for row in delta["artifacts"]}), 9)
-        pairs = []
-        full_components = full.find(NS + "components")
-        assert full_components is not None
-        for component in full_components:
-            for artifact in component:
-                identity = [component.get(k) for k in ("group", "name", "version")] + [artifact.get("name")]
-                self.assertEqual(artifact.tag, NS + "artifact")
-                self.assertEqual(set(artifact.attrib), {"name"})
-                self.assertEqual(len(artifact), 1)
-                checksum = artifact[0]
-                self.assertEqual(checksum.tag, NS + "sha256")
-                self.assertEqual(set(checksum.attrib), {"value", "origin"})
-                if tuple(identity) in delta_ids:
-                    row = next(row for row in delta["artifacts"] if row[:4] == identity)
-                    evidence = ("publisher SHA256 sidecar/module" if row[5] == "published-sha256" else
-                                "weaker published SHA1 + freshly retrieved original SHA256")
-                    self.assertEqual(checksum.get("origin"), f"Independent M2 audit: {evidence}; docs/build/m2-coverage-integrity.json; not authenticated publisher identity")
-                pairs.append(identity + [checksum.get("value")])
-        self.assertEqual(sorted(pairs), sorted(row[:5] for row in self.record["artifacts"] + delta["artifacts"]))
-        self.assertEqual(len(pairs), len({tuple(p) for p in pairs}))
-        self.assertEqual(len(full_components), 364 + 9)
-        self.assertEqual(len(pairs), 602 + 17)
-        self.assertEqual(hashlib.sha256(json.dumps(sorted(pairs), separators=(",", ":")).encode()).hexdigest(),
-                         "ba94604993d8d03d66d6e8b48fcdeb258aec36b62c3e851da32a6bed064434a3")
-        comparisons = {tuple(a[k] for k in ("group", "module", "version", "file")): a
-                       for a in delta["publisherComparisons"]}
-        tiers = {"published-sha256": 0, "published-sha1+original-sha256": 0}
-        for row in delta["artifacts"]:
-            tiers[row[5]] += 1
-            comparison = comparisons[tuple(row[:4])]
-            self.assertEqual(comparison["sha256"], row[4])
-            self.assertEqual(comparison["trustTier"], row[5])
-            self.assertEqual(comparison["url"], delta["repositories"][row[6][0]] + row[6][1])
-            matching = [p for p in comparison["publisherChecksums"] if p.get("match") is True and
-                        p["algorithm"] == ("sha256" if row[5] == "published-sha256" else "sha1")]
-            self.assertEqual(len(matching), 1)
-            proof = matching[0]
-            self.assertEqual(proof["publisherValue"], proof["computedValue"])
-            self.assertEqual(proof["url"], delta["repositories"][row[7][0][1]] + row[7][0][2])
-            self.assertEqual(proof["publisherValue"], row[4] if row[5] == "published-sha256" else row[7][0][3])
-        self.assertEqual(tiers, {"published-sha256": 7, "published-sha1+original-sha256": 10})
+    def test_m1_base_preserved_and_all_extended_artifacts_require_sha256(self):
+        validate_extended_metadata(ET.fromstring(self.full_bytes), self.record)
+
+    def test_extended_metadata_rejects_base_changes_and_broadened_trust(self):
+        for mutation in ("base-hash", "missing-base", "sha1", "extra-hash", "bad-hash",
+                         "trusted-artifacts", "ignored-keys", "artifact-ignore", "metadata-off",
+                         "empty-component", "duplicate-artifact"):
+            with self.subTest(mutation=mutation):
+                xml = ET.fromstring(self.full_bytes)
+                config = xml.find(NS + "configuration")
+                components = xml.find(NS + "components")
+                assert config is not None and components is not None
+                artifact = components[-1][0]
+                if mutation == "base-hash":
+                    components[0][0][0].set("value", "0" * 64)
+                elif mutation == "missing-base":
+                    components.remove(components[0])
+                elif mutation == "sha1":
+                    artifact[0].tag = NS + "sha1"
+                elif mutation == "extra-hash":
+                    ET.SubElement(artifact, NS + "sha256", value="0" * 64)
+                elif mutation == "bad-hash":
+                    artifact[0].set("value", "not-a-sha256")
+                elif mutation in ("trusted-artifacts", "ignored-keys"):
+                    ET.SubElement(config, NS + mutation)
+                elif mutation == "artifact-ignore":
+                    ET.SubElement(artifact, NS + "ignored-keys")
+                elif mutation == "metadata-off":
+                    config[0].text = "false"
+                elif mutation == "empty-component":
+                    for child in list(components[-1]):
+                        components[-1].remove(child)
+                else:
+                    components[-1].append(copy.deepcopy(artifact))
+                with self.assertRaises(AssertionError):
+                    validate_extended_metadata(xml, self.record)
 
     def test_per_artifact_sources_and_honest_trust_tiers(self):
         counts = {"published-sha256": 0, "published-sha1+original-sha256": 0}

@@ -274,6 +274,9 @@ jobs:
           retention-days: 7
           include-hidden-files: false
 
+  # Adapted from leugenea/qmix .github/workflows/android.yml at
+  # 0cc3f1eb8bfb1902ac8e2fae7fba729ef53cc9f0; MIT notice in app/build.gradle.
+  # Target policy requires both jobs to succeed; no allowed skips or routes.
   result:
     name: M2 Android result
     if: always()

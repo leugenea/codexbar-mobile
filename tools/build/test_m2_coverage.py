@@ -202,6 +202,9 @@ class CoverageContracts(unittest.TestCase):
                      "minimum = 0.90", "xml.required.set(true)", "html.required.set(true)",
                      "M2_TASK_OUTCOME", "m2PrepareDebugCoverage", "Incompatible JaCoCo tooling"):
             self.assertIn(seam, build)
+        self.assertIn("Copyright (c) 2026 QMix contributors", build)
+        self.assertIn("The above copyright notice and this permission notice shall be included", build)
+        self.assertIn('THE SOFTWARE IS PROVIDED "AS IS"', build)
         self.assertNotIn("tmp/kotlin-classes", build)
         self.assertNotIn("exclude(", build)
         for forbidden in ("ComposableSingletons", "*Lambda*", "*Activity*", "**/io/github/"):

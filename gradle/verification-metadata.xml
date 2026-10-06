@@ -2543,71 +2543,71 @@
    <!-- BEGIN independently audited M2 coverage delta -->
       <component group="org.jacoco" name="org.jacoco.agent" version="0.8.15">
          <artifact name="org.jacoco.agent-0.8.15-runtime.jar">
-            <sha256 value="fb5b0036a0899ea97edfa0fc2c7985b55f3f7c5695028163e5e60d4f3cf6075d" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="fb5b0036a0899ea97edfa0fc2c7985b55f3f7c5695028163e5e60d4f3cf6075d" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; not authenticated publisher identity"/>
          </artifact>
          <artifact name="org.jacoco.agent-0.8.15.jar">
-            <sha256 value="81607adaa5b03a687a04049dee6b07e9665708c3e6f7b0626892ca9659be587c" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="81607adaa5b03a687a04049dee6b07e9665708c3e6f7b0626892ca9659be587c" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; not authenticated publisher identity"/>
          </artifact>
          <artifact name="org.jacoco.agent-0.8.15.pom">
-            <sha256 value="47eb24b1577e473cbba634399bc56fe7b366b18401bf911d0d8771f56f228966" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="47eb24b1577e473cbba634399bc56fe7b366b18401bf911d0d8771f56f228966" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; not authenticated publisher identity"/>
          </artifact>
       </component>
       <component group="org.jacoco" name="org.jacoco.ant" version="0.8.15">
          <artifact name="org.jacoco.ant-0.8.15.jar">
-            <sha256 value="54fb6af97c95352d7deeb49113d7ad63f190eaa8cc9ae8e068fdb2f2a6de009e" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="54fb6af97c95352d7deeb49113d7ad63f190eaa8cc9ae8e068fdb2f2a6de009e" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; not authenticated publisher identity"/>
          </artifact>
          <artifact name="org.jacoco.ant-0.8.15.pom">
-            <sha256 value="96d1688a3e8723539de36eaeb3f0789ec05914585d69eae0f453c2924b559a0a" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="96d1688a3e8723539de36eaeb3f0789ec05914585d69eae0f453c2924b559a0a" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; not authenticated publisher identity"/>
          </artifact>
       </component>
       <component group="org.jacoco" name="org.jacoco.build" version="0.8.15">
          <artifact name="org.jacoco.build-0.8.15.pom">
-            <sha256 value="3a2c89f80c2ab9caf1b403a62da4bcbd909ee52ea53747391267a5cdc968c123" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="3a2c89f80c2ab9caf1b403a62da4bcbd909ee52ea53747391267a5cdc968c123" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; not authenticated publisher identity"/>
          </artifact>
       </component>
       <component group="org.jacoco" name="org.jacoco.core" version="0.8.15">
          <artifact name="org.jacoco.core-0.8.15.jar">
-            <sha256 value="ade1e0fdb4cd80d8537b57c6edb70a1360c47fdc518c20c65314517479bc4d0d" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="ade1e0fdb4cd80d8537b57c6edb70a1360c47fdc518c20c65314517479bc4d0d" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; not authenticated publisher identity"/>
          </artifact>
          <artifact name="org.jacoco.core-0.8.15.pom">
-            <sha256 value="7b283b35bb2bda3b827b4da89ce968d257d1d98dd8594d7c8cb5b2f6d8cd9b15" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="7b283b35bb2bda3b827b4da89ce968d257d1d98dd8594d7c8cb5b2f6d8cd9b15" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; not authenticated publisher identity"/>
          </artifact>
       </component>
       <component group="org.jacoco" name="org.jacoco.report" version="0.8.15">
          <artifact name="org.jacoco.report-0.8.15.jar">
-            <sha256 value="66a79e36edc77a1ebf6689e76a976e12ab4f1af515cbd09555840fba775714f4" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="66a79e36edc77a1ebf6689e76a976e12ab4f1af515cbd09555840fba775714f4" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; not authenticated publisher identity"/>
          </artifact>
          <artifact name="org.jacoco.report-0.8.15.pom">
-            <sha256 value="a1ea901ca04547f1dc24e75dde104b3a7171ff9d0c2b8f43b3153be09ac3c08a" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="a1ea901ca04547f1dc24e75dde104b3a7171ff9d0c2b8f43b3153be09ac3c08a" origin="Independent M2 audit: weaker published SHA1 + freshly retrieved original SHA256; not authenticated publisher identity"/>
          </artifact>
       </component>
       <component group="org.ow2.asm" name="asm" version="9.10.1">
          <artifact name="asm-9.10.1.jar">
-            <sha256 value="ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb" origin="Independent M2 audit: publisher SHA256 sidecar/module; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb" origin="Independent M2 audit: publisher SHA256 sidecar/module; not authenticated publisher identity"/>
          </artifact>
          <artifact name="asm-9.10.1.pom">
-            <sha256 value="e1b1c3832ca3ac0a9e563c405f4c760118b5556a4920daee14058886197e094d" origin="Independent M2 audit: publisher SHA256 sidecar/module; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="e1b1c3832ca3ac0a9e563c405f4c760118b5556a4920daee14058886197e094d" origin="Independent M2 audit: publisher SHA256 sidecar/module; not authenticated publisher identity"/>
          </artifact>
       </component>
       <component group="org.ow2.asm" name="asm-bom" version="9.10.1">
          <artifact name="asm-bom-9.10.1.pom">
-            <sha256 value="709472d69cf785d4b679eee0e6e0575d4b104476ddf35265ef1117e73c129cd4" origin="Independent M2 audit: publisher SHA256 sidecar/module; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="709472d69cf785d4b679eee0e6e0575d4b104476ddf35265ef1117e73c129cd4" origin="Independent M2 audit: publisher SHA256 sidecar/module; not authenticated publisher identity"/>
          </artifact>
       </component>
       <component group="org.ow2.asm" name="asm-commons" version="9.10.1">
          <artifact name="asm-commons-9.10.1.jar">
-            <sha256 value="6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895" origin="Independent M2 audit: publisher SHA256 sidecar/module; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895" origin="Independent M2 audit: publisher SHA256 sidecar/module; not authenticated publisher identity"/>
          </artifact>
          <artifact name="asm-commons-9.10.1.pom">
-            <sha256 value="ceb2c43f3a273db88af8652d89ed6312f3e91a1a1e0ffc6f7823169278cf795c" origin="Independent M2 audit: publisher SHA256 sidecar/module; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="ceb2c43f3a273db88af8652d89ed6312f3e91a1a1e0ffc6f7823169278cf795c" origin="Independent M2 audit: publisher SHA256 sidecar/module; not authenticated publisher identity"/>
          </artifact>
       </component>
       <component group="org.ow2.asm" name="asm-tree" version="9.10.1">
          <artifact name="asm-tree-9.10.1.jar">
-            <sha256 value="3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b" origin="Independent M2 audit: publisher SHA256 sidecar/module; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b" origin="Independent M2 audit: publisher SHA256 sidecar/module; not authenticated publisher identity"/>
          </artifact>
          <artifact name="asm-tree-9.10.1.pom">
-            <sha256 value="963eebdea6e2e1ff25c9068b64a238e1585c99f8acd455595ac159a7f52b6c41" origin="Independent M2 audit: publisher SHA256 sidecar/module; docs/build/m2-coverage-integrity.json; not authenticated publisher identity"/>
+            <sha256 value="963eebdea6e2e1ff25c9068b64a238e1585c99f8acd455595ac159a7f52b6c41" origin="Independent M2 audit: publisher SHA256 sidecar/module; not authenticated publisher identity"/>
          </artifact>
       </component>
    <!-- END independently audited M2 coverage delta -->
