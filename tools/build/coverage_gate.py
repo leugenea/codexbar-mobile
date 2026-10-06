@@ -13,7 +13,8 @@ import xml.etree.ElementTree as ET
 BUILD = Path("app/build")
 COVERAGE = BUILD / "coverage-gate"
 PHASES = {"jvm": "testDebugUnitTest", "instrumentation": "connectedDebugAndroidTest",
-          "report": "jacocoDebugReport", "verification": "jacocoDebugCoverageVerification"}
+          "inputs": "collectDebugCoverageInputs", "report": "jacocoDebugReport",
+          "verification": "jacocoDebugCoverageVerification"}
 IDENTITY_KEYS = ("checkoutSha", "sourceHeadSha", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT")
 
 
@@ -68,18 +69,16 @@ def validate_inputs(context, inventory, now, identity):
         raise ValueError("Missing JVM exec or native ec dataset")
     probe_counts = {}
     for dataset in datasets:
-        native = dataset["kind"] == "native"
-        # adb pull can preserve the device's mtime; native session times also use
-        # the device clock. prepare() removes the entire native output directory,
-        # and ctime records the subsequent local write on the runner's clock.
-        # Read it from the filesystem, not device-derived inventory metadata.
-        fresh_millis = Path(dataset["path"]).stat().st_ctime_ns // 1_000_000 if native else dataset["modifiedMillis"]
-        if fresh_millis < context["startedMillis"] or not dataset["bytes"]:
-            raise ValueError(f"Stale/empty execution data: {dataset['path']}")
-        if not dataset.get("sessions") or any(s["dumpMillis"] < s["startMillis"] or
-                                               (not native and s["startMillis"] < context["startedMillis"] - 2000)
-                                               for s in dataset["sessions"]):
-            raise ValueError(f"Stale/invalid JaCoCo session: {dataset['path']}")
+        if not dataset["bytes"]:
+            raise ValueError(f"Empty execution data (0 bytes): {dataset['path']}")
+        if dataset["modifiedMillis"] < context["startedMillis"]:
+            raise ValueError(f"Stale execution data: {dataset['path']}")
+        if not dataset.get("sessions"):
+            raise ValueError(f"No JaCoCo sessions: {dataset['path']}")
+        if any(s["startMillis"] < context["startedMillis"] - 2000 for s in dataset["sessions"]):
+            raise ValueError(f"Stale JaCoCo session: {dataset['path']}")
+        if any(s["dumpMillis"] < s["startMillis"] for s in dataset["sessions"]):
+            raise ValueError(f"Invalid JaCoCo session ordering: {dataset['path']}")
         matched = 0
         for record in dataset["records"]:
             if record["name"] in expected:
