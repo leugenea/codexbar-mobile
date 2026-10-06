@@ -1,0 +1,75 @@
+name: Repository policy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    name: Check repository scripts and supply-chain policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.13
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Install hash-pinned policy, research and metrics dependencies
+        run: |
+          python -m venv "$RUNNER_TEMP/policy-venv"
+          "$RUNNER_TEMP/policy-venv/bin/python" -m pip install --require-hashes --no-deps \
+            -r .github/requirements-policy.txt \
+            -r tools/research/requirements.txt \
+            -r .github/requirements-metrics.txt
+      - name: Install checksum-verified actionlint 1.7.12 and ShellCheck 0.11.0
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/policy-tools"
+          cd "$RUNNER_TEMP/policy-tools"
+          curl --fail --location --retry 3 \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            --output actionlint.tar.gz
+          curl --fail --location --retry 3 \
+            https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz \
+            --output shellcheck.tar.xz
+          printf '%s  %s\n' \
+            '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8' actionlint.tar.gz \
+            '8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198' shellcheck.tar.xz | sha256sum -c -
+          tar -xzf actionlint.tar.gz actionlint
+          tar -xJf shellcheck.tar.xz --strip-components=1 shellcheck-v0.11.0/shellcheck
+          test -x ./actionlint && test -x ./shellcheck
+          ./actionlint --version
+          ./shellcheck --version
+          printf '%s\n' "$RUNNER_TEMP/policy-tools" >> "$GITHUB_PATH"
+      - name: Run all repository Python, shell and workflow checks
+        env:
+          CHECK_PYTHON: ${{ runner.temp }}/policy-venv/bin/python
+          ACTIONLINT: ${{ runner.temp }}/policy-tools/actionlint
+          SHELLCHECK: ${{ runner.temp }}/policy-tools/shellcheck
+        run: bash tools/check.sh
+
+  result:
+    name: Repository policy result
+    if: always()
+    needs: policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require every repository policy check to succeed
+        env:
+          POLICY_RESULT: ${{ needs.policy.result }}
+        run: '[[ "$POLICY_RESULT" == success ]]'

@@ -1,0 +1,4 @@
+# Repository YAML parser: CPython 3.13 Linux x86_64 wheel only.
+# jsonschema is shared with tools/research/requirements.txt, installed by check CI.
+--only-binary=:all:
+PyYAML==6.0.3 --hash=sha256:0f29edc409a6392443abf94b9cf89ce99889a1dd5376d94316ae5145dfedd5d6

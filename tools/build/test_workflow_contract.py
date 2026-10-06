@@ -15,6 +15,59 @@ SCRATCH = Path(os.environ.get("RUNNER_TEMP", os.environ.get("BUILD_CONTRACT_SCRA
 
 
 class WorkflowContracts(unittest.TestCase):
+    def assert_repository_gate_tools(self, workflow, entrypoint):
+        self.assertTrue(workflow.startswith("name: Repository policy\n"))
+        self.assertNotRegex(workflow, r"\b[Mm][0-5]\b|[Mm][0-5][_-]|[Mm][0-5][A-Z]")
+        self.assertIn("run: bash tools/check.sh", workflow)
+        self.assertIn("--require-hashes --no-deps", workflow)
+        for requirements in (".github/requirements-policy.txt", "tools/research/requirements.txt",
+                             ".github/requirements-metrics.txt"):
+            self.assertIn("-r " + requirements, workflow)
+        self.assertIn('python -m venv "$RUNNER_TEMP/policy-venv"', workflow)
+        for tool, version, archive, checksum in (
+            ("actionlint", "1.7.12", "actionlint.tar.gz",
+             "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"),
+            ("shellcheck", "0.11.0", "shellcheck.tar.xz",
+             "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198"),
+        ):
+            self.assertIn("/releases/download/v" + version + "/", workflow)
+            self.assertIn("'" + checksum + "' " + archive, workflow)
+            self.assertIn("sha256sum -c -", workflow)
+            self.assertIn("tar -x", workflow)
+            self.assertLess(workflow.index("sha256sum -c -"), workflow.index("tar -x"))
+            self.assertIn("./" + tool + " --version", workflow)
+            self.assertIn("${{ runner.temp }}/policy-tools/" + tool, workflow)
+        for contract in ("set -euo pipefail", "tools/build tools/research tools/metrics tools/policy",
+                         "-m unittest discover", '"$shellcheck" --version',
+                         '"$shellcheck" --external-sources', 'bash -n "$source"',
+                         '"$actionlint" -shellcheck "$shellcheck"', "repository_policy.py",
+                         "ast.parse("):
+            self.assertIn(contract, entrypoint)
+        self.assertNotIn("|| true", entrypoint)
+
+    def test_single_repository_gate_runs_all_suites_and_verified_linters(self):
+        self.assert_repository_gate_tools(
+            (ROOT / ".github/workflows/repository-policy.yml").read_text(),
+            (ROOT / "tools/check.sh").read_text(),
+        )
+
+    def test_repository_gate_rejects_unverified_or_missing_tools_and_suites(self):
+        original = [(ROOT / path).read_text() for path in (
+            ".github/workflows/repository-policy.yml", "tools/check.sh")]
+        for target, old, new in (
+            (0, "sha256sum -c -", "true"),
+            (0, "./shellcheck --version", "true"),
+            (0, "--require-hashes --no-deps", "--no-deps"),
+            (1, "tools/build tools/research tools/metrics tools/policy", "tools/build tools/research"),
+            (1, '"$actionlint" -shellcheck "$shellcheck"', '"$actionlint" -shellcheck=""'),
+            (1, 'bash -n "$source"', "true"),
+        ):
+            texts = original.copy()
+            self.assertIn(old, texts[target])
+            texts[target] = texts[target].replace(old, new, 1)
+            with self.subTest(mutation=old), self.assertRaises(AssertionError):
+                self.assert_repository_gate_tools(*texts)
+
     def assert_descriptive_workflow_names(self, android, research):
         expected = {
             "Android": {
@@ -84,18 +137,14 @@ class WorkflowContracts(unittest.TestCase):
         self.assertEqual(text.count("persist-credentials: false"), 4)
         uses = re.findall(r"(?m)^\s*uses: ([\w/-]+)@([0-9a-f]{40}) # (v[\d.]+)$", text)
         self.assertEqual(len(re.findall(r"(?m)^\s*uses:", text)), len(uses))
-        pins = {
-            "actions/checkout": ("08eba0b27e820071cde6df949e0beb9ba4906955", "v4.3.0"),
-            "actions/setup-python": ("5fda3b95a4ea91299a34e894583c3862153e4b97", "v7.0.0"),
-            "actions/upload-artifact": ("ea165f8d65b6e75b540449e92b4886f43607fa02", "v4.6.2"),
-            "actions/download-artifact": ("d3f86a106a0bac45b974a628896c90dbdf5c8093", "v4.3.0"),
-            "benchmark-action/github-action-benchmark": ("4322e5726e6334590d251fc4f92bec0efafc45dc", "v1.22.2"),
-            "actions/upload-pages-artifact": ("fc324d3547104276b827a68afc52ff2a11cc49c9", "v5.0.0"),
-            "actions/deploy-pages": ("368f82528645a54fb793d4d04e342629a3f51346", "v5.0.1"),
+        # Assert the executable surface, not exact release versions: reviewed
+        # Dependabot SHA/comment updates must not require a second pin ledger.
+        expected_actions = {
+            "actions/checkout", "actions/setup-python", "actions/upload-artifact",
+            "actions/download-artifact", "benchmark-action/github-action-benchmark",
+            "actions/upload-pages-artifact", "actions/deploy-pages",
         }
-        self.assertEqual({action for action, _, _ in uses}, set(pins))
-        for action, sha, version in uses:
-            self.assertEqual((sha, version), pins[action])
+        self.assertEqual({action for action, _, _ in uses}, expected_actions)
         for job, artifact in (("erosion", "code-erosion"), ("duplication", "code-duplication")):
             body = jobs[job]
             self.assertNotRegex(body, r"(?m)^    (?:if|needs):")
@@ -137,13 +186,12 @@ class WorkflowContracts(unittest.TestCase):
         self.assertIn("needs: [build, instrumented]", android)
         self.assertNotIn("erosion", android)
         self.assertNotIn("duplication", android)
-        for path in (ROOT / ".github/workflows").glob("*.y*ml"):
-            text = path.read_text()
-            self.assertEqual(len(re.findall(r"(?m)^\s*uses:", text)),
-                             len(re.findall(r"(?m)^\s*uses: [\w/-]+@[0-9a-f]{40} # v[\d.]+$", text)))
+        # Cross-workflow pin/permission policy is exercised by tools/policy;
+        # keep this stdlib suite usable in the unchanged Android job.
 
     def test_code_metrics_contract_rejects_privilege_and_history_regressions(self):
         original = (ROOT / ".github/workflows/code-metrics.yml").read_text()
+        release_comment = re.findall(r"# v[\d.]+", original)[0]
         for old, new in (("      contents: read", "      contents: write"),
                          ("queue: max", "queue: single"),
                          ("github.event_name == 'push' && github.run_id", "github.ref"),
@@ -151,7 +199,7 @@ class WorkflowContracts(unittest.TestCase):
                          ("fail-on-alert: false", "fail-on-alert: true"),
                          ("persist-credentials: false", "persist-credentials: true"),
                          ("artifact_name: github-pages-${{ github.run_attempt }}", "artifact_name: github-pages"),
-                         ("# v4.3.0", "# unversioned")):
+                         (release_comment, "# unversioned")):
             with self.subTest(mutation=old), self.assertRaises(AssertionError):
                 self.assert_code_metrics_contract(original.replace(old, new, 1))
 
