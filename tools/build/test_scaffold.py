@@ -156,44 +156,31 @@ class ToolchainContract(unittest.TestCase):
         for layer in icon[1:]:
             self.assertEqual(layer.get(ns + "drawable"), "@drawable/ic_launcher_foreground")
 
-    def test_phase1_verification_is_explicitly_empty_not_claimed_reviewed(self):
-        ns = {"v": "https://schema.gradle.org/dependency-verification"}
-        metadata = ROOT / "gradle/verification-metadata.xml"
-        xml = ET.parse(metadata).getroot()
-        self.assertEqual(xml.find("v:configuration/v:verify-metadata", ns).text, "true")
-        self.assertEqual(len(xml.find("v:components", ns)), 0)
-        self.assertIn("NOT reviewed", metadata.read_text())
-        self.assertTrue((ROOT / "gradle/m1-bootstrap-diagnostic").is_file())
-        # Retire this phase-specific test with the marker when reviewed metadata lands.
-
-    def test_read_only_pr_route_and_strict_discovery_separation(self):
+    def test_read_only_routes_require_fresh_strict_verification_only(self):
         workflow = (ROOT / ".github/workflows/m1-toolchain.yml").read_text()
         self.assertIn("  pull_request:", workflow)
+        self.assertIn("  push:", workflow)
+        self.assertIn("  workflow_dispatch:", workflow)
         self.assertIn("runs-on: ubuntu-24.04", workflow)
-        self.assertIn("persist-credentials: false", workflow)
         self.assertIn("  contents: read", workflow)
-        self.assertIn("default: false", workflow)
-        self.assertIn("gradle/m1-bootstrap-diagnostic", workflow)
-        for unsafe in ("pull_request_target", "self-hosted", "secrets.", "continue-on-error:", "paths:"):
+        self.assertEqual(workflow.count("persist-credentials: false"), 2)
+        self.assertFalse((ROOT / "gradle/m1-bootstrap-diagnostic").exists())
+        for unsafe in ("pull_request_target", "self-hosted", "secrets.", "continue-on-error:", "paths:",
+                       "discover_dependencies", "m1-bootstrap-diagnostic", "m1-gradle-discovery",
+                       "--write-verification-metadata", "--dependency-verification off", "actions/cache"):
             self.assertNotIn(unsafe, workflow)
-        self.assertEqual(len(re.findall(r"uses: [\w/-]+@[a-f0-9]{40} # v[\d.]+", workflow)), 2)
-        strict = workflow.split("- name: Strict committed verification", 1)[1].split("- name: PHASE 1", 1)[0]
+        self.assertEqual(len(re.findall(r"uses: [\w/-]+@[a-f0-9]{40} # v[\d.]+", workflow)), 4)
+        strict = workflow.split("- name: Strict committed verification", 1)[1].split("- name: Bind evidence", 1)[0]
         self.assertIn("--dependency-verification strict", strict)
-        self.assertNotIn("--write-verification-metadata", strict)
-        self.assertNotIn("--dependency-verification off", strict)
+        self.assertIn('[[ ! -e "$GRADLE_USER_HOME" ]]', strict)
+        self.assertIn("m1-gradle-strict", strict)
         for task in ("lintDebug", "assembleDebug", "compileDebugUnitTestKotlin",
                      "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest"):
             self.assertIn(":app:" + task, strict)
-        discovery = workflow.split("- name: PHASE 1", 1)[1].split("- name: Bind evidence", 1)[0]
-        self.assertIn("always()", discovery)
-        self.assertIn("steps.route.outputs.discover == 'true'", discovery)
-        self.assertIn("--write-verification-metadata sha256", discovery)
-        self.assertIn(":app:connectedDebugAndroidTest --dry-run", discovery)
-        self.assertIn("lint_status=$?", discovery)
-        self.assertIn("lint_status == 0", discovery)
+        self.assertIn("verify_m1_manifests.py", strict)
+        self.assertIn("verify_m1_test_reports.py jvm", strict)
+        self.assertIn("committed-integrity-provenance.json", workflow)
         self.assertIn("if: always()", workflow.split("- name: Upload", 1)[1])
-        self.assertIn("m1-gradle-strict", strict)
-        self.assertIn("m1-gradle-discovery", discovery)
 
     def test_inventory_filters_projects_before_artifact_selection(self):
         inventory = (ROOT / "tools/build/toolchain.init.gradle").read_text()
@@ -209,7 +196,7 @@ class ToolchainContract(unittest.TestCase):
         self.assertIn("actual.every { it.version == expected[2] }", inventory)
         self.assertIn("write_sdk_package_metadata.py", (ROOT / "tools/build/install-hosted-toolchain.sh").read_text())
 
-    def test_no_network_permission_and_honest_runnable_placeholder(self):
+    def test_no_network_permission_and_honest_four_state_shell(self):
         ns = "{http://schemas.android.com/apk/res/android}"
         manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
         self.assertEqual(manifest.findall("uses-permission"), [])
@@ -218,13 +205,17 @@ class ToolchainContract(unittest.TestCase):
         self.assertEqual(activity.find("intent-filter/category").get(ns + "name"), "android.intent.category.LAUNCHER")
         strings = ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()
         text = " ".join(e.text or "" for e in strings)
-        self.assertIn("not authenticated", text)
-        self.assertIn("Placeholder demo", text)
-        self.assertIn("unofficial", text)
-        self.assertIn("not implemented yet", text)
+        self.assertIn("Not authenticated", text)
+        self.assertIn("not connected", text)
+        self.assertIn("offline demo", text)
+        self.assertIn("Unofficial", text)
+        self.assertNotIn("not implemented yet", text)
         ET.parse(ROOT / "app/src/main/res/values/themes.xml")
         source = (ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile/MainActivity.kt").read_text()
-        for snippet in ("ComponentActivity()", "setContent", "MaterialTheme", "heading()", "Modifier.padding(insets)"):
+        for snippet in ("ComponentActivity()", "setContent", "MaterialTheme", "heading()",
+                        "padding(insets)", "WindowInsets.safeDrawing", "isSystemInDarkTheme()",
+                        "rememberSaveable", "verticalScroll", "Preview.Disconnected", "Preview.Loading",
+                        "Preview.Error", "Preview.Demo"):
             self.assertIn(snippet, source)
         self.assertNotRegex(source, r"https?://|Socket|HttpClient|URLConnection|SharedPreferences")
 

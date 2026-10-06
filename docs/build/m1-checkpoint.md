@@ -1,11 +1,48 @@
-# M1 early hosted toolchain checkpoint — not mergeable
+# M1 hosted toolchain checkpoint history
 
-This is **phase 1 of issue #2**, not completed M1. It supplies a runnable-source
-Material 3 placeholder and the selected toolchain so a draft PR can expose
-resolution/compilation/lint failures early. No Android build or native launch has
-been performed locally. The four disconnected/loading/error/demo states and
-meaningful JVM/native behavior tests are still pending. The two small Kotlin tests
-are explicitly **linkage/compilation placeholders**, not final smoke evidence.
+**Current implementation/build instructions:** [M1 offline shell](m1.md).
+The four-state shell and behavior-bearing tests now replace the earlier runnable
+placeholder. The exact independently audited metadata has been imported; see
+[m1-integrity.md](m1-integrity.md) and its compact per-artifact source record.
+Full candidate strict/native verification and independent review are still pending;
+nothing in this history declares M1 complete or mergeable.
+
+The sections below preserve **contemporaneous checkpoint wording**. References
+to pending UI/tests or a “next checkpoint” describe that earlier source snapshot,
+not the current shell implementation or permission to bypass its final gates.
+M0 historical research and the approved M1 Gradle/AGP amendment remain intact.
+
+## Third hosted checkpoint: toolchain stop/go, not final M1
+
+Run **37461079663, attempt 1** checked out synthetic PR merge
+`d7de7bf7d34e63aab9db5ba1fd9998a6fe966116` for source
+`3bb5133a9ffe99bd62377d51a3813df46d793520`. The parent supplied verified
+provenance/all **44** artifact hashes before this continuation. Discovery returned
+resolution/lint/build/connected-dry-run **0**, and the actual lint XML contained
+zero issues. The app/test APKs and both placeholder test source sets built.
+The receipt observed Gradle **9.8.0**, AGP **9.4.1**, loaded KGP
+**2.4.20-gradle96**, unchanged JDK **17.0.20.1+1**, and passed all version/compiler
+assertions. This cleared the bounded toolchain stop/go for UI implementation,
+not the known documented fully-supported-range caveat or native execution gate.
+
+Strict verification still failed as expected for empty/unreviewed metadata.
+The **364-component** discovery graph is evidence for independent audit, not
+approved committed metadata. Native graph dry-run did not boot a device or run
+smoke tests. The current candidate introduces no dependency-coordinate changes,
+but its complete strict/native task execution still must establish graph
+completeness and all final behavior gates after audited import.
+
+---
+
+# Historical phase-1 checkpoint notes
+
+This was **phase 1 of issue #2**, not completed M1. It supplied a runnable-source
+Material 3 placeholder and the selected toolchain so a draft PR could expose
+resolution/compilation/lint failures early. No Android build or native launch was
+performed locally. At that snapshot, the four disconnected/loading/error/demo
+states and meaningful JVM/native behavior tests were pending. The two small
+Kotlin tests were explicitly **linkage/compilation placeholders**, not smoke
+acceptance, and have now been removed in favor of the full shell's actual tests.
 
 ## Current M1 pins and historical M0 baseline
 
