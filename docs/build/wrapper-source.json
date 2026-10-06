@@ -1,0 +1,18 @@
+{
+  "gradleVersion": "9.5.0",
+  "releaseTag": "v9.5.0",
+  "releaseCommit": "3fe117d68f3907790f3809f121aa36303a9151f8",
+  "tagApi": "https://api.github.com/repos/gradle/gradle/git/ref/tags/v9.5.0",
+  "sourceBase": "https://raw.githubusercontent.com/gradle/gradle/3fe117d68f3907790f3809f121aa36303a9151f8/",
+  "wrapperJarPublishedChecksumUrl": "https://services.gradle.org/distributions/gradle-9.5.0-wrapper.jar.sha256",
+  "files": {
+    "gradle/wrapper/gradle-wrapper.jar": "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7",
+    "gradlew": "45bda8deaef01b732f07bd317f962a736e349c6faa6662829bc0f41293b51212",
+    "gradlew.bat": "9e62ee9a1c6eb7cecc90e55acc3ff09a1631ccfe3edddf180538a1e42b1532dc"
+  },
+  "actionReleaseMappings": {
+    "actions/checkout@v4.3.0": "08eba0b27e820071cde6df949e0beb9ba4906955",
+    "actions/upload-artifact@v4.6.2": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+  },
+  "verificationStatus": "Wrapper JAR independently matched official published checksum; scripts matched exact official release source; Action tag refs returned commit objects and pinned action.yml inputs were inspected. Dependency graph still UNTRUSTED, not resolved locally."
+}

@@ -1,0 +1,3 @@
+PHASE 1 ONLY — NOT AN ACCEPTANCE GATE; REMOVE BEFORE FINAL REVIEW/MERGE.
+Allows PR-triggered UNTRUSTED dependency discovery in the runner worktree.
+The mandatory strict build remains failing until reviewed metadata is committed.

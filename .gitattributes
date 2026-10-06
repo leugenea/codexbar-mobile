@@ -1,0 +1,3 @@
+gradlew -text
+gradlew.bat -text
+gradle/wrapper/gradle-wrapper.jar binary

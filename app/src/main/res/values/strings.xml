@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CodexBar Mobile (unofficial demo)</string>
+    <string name="bootstrap_title">Toolchain checkpoint</string>
+    <string name="bootstrap_status">Placeholder demo — not authenticated</string>
+    <string name="bootstrap_detail">Independent unofficial app. No provider connection or usage data. The four-state phone demo is not implemented yet.</string>
+</resources>

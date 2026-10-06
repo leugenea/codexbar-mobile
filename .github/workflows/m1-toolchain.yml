@@ -1,0 +1,131 @@
+name: M1 toolchain checkpoint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      discover_dependencies:
+        description: 'UNTRUSTED metadata discovery only; never establishes acceptance'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checkpoint:
+    name: M1 strict toolchain checkpoint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - name: Record exact candidate and diagnostic route
+        id: route
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISCOVER: ${{ inputs.discover_dependencies || false }}
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/checkout-sha.txt
+          cp gradle/verification-metadata.xml evidence/committed-verification-metadata.xml
+          if { [[ "$EVENT_NAME" == pull_request ]] && [[ -f gradle/m1-bootstrap-diagnostic ]]; } ||
+             { [[ "$EVENT_NAME" == workflow_dispatch ]] && [[ "$DISCOVER" == true ]]; }; then
+            printf '%s\n' 'discover=true' >> "$GITHUB_OUTPUT"
+          else
+            printf '%s\n' 'discover=false' >> "$GITHUB_OUTPUT"
+          fi
+          python3 - <<'PY'
+          import json, os, pathlib, subprocess
+          keys = ('GITHUB_SHA', 'GITHUB_REF', 'GITHUB_EVENT_NAME', 'GITHUB_RUN_ID',
+                  'GITHUB_RUN_ATTEMPT', 'GITHUB_REPOSITORY', 'RUNNER_OS', 'RUNNER_ARCH')
+          data = {k: os.environ[k] for k in keys}
+          data['checkoutSha'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          data['phase1MarkerPresent'] = pathlib.Path('gradle/m1-bootstrap-diagnostic').is_file()
+          pathlib.Path('evidence/provenance.json').write_text(json.dumps(data, indent=2) + '\n')
+          PY
+      - name: Cheap offline scaffold contract
+        run: python3 -B -m unittest discover -s tools/build -p 'test_*.py' -v
+      - name: Install and verify exact M0 JDK and SDK archives
+        id: install
+        run: bash tools/build/install-hosted-toolchain.sh
+      - name: Strict committed verification (mandatory; no metadata generation)
+        if: steps.install.outcome == 'success'
+        env:
+          GRADLE_USER_HOME: ${{ runner.temp }}/m1-gradle-strict
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --dependency-verification strict --stacktrace --info --continue \
+            -I tools/build/toolchain.init.gradle :app:m1ToolchainCheckpoint \
+            :app:lintDebug :app:assembleDebug :app:compileDebugUnitTestKotlin \
+            :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
+            2>&1 | tee evidence/strict.log
+      - name: PHASE 1 UNTRUSTED discovery (not an acceptance gate)
+        if: always() && steps.install.outcome == 'success' && steps.route.outputs.discover == 'true'
+        env:
+          GRADLE_USER_HOME: ${{ runner.temp }}/m1-gradle-discovery
+        run: |
+          # Runner-worktree-only write. The committed empty/reviewed file is preserved above.
+          rm gradle/verification-metadata.xml
+          set +e
+          set -o pipefail
+          ./gradlew --no-daemon --dependency-verification off --write-verification-metadata sha256 \
+            --stacktrace --info -I tools/build/toolchain.init.gradle :app:m1ToolchainCheckpoint \
+            2>&1 | tee evidence/discovery-resolution.log
+          resolution_status=$?
+          # Run lint early; preserve its exact failure while continuing graph discovery.
+          ./gradlew --no-daemon --dependency-verification off --write-verification-metadata sha256 \
+            --stacktrace --info :app:lintDebug 2>&1 | tee evidence/discovery-lint.log
+          lint_status=$?
+          ./gradlew --no-daemon --dependency-verification off --write-verification-metadata sha256 \
+            --stacktrace --info --continue :app:assembleDebug :app:compileDebugUnitTestKotlin \
+            :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
+            2>&1 | tee evidence/discovery-build.log
+          build_status=$?
+          # Graph observation only: no emulator, no connected test execution or native claim.
+          ./gradlew --no-daemon --dependency-verification off --write-verification-metadata sha256 \
+            --stacktrace --info :app:connectedDebugAndroidTest --dry-run \
+            2>&1 | tee evidence/discovery-connected-graph.log
+          graph_status=$?
+          printf 'resolution=%s\nlint=%s\nbuild=%s\nconnected_dry_run=%s\n' \
+            "$resolution_status" "$lint_status" "$build_status" "$graph_status" > evidence/discovery-exit-status.txt
+          if [[ -f gradle/verification-metadata.xml ]]; then
+            cp gradle/verification-metadata.xml evidence/UNTRUSTED-discovered-verification-metadata.xml
+          fi
+          (( resolution_status == 0 && lint_status == 0 && build_status == 0 && graph_status == 0 ))
+      - name: Bind evidence to exact files (all outcomes)
+        if: always()
+        run: |
+          mkdir -p evidence
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          directories = ('evidence', 'build/reports', 'app/build/reports',
+                         'app/build/test-results', 'app/build/outputs/apk',
+                         'app/build/intermediates/merged_manifests')
+          paths = [p for d in directories for p in pathlib.Path(d).rglob('*')]
+          rows = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths) if p.is_file()}
+          pathlib.Path('evidence/artifact-files.sha256.json').write_text(json.dumps(rows, indent=2) + '\n')
+          PY
+      - name: Upload exact diagnostic/build evidence (all outcomes)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: m1-toolchain-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            evidence/
+            build/reports/
+            app/build/reports/
+            app/build/test-results/
+            app/build/outputs/apk/
+            app/build/intermediates/merged_manifests/
+          if-no-files-found: error
+          retention-days: 7
+          include-hidden-files: false
