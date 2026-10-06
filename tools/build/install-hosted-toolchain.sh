@@ -47,6 +47,13 @@ for archive, destination, revision, api in (
     shutil.move(str(source.parent), str(root / 'm1-sdk' / destination))
 PY
 cd "$GITHUB_WORKSPACE"
+# SDK installers normally write package.xml from the repository record after
+# unpacking. The platform's decimal API cannot use sdklib's legacy int parser.
+# Require the exact M0 archive/revision before writing official local metadata.
+curl --fail --location --retry 3 --output evidence/sdk-repository.xml \
+  'https://dl.google.com/android/repository/repository2-4.xml'
+python3 tools/build/write_sdk_package_metadata.py "$RUNNER_TEMP/m1-sdk" \
+  evidence/sdk-repository.xml docs/research/m0/toolchain.json evidence
 cp "$JAVA_HOME/release" evidence/jdk-release.txt
 cp "$RUNNER_TEMP/m1-sdk/platforms/android-37.0/source.properties" evidence/platform-source.properties
 cp "$RUNNER_TEMP/m1-sdk/build-tools/36.0.0/source.properties" evidence/build-tools-source.properties

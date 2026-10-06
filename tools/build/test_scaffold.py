@@ -84,6 +84,20 @@ class ToolchainContract(unittest.TestCase):
         self.assertIn("m1-gradle-strict", strict)
         self.assertIn("m1-gradle-discovery", discovery)
 
+    def test_inventory_filters_projects_before_artifact_selection(self):
+        inventory = (ROOT / "tools/build/toolchain.init.gradle").read_text()
+        self.assertIn("configuration.incoming.artifactView { view ->", inventory)
+        self.assertIn("view.componentFilter { component ->", inventory)
+        self.assertIn("component instanceof ModuleComponentIdentifier", inventory)
+        for unsafe in ("configuration.incoming.artifacts", "lenient", "withVariantReselection", "artifactType"):
+            # Comments may explain AGP artifact types; executable view must remain untyped/non-lenient.
+            code = "\n".join(line for line in inventory.splitlines() if not line.strip().startswith("//"))
+            self.assertNotIn(unsafe, code)
+        self.assertIn("c.name.toLowerCase().contains('debug')", inventory)
+        self.assertIn("digest(artifact.file)", inventory)
+        self.assertIn("actual.every { it.version == expected[2] }", inventory)
+        self.assertIn("write_sdk_package_metadata.py", (ROOT / "tools/build/install-hosted-toolchain.sh").read_text())
+
     def test_no_network_permission_and_honest_runnable_placeholder(self):
         ns = "{http://schemas.android.com/apk/res/android}"
         manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()

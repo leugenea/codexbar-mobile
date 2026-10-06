@@ -18,7 +18,14 @@ gradle.projectsEvaluated {
             }
             def rows = []
             def collect = { owner, configuration ->
-                configuration.incoming.artifacts.artifacts.each { artifact ->
+                // Filter before artifact selection: AGP's tested-app self-project
+                // publishes several artifact types. This inventory only hashes
+                // external originals; real compile/package tasks select app artifacts.
+                configuration.incoming.artifactView { view ->
+                    view.componentFilter { component ->
+                        component instanceof ModuleComponentIdentifier
+                    }
+                }.artifacts.artifacts.each { artifact ->
                     def id = artifact.id.componentIdentifier
                     if (id instanceof ModuleComponentIdentifier) {
                         rows.add([configuration: owner + ':' + configuration.name,

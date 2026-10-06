@@ -71,6 +71,78 @@ uploaded evidence/build/report file. The APK remains diagnostic until strict
 replay and native smoke pass. Inspect SDK source.properties (`Pkg.Revision`),
 JDK release, actual resolved-toolchain JSON and all discovery exit statuses/logs.
 
+## First hosted diagnosis and bounded setup corrections
+
+Run **37447243358, attempt 1**, checked out PR merge
+`787cbf70e3702c2b718618c6011b6e414086b316` for candidate
+`e346eaec27d92d30419061251f8abf31574879f4`. All four discovery commands
+failed. These failures do **not** establish the documented lint incompatibility:
+
+- Strict failed at the AGP plugin-marker POM, as expected with intentionally empty
+  committed verification metadata. That gate remains unchanged/fail-closed.
+- Inventory failed at init-script line 21 for `debugAndroidTestCompileClasspath`:
+  AGP's tested-variant self-project exposes multiple `debugApiElements` artifact
+  types. Filtering module identifiers **after** resolving all artifacts is too
+  late. The inventory now uses Gradle's documented module-only `ArtifactView`
+  component filter **before** artifact selection. It retains configuration
+  attributes, non-lenient resolution, every existing configuration and all
+  version/SHA assertions. Real AGP compile/package tasks still select self-project
+  artifacts; no native/test configuration is omitted.
+- Lint, build and connected graph observation failed during task-dependency
+  calculation: `Failed to find target with hash string 'android-37.0'`. Lint and
+  compilation never executed. The exact independently downloaded platform ZIP
+  matches M0 SHA-1 and contains **no `package.xml`**. Its unmodified
+  `source.properties` has `AndroidVersion.ApiLevel=37.0`. AGP 9.3.1 consumes sdklib
+  32.3.1, whose legacy `AndroidVersionHelper.create` calls `Integer.parseInt` on
+  that field and returns null for `37.0`; `LocalSdk.scanPlatforms` skips it.
+  Normal SDK installation writes local `package.xml` from the repository record.
+  The installer had only unpacked/moved the ZIP and omitted this step.
+
+`write_sdk_package_metadata.py` supplies that missing bounded metadata step for
+**only the two selected M0 packages**. It retrieves the official repository v4
+record, validates exact selected archive URL/checksum algorithm/checksum,
+revision and stable platform details, and writes local metadata following the
+published `InstallerUtil.writePackageXml` field mapping. It preserves the license
+and QName namespace bindings and drops remote-only archive/channel fields.
+Neither SDK payload nor `source.properties` is edited. A changed upstream
+revision/archive is a hard error, not permission to install a newer package.
+The full retrieved repository XML and both installed metadata records are saved
+in hash-bound evidence. Using an additional sdkmanager distribution here would
+add a separately pinned executable/download without removing the need to guard
+against a later revision of the same package path; this adapter keeps the exact
+already-verified payload archives and contains no package-selection framework.
+
+Offline regression fixtures are explicitly synthetic. The generated metadata
+from the **actual retrieved Google records** also passed XML Schema validation
+against SDK/repository XSDs extracted from AGP's published sdklib/repository
+32.3.1 JARs (local import locations only). This proves schema/metadata shape, not
+an executed SDK load. No local SDK install, Gradle build or emulator was run.
+The next hosted candidate must prove target loading, the complete receipt and
+actual lint execution. Both 2.4.0 and 2.4.20 compiler downloads appear in the first
+resolution log; the existing all-row 2.4.20 assertion is retained and any actual
+receipt mismatch must be investigated, not hidden by filtering versions.
+
+Primary implementation sources inspected (exact versions, not `main`):
+
+- `https://dl.google.com/android/repository/repository2-4.xml` — selected remote
+  records, stable API `37.0`, extension 22/base SDK and original archive checksums.
+- `https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/9.3.1/gradle-9.3.1-sources.jar`
+  — `SdkDirectLoadingStrategy.kt` (`package.xml` platform load),
+  `VariantDependenciesBuilder.java` (tested-app self-project dependency),
+  `VariantDependencies.kt` (AGP's artifact views).
+- `https://dl.google.com/dl/android/maven2/com/android/tools/sdklib/32.3.1/sdklib-32.3.1-sources.jar`
+  — `AndroidVersionHelper.java`, `LocalSdk.java`, `AndroidTargetManager.java`,
+  `DetailsTypes.java` (supported string major/minor API metadata).
+- `https://dl.google.com/dl/android/maven2/com/android/tools/repository/32.3.1/repository-32.3.1-sources.jar`
+  — `AbstractInstaller.java`, `InstallerUtil.java`, `LocalRepoLoaderImpl.java`.
+- `https://docs.gradle.org/9.5.0/userguide/artifact_views.html` — documented
+  `ModuleComponentIdentifier` component filter, without leniency/reselection.
+
+The M0 baseline, compile SDK DSL, lint severity, verification metadata, diagnostic
+marker/route and all mandatory workflow tasks are unchanged. A real
+`JavaDocParser`/`List.removeLast()` lint crash or unresolved selected baseline
+compatibility still triggers the owner stop condition above.
+
 ## Independent integrity review and strict replay
 
 1. Verify wrapper JAR independently against Gradle's published wrapper-JAR
