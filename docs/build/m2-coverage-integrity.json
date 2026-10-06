@@ -1,0 +1,960 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-10-06T19:18:24.123624+00:00",
+  "scope": "Independently audited M2 allowed delta; not a Gradle resolution/native acceptance receipt",
+  "base": {
+    "components": 364,
+    "pairs": 602,
+    "semanticPairSha256": "f692e8c2fd402671343ed88c35324d6b95cbe4fe8239e801a19b48fa6c9ab594",
+    "metadataSha256": "430a411f2f279968fe6e8b1813fe423bbf74f678bc12fa7efa6fd8d9d6758f9a"
+  },
+  "counts": {
+    "auditedGraphArtifacts": 18,
+    "alreadyM1AuditedArtifacts": 1,
+    "newArtifacts": 17,
+    "newComponents": 9,
+    "newArtifactTrustTiers": {
+      "published-sha1+original-sha256": 10,
+      "published-sha256": 7
+    },
+    "allArtifactTrustTiers": {
+      "published-sha1+original-sha256": 11,
+      "published-sha256": 7
+    },
+    "publisherChecksumMismatches": 0,
+    "authenticatedSignatures": 0,
+    "expectedUnionArtifacts": 619,
+    "expectedUnionComponents": 373
+  },
+  "deltaSemanticPairSha256": "8602b18ec24bb2558cc04f6923b7fd3043a85e55202b633836c8479c4d6e9936",
+  "unionSemanticPairSha256": "ba94604993d8d03d66d6e8b48fcdeb258aec36b62c3e851da32a6bed064434a3",
+  "repositories": {
+    "central_repo1": "https://repo1.maven.org/maven2/"
+  },
+  "artifacts": [
+    [
+      "org.jacoco",
+      "org.jacoco.agent",
+      "0.8.15",
+      "org.jacoco.agent-0.8.15-runtime.jar",
+      "fb5b0036a0899ea97edfa0fc2c7985b55f3f7c5695028163e5e60d4f3cf6075d",
+      "published-sha1+original-sha256",
+      [
+        "central_repo1",
+        "org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar"
+      ],
+      [
+        [
+          "publisher_sha1_sidecar",
+          "central_repo1",
+          "org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar.sha1",
+          "14df437c4e8ff131c0ed9a0c8802b30927fa91b5"
+        ]
+      ]
+    ],
+    [
+      "org.jacoco",
+      "org.jacoco.agent",
+      "0.8.15",
+      "org.jacoco.agent-0.8.15.jar",
+      "81607adaa5b03a687a04049dee6b07e9665708c3e6f7b0626892ca9659be587c",
+      "published-sha1+original-sha256",
+      [
+        "central_repo1",
+        "org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15.jar"
+      ],
+      [
+        [
+          "publisher_sha1_sidecar",
+          "central_repo1",
+          "org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15.jar.sha1",
+          "40cc34e8a1dee55c39d805a1241e03788d5737c6"
+        ]
+      ]
+    ],
+    [
+      "org.jacoco",
+      "org.jacoco.agent",
+      "0.8.15",
+      "org.jacoco.agent-0.8.15.pom",
+      "47eb24b1577e473cbba634399bc56fe7b366b18401bf911d0d8771f56f228966",
+      "published-sha1+original-sha256",
+      [
+        "central_repo1",
+        "org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15.pom"
+      ],
+      [
+        [
+          "publisher_sha1_sidecar",
+          "central_repo1",
+          "org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15.pom.sha1",
+          "5739a8b4b9be92ce7c95fdaf2e7b731c93e2054e"
+        ]
+      ]
+    ],
+    [
+      "org.jacoco",
+      "org.jacoco.ant",
+      "0.8.15",
+      "org.jacoco.ant-0.8.15.jar",
+      "54fb6af97c95352d7deeb49113d7ad63f190eaa8cc9ae8e068fdb2f2a6de009e",
+      "published-sha1+original-sha256",
+      [
+        "central_repo1",
+        "org/jacoco/org.jacoco.ant/0.8.15/org.jacoco.ant-0.8.15.jar"
+      ],
+      [
+        [
+          "publisher_sha1_sidecar",
+          "central_repo1",
+          "org/jacoco/org.jacoco.ant/0.8.15/org.jacoco.ant-0.8.15.jar.sha1",
+          "ab67b8566970fb792fcf574034ab6d86bd6461de"
+        ]
+      ]
+    ],
+    [
+      "org.jacoco",
+      "org.jacoco.ant",
+      "0.8.15",
+      "org.jacoco.ant-0.8.15.pom",
+      "96d1688a3e8723539de36eaeb3f0789ec05914585d69eae0f453c2924b559a0a",
+      "published-sha1+original-sha256",
+      [
+        "central_repo1",
+        "org/jacoco/org.jacoco.ant/0.8.15/org.jacoco.ant-0.8.15.pom"
+      ],
+      [
+        [
+          "publisher_sha1_sidecar",
+          "central_repo1",
+          "org/jacoco/org.jacoco.ant/0.8.15/org.jacoco.ant-0.8.15.pom.sha1",
+          "1d6715973f02c85fe45140e9a33944dcd5088933"
+        ]
+      ]
+    ],
+    [
+      "org.jacoco",
+      "org.jacoco.build",
+      "0.8.15",
+      "org.jacoco.build-0.8.15.pom",
+      "3a2c89f80c2ab9caf1b403a62da4bcbd909ee52ea53747391267a5cdc968c123",
+      "published-sha1+original-sha256",
+      [
+        "central_repo1",
+        "org/jacoco/org.jacoco.build/0.8.15/org.jacoco.build-0.8.15.pom"
+      ],
+      [
+        [
+          "publisher_sha1_sidecar",
+          "central_repo1",
+          "org/jacoco/org.jacoco.build/0.8.15/org.jacoco.build-0.8.15.pom.sha1",
+          "1d5dad551269a39fbc5d154044b86480b15d34a0"
+        ]
+      ]
+    ],
+    [
+      "org.jacoco",
+      "org.jacoco.core",
+      "0.8.15",
+      "org.jacoco.core-0.8.15.jar",
+      "ade1e0fdb4cd80d8537b57c6edb70a1360c47fdc518c20c65314517479bc4d0d",
+      "published-sha1+original-sha256",
+      [
+        "central_repo1",
+        "org/jacoco/org.jacoco.core/0.8.15/org.jacoco.core-0.8.15.jar"
+      ],
+      [
+        [
+          "publisher_sha1_sidecar",
+          "central_repo1",
+          "org/jacoco/org.jacoco.core/0.8.15/org.jacoco.core-0.8.15.jar.sha1",
+          "0bf8fcbb5a32834c752f1932b332d42879d6c41d"
+        ]
+      ]
+    ],
+    [
+      "org.jacoco",
+      "org.jacoco.core",
+      "0.8.15",
+      "org.jacoco.core-0.8.15.pom",
+      "7b283b35bb2bda3b827b4da89ce968d257d1d98dd8594d7c8cb5b2f6d8cd9b15",
+      "published-sha1+original-sha256",
+      [
+        "central_repo1",
+        "org/jacoco/org.jacoco.core/0.8.15/org.jacoco.core-0.8.15.pom"
+      ],
+      [
+        [
+          "publisher_sha1_sidecar",
+          "central_repo1",
+          "org/jacoco/org.jacoco.core/0.8.15/org.jacoco.core-0.8.15.pom.sha1",
+          "e76d0ffbd3d283ff4735062757268aac1d7b62a4"
+        ]
+      ]
+    ],
+    [
+      "org.jacoco",
+      "org.jacoco.report",
+      "0.8.15",
+      "org.jacoco.report-0.8.15.jar",
+      "66a79e36edc77a1ebf6689e76a976e12ab4f1af515cbd09555840fba775714f4",
+      "published-sha1+original-sha256",
+      [
+        "central_repo1",
+        "org/jacoco/org.jacoco.report/0.8.15/org.jacoco.report-0.8.15.jar"
+      ],
+      [
+        [
+          "publisher_sha1_sidecar",
+          "central_repo1",
+          "org/jacoco/org.jacoco.report/0.8.15/org.jacoco.report-0.8.15.jar.sha1",
+          "f347d96678b9a242f7b6a0a003d777ffd7e23aa1"
+        ]
+      ]
+    ],
+    [
+      "org.jacoco",
+      "org.jacoco.report",
+      "0.8.15",
+      "org.jacoco.report-0.8.15.pom",
+      "a1ea901ca04547f1dc24e75dde104b3a7171ff9d0c2b8f43b3153be09ac3c08a",
+      "published-sha1+original-sha256",
+      [
+        "central_repo1",
+        "org/jacoco/org.jacoco.report/0.8.15/org.jacoco.report-0.8.15.pom"
+      ],
+      [
+        [
+          "publisher_sha1_sidecar",
+          "central_repo1",
+          "org/jacoco/org.jacoco.report/0.8.15/org.jacoco.report-0.8.15.pom.sha1",
+          "6babbd228f971031083937987eaf18069b9278d0"
+        ]
+      ]
+    ],
+    [
+      "org.ow2.asm",
+      "asm",
+      "9.10.1",
+      "asm-9.10.1.jar",
+      "ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb",
+      "published-sha256",
+      [
+        "central_repo1",
+        "org/ow2/asm/asm/9.10.1/asm-9.10.1.jar"
+      ],
+      [
+        [
+          "publisher_sha256_sidecar",
+          "central_repo1",
+          "org/ow2/asm/asm/9.10.1/asm-9.10.1.jar.sha256"
+        ]
+      ]
+    ],
+    [
+      "org.ow2.asm",
+      "asm",
+      "9.10.1",
+      "asm-9.10.1.pom",
+      "e1b1c3832ca3ac0a9e563c405f4c760118b5556a4920daee14058886197e094d",
+      "published-sha256",
+      [
+        "central_repo1",
+        "org/ow2/asm/asm/9.10.1/asm-9.10.1.pom"
+      ],
+      [
+        [
+          "publisher_sha256_sidecar",
+          "central_repo1",
+          "org/ow2/asm/asm/9.10.1/asm-9.10.1.pom.sha256"
+        ]
+      ]
+    ],
+    [
+      "org.ow2.asm",
+      "asm-bom",
+      "9.10.1",
+      "asm-bom-9.10.1.pom",
+      "709472d69cf785d4b679eee0e6e0575d4b104476ddf35265ef1117e73c129cd4",
+      "published-sha256",
+      [
+        "central_repo1",
+        "org/ow2/asm/asm-bom/9.10.1/asm-bom-9.10.1.pom"
+      ],
+      [
+        [
+          "publisher_sha256_sidecar",
+          "central_repo1",
+          "org/ow2/asm/asm-bom/9.10.1/asm-bom-9.10.1.pom.sha256"
+        ]
+      ]
+    ],
+    [
+      "org.ow2.asm",
+      "asm-commons",
+      "9.10.1",
+      "asm-commons-9.10.1.jar",
+      "6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895",
+      "published-sha256",
+      [
+        "central_repo1",
+        "org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar"
+      ],
+      [
+        [
+          "publisher_sha256_sidecar",
+          "central_repo1",
+          "org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar.sha256"
+        ]
+      ]
+    ],
+    [
+      "org.ow2.asm",
+      "asm-commons",
+      "9.10.1",
+      "asm-commons-9.10.1.pom",
+      "ceb2c43f3a273db88af8652d89ed6312f3e91a1a1e0ffc6f7823169278cf795c",
+      "published-sha256",
+      [
+        "central_repo1",
+        "org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.pom"
+      ],
+      [
+        [
+          "publisher_sha256_sidecar",
+          "central_repo1",
+          "org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.pom.sha256"
+        ]
+      ]
+    ],
+    [
+      "org.ow2.asm",
+      "asm-tree",
+      "9.10.1",
+      "asm-tree-9.10.1.jar",
+      "3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b",
+      "published-sha256",
+      [
+        "central_repo1",
+        "org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar"
+      ],
+      [
+        [
+          "publisher_sha256_sidecar",
+          "central_repo1",
+          "org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar.sha256"
+        ]
+      ]
+    ],
+    [
+      "org.ow2.asm",
+      "asm-tree",
+      "9.10.1",
+      "asm-tree-9.10.1.pom",
+      "963eebdea6e2e1ff25c9068b64a238e1585c99f8acd455595ac159a7f52b6c41",
+      "published-sha256",
+      [
+        "central_repo1",
+        "org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.pom"
+      ],
+      [
+        [
+          "publisher_sha256_sidecar",
+          "central_repo1",
+          "org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.pom.sha256"
+        ]
+      ]
+    ]
+  ],
+  "versionSelection": {
+    "selectedJacoco": "0.8.15",
+    "officialReleaseDate": "2026-06-04",
+    "repository": "https://repo1.maven.org/maven2/"
+  },
+  "versionMetadata": [
+    {
+      "module": "org.jacoco.agent",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.agent/maven-metadata.xml",
+      "sha256": "356e4e12fbcda302534b3f9fbb296665b01ebb2562d00be711cd1900fd3ca2e8",
+      "latest": "0.8.15",
+      "release": "0.8.15",
+      "lastUpdated": "20260605202919",
+      "stableVersionRule": "Only numeric dot-separated published versions; independently sort full version list, do not rely on release/latest fields",
+      "newestStable": "0.8.15"
+    },
+    {
+      "module": "org.jacoco.ant",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.ant/maven-metadata.xml",
+      "sha256": "bd6dee969352e902e830d97b621e74475da57e5503bbba7ce961fa5153247126",
+      "latest": "0.8.15",
+      "release": "0.8.15",
+      "lastUpdated": "20260605202920",
+      "stableVersionRule": "Only numeric dot-separated published versions; independently sort full version list, do not rely on release/latest fields",
+      "newestStable": "0.8.15"
+    },
+    {
+      "module": "org.jacoco.core",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.core/maven-metadata.xml",
+      "sha256": "30407a6b586bb7f46ef5c6e610770e361cb37893f811397f3f5ceca3a282bc15",
+      "latest": "0.8.15",
+      "release": "0.8.15",
+      "lastUpdated": "20260605202917",
+      "stableVersionRule": "Only numeric dot-separated published versions; independently sort full version list, do not rely on release/latest fields",
+      "newestStable": "0.8.15"
+    },
+    {
+      "module": "org.jacoco.report",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.report/maven-metadata.xml",
+      "sha256": "5fde790a127eeb2aed0fd6b878d5c8bc0fd5e0456f3fb96a68496951966a0c9a",
+      "latest": "0.8.15",
+      "release": "0.8.15",
+      "lastUpdated": "20260605202919",
+      "stableVersionRule": "Only numeric dot-separated published versions; independently sort full version list, do not rely on release/latest fields",
+      "newestStable": "0.8.15"
+    }
+  ],
+  "publisherComparisons": [
+    {
+      "group": "org.jacoco",
+      "module": "org.jacoco.agent",
+      "version": "0.8.15",
+      "file": "org.jacoco.agent-0.8.15.pom",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15.pom",
+      "sha256": "47eb24b1577e473cbba634399bc56fe7b366b18401bf911d0d8771f56f228966",
+      "sha1": "5739a8b4b9be92ce7c95fdaf2e7b731c93e2054e",
+      "bytes": 4334,
+      "trustTier": "published-sha1+original-sha256",
+      "trustExplanation": "Central SHA256 sidecar absent (recorded HTTP status); Central SHA1 sidecar matches freshly fetched bytes. Recorded SHA256 was computed locally. SHA1 is weaker, not collision-resistant, and this is not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15.pom.sha256",
+          "httpStatus": 404,
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15.pom.sha1",
+          "httpStatus": 200,
+          "publisherValue": "5739a8b4b9be92ce7c95fdaf2e7b731c93e2054e",
+          "computedValue": "5739a8b4b9be92ce7c95fdaf2e7b731c93e2054e",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.jacoco",
+      "module": "org.jacoco.agent",
+      "version": "0.8.15",
+      "file": "org.jacoco.agent-0.8.15.jar",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15.jar",
+      "sha256": "81607adaa5b03a687a04049dee6b07e9665708c3e6f7b0626892ca9659be587c",
+      "sha1": "40cc34e8a1dee55c39d805a1241e03788d5737c6",
+      "bytes": 280159,
+      "trustTier": "published-sha1+original-sha256",
+      "trustExplanation": "Central SHA256 sidecar absent (recorded HTTP status); Central SHA1 sidecar matches freshly fetched bytes. Recorded SHA256 was computed locally. SHA1 is weaker, not collision-resistant, and this is not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15.jar.sha256",
+          "httpStatus": 404,
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15.jar.sha1",
+          "httpStatus": 200,
+          "publisherValue": "40cc34e8a1dee55c39d805a1241e03788d5737c6",
+          "computedValue": "40cc34e8a1dee55c39d805a1241e03788d5737c6",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.jacoco",
+      "module": "org.jacoco.ant",
+      "version": "0.8.15",
+      "file": "org.jacoco.ant-0.8.15.pom",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.ant/0.8.15/org.jacoco.ant-0.8.15.pom",
+      "sha256": "96d1688a3e8723539de36eaeb3f0789ec05914585d69eae0f453c2924b559a0a",
+      "sha1": "1d6715973f02c85fe45140e9a33944dcd5088933",
+      "bytes": 5187,
+      "trustTier": "published-sha1+original-sha256",
+      "trustExplanation": "Central SHA256 sidecar absent (recorded HTTP status); Central SHA1 sidecar matches freshly fetched bytes. Recorded SHA256 was computed locally. SHA1 is weaker, not collision-resistant, and this is not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.ant/0.8.15/org.jacoco.ant-0.8.15.pom.sha256",
+          "httpStatus": 404,
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.ant/0.8.15/org.jacoco.ant-0.8.15.pom.sha1",
+          "httpStatus": 200,
+          "publisherValue": "1d6715973f02c85fe45140e9a33944dcd5088933",
+          "computedValue": "1d6715973f02c85fe45140e9a33944dcd5088933",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.jacoco",
+      "module": "org.jacoco.ant",
+      "version": "0.8.15",
+      "file": "org.jacoco.ant-0.8.15.jar",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.ant/0.8.15/org.jacoco.ant-0.8.15.jar",
+      "sha256": "54fb6af97c95352d7deeb49113d7ad63f190eaa8cc9ae8e068fdb2f2a6de009e",
+      "sha1": "ab67b8566970fb792fcf574034ab6d86bd6461de",
+      "bytes": 35310,
+      "trustTier": "published-sha1+original-sha256",
+      "trustExplanation": "Central SHA256 sidecar absent (recorded HTTP status); Central SHA1 sidecar matches freshly fetched bytes. Recorded SHA256 was computed locally. SHA1 is weaker, not collision-resistant, and this is not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.ant/0.8.15/org.jacoco.ant-0.8.15.jar.sha256",
+          "httpStatus": 404,
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.ant/0.8.15/org.jacoco.ant-0.8.15.jar.sha1",
+          "httpStatus": 200,
+          "publisherValue": "ab67b8566970fb792fcf574034ab6d86bd6461de",
+          "computedValue": "ab67b8566970fb792fcf574034ab6d86bd6461de",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.jacoco",
+      "module": "org.jacoco.core",
+      "version": "0.8.15",
+      "file": "org.jacoco.core-0.8.15.pom",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.core/0.8.15/org.jacoco.core-0.8.15.pom",
+      "sha256": "7b283b35bb2bda3b827b4da89ce968d257d1d98dd8594d7c8cb5b2f6d8cd9b15",
+      "sha1": "e76d0ffbd3d283ff4735062757268aac1d7b62a4",
+      "bytes": 2086,
+      "trustTier": "published-sha1+original-sha256",
+      "trustExplanation": "Central SHA256 sidecar absent (recorded HTTP status); Central SHA1 sidecar matches freshly fetched bytes. Recorded SHA256 was computed locally. SHA1 is weaker, not collision-resistant, and this is not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.core/0.8.15/org.jacoco.core-0.8.15.pom.sha256",
+          "httpStatus": 404,
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.core/0.8.15/org.jacoco.core-0.8.15.pom.sha1",
+          "httpStatus": 200,
+          "publisherValue": "e76d0ffbd3d283ff4735062757268aac1d7b62a4",
+          "computedValue": "e76d0ffbd3d283ff4735062757268aac1d7b62a4",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.jacoco",
+      "module": "org.jacoco.core",
+      "version": "0.8.15",
+      "file": "org.jacoco.core-0.8.15.jar",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.core/0.8.15/org.jacoco.core-0.8.15.jar",
+      "sha256": "ade1e0fdb4cd80d8537b57c6edb70a1360c47fdc518c20c65314517479bc4d0d",
+      "sha1": "0bf8fcbb5a32834c752f1932b332d42879d6c41d",
+      "bytes": 234726,
+      "trustTier": "published-sha1+original-sha256",
+      "trustExplanation": "Central SHA256 sidecar absent (recorded HTTP status); Central SHA1 sidecar matches freshly fetched bytes. Recorded SHA256 was computed locally. SHA1 is weaker, not collision-resistant, and this is not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.core/0.8.15/org.jacoco.core-0.8.15.jar.sha256",
+          "httpStatus": 404,
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.core/0.8.15/org.jacoco.core-0.8.15.jar.sha1",
+          "httpStatus": 200,
+          "publisherValue": "0bf8fcbb5a32834c752f1932b332d42879d6c41d",
+          "computedValue": "0bf8fcbb5a32834c752f1932b332d42879d6c41d",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.jacoco",
+      "module": "org.jacoco.report",
+      "version": "0.8.15",
+      "file": "org.jacoco.report-0.8.15.pom",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.report/0.8.15/org.jacoco.report-0.8.15.pom",
+      "sha256": "a1ea901ca04547f1dc24e75dde104b3a7171ff9d0c2b8f43b3153be09ac3c08a",
+      "sha1": "6babbd228f971031083937987eaf18069b9278d0",
+      "bytes": 1884,
+      "trustTier": "published-sha1+original-sha256",
+      "trustExplanation": "Central SHA256 sidecar absent (recorded HTTP status); Central SHA1 sidecar matches freshly fetched bytes. Recorded SHA256 was computed locally. SHA1 is weaker, not collision-resistant, and this is not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.report/0.8.15/org.jacoco.report-0.8.15.pom.sha256",
+          "httpStatus": 404,
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.report/0.8.15/org.jacoco.report-0.8.15.pom.sha1",
+          "httpStatus": 200,
+          "publisherValue": "6babbd228f971031083937987eaf18069b9278d0",
+          "computedValue": "6babbd228f971031083937987eaf18069b9278d0",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.jacoco",
+      "module": "org.jacoco.report",
+      "version": "0.8.15",
+      "file": "org.jacoco.report-0.8.15.jar",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.report/0.8.15/org.jacoco.report-0.8.15.jar",
+      "sha256": "66a79e36edc77a1ebf6689e76a976e12ab4f1af515cbd09555840fba775714f4",
+      "sha1": "f347d96678b9a242f7b6a0a003d777ffd7e23aa1",
+      "bytes": 131106,
+      "trustTier": "published-sha1+original-sha256",
+      "trustExplanation": "Central SHA256 sidecar absent (recorded HTTP status); Central SHA1 sidecar matches freshly fetched bytes. Recorded SHA256 was computed locally. SHA1 is weaker, not collision-resistant, and this is not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.report/0.8.15/org.jacoco.report-0.8.15.jar.sha256",
+          "httpStatus": 404,
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.report/0.8.15/org.jacoco.report-0.8.15.jar.sha1",
+          "httpStatus": 200,
+          "publisherValue": "f347d96678b9a242f7b6a0a003d777ffd7e23aa1",
+          "computedValue": "f347d96678b9a242f7b6a0a003d777ffd7e23aa1",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.jacoco",
+      "module": "org.jacoco.agent",
+      "version": "0.8.15",
+      "file": "org.jacoco.agent-0.8.15-runtime.jar",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar",
+      "sha256": "fb5b0036a0899ea97edfa0fc2c7985b55f3f7c5695028163e5e60d4f3cf6075d",
+      "sha1": "14df437c4e8ff131c0ed9a0c8802b30927fa91b5",
+      "bytes": 307843,
+      "trustTier": "published-sha1+original-sha256",
+      "trustExplanation": "Central SHA256 sidecar absent (recorded HTTP status); Central SHA1 sidecar matches freshly fetched bytes. Recorded SHA256 was computed locally. SHA1 is weaker, not collision-resistant, and this is not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar.sha256",
+          "httpStatus": 404,
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.agent/0.8.15/org.jacoco.agent-0.8.15-runtime.jar.sha1",
+          "httpStatus": 200,
+          "publisherValue": "14df437c4e8ff131c0ed9a0c8802b30927fa91b5",
+          "computedValue": "14df437c4e8ff131c0ed9a0c8802b30927fa91b5",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.jacoco",
+      "module": "org.jacoco.build",
+      "version": "0.8.15",
+      "file": "org.jacoco.build-0.8.15.pom",
+      "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.build/0.8.15/org.jacoco.build-0.8.15.pom",
+      "sha256": "3a2c89f80c2ab9caf1b403a62da4bcbd909ee52ea53747391267a5cdc968c123",
+      "sha1": "1d5dad551269a39fbc5d154044b86480b15d34a0",
+      "bytes": 49565,
+      "trustTier": "published-sha1+original-sha256",
+      "trustExplanation": "Central SHA256 sidecar absent (recorded HTTP status); Central SHA1 sidecar matches freshly fetched bytes. Recorded SHA256 was computed locally. SHA1 is weaker, not collision-resistant, and this is not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.build/0.8.15/org.jacoco.build-0.8.15.pom.sha256",
+          "httpStatus": 404,
+          "error": "HTTP Error 404: Not Found"
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.build/0.8.15/org.jacoco.build-0.8.15.pom.sha1",
+          "httpStatus": 200,
+          "publisherValue": "1d5dad551269a39fbc5d154044b86480b15d34a0",
+          "computedValue": "1d5dad551269a39fbc5d154044b86480b15d34a0",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.ow2.asm",
+      "module": "asm",
+      "version": "9.10.1",
+      "file": "asm-9.10.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.pom",
+      "sha256": "e1b1c3832ca3ac0a9e563c405f4c760118b5556a4920daee14058886197e094d",
+      "sha1": "507e7f8821c58fc995a057b63ad4008b96bafa4d",
+      "bytes": 2373,
+      "trustTier": "published-sha256",
+      "trustExplanation": "Official Central SHA256 sidecar matches independently fetched bytes. Same TLS/repository channel, not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.pom.sha256",
+          "httpStatus": 200,
+          "publisherValue": "e1b1c3832ca3ac0a9e563c405f4c760118b5556a4920daee14058886197e094d",
+          "computedValue": "e1b1c3832ca3ac0a9e563c405f4c760118b5556a4920daee14058886197e094d",
+          "match": true
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.pom.sha1",
+          "httpStatus": 200,
+          "publisherValue": "507e7f8821c58fc995a057b63ad4008b96bafa4d",
+          "computedValue": "507e7f8821c58fc995a057b63ad4008b96bafa4d",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.ow2.asm",
+      "module": "asm",
+      "version": "9.10.1",
+      "file": "asm-9.10.1.jar",
+      "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar",
+      "sha256": "ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb",
+      "sha1": "ada2141c0cc52ee8f5c48cd5fa4ce0e794f22236",
+      "bytes": 126151,
+      "trustTier": "published-sha256",
+      "trustExplanation": "Official Central SHA256 sidecar matches independently fetched bytes. Same TLS/repository channel, not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar.sha256",
+          "httpStatus": 200,
+          "publisherValue": "ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb",
+          "computedValue": "ed825d10ab1399c8c0cb669e688cf0c8c82629b4c8399b58352b68e92ca10fcb",
+          "match": true
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar.sha1",
+          "httpStatus": 200,
+          "publisherValue": "ada2141c0cc52ee8f5c48cd5fa4ce0e794f22236",
+          "computedValue": "ada2141c0cc52ee8f5c48cd5fa4ce0e794f22236",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.ow2.asm",
+      "module": "asm-commons",
+      "version": "9.10.1",
+      "file": "asm-commons-9.10.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.pom",
+      "sha256": "ceb2c43f3a273db88af8652d89ed6312f3e91a1a1e0ffc6f7823169278cf795c",
+      "sha1": "a28039cb619a6c2a5c7ca5b3206381f9032c8368",
+      "bytes": 2797,
+      "trustTier": "published-sha256",
+      "trustExplanation": "Official Central SHA256 sidecar matches independently fetched bytes. Same TLS/repository channel, not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.pom.sha256",
+          "httpStatus": 200,
+          "publisherValue": "ceb2c43f3a273db88af8652d89ed6312f3e91a1a1e0ffc6f7823169278cf795c",
+          "computedValue": "ceb2c43f3a273db88af8652d89ed6312f3e91a1a1e0ffc6f7823169278cf795c",
+          "match": true
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.pom.sha1",
+          "httpStatus": 200,
+          "publisherValue": "a28039cb619a6c2a5c7ca5b3206381f9032c8368",
+          "computedValue": "a28039cb619a6c2a5c7ca5b3206381f9032c8368",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.ow2.asm",
+      "module": "asm-commons",
+      "version": "9.10.1",
+      "file": "asm-commons-9.10.1.jar",
+      "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar",
+      "sha256": "6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895",
+      "sha1": "4229e4c55fd8e01c23f9fe9884075cc628aacc50",
+      "bytes": 74840,
+      "trustTier": "published-sha256",
+      "trustExplanation": "Official Central SHA256 sidecar matches independently fetched bytes. Same TLS/repository channel, not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar.sha256",
+          "httpStatus": 200,
+          "publisherValue": "6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895",
+          "computedValue": "6d0abefb7cbf972ea16edb37ec14835372505063a45f976ab7ea889ed9497895",
+          "match": true
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar.sha1",
+          "httpStatus": 200,
+          "publisherValue": "4229e4c55fd8e01c23f9fe9884075cc628aacc50",
+          "computedValue": "4229e4c55fd8e01c23f9fe9884075cc628aacc50",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.ow2.asm",
+      "module": "asm-tree",
+      "version": "9.10.1",
+      "file": "asm-tree-9.10.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.pom",
+      "sha256": "963eebdea6e2e1ff25c9068b64a238e1585c99f8acd455595ac159a7f52b6c41",
+      "sha1": "0fe218ecae48cabf4e53295d64ae4e01e5ddfb33",
+      "bytes": 2598,
+      "trustTier": "published-sha256",
+      "trustExplanation": "Official Central SHA256 sidecar matches independently fetched bytes. Same TLS/repository channel, not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.pom.sha256",
+          "httpStatus": 200,
+          "publisherValue": "963eebdea6e2e1ff25c9068b64a238e1585c99f8acd455595ac159a7f52b6c41",
+          "computedValue": "963eebdea6e2e1ff25c9068b64a238e1585c99f8acd455595ac159a7f52b6c41",
+          "match": true
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.pom.sha1",
+          "httpStatus": 200,
+          "publisherValue": "0fe218ecae48cabf4e53295d64ae4e01e5ddfb33",
+          "computedValue": "0fe218ecae48cabf4e53295d64ae4e01e5ddfb33",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.ow2.asm",
+      "module": "asm-tree",
+      "version": "9.10.1",
+      "file": "asm-tree-9.10.1.jar",
+      "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar",
+      "sha256": "3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b",
+      "sha1": "e244332a17564c1d1572449399a842de35881be2",
+      "bytes": 51958,
+      "trustTier": "published-sha256",
+      "trustExplanation": "Official Central SHA256 sidecar matches independently fetched bytes. Same TLS/repository channel, not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar.sha256",
+          "httpStatus": 200,
+          "publisherValue": "3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b",
+          "computedValue": "3dfb0d5b6a106cd40b5b250e39935fbf2f927f4477546a5369a3ac609cf0506b",
+          "match": true
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar.sha1",
+          "httpStatus": 200,
+          "publisherValue": "e244332a17564c1d1572449399a842de35881be2",
+          "computedValue": "e244332a17564c1d1572449399a842de35881be2",
+          "match": true
+        }
+      ]
+    },
+    {
+      "group": "org.ow2.asm",
+      "module": "asm-bom",
+      "version": "9.10.1",
+      "file": "asm-bom-9.10.1.pom",
+      "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-bom/9.10.1/asm-bom-9.10.1.pom",
+      "sha256": "709472d69cf785d4b679eee0e6e0575d4b104476ddf35265ef1117e73c129cd4",
+      "sha1": "65b8b71d484813b8a5aab1f3778570fec03fc17e",
+      "bytes": 3272,
+      "trustTier": "published-sha256",
+      "trustExplanation": "Official Central SHA256 sidecar matches independently fetched bytes. Same TLS/repository channel, not authenticated publisher identity.",
+      "publisherChecksums": [
+        {
+          "algorithm": "sha256",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-bom/9.10.1/asm-bom-9.10.1.pom.sha256",
+          "httpStatus": 200,
+          "publisherValue": "709472d69cf785d4b679eee0e6e0575d4b104476ddf35265ef1117e73c129cd4",
+          "computedValue": "709472d69cf785d4b679eee0e6e0575d4b104476ddf35265ef1117e73c129cd4",
+          "match": true
+        },
+        {
+          "algorithm": "sha1",
+          "url": "https://repo1.maven.org/maven2/org/ow2/asm/asm-bom/9.10.1/asm-bom-9.10.1.pom.sha1",
+          "httpStatus": 200,
+          "publisherValue": "65b8b71d484813b8a5aab1f3778570fec03fc17e",
+          "computedValue": "65b8b71d484813b8a5aab1f3778570fec03fc17e",
+          "match": true
+        }
+      ]
+    }
+  ],
+  "jarByteChecks": {
+    "jars": [
+      {
+        "file": "org.jacoco.agent-0.8.15.jar",
+        "validZip": true,
+        "entries": 14
+      },
+      {
+        "file": "org.jacoco.ant-0.8.15.jar",
+        "validZip": true,
+        "entries": 33
+      },
+      {
+        "file": "org.jacoco.core-0.8.15.jar",
+        "validZip": true,
+        "entries": 233
+      },
+      {
+        "file": "org.jacoco.report-0.8.15.jar",
+        "validZip": true,
+        "entries": 127
+      },
+      {
+        "file": "org.jacoco.agent-0.8.15-runtime.jar",
+        "validZip": true,
+        "entries": 208
+      },
+      {
+        "file": "asm-9.10.1.jar",
+        "validZip": true,
+        "entries": 45
+      },
+      {
+        "file": "asm-commons-9.10.1.jar",
+        "validZip": true,
+        "entries": 34
+      },
+      {
+        "file": "asm-tree-9.10.1.jar",
+        "validZip": true,
+        "entries": 45
+      }
+    ],
+    "embeddedAgentRuntimeSha256": "fb5b0036a0899ea97edfa0fc2c7985b55f3f7c5695028163e5e60d4f3cf6075d",
+    "downloadedRuntimeClassifierSha256": "fb5b0036a0899ea97edfa0fc2c7985b55f3f7c5695028163e5e60d4f3cf6075d",
+    "identical": true
+  },
+  "limitations": [
+    "POM-declared closure audited without Gradle/SDK execution; exact resolved graph must be inspected in strict hosted CI.",
+    "Ten new artifacts lack SHA256 publisher sidecars: published SHA1 matched freshly fetched bytes; local SHA256 is stronger for later replay but not authenticated publisher identity.",
+    "No authenticated signatures. No dependency-verification metadata generation was used as trust."
+  ]
+}

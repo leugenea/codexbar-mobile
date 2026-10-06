@@ -1,9 +1,147 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import com.android.build.api.artifact.ScopedArtifact
+import com.android.build.api.variant.ScopedArtifacts
+import groovy.json.JsonOutput
+import java.security.MessageDigest
+import java.util.zip.ZipFile
+import javax.inject.Inject
+import org.gradle.process.ExecOperations
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.Directory
+import org.gradle.api.file.RegularFile
+import org.gradle.api.provider.ListProperty
+import org.gradle.testing.jacoco.tasks.JacocoReport
+import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
 
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.plugin.compose'
+    id 'jacoco'
 }
+
+abstract class M2CoverageInputs extends DefaultTask {
+    @InputFiles @PathSensitive(PathSensitivity.RELATIVE)
+    abstract ListProperty<RegularFile> getClassJars()
+    @InputFiles @PathSensitive(PathSensitivity.RELATIVE)
+    abstract ListProperty<Directory> getClassDirs()
+    @Classpath abstract ConfigurableFileCollection getAnalyzerClasspath()
+    @Inject abstract ExecOperations getExecOperations()
+    @OutputDirectory abstract DirectoryProperty getSnapshot()
+
+    @TaskAction
+    void collect() {
+        def base = project.rootProject.projectDir
+        def output = snapshot.get().asFile
+        output.mkdirs()
+        def loader = new URLClassLoader(analyzerClasspath.files.collect { it.toURI().toURL() } as URL[], (ClassLoader) null)
+        try {
+            def analyzerVersion = loader.loadClass('org.jacoco.core.JaCoCo').getField('VERSION').get(null)
+            if (analyzerVersion != '0.8.15.202606040825') {
+                throw new GradleException('Resolved analyzer is not audited JaCoCo 0.8.15')
+            }
+            def newInstance = { name -> loader.loadClass(name).getDeclaredConstructor().newInstance() }
+            def storeClass = loader.loadClass('org.jacoco.core.data.ExecutionDataStore')
+            def visitorClass = loader.loadClass('org.jacoco.core.analysis.ICoverageVisitor')
+            def analyzerClass = loader.loadClass('org.jacoco.core.analysis.Analyzer')
+            def handwrittenSources = project.fileTree('src/main').matching {
+                include '**/*.kt', '**/*.java'
+            }.files.collect { it.name } as Set
+            def classes = []
+            def excluded = []
+            def names = [] as Set
+            def addClass = { String entry, byte[] bytes ->
+                def builder = newInstance('org.jacoco.core.analysis.CoverageBuilder')
+                def analyzer = analyzerClass.getConstructor(storeClass, visitorClass)
+                    .newInstance(newInstance('org.jacoco.core.data.ExecutionDataStore'), builder)
+                analyzer.analyzeClass(bytes, entry)
+                def coverage = builder.classes.iterator().next()
+                def name = coverage.name
+                if (!names.add(name)) throw new GradleException("Duplicate project class: ${name}")
+                // Platform-generated identities only. Compose, lambdas, Activity and companions stay.
+                def simple = name.tokenize('/').last()
+                if (simple == 'R' || simple.startsWith('R$') || simple == 'BuildConfig' ||
+                    simple == 'Manifest' || simple.startsWith('Manifest$')) {
+                    if (handwrittenSources.contains(coverage.sourceFileName)) {
+                        throw new GradleException("Refusing to exclude handwritten platform-like class: ${name}")
+                    }
+                    excluded.add([name: name, reason: 'Android generated platform class'])
+                } else {
+                    def file = new File(output, name + '.class')
+                    file.parentFile.mkdirs()
+                    file.bytes = bytes
+                    classes.add([name: name, classId: Long.toUnsignedString(coverage.id, 16),
+                        source: coverage.sourceFileName, instructions: coverage.instructionCounter.totalCount,
+                        path: base.toPath().relativize(file.toPath()).toString(),
+                        sha256: MessageDigest.getInstance('SHA-256').digest(bytes).encodeHex().toString()])
+                }
+            }
+            classDirs.get().each { directory ->
+                project.fileTree(directory.asFile).matching { include '**/*.class' }.files.sort().each { file ->
+                    addClass(directory.asFile.toPath().relativize(file.toPath()).toString(), file.bytes)
+                }
+            }
+            classJars.get().each { jar ->
+                new ZipFile(jar.asFile).withCloseable { zip ->
+                    zip.entries().toList().findAll { !it.directory && it.name.endsWith('.class') }.sort { it.name }.each { entry ->
+                        addClass(entry.name, zip.getInputStream(entry).withCloseable { it.bytes })
+                    }
+                }
+            }
+            // Analyze the complete snapshot together: JaCoCo's cross-class Kotlin
+            // inline fragments can alter counters when CoverageBuilder builds a bundle.
+            def aggregate = newInstance('org.jacoco.core.analysis.CoverageBuilder')
+            def aggregateAnalyzer = analyzerClass.getConstructor(storeClass, visitorClass)
+                .newInstance(newInstance('org.jacoco.core.data.ExecutionDataStore'), aggregate)
+            aggregateAnalyzer.analyzeAll(output)
+            aggregate.classes.each { coverage ->
+                classes.find { it.name == coverage.name }.instructions = coverage.instructionCounter.totalCount
+            }
+            def unit = new File(project.buildDir, 'outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec')
+            def nativeFiles = project.fileTree(new File(project.buildDir, 'outputs/code_coverage/debugAndroidTest/connected')) {
+                include '**/*.ec'
+            }.files.sort()
+            if (!unit.isFile() || nativeFiles.empty) throw new GradleException('Missing JVM exec or native ec coverage data')
+            def union = newInstance('org.jacoco.core.tools.ExecFileLoader')
+            def datasets = ([unit] + nativeFiles).collect { file ->
+                union.load(file) // also rejects conflicting probe counts within the union
+                def execution = newInstance('org.jacoco.core.tools.ExecFileLoader')
+                execution.load(file)
+                [kind: file == unit ? 'jvm' : 'native', path: base.toPath().relativize(file.toPath()).toString(),
+                 bytes: file.length(), modifiedMillis: file.lastModified(),
+                 sessions: execution.sessionInfoStore.infos.collect { session ->
+                     [startMillis: session.startTimeStamp, dumpMillis: session.dumpTimeStamp]
+                 },
+                 records: execution.executionDataStore.contents.collect { record ->
+                     [name: record.name, classId: Long.toUnsignedString(record.id, 16), probes: record.probes.length]
+                 }.sort { it.name }]
+            }
+            def tooling = analyzerClasspath.files.sort().collect { file ->
+                [file: file.name, sha256: MessageDigest.getInstance('SHA-256').digest(file.bytes).encodeHex().toString()]
+            }
+            def resolvedTools = []
+            project.configurations.findAll { it.canBeResolved && it.name in ['jacocoAgent', 'jacocoAnt', 'androidJacocoAnt'] }.each { configuration ->
+                configuration.resolvedConfiguration.resolvedArtifacts.each { artifact ->
+                    def id = artifact.moduleVersion.id
+                    if (id.group == 'org.jacoco' && id.version != '0.8.15') {
+                        throw new GradleException("Incompatible JaCoCo tooling: ${id}")
+                    }
+                    resolvedTools.add([configuration: configuration.name, group: id.group, module: id.name,
+                        version: id.version, file: artifact.file.name,
+                        sha256: MessageDigest.getInstance('SHA-256').digest(artifact.file.bytes).encodeHex().toString()])
+                }
+            }
+            def inventory = [resolvedCoverageArtifacts: resolvedTools.sort { it.toString() }, classes: classes.sort { it.name }, excluded: excluded.sort { it.name }, datasets: datasets,
+                tooling: tooling, analyzerVersion: analyzerVersion, jacocoVersion: '0.8.15', scopedInputs: [jars: classJars.get()*.asFile*.toString(),
+                directories: classDirs.get()*.asFile*.toString()]]
+            new File(output.parentFile, 'inventory.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(inventory)) + '\n'
+            execOperations.exec { workingDir base; commandLine 'python3', 'tools/build/m2_coverage.py', 'inputs' }
+        } finally {
+            loader.close()
+        }
+    }
+}
+
 
 android {
     namespace 'io.github.leugenea.codexbarmobile'
@@ -19,6 +157,13 @@ android {
         versionCode 1
         versionName '0.1.0'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+    testCoverage { jacocoVersion = '0.8.15' }
+    buildTypes {
+        debug {
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = true
+        }
     }
     buildFeatures {
         compose true
@@ -50,4 +195,87 @@ dependencies {
     androidTestImplementation 'androidx.test:runner:1.7.0'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
     debugImplementation 'androidx.compose.ui:ui-test-manifest:1.12.1'
+}
+
+jacoco { toolVersion = '0.8.15' }
+// AGP 9.4.1 registers its transform using a hard-coded 0.8.14 default.
+// Resolve the actual tool binaries consistently; do not mutate AGP internals.
+configurations.configureEach {
+    resolutionStrategy.eachDependency { dependency ->
+        if (dependency.requested.group == 'org.jacoco') {
+            dependency.useVersion('0.8.15')
+            dependency.because('M2 audited compatible JVM/native JaCoCo union')
+        }
+    }
+}
+
+def prepareCoverage = tasks.register('m2PrepareDebugCoverage', Exec) {
+    workingDir rootProject.projectDir
+    commandLine 'python3', 'tools/build/m2_coverage.py', 'prepare'
+}
+tasks.configureEach { task ->
+    if (task.name in ['testDebugUnitTest', 'connectedDebugAndroidTest']) {
+        task.dependsOn prepareCoverage
+    }
+}
+
+def coverageInputs = tasks.register('m2DebugCoverageInputs', M2CoverageInputs) {
+    dependsOn 'testDebugUnitTest', 'connectedDebugAndroidTest'
+    analyzerClasspath.from configurations.jacocoAnt
+    snapshot.set(layout.buildDirectory.dir('m2-coverage/classes'))
+}
+androidComponents.onVariants(androidComponents.selector().withBuildType('debug')) { variant ->
+    variant.artifacts.forScope(ScopedArtifacts.Scope.PROJECT).use(coverageInputs).toGet(
+        ScopedArtifact.CLASSES.INSTANCE, { it.classJars }, { it.classDirs })
+}
+def debugClasses = fileTree(layout.buildDirectory.dir('m2-coverage/classes')) { include '**/*.class' }
+def debugCoverageData = files(
+    layout.buildDirectory.file('outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec'),
+    fileTree(layout.buildDirectory.dir('outputs/code_coverage/debugAndroidTest/connected')) { include '**/*.ec' })
+
+// Adapted task seam: qmix main 0cc3f1eb8bfb1902ac8e2fae7fba729ef53cc9f0,
+// android/app/build.gradle.kts debugCoverageData/JacocoReport/verification.
+// MIT notice and exact adaptations: docs/build/m2-coverage.md.
+def coverageReport = tasks.register('jacocoDebugReport', JacocoReport) {
+    dependsOn coverageInputs
+    sourceDirectories.setFrom files('src/main/java', 'src/main/kotlin')
+    classDirectories.setFrom debugClasses
+    executionData.setFrom debugCoverageData
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+}
+tasks.register('jacocoDebugCoverageVerification', JacocoCoverageVerification) {
+    dependsOn coverageReport
+    sourceDirectories.setFrom files('src/main/java', 'src/main/kotlin')
+    classDirectories.setFrom debugClasses
+    executionData.setFrom debugCoverageData
+    violationRules {
+        rule {
+            limit {
+                counter = 'INSTRUCTION'
+                value = 'COVEREDRATIO'
+                minimum = 0.90
+            }
+        }
+    }
+    // Run before Ant's verifier: independently rejects zero denominator, stale reports,
+    // inventory omissions and changed data, and binds the successful XML to this run.
+    doFirst {
+        providers.exec {
+            workingDir rootProject.projectDir
+            commandLine 'python3', 'tools/build/m2_coverage.py', 'report'
+        }.result.get().assertNormalExitValue()
+    }
+}
+// Configuration cache is explicitly disabled in the hosted gate. These are observed
+// terminal task states, not inferred from banners or the aggregate process exit.
+gradle.taskGraph.afterTask { task, state ->
+    if (task.path in [':app:testDebugUnitTest', ':app:connectedDebugAndroidTest',
+                     ':app:jacocoDebugReport', ':app:jacocoDebugCoverageVerification']) {
+        def outcome = state.failure ? 'FAILED' : state.noSource ? 'NO_SOURCE' :
+            state.upToDate ? 'UP_TO_DATE' : state.skipped ? 'SKIPPED' : 'SUCCESS'
+        logger.lifecycle("M2_TASK_OUTCOME ${task.path} ${outcome}")
+    }
 }

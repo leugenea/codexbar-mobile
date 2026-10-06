@@ -75,7 +75,7 @@ class M1Contracts(unittest.TestCase):
                          "system-images;android-36;google_apis;x86_64", "--channel=0"):
             self.assertIn(contract, script)
         for unsafe in ("--dependency-verification off", "--write-verification-metadata", "testInstrumentationRunnerArguments",
-                       "--tests ", "--dry-run", "jacoco", "system-images;android-37"):
+                       "--tests ", "--dry-run", "system-images;android-37"):
             self.assertNotIn(unsafe, script)
         installation = script.split("--install ", 1)[1].split("2>&1", 1)[0]
         self.assertEqual(installation.strip(), 'platform-tools emulator "$image"')
@@ -97,7 +97,7 @@ class M1Contracts(unittest.TestCase):
         ])
         self.assertEqual(re.findall(r":app:(\w+)", connected), [
             "m1ToolchainCheckpoint", "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
-            "connectedDebugAndroidTest",
+            "testDebugUnitTest", "connectedDebugAndroidTest", "jacocoDebugCoverageVerification",
         ])
         self.assertIn('${GRADLE_USER_HOME:?}', script)
         self.assertNotRegex(script, r"(?m)^\s*(?:export\s+)?GRADLE_USER_HOME=")

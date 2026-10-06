@@ -43,18 +43,77 @@ def validate_metadata(xml, record):
 class AuditedImportTests(unittest.TestCase):
     def setUp(self):
         self.path = ROOT / "gradle/verification-metadata.xml"
-        self.xml = ET.parse(self.path).getroot()
+        self.full_bytes = self.path.read_bytes()
+        marker = b"   <!-- BEGIN independently audited M2 coverage delta -->\n"
+        end = b"   <!-- END independently audited M2 coverage delta -->\n"
+        prefix, tail = self.full_bytes.split(marker)
+        _, suffix = tail.split(end)
+        self.base_bytes = prefix + suffix
+        self.xml = ET.fromstring(self.base_bytes)
         self.record = json.loads((ROOT / "docs/build/m1-integrity.json").read_text())
 
     def test_exact_approved_metadata_and_file_identity(self):
         validate_metadata(self.xml, self.record)
         self.assertEqual(self.record["auditManifest"]["sha256"], AUDIT_SHA256)
         self.assertEqual(self.record["importedMetadata"]["semanticPairSha256"], SEMANTIC_SHA256)
-        self.assertEqual(self.record["importedMetadata"]["sha256"], hashlib.sha256(self.path.read_bytes()).hexdigest())
+        self.assertEqual(self.record["importedMetadata"]["sha256"], hashlib.sha256(self.base_bytes).hexdigest())
         self.assertEqual(self.record["inputs"]["UNTRUSTED-discovered-verification-metadata.xml"]["sha256"],
                          "a083a574908401043606876d80a00e64b2ef4c1f1441945be30e03ebec6c6998")
         self.assertEqual(self.record["inputs"]["resolved-toolchain.json"]["sha256"],
                          "d0390bf6c3d3229b315cb84c3e8660644e9e70997d94b615621f5c662498cae5")
+
+    def test_exact_m1_base_plus_independently_approved_m2_delta(self):
+        delta_path = ROOT / "docs/build/m2-coverage-integrity.json"
+        delta = json.loads(delta_path.read_text())
+        self.assertEqual(hashlib.sha256(delta_path.read_bytes()).hexdigest(),
+                         "22fec472348cc62a2e774459ac7a9be3f482a7c9011e63e24f9ce278d0aeaf36")
+        full = ET.fromstring(self.full_bytes)
+        base_ids = {tuple(row[:4]) for row in self.record["artifacts"]}
+        delta_ids = {tuple(row[:4]) for row in delta["artifacts"]}
+        self.assertFalse(base_ids & delta_ids)
+        self.assertEqual(len(delta_ids), 17)
+        self.assertEqual(len({tuple(row[:3]) for row in delta["artifacts"]}), 9)
+        pairs = []
+        full_components = full.find(NS + "components")
+        assert full_components is not None
+        for component in full_components:
+            for artifact in component:
+                identity = [component.get(k) for k in ("group", "name", "version")] + [artifact.get("name")]
+                self.assertEqual(artifact.tag, NS + "artifact")
+                self.assertEqual(set(artifact.attrib), {"name"})
+                self.assertEqual(len(artifact), 1)
+                checksum = artifact[0]
+                self.assertEqual(checksum.tag, NS + "sha256")
+                self.assertEqual(set(checksum.attrib), {"value", "origin"})
+                if tuple(identity) in delta_ids:
+                    row = next(row for row in delta["artifacts"] if row[:4] == identity)
+                    evidence = ("publisher SHA256 sidecar/module" if row[5] == "published-sha256" else
+                                "weaker published SHA1 + freshly retrieved original SHA256")
+                    self.assertEqual(checksum.get("origin"), f"Independent M2 audit: {evidence}; docs/build/m2-coverage-integrity.json; not authenticated publisher identity")
+                pairs.append(identity + [checksum.get("value")])
+        self.assertEqual(sorted(pairs), sorted(row[:5] for row in self.record["artifacts"] + delta["artifacts"]))
+        self.assertEqual(len(pairs), len({tuple(p) for p in pairs}))
+        self.assertEqual(len(full_components), 364 + 9)
+        self.assertEqual(len(pairs), 602 + 17)
+        self.assertEqual(hashlib.sha256(json.dumps(sorted(pairs), separators=(",", ":")).encode()).hexdigest(),
+                         "ba94604993d8d03d66d6e8b48fcdeb258aec36b62c3e851da32a6bed064434a3")
+        comparisons = {tuple(a[k] for k in ("group", "module", "version", "file")): a
+                       for a in delta["publisherComparisons"]}
+        tiers = {"published-sha256": 0, "published-sha1+original-sha256": 0}
+        for row in delta["artifacts"]:
+            tiers[row[5]] += 1
+            comparison = comparisons[tuple(row[:4])]
+            self.assertEqual(comparison["sha256"], row[4])
+            self.assertEqual(comparison["trustTier"], row[5])
+            self.assertEqual(comparison["url"], delta["repositories"][row[6][0]] + row[6][1])
+            matching = [p for p in comparison["publisherChecksums"] if p.get("match") is True and
+                        p["algorithm"] == ("sha256" if row[5] == "published-sha256" else "sha1")]
+            self.assertEqual(len(matching), 1)
+            proof = matching[0]
+            self.assertEqual(proof["publisherValue"], proof["computedValue"])
+            self.assertEqual(proof["url"], delta["repositories"][row[7][0][1]] + row[7][0][2])
+            self.assertEqual(proof["publisherValue"], row[4] if row[5] == "published-sha256" else row[7][0][3])
+        self.assertEqual(tiers, {"published-sha256": 7, "published-sha1+original-sha256": 10})
 
     def test_per_artifact_sources_and_honest_trust_tiers(self):
         counts = {"published-sha256": 0, "published-sha1+original-sha256": 0}
