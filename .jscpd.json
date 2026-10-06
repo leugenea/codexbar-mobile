@@ -1,0 +1,18 @@
+{
+  "formats": ["kotlin"],
+  "ignore": [
+    "**/test/**",
+    "**/tests/**",
+    "**/androidTest/**",
+    "**/*Test.kt",
+    "**/*.generated.kt",
+    "**/*_generated.kt",
+    "**/build/**",
+    "**/generated/**",
+    "**/third_party/**",
+    "**/vendor/**"
+  ],
+  "reporters": ["json"],
+  "minLines": 10,
+  "threshold": 100
+}

@@ -1,0 +1,218 @@
+name: Code metrics
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # PR/manual runs follow the Android workflow's cancellation style. Every main
+  # push needs a distinct group so its history point cannot be cancelled upstream.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'push' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  erosion:
+    name: Code erosion (Kotlin complexity)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - name: Set up Python 3.13
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Install hash-pinned Kotlin parser dependencies
+        run: |
+          python -m venv "$RUNNER_TEMP/erosion-venv"
+          "$RUNNER_TEMP/erosion-venv/bin/python" -m pip install \
+            --require-hashes --no-deps -r .github/requirements-metrics.txt
+      - name: Test Kotlin counter, erosion and benchmark conversion
+        run: |
+          "$RUNNER_TEMP/erosion-venv/bin/python" -B -m unittest discover -s tools/metrics -p 'test_*.py' -v
+      - name: Analyze production source
+        run: |
+          mkdir -p "$RUNNER_TEMP/erosion"
+          "$RUNNER_TEMP/erosion-venv/bin/python" tools/metrics/erosion.py \
+            --output "$RUNNER_TEMP/erosion/report.json" \
+            --summary "$RUNNER_TEMP/erosion/report.md"
+          cat "$RUNNER_TEMP/erosion/report.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload erosion report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: code-erosion
+          path: ${{ runner.temp }}/erosion/
+          if-no-files-found: error
+
+  duplication:
+    name: Code duplication (jscpd)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - name: Install checksum-verified jscpd v5.3.2
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/jscpd"
+          curl --fail --location --retry 3 \
+            https://github.com/kucherenko/jscpd/releases/download/v5.3.2/jscpd-linux-x64-gnu.tar.gz \
+            --output "$RUNNER_TEMP/jscpd/jscpd-linux-x64-gnu.tar.gz"
+          cd "$RUNNER_TEMP/jscpd"
+          printf '%s  %s\n' \
+            '97259f222ea7f6d51a0f2faa98ed5889430233e0fb8d2c129f23d84aff4b93b2' 'jscpd-linux-x64-gnu.tar.gz' | sha256sum -c -
+          tar -xzf jscpd-linux-x64-gnu.tar.gz
+          test -x ./jscpd
+          ./jscpd --version
+      - name: Test duplication report normalization
+        run: |
+          python3 -B -m unittest discover -s tools/metrics -p 'test_jscpd_report.py' -v
+          python3 -B -m unittest discover -s tools/metrics -p 'test_benchmark_metrics.py' -v
+      - name: Analyze production duplication
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/duplication/raw"
+          python3 tools/metrics/jscpd_report.py sources . > "$RUNNER_TEMP/duplication/sources"
+          mapfile -d '' -t sources < "$RUNNER_TEMP/duplication/sources"
+          (( ${#sources[@]} > 0 ))
+          "$RUNNER_TEMP/jscpd/jscpd" --config .jscpd.json --absolute \
+            --reporters json --threshold 100 --fail-on-empty \
+            --output "$RUNNER_TEMP/duplication/raw" \
+            "${sources[@]}"
+          python3 tools/metrics/jscpd_report.py report \
+            "$RUNNER_TEMP/duplication/raw/jscpd-report.json" \
+            "$RUNNER_TEMP/duplication/report.json" \
+            "$RUNNER_TEMP/duplication/report.md"
+          cat "$RUNNER_TEMP/duplication/report.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload duplication report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: code-duplication
+          path: |
+            ${{ runner.temp }}/duplication/report.json
+            ${{ runner.temp }}/duplication/report.md
+          if-no-files-found: error
+
+  # Only trusted main pushes write history; never execute PR code with a write token.
+  history:
+    name: Publish code metric history
+    needs: [erosion, duplication]
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.erosion.result == 'success' || needs.duplication.result == 'success') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: code-metrics-history-main
+      # Retain every pending push, rather than replacing the older pending job.
+      # GitHub caps this queue at 100; above that limit, manual recovery is needed.
+      queue: max
+      cancel-in-progress: false
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          persist-credentials: false
+      - name: Download erosion report
+        if: needs.erosion.result == 'success'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: code-erosion
+          path: ${{ runner.temp }}/erosion
+      - name: Convert erosion report to benchmark metrics
+        if: needs.erosion.result == 'success'
+        run: |
+          python3 tools/metrics/benchmark_metrics.py \
+            --input "$RUNNER_TEMP/erosion/report.json" \
+            --output "$RUNNER_TEMP/erosion/benchmark.json"
+      - name: Publish erosion history and alert
+        if: needs.erosion.result == 'success'
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
+        with:
+          name: Code erosion
+          tool: customSmallerIsBetter
+          output-file-path: ${{ runner.temp }}/erosion/benchmark.json
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: dev/bench
+          github-token: ${{ github.token }}
+          auto-push: true
+          alert-threshold: "110%"
+          comment-on-alert: true
+          fail-on-alert: false
+      - name: Download duplication report
+        if: needs.duplication.result == 'success'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: code-duplication
+          path: ${{ runner.temp }}/duplication
+      - name: Convert duplication report to benchmark metrics
+        if: needs.duplication.result == 'success'
+        run: |
+          python3 tools/metrics/benchmark_metrics.py --kind duplication \
+            --input "$RUNNER_TEMP/duplication/report.json" \
+            --output "$RUNNER_TEMP/duplication/benchmark.json"
+      - name: Publish duplication history and alert
+        if: needs.duplication.result == 'success'
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
+        with:
+          name: Code duplication
+          tool: customSmallerIsBetter
+          output-file-path: ${{ runner.temp }}/duplication/benchmark.json
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: dev/bench
+          github-token: ${{ github.token }}
+          auto-push: true
+          alert-threshold: "110%"
+          comment-on-alert: true
+          fail-on-alert: false
+
+  # Token-made branch pushes do not trigger branch-based Pages builds.
+  pages:
+    name: Deploy code metric chart
+    needs: history
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.history.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: code-metrics-pages
+      queue: max
+      cancel-in-progress: false
+    steps:
+      - name: Check out history branch
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          ref: gh-pages
+          persist-credentials: false
+      - name: Bypass Jekyll in the uploaded snapshot
+        run: touch .nojekyll
+      - name: Upload chart snapshot
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          name: github-pages-${{ github.run_attempt }}
+          path: .
+          include-hidden-files: true
+      - name: Deploy chart
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        with:
+          artifact_name: github-pages-${{ github.run_attempt }}
