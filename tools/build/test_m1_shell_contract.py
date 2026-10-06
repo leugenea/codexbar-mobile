@@ -80,6 +80,70 @@ class M1Contracts(unittest.TestCase):
         installation = script.split("--install ", 1)[1].split("2>&1", 1)[0]
         self.assertEqual(installation.strip(), 'platform-tools emulator "$image"')
 
+    def assert_host_emulator_prerequisite(self, workflow):
+        checkpoint, native = workflow.split("  native:\n", 1)
+        self.assertNotIn("apt-get", checkpoint)
+        self.assertIn("runs-on: ubuntu-24.04", native)
+        steps = re.split(r"(?m)^      - ", native)[1:]
+        setup = [index for index, step in enumerate(steps)
+                 if step.startswith("name: Prepare hosted emulator client library\n")]
+        invocation = [index for index, step in enumerate(steps)
+                      if "bash tools/build/run-hosted-native-smoke.sh" in step]
+        self.assertEqual(len(setup), 1, "Missing/duplicate hosted emulator prerequisite")
+        self.assertEqual(len(invocation), 1)
+        self.assertLess(setup[0], invocation[0], "Emulator prerequisite must precede native invocation")
+        step = steps[setup[0]]
+        self.assertRegex(step, r"(?m)^        timeout-minutes: [1-5]$")
+        self.assertNotRegex(step, r"(?m)^        (?:if|continue-on-error):")
+        header, run = step.split("        run: |\n", 1)
+        self.assertNotIn("if:", header)
+        self.assertTrue(run.lstrip().startswith("set -euo pipefail\n"))
+        receipt, commands = run.split("trap record_prerequisite EXIT\n", 1)
+        for contract in ("status=$?", "trap - EXIT", 'exit "$status"',
+                         "${binary:Package}", "${Version}", "${db:Status-Status}",
+                         "host-libpulse0-receipt.txt", "package_query_exit=",
+                         "library_readable=true", "library_readable=false", 'sha256sum "$library"'):
+            self.assertIn(contract, receipt)
+        self.assertIn("library=/usr/lib/x86_64-linux-gnu/libpulse.so.0", receipt)
+        self.assertRegex(commands, r"timeout --signal=TERM --kill-after=15s [1-2]m sudo apt-get "
+                                  r"-o APT::Update::Error-Mode=any update")
+        self.assertRegex(commands, r"timeout --signal=TERM --kill-after=15s [1-2]m sudo env "
+                                  r"DEBIAN_FRONTEND=noninteractive")
+        self.assertRegex(commands, r"apt-get install\s+--yes\s+--no-install-recommends\s+libpulse0\s+\\\n"
+                                  r"\s+2>&1 \| tee evidence/native/host-libpulse0-install.log")
+        self.assertIn("tee evidence/native/host-apt-update.log", commands)
+        self.assertIn("dpkg-query -W -f='${db:Status-Status}\\n' libpulse0 | grep -Fx installed", commands)
+        self.assertIn('test -r "$library"', commands)
+        self.assertLess(commands.index(" update"), commands.index("apt-get install"))
+        self.assertLess(commands.index("apt-get install"), commands.index("dpkg-query"))
+        self.assertLess(commands.index("dpkg-query"), commands.index('test -r "$library"'))
+        for unsafe in ("||", "&&", "set +e", "exit 0", "LD_LIBRARY_PATH", "--allow-", "--force-yes"):
+            self.assertNotIn(unsafe, commands)
+
+    def test_host_emulator_prerequisite_is_bounded_observable_and_fail_closed(self):
+        self.assert_host_emulator_prerequisite((ROOT / ".github/workflows/m1-toolchain.yml").read_text())
+
+    def test_host_emulator_prerequisite_contract_rejects_synthetic_regressions(self):
+        # Pure source controls: never install host packages or invoke an emulator here.
+        workflow = (ROOT / ".github/workflows/m1-toolchain.yml").read_text()
+        setup_match = re.search(r"(?ms)^      - name: Prepare hosted emulator client library\n.*?"
+                                r"(?=^      - )", workflow)
+        assert setup_match is not None, "Missing hosted emulator prerequisite"
+        setup = setup_match.group()
+        missing = workflow.replace(setup, "", 1)
+        invocation_match = re.search(r"(?ms)^      - name: Run complete M1 native graph.*?(?=^      - )", missing)
+        assert invocation_match is not None, "Missing native invocation"
+        invocation = invocation_match.group()
+        for name, mutation in (
+            ("missing", missing),
+            ("misordered", missing.replace(invocation, invocation + setup, 1)),
+            ("fail-open", workflow.replace("          set -euo pipefail\n", "          set -uo pipefail\n", 1)),
+            ("conditional", workflow.replace(setup, setup.replace("        run: |", "        if: false\n        run: |"), 1)),
+        ):
+            with self.subTest(mutation=name):
+                with self.assertRaises(AssertionError):
+                    self.assert_host_emulator_prerequisite(mutation)
+
 
 class SyntheticReportTests(unittest.TestCase):
     def setUp(self):

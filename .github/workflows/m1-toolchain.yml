@@ -88,6 +88,39 @@ jobs:
       - name: Install unchanged exact project JDK and SDK archives
         timeout-minutes: 15
         run: bash tools/build/install-hosted-toolchain.sh
+      - name: Prepare hosted emulator client library
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/native
+          # Ubuntu host prerequisite, not a project/toolchain version pin.
+          library=/usr/lib/x86_64-linux-gnu/libpulse.so.0
+          record_prerequisite() {
+            status=$?
+            trap - EXIT
+            set +e
+            {
+              printf 'host_prerequisite_exit=%s\nlibrary=%s\n' "$status" "$library"
+              dpkg-query -W -f='${binary:Package}\t${Version}\t${db:Status-Status}\n' libpulse0
+              printf 'package_query_exit=%s\n' "$?"
+              if [[ -r "$library" ]]; then
+                printf '%s\n' 'library_readable=true'
+                readlink -f "$library"
+                sha256sum "$library"
+              else
+                printf '%s\n' 'library_readable=false'
+              fi
+            } > evidence/native/host-libpulse0-receipt.txt 2>&1
+            exit "$status"
+          }
+          trap record_prerequisite EXIT
+          timeout --signal=TERM --kill-after=15s 2m sudo apt-get -o APT::Update::Error-Mode=any update \
+            2>&1 | tee evidence/native/host-apt-update.log
+          timeout --signal=TERM --kill-after=15s 2m sudo env DEBIAN_FRONTEND=noninteractive \
+            apt-get install --yes --no-install-recommends libpulse0 \
+            2>&1 | tee evidence/native/host-libpulse0-install.log
+          dpkg-query -W -f='${db:Status-Status}\n' libpulse0 | grep -Fx installed
+          test -r "$library"
       - name: Require hosted KVM access
         run: |
           test -c /dev/kvm
