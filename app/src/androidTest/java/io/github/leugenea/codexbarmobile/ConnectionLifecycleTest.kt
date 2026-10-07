@@ -8,6 +8,7 @@ import android.os.Parcel
 import android.view.WindowManager
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -255,6 +256,164 @@ class ConnectionLifecycleTest {
         }
     }
 
+    @Test
+    fun restoredSessionRotationReauthAndLogoutUseRealKeystore() {
+        launch().use { scenario ->
+            openGate(scenario)
+            click("connect")
+            await(scenario, "initial device code") { it.auth is AuthState.AwaitingUser }
+            fake.poll.complete(Unit)
+            await(scenario, "initial stored session") { it.phase == ConnectionPhase.OBSERVED }
+        }
+        val requests = fake.calls.size
+        launch().use { scenario ->
+            openGate(scenario, ConnectionPhase.RESTORED)
+            assertEquals(requests, fake.calls.size)
+            fake.rejectOriginalBearer = true
+            click("read-usage")
+            await(scenario, "401 rotation and bounded retry") { it.phase == ConnectionPhase.OBSERVED }
+            val slot = NativeConnection.session(context)
+            val store = KeystoreCredentialStore(context, slot)
+            scenario.onActivity {
+                val generation = (it.connection.state.value.auth as AuthState.Connected).generation
+                val saved = (store.read(generation) as CredentialResult.Success).value
+                assertEquals(ROTATED_ACCESS, saved.accessToken.copyBytes().toString(Charsets.UTF_8))
+                assertEquals(ROTATED_REFRESH, saved.refreshToken!!.copyBytes().toString(Charsets.UTF_8))
+                assertTrue(it.connection.state.value.observations!!.successful)
+            }
+            assertEquals(1, fake.refreshCount)
+            assertFalse(File(KeystoreCredentialStore.file(context, slot).parentFile, "rotation-pending").exists())
+            val beforeRecreation = fake.calls.size
+            scenario.recreate()
+            await(scenario, "rotation survives Activity recreation") { it.phase == ConnectionPhase.OBSERVED }
+            assertEquals(beforeRecreation, fake.calls.size)
+            fake.refreshStatus = 401
+            click("refresh-session")
+            await(scenario, "terminal refresh requires reauth") { it.phase == ConnectionPhase.REAUTH_REQUIRED }
+            assertFalse(keyExists(slot))
+            assertFalse(KeystoreCredentialStore.file(context, slot).exists())
+            compose.onNodeWithTag("connect").performScrollTo().assertTextEquals("Sign in again")
+            assertSavedStateHasNoSecrets(scenario)
+            fake.refreshStatus = 200
+            fake.rejectOriginalBearer = false
+            click("connect")
+            await(scenario, "reauth replaces quarantined session") { it.phase == ConnectionPhase.OBSERVED }
+            click("sign-out")
+            await(scenario, "reauthenticated local deletion") { it.phase == ConnectionPhase.SIGNED_OUT }
+            assertFalse(keyExists(slot))
+            assertFalse(KeystoreCredentialStore.file(context, slot).exists())
+        }
+        launch().use { scenario -> openGate(scenario); assertSavedStateHasNoSecrets(scenario) }
+    }
+
+    @Test
+    fun nativeLogoutDuringRefreshAndReplacementRejectLateRotatedCredentials() {
+        launch().use { scenario ->
+            openGate(scenario)
+            click("connect")
+            await(scenario, "code before refresh race") { it.auth is AuthState.AwaitingUser }
+            fake.poll.complete(Unit)
+            await(scenario, "session before refresh race") { it.phase == ConnectionPhase.OBSERVED }
+            fake.holdRefresh = true
+            click("refresh-session")
+            bounded("refresh reached transport") { fake.refreshes.isNotEmpty() }
+            val late = fake.refreshes.single()
+            click("sign-out")
+            await(scenario, "logout cancels refresh and deletes credentials") { it.phase == ConnectionPhase.SIGNED_OUT }
+            assertEquals(1, fake.cancelledRefreshes)
+            val slot = NativeConnection.session(context)
+            assertFalse(keyExists(slot))
+            assertFalse(KeystoreCredentialStore.file(context, slot).exists())
+            fake.holdRefresh = false
+            click("connect")
+            await(scenario, "replacement session stored") { it.phase == ConnectionPhase.OBSERVED }
+            val store = KeystoreCredentialStore(context, slot)
+            late(response("""{"access_token":"$ROTATED_ACCESS","refresh_token":"$ROTATED_REFRESH"}"""))
+            scenario.onActivity {
+                val generation = (it.connection.state.value.auth as AuthState.Connected).generation
+                val saved = (store.read(generation) as CredentialResult.Success).value
+                assertEquals(ACCESS, saved.accessToken.copyBytes().toString(Charsets.UTF_8))
+                assertEquals(REFRESH, saved.refreshToken!!.copyBytes().toString(Charsets.UTF_8))
+            }
+            assertSavedStateHasNoSecrets(scenario)
+            click("connect") // replacement also deletes the previous durable pair before auth.
+            await(scenario, "explicit account replacement") { it.phase == ConnectionPhase.OBSERVED }
+            click("sign-out")
+            await(scenario, "replacement local deletion") { it.phase == ConnectionPhase.SIGNED_OUT }
+        }
+    }
+
+    @Test
+    fun nativeFailedRotationWriteQuarantinesRealStoreBeforeReauth() {
+        val failWrite = java.util.concurrent.atomic.AtomicBoolean()
+        MainActivity.connectionFactory = { app ->
+            val actual = KeystoreCredentialStore(app, NativeConnection.session(app))
+            val store = object : CredentialStore by actual {
+                override fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation): CredentialResult<CredentialEnvelope> =
+                    if (failWrite.get()) CredentialResult.Failure(CredentialFailure.FAILED_WRITE)
+                    else actual.replace(envelope, cancellation)
+            }
+            ConnectionController(store, io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator(fake, store, fake.clock, fake::pause),
+                NativeFeasibilityReader(fake, fake.clock, fake::pause),
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO))
+        }
+        launch().use { scenario ->
+            openGate(scenario)
+            click("connect")
+            await(scenario, "code before write failure") { it.auth is AuthState.AwaitingUser }
+            fake.poll.complete(Unit)
+            await(scenario, "durable session before write failure") { it.phase == ConnectionPhase.OBSERVED }
+            failWrite.set(true)
+            click("refresh-session")
+            await(scenario, "rotated write failure quarantined") { it.phase == ConnectionPhase.REAUTH_REQUIRED }
+            val slot = NativeConnection.session(context)
+            assertFalse(keyExists(slot))
+            assertFalse(KeystoreCredentialStore.file(context, slot).exists())
+            assertEquals(1, fake.refreshCount)
+            scenario.onActivity { assertNull(it.connection.state.value.observations) }
+            compose.onNodeWithTag("read-usage").performScrollTo().assertIsNotEnabled()
+            assertEquals(1, fake.refreshCount)
+            assertSavedStateHasNoSecrets(scenario)
+        }
+        launch().use { scenario -> openGate(scenario); assertEquals(1, fake.refreshCount) }
+    }
+
+    @Test
+    fun nativeKeyLossCorruptionAndInterruptedRotationRestoreFailClosedToReauth() {
+        val slot = NativeConnection.session(context)
+        val store = KeystoreCredentialStore(context, slot)
+        fun install(): SessionGeneration {
+            val generation = store.openSession()
+            assertTrue(store.replace(CredentialEnvelope(generation, SensitiveValue.copyOf(ACCESS.toByteArray()),
+                SensitiveValue.copyOf(REFRESH.toByteArray())), CredentialCancellation()) is CredentialResult.Success)
+            return generation
+        }
+        for (mutation in listOf("pending", "key", "ciphertext")) {
+            cleanStore()
+            val generation = install()
+            when (mutation) {
+                "pending" -> assertTrue(store.beginRotation(generation) is CredentialResult.Success)
+                "key" -> KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(KeystoreCredentialStore.alias(context, slot))
+                else -> KeystoreCredentialStore.file(context, slot).writeBytes(byteArrayOf(1, 2, 3))
+            }
+            val requests = fake.calls.size
+            launch().use { scenario ->
+                openGate(scenario, ConnectionPhase.REAUTH_REQUIRED)
+                assertEquals(requests, fake.calls.size)
+                scenario.onActivity { assertNull(it.connection.state.value.observations) }
+                click("connect")
+                await(scenario, "$mutation recovery code") { it.auth is AuthState.AwaitingUser || it.phase == ConnectionPhase.OBSERVED }
+                fake.poll.complete(Unit)
+                await(scenario, "$mutation explicit reauth") { it.phase == ConnectionPhase.OBSERVED }
+                click("sign-out")
+                await(scenario, "$mutation local deletion") { it.phase == ConnectionPhase.SIGNED_OUT }
+                assertFalse(KeystoreCredentialStore.file(context, slot).exists())
+                assertFalse(keyExists(slot))
+            }
+        }
+        // New Activity/store owners model storage restoration, not actual process death/reboot.
+    }
+
     private fun launch(): ActivityScenario<MainActivity> = ActivityScenario.launch(MainActivity::class.java)
 
     private fun openGate(scenario: ActivityScenario<MainActivity>, phase: ConnectionPhase = ConnectionPhase.IDLE) {
@@ -312,7 +471,7 @@ class ConnectionLifecycleTest {
         compose.onNodeWithTag("connection-tab").assertExists()
         val parcel = Parcel.obtain()
         val bytes = try { parcel.writeBundle(bundle); parcel.marshall() } finally { parcel.recycle() }
-        for (secret in listOf(CODE, ACCESS, REFRESH, "synthetic-device", "synthetic-authorization", "synthetic-verifier")) {
+        for (secret in listOf(CODE, ACCESS, REFRESH, ROTATED_ACCESS, ROTATED_REFRESH, "synthetic-device", "synthetic-authorization", "synthetic-verifier")) {
             assertFalse("Secret in diagnostic", diagnostics.contains(secret))
             assertFalse("Secret in saved Bundle UTF-8", bytes.toString(Charsets.UTF_8).contains(secret))
             assertFalse("Secret in saved Bundle UTF-16", bytes.toString(Charsets.UTF_16LE).contains(secret))
@@ -331,6 +490,12 @@ class ConnectionLifecycleTest {
         val calls = CopyOnWriteArrayList<ProviderHttpRequest>()
         val reads = CopyOnWriteArrayList<(TransportResult) -> Unit>()
         val poll = CompletableDeferred<Unit>()
+        val refreshes = CopyOnWriteArrayList<(TransportResult) -> Unit>()
+        @Volatile var holdRefresh = false
+        @Volatile var refreshStatus = 200
+        @Volatile var rejectOriginalBearer = false
+        @Volatile var cancelledRefreshes = 0
+        @Volatile var refreshCount = 0
         private val millis = AtomicLong()
         val clock = TransportClock { TransportTime(Instant.parse("2026-01-01T00:00:00Z").plusMillis(millis.get()), millis.get()) }
         @Volatile var holdReads = false
@@ -339,20 +504,37 @@ class ConnectionLifecycleTest {
         suspend fun pause(duration: Long) { poll.await(); millis.addAndGet(duration) }
         override fun execute(request: ProviderHttpRequest, deadline: ReadDeadline, terminal: (TransportResult) -> Unit): CancellationHandle {
             calls += request
-            if (request is ProviderHttpRequest.Get && holdReads) reads += terminal
+            val refreshing = request is ProviderHttpRequest.FormPost &&
+                request.fields["grant_type"]?.copyBytes()?.toString(Charsets.UTF_8) == "refresh_token"
+            val heldRead = request is ProviderHttpRequest.Get && holdReads
+            val heldRefresh = refreshing && holdRefresh
+            if (refreshing) refreshCount++
+            if (heldRefresh) refreshes += terminal
+            else if (heldRead) reads += terminal
             else {
                 millis.incrementAndGet()
                 val body = when (request.url.encodedPath) {
                     "/api/accounts/deviceauth/usercode" -> """{"device_auth_id":"synthetic-device","user_code":"$CODE"}"""
                     "/api/accounts/deviceauth/token" -> """{"authorization_code":"synthetic-authorization","code_verifier":"synthetic-verifier"}"""
-                    "/oauth/token" -> """{"access_token":"$ACCESS","refresh_token":"$REFRESH"}"""
+                    "/oauth/token" -> if (refreshing) """{"access_token":"$ROTATED_ACCESS","refresh_token":"$ROTATED_REFRESH"}"""
+                        else """{"access_token":"$ACCESS","refresh_token":"$REFRESH"}"""
                     ReadOperation.USAGE.path -> USAGE
                     ReadOperation.RESET_INVENTORY.path -> INVENTORY
                     else -> error("Unexpected synthetic route")
                 }
-                terminal(response(body, if (request is ProviderHttpRequest.Get) readStatus else 200))
+                val status = when {
+                    refreshing -> refreshStatus
+                    request is ProviderHttpRequest.Get && rejectOriginalBearer &&
+                        request.bearer.copyBytes().toString(Charsets.UTF_8) == ACCESS -> 401
+                    request is ProviderHttpRequest.Get -> readStatus
+                    else -> 200
+                }
+                terminal(response(body, status))
             }
-            return CancellationHandle { if (request is ProviderHttpRequest.Get && holdReads) cancelledReads++ }
+            return CancellationHandle {
+                if (heldRead) cancelledReads++
+                if (heldRefresh) cancelledRefreshes++
+            }
         }
     }
 
@@ -360,6 +542,8 @@ class ConnectionLifecycleTest {
         const val CODE = "SYNTHETIC-NATIVE-CODE"
         const val ACCESS = "synthetic-native-access"
         const val REFRESH = "synthetic-native-refresh"
+        const val ROTATED_ACCESS = "synthetic-native-rotated-access"
+        const val ROTATED_REFRESH = "synthetic-native-rotated-refresh"
         const val USAGE = """{"rate_limit":{"allowed":true,"limit_reached":false,"primary_window":{"limit_window_seconds":604800,"used_percent":5,"reset_at":1791756793},"secondary_window":{"limit_window_seconds":18000,"used_percent":12,"reset_after_seconds":500}},"rate_limit_reset_credits":{"available_count":2}}"""
         const val INVENTORY = """{"available_count":2,"credits":[{"expires_at":"2026-10-22T20:31:56.833553Z"},{"expires_at":null}]}"""
         fun response(body: String, status: Int = 200) = TransportResult.Response.bounded(status, body.toByteArray())

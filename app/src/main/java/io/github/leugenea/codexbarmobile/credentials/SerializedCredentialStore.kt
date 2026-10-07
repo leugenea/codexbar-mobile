@@ -40,6 +40,12 @@ class SerializedCredentialStore(private val persistence: CredentialPersistence) 
         }
     }
 
+    override fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = synchronized(ownership) {
+        if (active !== generation) stale() else CredentialResult.Success(Unit)
+    }
+
+    override fun finishRotation(generation: SessionGeneration): CredentialResult<Unit> = beginRotation(generation)
+
     override fun delete(generation: SessionGeneration): CredentialResult<Unit> = synchronized(ownership) {
         if (active !== generation) return@synchronized stale()
         active = null

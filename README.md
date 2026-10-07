@@ -11,18 +11,22 @@ an owner-operated native connection feasibility gate, not supported provider acc
 - Preview selection restored across Activity recreation; preview actions never request provider data.
 - A separate connection gate: connect/cancel, fixed system-browser device login,
   Keystore-backed local storage and sign-out, and only the two selected read-only routes.
+- Serialized session refresh/rotation with durable save before publication, bounded
+  401 recovery, re-auth on terminal/write failures, and generation-isolated local logout.
+- Explicit stored-session read/refresh controls; no automatic cadence or invented token TTL.
 - Safe numeric/date/status observations with independent endpoint clocks.
 - Android launcher, Compose UI, JVM state tests and hosted synthetic native tests.
 
-The connection gate always reports **binding UNRESOLVED / NOT_GO**. Receiving tokens
-or HTTP 200 does not establish account/workspace association. Owner live verification
-on a physical phone is a separate stop/go decision after merging the wiring; CI uses
-only fake transport and synthetic data. Pending login lives only in memory: Activity
+The connection gate reports **binding UNRESOLVED / identity UNVERIFIED**. Receiving
+tokens or HTTP 200 does not establish account/workspace association. The owner accepted
+this single identity-unverified session and recorded A8 GO on 2026-10-07 in issue #48.
+Refresh/rotation/local-logout verification on the exact candidate remains a separate
+owner gate; CI uses only fake transport and synthetic data. Pending login lives only in memory: Activity
 recreation retains one bounded attempt, while process death requires restarting login.
 Restored credentials remain unresolved and cause no automatic provider requests.
 
-There is no complete refresh/re-auth lifecycle, account history, graphs, live reset
-countdown or signed production release. CI debug APKs are test outputs, not signed
+There is no periodic refresh, account history, graphs, live reset countdown or signed
+production release. CI debug APKs are test outputs, not signed
 release deliverables. Minimum Android version is Android 8.0 (API 26).
 
 The app declares INTERNET, with cleartext traffic explicitly disabled. Offline

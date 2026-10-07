@@ -171,6 +171,62 @@ class CredentialPersistenceTest {
         staged.discard()
     }
 
+    @Test fun rotationMarkerBlocksRestorationUntilWholeEnvelopeIsDurable() {
+        val target = File(temporary.root, "slot/value.bin")
+        val marker = File(target.parentFile, "rotation-pending")
+        val persistence = ProtectedCredentialPersistence(AtomicCredentialFile(target), FakeCipher(), session, marker)
+        val owner = CredentialSlotOwner(persistence)
+        val generation = owner.openSession()
+        success(owner.replace(envelope(generation), CredentialCancellation()))
+        success(owner.beginRotation(generation))
+        assertTrue(marker.isFile)
+        failure(CredentialFailure.CORRUPT, owner.read(generation))
+        val restarted = owner.openSession()
+        failure(CredentialFailure.CORRUPT, owner.read(restarted))
+        failure(CredentialFailure.STALE_GENERATION, owner.finishRotation(generation))
+        assertTrue(marker.exists())
+        success(owner.replace(envelope(restarted, 9), CredentialCancellation()))
+        failure(CredentialFailure.CORRUPT, owner.read(restarted))
+        success(owner.finishRotation(restarted))
+        assertFalse(marker.exists())
+        assertArrayEquals(byteArrayOf(9, 2, 3), success(owner.read(restarted)).accessToken.copyBytes())
+    }
+
+    @Test fun failedDeletionOfBothKeyAndCiphertextLeavesDurableRestorationTombstone() {
+        val target = File(temporary.root, "slot/value.bin")
+        val actual = AtomicCredentialFile(target)
+        val file = object : CredentialFile by actual { override fun delete() { throw IOException() } }
+        val cipher = FakeCipher().apply { failDelete = true }
+        val marker = File(target.parentFile, "rotation-pending")
+        val owner = CredentialSlotOwner(ProtectedCredentialPersistence(file, cipher, session, marker))
+        val generation = owner.openSession()
+        success(owner.replace(envelope(generation), CredentialCancellation()))
+        assertFalse(marker.exists())
+        failure(CredentialFailure.FAILED_WRITE, owner.delete(generation))
+        assertTrue(target.isFile)
+        assertTrue(marker.isFile)
+        val restarted = CredentialSlotOwner(ProtectedCredentialPersistence(actual, cipher, session, marker))
+        failure(CredentialFailure.CORRUPT, restarted.read(restarted.openSession()))
+    }
+
+    @Test fun rotationMarkAndClearFailuresAreCategoricalAndNeverClearAnotherOwner() {
+        val target = File(temporary.root, "slot/value.bin")
+        val marker = File(target.parentFile, "rotation-pending")
+        val owner = CredentialSlotOwner(ProtectedCredentialPersistence(AtomicCredentialFile(target), FakeCipher(), session, marker))
+        val generation = owner.openSession()
+        success(owner.replace(envelope(generation), CredentialCancellation()))
+        val foreign = SerializedCredentialStore(FakeCredentialPersistence()).openSession()
+        failure(CredentialFailure.STALE_GENERATION, owner.beginRotation(foreign))
+        success(owner.beginRotation(generation))
+        assertTrue(marker.delete())
+        assertTrue(marker.mkdir())
+        File(marker, "synthetic").writeText("synthetic")
+        failure(CredentialFailure.FAILED_WRITE, owner.finishRotation(generation))
+        failure(CredentialFailure.CORRUPT, owner.beginRotation(generation))
+        failure(CredentialFailure.FAILED_WRITE, owner.delete(generation))
+        assertTrue(marker.exists())
+    }
+
     private fun envelope(generation: SessionGeneration, first: Byte = 1) = CredentialEnvelope(
         generation, SensitiveValue.copyOf(byteArrayOf(first, 2, 3)), SensitiveValue.copyOf(byteArrayOf(4, 5)),
     )

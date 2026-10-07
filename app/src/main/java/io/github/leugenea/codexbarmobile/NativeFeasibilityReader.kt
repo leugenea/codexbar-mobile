@@ -40,20 +40,27 @@ internal class NativeFeasibilityReader(
 ) {
     private val policy = ReadPolicy(clock, ReadBackoff { retry -> retry * 1_000L })
 
+    fun session(store: io.github.leugenea.codexbarmobile.credentials.CredentialStore, scope: kotlinx.coroutines.CoroutineScope) =
+        SessionCoordinator(store, transport, scope, clock)
+
     suspend fun read(bearer: SensitiveValue): FeasibilityObservations {
         val usage = endpoint(ReadOperation.USAGE, bearer)
         return FeasibilityObservations(usage, endpoint(ReadOperation.RESET_INVENTORY, bearer, usage.usage))
     }
 
-    private suspend fun endpoint(
+    internal suspend fun endpoint(
         operation: ReadOperation, bearer: SensitiveValue, usage: UsageObservation? = null,
+        session: SessionCoordinator? = null, envelope: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope? = null,
+        alreadyRefreshed: Boolean = false,
     ): EndpointObservation {
+        var credentials = envelope
+        var token = bearer
         val request = ReadRequest(operation, ReadDeadline.after(clock.now()))
-        var attempt = ReadAttempt()
+        var attempt = ReadAttempt(refreshRequested = alreadyRefreshed)
         try {
             while (true) {
                 currentCoroutineContext().ensureActive()
-                val result = transport.await(ProviderHttpRequest.Get(url(operation), bearer), request.deadline)
+                val result = transport.await(ProviderHttpRequest.Get(url(operation), token), request.deadline)
                 currentCoroutineContext().ensureActive()
                 val receivedAt = clock.now().wall
                 val decision = policy.evaluate(request, attempt, result)
@@ -64,8 +71,15 @@ internal class NativeFeasibilityReader(
                         attempt = decision.next
                         pause((requireNotNull(decision.notBeforeMillis) - clock.now().monotonicMillis).coerceAtLeast(0))
                     }
-                    ReadAction.SERIALIZED_REFRESH_AND_RETRY -> return EndpointObservation(operation, status, error = ReadError.REAUTHORIZE)
-                    else -> return EndpointObservation(operation, status, error = decision.error)
+                    ReadAction.SERIALIZED_REFRESH_AND_RETRY -> {
+                        when (val refreshed = refresh(session, credentials, request.deadline)) {
+                            is SessionResult.Ready -> { credentials = refreshed.envelope; token = credentials.accessToken; attempt = decision.next }
+                            is SessionResult.Failed -> return EndpointObservation(operation, status, error = refreshed.problem.readError())
+                        }
+                    }
+                    else -> {
+                        return finished(operation, status, decision.error, session, credentials)
+                    }
                 }
             }
         } catch (cancelled: CancellationException) {
@@ -73,6 +87,19 @@ internal class NativeFeasibilityReader(
         } catch (_: Exception) {
             return EndpointObservation(operation, error = ReadError.INVALID_RESPONSE)
         }
+    }
+
+    private suspend fun refresh(
+        session: SessionCoordinator?, credentials: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope?, deadline: ReadDeadline,
+    ): SessionResult = if (session == null || credentials == null) SessionResult.Failed(SessionProblem.REAUTHORIZE)
+        else session.refresh(credentials, deadline)
+
+    private fun finished(
+        operation: ReadOperation, status: Int?, error: ReadError?, session: SessionCoordinator?,
+        credentials: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope?,
+    ): EndpointObservation {
+        if (error == ReadError.REAUTHORIZE && credentials != null) session?.requireReauthorization(credentials)
+        return EndpointObservation(operation, status, error = error)
     }
 
     private fun project(

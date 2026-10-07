@@ -20,8 +20,9 @@ Development fixes target `main`. There is no signed production release or promis
 of maintained older releases. The app declares INTERNET as network infrastructure,
 with cleartext traffic explicitly disabled in every app build. The separate offline
 preview still makes no provider traffic. Explicit connect enters the selected
-system-browser device-code flow and two read-only WHAM endpoints only. The initial
-native gate is not authoritative account/workspace association or a supported client.
+system-browser device-code flow, the same selected token endpoint for session refresh,
+and two read-only WHAM endpoints only. The native gate is not authoritative
+account/workspace association or a supported client.
 
 A retained Activity ViewModel owns one bounded login/read worker; it does not hold the
 Activity. Device codes stay in owned memory, never Bundle/SavedStateHandle/clipboard,
@@ -29,16 +30,36 @@ logs or exception diagnostics. The Activity sets FLAG_SECURE. Process death drop
 pending login; encrypted credentials may restore only as unresolved, without automatic
 requests. Credentials use A6 AndroidKeyStore AES-GCM and an atomic no-backup ciphertext
 slot; its random local selector is also under noBackupFilesDir, not provider identity.
-Sign-out cancels owned work and deletes the slot key and ciphertext locally; it does
-not revoke remote sessions. Backup/extraction rules exclude app data. Native fake tests
-and the later owner's physical-phone session are separate evidence boundaries.
+Sign-out cancels owned auth/read/refresh work and deletes the slot key and ciphertext
+locally; it does not revoke remote sessions. Account replacement invalidates the old
+generation and deletes its credentials before new authentication. Late results cannot
+publish old account data or persist into a newer generation; a shared local-deletion
+barrier protects fresh Activity owners. Backup/extraction rules exclude app data.
+Native fake tests and the owner's physical-phone session are separate evidence boundaries.
+
+Refresh is serialized per session. Complete rotated credentials are durably saved
+before publication. A non-secret, fsynced uncertainty marker in the no-backup slot
+fails closed on restart during rotation or failed deletion. A write/marker failure
+after the server may have consumed a token quarantines the session and requires sign-in;
+the old token is never a fallback for a failed durable rotation. Terminal selected-source
+refresh errors and refresh HTTP 401/403 require re-auth. Network, 5xx, malformed and 429
+outcomes remain transient under the selected contract, with no fabricated quota values.
+Transient outcomes cannot establish whether a remote token was consumed; a later
+provider rejection can still require sign-in. Cancelling an unfinished refresh removes
+uncertain local credentials. An accepted successful rotation is settled even when its
+read waiter has expired; it does not authorize an expired endpoint retry. There is no
+invented token TTL or remote-revocation API. Diagnostic objects expose only categories
+and redact arbitrary provider error descriptions, token pairs and response bodies.
 
 PR workflows run on hosted runners with no live credentials; strict Gradle checksum
 verification, full-SHA Action pins and hash-pinned Python inputs protect build
 acquisition. These are limited safeguards, not a security certification.
 
-The initial gate always reports binding UNRESOLVED and NOT_GO; token receipt and HTTP
-200 do not establish identity. Complete refresh/rotation/re-auth and broader usage work
-remain blocked by the owner live gate. Never infer workspace from tokens or add another
-endpoint/protocol to resolve it without approval. Private-interface/terms risks in
+The gate reports binding UNRESOLVED and identity UNVERIFIED; token receipt and HTTP
+200 do not establish identity. The owner accepted the single identity-unverified
+session under Q1 and recorded A8 GO on 2026-10-07 (issue #48). A10 refresh/rotation,
+re-auth and local logout require their own exact-candidate hosted and safe owner live
+checks; initial sign-in is not proof of refresh or parent #4 completion. Never infer
+workspace from tokens or add another endpoint/protocol to resolve it without approval.
+Private-interface/terms risks in
 [research](docs/research/m0.md) remain unresolved integration constraints.

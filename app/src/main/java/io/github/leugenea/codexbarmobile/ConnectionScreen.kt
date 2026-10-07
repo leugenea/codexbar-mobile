@@ -103,8 +103,13 @@ internal fun ConnectionScreen(state: ConnectionState, controller: ConnectionCont
             }
         }
         Button(onClick = controller::connect, enabled = !state.busy, modifier = Modifier.testTag("connect")) {
-            Text(stringResource(R.string.gate_connect))
+            Text(stringResource(if (state.phase == ConnectionPhase.REAUTH_REQUIRED) R.string.gate_reauth else R.string.gate_connect))
         }
+        OutlinedButton(onClick = { controller.readUsage() }, enabled = !state.busy && controller.session.snapshot() is SessionResult.Ready,
+            modifier = Modifier.testTag("read-usage")) { Text(stringResource(R.string.gate_read)) }
+        OutlinedButton(onClick = { controller.readUsage(refreshSession = true) },
+            enabled = !state.busy && controller.session.snapshot() is SessionResult.Ready,
+            modifier = Modifier.testTag("refresh-session")) { Text(stringResource(R.string.gate_refresh)) }
         OutlinedButton(onClick = controller::cancel,
             enabled = state.phase !in setOf(ConnectionPhase.RESTORING, ConnectionPhase.SIGNING_OUT),
             modifier = Modifier.testTag("cancel-connect")) {

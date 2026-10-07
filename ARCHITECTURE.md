@@ -40,8 +40,9 @@ MainActivity / Activity ViewModelStore
     -> ConnectionOwner / worker scope (no Activity or saved-state reference)
     -> ConnectionController
         -> A7 DeviceCodeAuthenticator -> A4 HttpTransportAdapter
-        -> A6 KeystoreCredentialStore (binding Unresolved)
-        -> NativeFeasibilityReader -> A2 ReadPolicy + A4 JSON boundary
+        -> A10 SessionCoordinator -> selected token endpoint via A4
+            -> A6 KeystoreCredentialStore (binding Unresolved)
+        -> AuthenticatedProviderReader -> NativeFeasibilityReader -> A2 ReadPolicy + A4 JSON boundary
             -> A9 UsageResponseParser / BankedResetResponseParser -> A1 normalization
 ```
 
@@ -53,15 +54,38 @@ login; it is not reconstructed from Bundle, an intent or a persisted code.
 
 The only durable selector is a random local UUID under noBackupFilesDir; it selects
 A6's encrypted slot and is not account/workspace identity. A fresh owner may restore
-credentials only as Unresolved, without automatic network requests. Local sign-out
-invalidates/cancels work and deletes the A6 key and ciphertext; it makes no remote
-revocation request. Its admitted synchronous deletion cannot be dropped by Activity
-finish before the worker begins.
+credentials only as Unresolved, without automatic network requests. The selected flow
+provides no authoritative token lifetime: there is no inferred TTL, JWT inspection or
+expiry schedule. Key loss, corruption or an interrupted rotation restores as re-auth
+required, never a usable old credential. Local sign-out invalidates/cancels auth, read
+and refresh work and deletes the A6 key and ciphertext; it makes no remote revocation
+request. Its admitted synchronous deletion cannot be dropped by Activity finish before
+the worker begins. A shared deletion barrier prevents a new Activity owner from
+restoring or signing in ahead of an already admitted logout. Account replacement
+retires the preceding generation and deletes its durable credentials before new auth.
 
 After a successful selected exchange/persistence, the reader issues only the two
 selected GET routes. Each logical read has a 30-second deadline and bounded,
-cancellable A2 backoff. A 401 reports reauthorization required without implementing
-A10 refresh; generic 403 remains forbidden, not session expiry. The narrow projection
+cancellable A2 backoff. One usage/inventory read has at most one 401 refresh/retry
+allowance across both endpoints; generic read 403 remains forbidden, not session expiry.
+A10 coalesces concurrent refresh waiters for the same rejected envelope. Refresh uses
+only the selected form POST `/oauth/token` with `grant_type=refresh_token`, current
+`refresh_token` and selected `client_id`. A returned refresh token replaces the old one;
+when absent/empty the pinned selected-source behavior retains the previous one. A
+complete envelope is durably saved before new tokens become observable. An accepted
+rotation is still settled if the waiting read expires before its continuation resumes;
+the expired read cannot continue its endpoint retry or make the consumed token reusable.
+Terminal selected-source refresh codes or refresh HTTP 401/403 clear the session and
+require sign-in. Network, 5xx, malformed and 429 failures stay categorical/transient;
+a later explicit action may retry, not an automatic refresh loop. A durable-write or
+rotation-marker failure quarantines the session and requires sign-in; no possibly
+consumed old token is reused. A non-secret, fsynced uncertainty marker under the owned
+no-backup slot prevents interrupted or unsuccessfully deleted rotations from restoring
+unsafe credentials. Successful complete-envelope persistence or a documented transient
+result clears that marker. Cancel/finish during an unfinished refresh deletes its
+uncertain credentials. Generation checks reject late writes/results after logout or
+replacement; diagnostics expose categories, never token values or error descriptions.
+The narrow projection
 shows validated duration-identified five-hour/weekly percentages, resets, provider
 flags, banked counts and UTC expiry facts, with independent endpoint observation
 times. Both endpoints now use the production A9 decoders; no independent A8 JSON
@@ -69,12 +93,16 @@ fact extractor remains. Decoders retain missing/null/wrong-type knowledge and al
 window/item siblings through A1, without treating M0 fixtures as provider guarantees.
 Full normalized observations remain in memory; endpoint/result diagnostics redact
 arbitrary provider strings and identities. The screen still renders only its existing
-allowlisted numeric/date facts, not B/C presentation or refresh work.
+allowlisted numeric/date facts, not B/C presentation. The existing gate has explicit
+read/session-refresh controls and a minimal sign-in-again action; no periodic traffic.
 
-Every state reports binding UNRESOLVED / NOT_GO. Token receipt and HTTP 200 do not
-resolve account association. CI uses fake transport and synthetic protocol data;
-owner-operated physical-phone sign-in, actual process-kill/relaunch and the live
-stop/go decision are separate evidence boundaries, not established by parser tests.
+Every state reports binding UNRESOLVED / identity UNVERIFIED. Token receipt and HTTP
+200 do not resolve account association. The owner accepted this single identity-unverified
+session under Q1 and recorded A8 GO on 2026-10-07 in issue #48. CI uses fake transport
+and synthetic protocol data; owner-operated physical-phone sign-in and actual
+process-kill/relaunch are separate evidence boundaries, not established by parser
+tests. A10 live refresh/rotation/logout still needs an exact-candidate owner check;
+A8 sign-in alone does not close parent #4.
 
 ## Verification boundaries
 
@@ -93,8 +121,16 @@ stop/go decision are separate evidence boundaries, not established by parser tes
   orders through the same production decoders without inventing an atomic snapshot.
 - `ConnectionControllerTest`: no-network orchestration, cancellation/stale results,
   storage/browser/read failures, strict allowlisted projection and bounded backoff.
+- `SessionCoordinatorTest` / `AuthenticatedProviderReaderTest`: controlled concurrent
+  refresh, durable-before-publication, write-failure quarantine, cancellation/replacement,
+  terminal/transient classification, accepted rotation across deadline expiry and one
+  shared 401 allowance; existing A2 policy-vector tests remain the read-policy oracle.
+- `CredentialPersistenceTest`: uncertainty marker, fresh-owner rejection, deletion
+  failure quarantine and generation-safe marker operations with synthetic persistence.
 - `ConnectionLifecycleTest`: real Activity intent seam, recreation/background/finish,
-  saved Bundle/redacted diagnostics, synthetic exchange through real A6 and local deletion.
+  saved Bundle/redacted diagnostics, synthetic exchange/rotation through real A6,
+  fresh-owner restoration, key loss/corruption/interrupted rotation, re-auth UI,
+  failed-rotation-write quarantine and local deletion with late-refresh rejection.
   These hosted fakes are not live system-browser sign-in or process-death proof.
 
 Coverage minimum: **90%** JaCoCo **INSTRUCTION** over the JVM + instrumented union,
@@ -112,8 +148,10 @@ JVM and hosted fake Activity/browser/Keystore scenarios; it does not use the dem
 values. Public sources and successful token receipt still do not establish Android
 account/workspace association or service distribution permission.
 
-The native gate implements only the selected initial connect/two-read/local-delete
-boundary with production usage/inventory decoding. Complete refresh/re-auth,
-authoritative association, usage polish and automatic refresh remain separate work.
+The native gate implements selected connect, explicit two-read/session-refresh,
+rotation/re-auth and local-delete boundaries with production usage/inventory decoding.
+Authoritative association is unavailable and is not inferred. Usage polish and
+automatic refresh remain separate B/C work; B2 must consume the session/repository API
+rather than reimplement token rotation or login.
 History, graphs, further providers, signing and distribution remain future scope.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).

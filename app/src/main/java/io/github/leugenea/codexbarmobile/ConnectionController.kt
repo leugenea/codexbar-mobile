@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-internal enum class ConnectionPhase { RESTORING, IDLE, AUTHENTICATING, READING, OBSERVED, RESTORED, CANCELLED, SIGNING_OUT, SIGNED_OUT, FAILED }
+internal enum class ConnectionPhase { RESTORING, IDLE, AUTHENTICATING, READING, OBSERVED, RESTORED, CANCELLED, SIGNING_OUT, SIGNED_OUT, REAUTH_REQUIRED, FAILED }
 internal enum class ConnectionProblem { STORAGE, AUTH, READ, BROWSER }
 
 /** Never serialize this state. Diagnostics deliberately omit even the in-memory code. */
@@ -27,7 +27,7 @@ internal class ConnectionState(
     val problem: ConnectionProblem? = null,
 ) {
     val busy: Boolean get() = phase in setOf(ConnectionPhase.RESTORING, ConnectionPhase.AUTHENTICATING, ConnectionPhase.READING, ConnectionPhase.SIGNING_OUT)
-    override fun toString(): String = "ConnectionState(phase=$phase, binding=UNRESOLVED, gate=NOT_GO, problem=$problem)"
+    override fun toString(): String = "ConnectionState(phase=$phase, binding=UNRESOLVED, identity=UNVERIFIED, problem=$problem)"
 }
 
 /** A new Activity owner must settle a previously admitted local deletion before restore. */
@@ -39,8 +39,7 @@ internal class ConnectionDeletionBarrier {
 }
 
 /**
- * The first gate only: one bounded login and two selected reads, no refresh/rotation or
- * periodic traffic. Commands invalidate publication before cancelling detached work.
+ * One bounded login and two selected reads with session-owned rotation; no periodic traffic. Commands invalidate publication before cancelling detached work.
  * The Activity's retained owner supplies a worker scope; no Activity or saved state here.
  */
 internal class ConnectionController(
@@ -53,6 +52,8 @@ internal class ConnectionController(
 ) {
     private val mutableState = MutableStateFlow(ConnectionState(ConnectionPhase.RESTORING))
     val state: StateFlow<ConnectionState> = mutableState.asStateFlow()
+    internal val session = reader.session(store, scope)
+    private val authenticatedReader = AuthenticatedProviderReader(session, reader)
     private var work: Job? = null
     private var revision = 0L
     private var closed = false
@@ -70,10 +71,16 @@ internal class ConnectionController(
                 CredentialResult.Failure(CredentialFailure.CORRUPT)
             val phase = when (restored) {
                 is CredentialResult.Success -> ConnectionPhase.RESTORED
-                is CredentialResult.Failure -> if (restored.category == CredentialFailure.MISSING)
-                    ConnectionPhase.IDLE else ConnectionPhase.FAILED
+                is CredentialResult.Failure -> when (restored.category) {
+                    CredentialFailure.MISSING -> ConnectionPhase.IDLE
+                    CredentialFailure.KEY_LOST, CredentialFailure.CORRUPT -> if (storageReady) ConnectionPhase.REAUTH_REQUIRED else ConnectionPhase.FAILED
+                    else -> ConnectionPhase.FAILED
+                }
             }
-            publish(0, ConnectionState(phase, problem = if (phase == ConnectionPhase.FAILED) ConnectionProblem.STORAGE else null))
+            synchronized(this@ConnectionController) {
+                if (!closed && revision == 0L && restored is CredentialResult.Success) session.adopt(restored.value)
+                publish(0, ConnectionState(phase, problem = if (phase in setOf(ConnectionPhase.FAILED, ConnectionPhase.REAUTH_REQUIRED)) ConnectionProblem.STORAGE else null))
+            }
         }
     }
 
@@ -81,14 +88,20 @@ internal class ConnectionController(
         synchronized(this) {
             if (closed || deleting || !storageReady || mutableState.value.busy) return
             val owner = retire()
+            val replacement = store.openSession()
+            val next = scope.launch(start = CoroutineStart.LAZY) { login(owner, replacement) }
+            work = next
             mutableState.value = ConnectionState(ConnectionPhase.AUTHENTICATING)
-            work = scope.launch(start = CoroutineStart.LAZY) { login(owner) }
-            work!!.start()
+            if (!closed && revision == owner) next.start()
         }
     }
 
-    private suspend fun login(owner: Long) {
+    private suspend fun login(owner: Long, replacement: io.github.leugenea.codexbarmobile.credentials.SessionGeneration) {
         deletions.await()
+        if (store.delete(replacement) is CredentialResult.Failure) {
+            publish(owner, ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.STORAGE))
+            return
+        }
         val context = kotlinx.coroutines.currentCoroutineContext()
         synchronized(this) {
             if (closed || revision != owner) return
@@ -102,15 +115,52 @@ internal class ConnectionController(
             publish(owner, ConnectionState(ConnectionPhase.FAILED, terminal, problem = ConnectionProblem.AUTH))
             return
         }
+        connected(owner, terminal)
+    }
+
+    private suspend fun connected(owner: Long, terminal: AuthState.Connected) {
         publish(owner, ConnectionState(ConnectionPhase.READING, terminal))
         when (val credentials = store.read(terminal.generation)) {
             is CredentialResult.Failure -> publish(owner, ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.STORAGE))
             is CredentialResult.Success -> {
-                val facts = reader.read(credentials.value.accessToken)
-                publish(owner, ConnectionState(ConnectionPhase.OBSERVED, auth = terminal, observations = facts,
-                    problem = if (facts.successful) null else ConnectionProblem.READ))
+                synchronized(this) {
+                    if (closed || revision != owner) return
+                    session.adopt(credentials.value)
+                }
+                observe(owner, terminal)
             }
         }
+    }
+
+    /** Explicit owner action only; B2 will own automatic cadence. */
+    fun readUsage(refreshSession: Boolean = false) {
+        synchronized(this) {
+            if (closed || deleting || mutableState.value.busy) return
+            val active = session.snapshot() as? SessionResult.Ready ?: return
+            revision++
+            val owner = revision
+            work?.cancel()
+            session.retryTransient()
+            val next = scope.launch(start = CoroutineStart.LAZY) {
+                val refreshed = if (refreshSession) session.refresh(active.envelope, session.deadline()) else null
+                observe(owner, AuthState.Connected(active.envelope.generation), refreshed as? SessionResult.Failed)
+            }
+            work = next
+            mutableState.value = ConnectionState(ConnectionPhase.READING, AuthState.Connected(active.envelope.generation))
+            if (!closed && revision == owner) next.start()
+        }
+    }
+
+    private suspend fun observe(owner: Long, auth: AuthState, refreshFailure: SessionResult.Failed? = null) {
+        val facts = if (refreshFailure == null) authenticatedReader.read() else FeasibilityObservations(
+            EndpointObservation(io.github.leugenea.codexbarmobile.transport.ReadOperation.USAGE, error = refreshFailure.problem.readError()),
+            EndpointObservation(io.github.leugenea.codexbarmobile.transport.ReadOperation.RESET_INVENTORY, error = refreshFailure.problem.readError()),
+        )
+        val status = session.snapshot()
+        val reauth = status is SessionResult.Failed && status.problem in setOf(SessionProblem.REAUTHORIZE, SessionProblem.STORAGE)
+        publish(owner, ConnectionState(if (reauth) ConnectionPhase.REAUTH_REQUIRED else ConnectionPhase.OBSERVED,
+            auth = if (reauth) AuthState.Idle else auth, observations = if (reauth) null else facts,
+            problem = if (reauth) ConnectionProblem.AUTH else if (facts.successful) null else ConnectionProblem.READ))
     }
 
     fun cancel() {
@@ -140,13 +190,12 @@ internal class ConnectionController(
             }
             val owner = retire()
             deleting = true
-            mutableState.value = ConnectionState(ConnectionPhase.SIGNING_OUT)
             // Atomic admission ensures Activity finish cannot drop a requested local deletion
             // before its synchronous store operation starts. No network or suspension inside.
             // Capture the capability at admission: an old worker can never delete a newer login.
             val generation = store.openSession()
             val completion = deletions.admit()
-            work = scope.launch(start = CoroutineStart.ATOMIC) {
+            val next = scope.launch(start = CoroutineStart.ATOMIC) {
                 try {
                     val result = store.delete(generation)
                     synchronized(this@ConnectionController) {
@@ -156,6 +205,13 @@ internal class ConnectionController(
                     }
                 } finally { completion.complete(Unit) }
             }
+            // Admit the deletion before notification. A close/replacement observer cannot
+            // cancel this non-suspending owned removal or bypass the restoration barrier.
+            work = next
+            next.invokeOnCompletion { completion.complete(Unit) }
+            next.start()
+            if (!closed && revision == owner && deleting)
+                mutableState.value = ConnectionState(ConnectionPhase.SIGNING_OUT)
         }
     }
 
@@ -163,6 +219,7 @@ internal class ConnectionController(
         revision++
         work?.cancel()
         authenticator.cancel()
+        session.retire()
         return revision
     }
 

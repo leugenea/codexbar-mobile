@@ -5,6 +5,7 @@ import io.github.leugenea.codexbarmobile.credentials.*
 import io.github.leugenea.codexbarmobile.transport.*
 import io.github.leugenea.codexbarmobile.usage.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.*
 import org.junit.Test
 import java.math.BigDecimal
@@ -89,7 +90,7 @@ class ConnectionControllerTest {
             h.persistence.deleteFailure = CredentialFailure.FAILED_WRITE
             h.controller.signOut()
             assertEquals(ConnectionProblem.STORAGE, h.controller.state.value.problem)
-            assertTrue(h.controller.state.value.toString().contains("NOT_GO"))
+            assertTrue(h.controller.state.value.toString().contains("UNVERIFIED"))
             h.controller.close()
             h.controller.close()
             h.controller.connect()
@@ -116,7 +117,7 @@ class ConnectionControllerTest {
             val controller = ConnectionController(store, DeviceCodeAuthenticator(fake, store), NativeFeasibilityReader(fake),
                 CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
             assertEquals(when (failure) { null -> ConnectionPhase.RESTORED; CredentialFailure.MISSING -> ConnectionPhase.IDLE
-                else -> ConnectionPhase.FAILED }, controller.state.value.phase)
+                else -> ConnectionPhase.REAUTH_REQUIRED }, controller.state.value.phase)
             assertTrue(fake.calls.isEmpty())
             controller.close()
         }
@@ -140,7 +141,7 @@ class ConnectionControllerTest {
     }
 
     @Test
-    fun rateLimitBackoffIsBoundedCancellableAndDoesNotRefresh401OrExpire403() = runBlocking {
+    fun rateLimitBackoffIsBoundedCancellableAnd401RefreshIsBoundedWithoutExpiring403() = runBlocking {
         Harness().use { h ->
             var attempts = 0
             h.fake.respond = { call ->
@@ -159,10 +160,18 @@ class ConnectionControllerTest {
                         RetryAfter.NotBefore(h.clock.millis + 40_000))) else h.respond(call)
                 }
                 h.connect()
-                assertEquals(error, h.controller.state.value.observations!!.usage.error)
-                assertEquals(ConnectionProblem.READ, h.controller.state.value.problem)
-                assertNotNull(h.persistence.durable) // generic 403 does not delete or expire credentials.
-                assertEquals(5, h.fake.calls.size)
+                if (status == 401) {
+                    assertEquals(ConnectionPhase.REAUTH_REQUIRED, h.controller.state.value.phase)
+                    assertEquals(ConnectionProblem.AUTH, h.controller.state.value.problem)
+                    assertNull(h.controller.state.value.observations)
+                    assertNull(h.persistence.durable)
+                    assertEquals(6, h.fake.calls.size) // auth + usage + one refresh + one retry.
+                } else {
+                    assertEquals(error, h.controller.state.value.observations!!.usage.error)
+                    assertEquals(ConnectionProblem.READ, h.controller.state.value.problem)
+                    assertNotNull(h.persistence.durable) // generic 403 never expires credentials.
+                    assertEquals(5, h.fake.calls.size)
+                }
             }
         }
         Harness().use { h ->
@@ -293,11 +302,104 @@ class ConnectionControllerTest {
                 while (queue.isNotEmpty()) queue.removeFirst().run()
                 assertEquals(ConnectionPhase.IDLE, newer.state.value.phase)
                 assertNull(h.persistence.durable)
-                assertEquals(1, h.persistence.deleteCount)
+                assertEquals(2, h.persistence.deleteCount) // initial replacement + admitted logout.
                 newer.connect()
                 assertEquals(ConnectionPhase.OBSERVED, newer.state.value.phase)
                 assertNotNull(h.persistence.durable)
             } finally { newer.close() }
+        }
+    }
+
+    @Test
+    fun reentrantAuthenticationObserverCannotInvalidateAReplacementOwner() = runBlocking {
+        Harness().use { h ->
+            h.connect()
+            val restoringStore = object : CredentialStore by h.store {
+                override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> =
+                    h.persistence.durable?.let { CredentialResult.Success(CredentialEnvelope(generation, it.accessToken, it.refreshToken)) }
+                        ?: CredentialResult.Failure(CredentialFailure.MISSING)
+            }
+            var newer: ConnectionController? = null
+            val observing = launch(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+                h.controller.state.collect { state ->
+                    if (state.phase == ConnectionPhase.AUTHENTICATING && newer == null) {
+                        h.controller.close()
+                        newer = ConnectionController(restoringStore, DeviceCodeAuthenticator(h.fake, restoringStore, h.clock, h.clock::pause),
+                            NativeFeasibilityReader(h.fake, h.clock, h.clock::pause), CoroutineScope(SupervisorJob() + Dispatchers.Default))
+                        runBlocking { withTimeout(5_000) { newer.state.first { it.phase == ConnectionPhase.RESTORED } } }
+                    }
+                }
+            }
+            try {
+                h.controller.connect()
+                assertNotNull("Replacement observer reached", newer)
+                val restored = newer!!.session.snapshot() as SessionResult.Ready
+                assertTrue("Old publication tail cannot invalidate restored capability", h.store.finishRotation(restored.envelope.generation) is CredentialResult.Success)
+                assertEquals(ConnectionPhase.CANCELLED, h.controller.state.value.phase)
+                assertEquals(5, h.fake.calls.size)
+                newer.connect()
+                withTimeout(5_000) { newer.state.first { it.phase == ConnectionPhase.OBSERVED } }
+                val generation = (newer.state.value.auth as AuthState.Connected).generation
+                assertTrue(h.store.read(generation) is CredentialResult.Success)
+            } finally { observing.cancelAndJoin(); newer?.close() }
+        }
+    }
+
+    @Test
+    fun reentrantSigningOutObserverCannotBypassAdmittedDeletionBarrier() = runBlocking {
+        Harness().use { h ->
+            val queue = java.util.ArrayDeque<Runnable>()
+            val dispatcher = object : CoroutineDispatcher() {
+                override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) { queue.add(block) }
+            }
+            val barrier = ConnectionDeletionBarrier()
+            val old = ConnectionController(h.store, DeviceCodeAuthenticator(h.fake, h.store, h.clock, h.clock::pause),
+                NativeFeasibilityReader(h.fake, h.clock, h.clock::pause), CoroutineScope(SupervisorJob() + dispatcher), deletions = barrier)
+            while (queue.isNotEmpty()) queue.removeFirst().run()
+            old.connect()
+            while (queue.isNotEmpty()) queue.removeFirst().run()
+            assertEquals(ConnectionPhase.OBSERVED, old.state.value.phase)
+            var newer: ConnectionController? = null
+            val observing = launch(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+                old.state.collect { state ->
+                    if (state.phase == ConnectionPhase.SIGNING_OUT && newer == null) {
+                        old.close()
+                        newer = ConnectionController(h.store, DeviceCodeAuthenticator(h.fake, h.store, h.clock, h.clock::pause),
+                            NativeFeasibilityReader(h.fake, h.clock, h.clock::pause), CoroutineScope(SupervisorJob() + Dispatchers.Unconfined), deletions = barrier)
+                        assertEquals(ConnectionPhase.RESTORING, newer.state.value.phase)
+                        newer.connect()
+                    }
+                }
+            }
+            try {
+                old.signOut()
+                assertNotNull("Deletion observer reached", newer)
+                while (queue.isNotEmpty()) queue.removeFirst().run()
+                assertNull(h.persistence.durable)
+                assertEquals(ConnectionPhase.IDLE, newer!!.state.value.phase)
+                newer.connect()
+                assertEquals(ConnectionPhase.OBSERVED, newer.state.value.phase)
+                val generation = (newer.state.value.auth as AuthState.Connected).generation
+                assertTrue(h.store.read(generation) is CredentialResult.Success)
+            } finally { observing.cancelAndJoin(); old.close(); newer?.close() }
+        }
+    }
+
+    @Test
+    fun explicitRefreshTransientFailureIsVisibleAndDoesNotStartReadsOrExpireSession() = runBlocking {
+        Harness().use { h ->
+            h.connect()
+            val before = h.fake.calls.size
+            h.fake.respond = { call -> call.reply(SyntheticAuth.response("{}", 429)) }
+            h.controller.readUsage(refreshSession = true)
+            val state = h.controller.state.value
+            assertEquals(ConnectionPhase.OBSERVED, state.phase)
+            assertEquals(ConnectionProblem.READ, state.problem)
+            assertEquals(ReadError.RATE_LIMITED, state.observations!!.usage.error)
+            assertNotNull(h.persistence.durable)
+            assertEquals(before + 1, h.fake.calls.size)
+            h.controller.readUsage()
+            assertNotNull(h.persistence.durable)
         }
     }
 

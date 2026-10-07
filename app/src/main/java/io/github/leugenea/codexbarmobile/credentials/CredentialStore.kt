@@ -26,13 +26,19 @@ interface CredentialStore {
     fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope>
     fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation): CredentialResult<CredentialEnvelope>
     fun delete(generation: SessionGeneration): CredentialResult<Unit>
+    /** Protected adapters persist an uncertainty marker before sending a refresh. */
+    fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = CredentialResult.Success(Unit)
+    /** Clear only after a complete durable write or a documented transient failure. */
+    fun finishRotation(generation: SessionGeneration): CredentialResult<Unit> = CredentialResult.Success(Unit)
 }
 
 /**
  * A6 implements protected I/O, not A3. All methods return categorical outcomes.
  * prepare must not change the committed envelope and may run concurrently with deletion.
  * commit and delete run on the store's serialized lane, never from a staging worker.
- * A failed commit must preserve the entire previous durable envelope, never a partial pair.
+ * Staging/admission failures preserve the previous envelope. An irreversible rename
+ * followed by a durability-barrier failure may leave either complete envelope, never
+ * a partial token pair; a refresh owner must quarantine that uncertain outcome.
  * Success means durable completion, not queued I/O or an in-memory file-map update.
  * One shared ownership lane is required for every adapter targeting the same durable slot.
  */

@@ -50,6 +50,35 @@ internal object AuthProtocol {
             "redirect_uri" to sensitive(REDIRECT_URI),
         ))
 
+    fun refreshRequest(refresh: SensitiveValue): ProviderHttpRequest =
+        ProviderHttpRequest.FormPost(EXCHANGE_URL.toHttpUrl(), mapOf(
+            "grant_type" to sensitive("refresh_token"),
+            "refresh_token" to refresh,
+            "client_id" to sensitive(CLIENT_ID),
+        ))
+
+    /** Pinned Hermes [87]: rotation is optional; absent/empty token retains the current one. */
+    fun refreshedTokens(body: ResponseBody, previous: SensitiveValue): AuthTokens {
+        val tree = objectTree(body)
+        val refresh = tree["refresh_token"] as? JsonPrimitive
+        val next = if (refresh?.isString == true && refresh.content.isNotBlank()) sensitive(refresh.content.trim()) else previous
+        val access = text(required(tree, "access_token")).trim()
+        if (access.isEmpty()) malformed()
+        return AuthTokens(sensitive(access), next)
+    }
+
+    /** Never expose provider descriptions. Only source-backed categorical codes are read. */
+    fun terminalRefresh(response: io.github.leugenea.codexbarmobile.transport.TransportResult.Response): Boolean {
+        if (response.status in setOf(401, 403)) return true
+        val tree = (JsonBoundary.parse(response.body) as? JsonResult.Tree)?.value as? JsonObject ?: return false
+        val error = tree["error"]
+        val code = if (error is JsonObject) string(error["code"]) ?: string(error["type"]) else string(error)
+        return code in setOf("invalid_grant", "invalid_token", "invalid_request", "refresh_token_reused")
+    }
+
+    private fun string(value: kotlinx.serialization.json.JsonElement?): String? =
+        (value as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim()?.takeIf { it.isNotEmpty() }
+
     fun device(body: ResponseBody): DeviceCode {
         val tree = objectTree(body)
         return DeviceCode(required(tree, "device_auth_id"), required(tree, "user_code"), interval(tree))
