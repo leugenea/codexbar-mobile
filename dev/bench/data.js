@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791383159542,
+  "lastUpdate": 1791397250984,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -499,6 +499,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/c5625ec65a61f562befbae814d8a71f5cb1f07a6"
         },
         "date": 1791383154196,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "82bcaff89eddb30376641186280aa25c224cf731",
+          "message": "build: update Gradle wrapper to 9.8.1 (#51)",
+          "timestamp": "2026-10-07T21:20:21+03:00",
+          "tree_id": "66422971575adb71464e11e3cf89ef9a32bbdb09",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/82bcaff89eddb30376641186280aa25c224cf731"
+        },
+        "date": 1791397249787,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
