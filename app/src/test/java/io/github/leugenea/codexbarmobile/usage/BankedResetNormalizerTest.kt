@@ -7,6 +7,10 @@ import org.junit.Test
 
 class BankedResetNormalizerTest {
     private val now = M0Fixtures.clock
+    private val invalidEpochTimes = listOf(
+        "0000-01-01T00:00:00Z", "1969-12-31T23:59:59Z", "1970-01-01T00:00:00Z",
+        "1970-01-01T00:00:00.000001Z", "1970-01-01T00:00:00.999999Z",
+    )
     private fun value(value: Any) = M0Fixtures.value(value)
     private fun normalize(
         input: Input<InventoryInput>, summary: Any? = null, evaluated: Instant? = now,
@@ -95,6 +99,86 @@ class BankedResetNormalizerTest {
             assertEquals(Completeness.PARTIAL, result.completeness)
             assertNull(result.items.single().value!!.locallyExpired)
         }
+    }
+
+    @Test fun expiryRejectsNonpositiveEpochSecondsWithoutChangingCountsOrValidSibling() {
+        for (text in invalidEpochTimes) {
+            val result = normalize(M0Fixtures.inventory(2,
+                M0Fixtures.item(expiry = value(text)), M0Fixtures.item("fixture-reset-b"),
+            ), 2)
+            val invalid = result.items[0].value!!
+            assertEquals(text, Knowledge.MALFORMED, invalid.expiresAt.knowledge)
+            assertEquals(Reason.OUT_OF_RANGE, invalid.expiresAt.reason)
+            assertNull(invalid.expiresAt.value)
+            assertNull(invalid.locallyExpired)
+            assertEquals(Knowledge.KNOWN, invalid.grantedAt.knowledge)
+            assertEquals("available", invalid.providerStatus.value)
+            assertEquals(2L, result.summaryAvailableCount.value)
+            assertEquals(2L, result.reportedAvailableCount.value)
+            assertEquals(2, result.inventoryRowCount)
+            assertEquals(Completeness.PARTIAL, result.completeness)
+            assertEquals(item(M0Fixtures.inventory(1, M0Fixtures.item("fixture-reset-b"))), result.items[1].value)
+            assertTrue(result.issues.isEmpty())
+        }
+    }
+
+    @Test fun grantRejectsNonpositiveEpochSecondsWithoutChangingExpiryOrValidSibling() {
+        val original = (M0Fixtures.item() as Input.Value).value
+        for (text in invalidEpochTimes) {
+            val result = normalize(M0Fixtures.inventory(2,
+                Input.Value(original.copy(grantedAt = value(text))), M0Fixtures.item("fixture-reset-b"),
+            ), 2)
+            val invalid = result.items[0].value!!
+            assertEquals(text, Knowledge.MALFORMED, invalid.grantedAt.knowledge)
+            assertEquals(Reason.OUT_OF_RANGE, invalid.grantedAt.reason)
+            assertNull(invalid.grantedAt.value)
+            assertEquals(Instant.parse("2026-10-05T23:00:00Z"), invalid.expiresAt.value)
+            assertEquals(false, invalid.locallyExpired)
+            assertEquals("available", invalid.providerStatus.value)
+            assertEquals(2L, result.summaryAvailableCount.value)
+            assertEquals(2L, result.reportedAvailableCount.value)
+            assertEquals(Completeness.PARTIAL, result.completeness)
+            assertEquals(item(M0Fixtures.inventory(1, M0Fixtures.item("fixture-reset-b"))), result.items[1].value)
+            assertTrue(result.issues.isEmpty())
+        }
+    }
+
+    @Test fun positiveEpochBoundaryRetainsGrantAndExpiryMicroseconds() {
+        val original = (M0Fixtures.item() as Input.Value).value
+        // M0 truncates before testing > 0: the first accepted second is 1, not EPOCH + 1us.
+        for (text in listOf("1970-01-01T00:00:01Z", "1970-01-01T00:00:01.000001Z", M0Fixtures.ownerExpiries[0])) {
+            val input = Input.Value(original.copy(grantedAt = value(text), expiresAt = value(text)))
+            val result = normalize(M0Fixtures.inventory(1, input))
+            val item = result.items.single().value!!
+            assertEquals(Knowledge.KNOWN, item.grantedAt.knowledge)
+            assertEquals(Knowledge.KNOWN, item.expiresAt.knowledge)
+            assertEquals(Instant.parse(text), item.grantedAt.value)
+            assertEquals(Instant.parse(text), item.expiresAt.value)
+            assertEquals(Completeness.COMPLETE, result.completeness)
+        }
+    }
+
+    @Test fun invalidEndpointClocksRemainUnknownWithoutChangingInventoryFacts() {
+        val usage = UsageNormalizer.normalize(UsageInput(bankedAvailableCount = value(1)), now)
+        val input = M0Fixtures.inventory(1, M0Fixtures.item())
+        for (text in invalidEpochTimes) {
+            val clock = Instant.parse(text)
+            // Also reject an invalid summary clock supplied by an already-constructed observation.
+            val result = BankedResetNormalizer.normalize(input, usage.copy(observedAt = clock), clock, clock)
+            assertNull(result.observedAt)
+            assertNull(result.summaryObservedAt)
+            assertNull(result.items.single().value!!.locallyExpired)
+            assertEquals(Knowledge.KNOWN, result.items.single().value!!.expiresAt.knowledge)
+            assertEquals(1L, result.summaryAvailableCount.value)
+            assertEquals(1L, result.reportedAvailableCount.value)
+            assertEquals(Completeness.COMPLETE, result.completeness)
+            assertTrue(result.issues.isEmpty())
+        }
+        val first = Instant.ofEpochSecond(1, 1000)
+        val valid = BankedResetNormalizer.normalize(input, usage.copy(observedAt = first), first, first)
+        assertEquals(first, valid.observedAt)
+        assertEquals(first, valid.summaryObservedAt)
+        assertEquals(false, valid.items.single().value!!.locallyExpired)
     }
 
     @Test fun expiryBoundaryNeverChangesProviderCountOrStatus() {

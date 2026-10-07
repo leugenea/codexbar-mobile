@@ -14,11 +14,13 @@ object BankedResetNormalizer {
             ?: Field(inventory.knowledge, reason = inventory.reason)
         val rows = inventory.value?.let { value -> PrimitiveNormalizer.read(value.items) { PrimitiveNormalizer.known(it) } }
             ?: Field(inventory.knowledge, reason = inventory.reason)
-        val items = rows.value.orEmpty().map { item(it, evaluatedAt) }
+        val evaluated = PrimitiveNormalizer.positiveEpoch(evaluatedAt)
+        val items = rows.value.orEmpty().map { item(it, evaluated) }
         val summary = usage?.bankedAvailableCount ?: Field(Knowledge.UNAVAILABLE, reason = Reason.MISSING)
         val completeness = completeness(rows, items)
         return BankedResetObservation(
-            usage?.observedAt, observedAt, summary, count, rows.value?.size, items, completeness,
+            PrimitiveNormalizer.positiveEpoch(usage?.observedAt), PrimitiveNormalizer.positiveEpoch(observedAt),
+            summary, count, rows.value?.size, items, completeness,
             issues(summary, count, items, completeness),
         )
     }

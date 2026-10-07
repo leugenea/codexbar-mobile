@@ -4,12 +4,14 @@ import java.time.Instant
 
 object UsageNormalizer {
     fun normalize(input: UsageInput, observedAt: Instant? = null, evaluatedAt: Instant? = null): UsageObservation {
+        val observed = PrimitiveNormalizer.positiveEpoch(observedAt)
+        val evaluated = PrimitiveNormalizer.positiveEpoch(evaluatedAt)
         val slots = listOf(
-            slot(Slot.PRIMARY, input.primary, observedAt, evaluatedAt),
-            slot(Slot.SECONDARY, input.secondary, observedAt, evaluatedAt),
+            slot(Slot.PRIMARY, input.primary, observed, evaluated),
+            slot(Slot.SECONDARY, input.secondary, observed, evaluated),
         )
         return UsageObservation(
-            observedAt, select(slots, 18000), select(slots, 604800), slots,
+            observed, select(slots, 18000), select(slots, 604800), slots,
             PrimitiveNormalizer.boolean(input.allowed), PrimitiveNormalizer.boolean(input.limitReached),
             PrimitiveNormalizer.text(input.planType), PrimitiveNormalizer.integer(input.bankedAvailableCount),
         )

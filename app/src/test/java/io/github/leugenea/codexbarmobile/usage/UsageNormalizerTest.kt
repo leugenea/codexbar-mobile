@@ -174,6 +174,47 @@ class UsageNormalizerTest {
         assertNull(nullable.due)
     }
 
+    @Test fun firstPositiveResetEpochAndZeroRelativeSecondsRemainKnown() {
+        val first = Instant.ofEpochSecond(1, 1000)
+        val input = M0Fixtures.usage(M0Fixtures.window(absolute = value(1), relative = value(0)))
+        val result = normalize(input, observed = first, evaluated = first)
+        val reset = window(result).reset
+        assertEquals(first, result.observedAt)
+        assertEquals(Instant.ofEpochSecond(1), reset.absolute.value)
+        assertEquals(Knowledge.KNOWN, reset.absolute.knowledge)
+        assertEquals(0L, reset.relativeSeconds.value)
+        assertEquals(first, reset.relativeDerived.value)
+        assertTrue(reset.discrepant)
+        assertNull(reset.due)
+    }
+
+    @Test fun invalidObservationClocksCannotAuthorizeRelativeResetDerivation() {
+        val input = M0Fixtures.usage(M0Fixtures.window(relative = value(2)))
+        for (clock in listOf(Instant.ofEpochSecond(-1), Instant.EPOCH, Instant.ofEpochSecond(0, 1000))) {
+            val result = normalize(input, observed = clock)
+            val reset = window(result).reset
+            assertNull(result.observedAt)
+            assertEquals(Reason.CLOCK_REQUIRED, reset.relativeDerived.reason)
+            assertNull(reset.relativeDerived.value)
+            assertNull(reset.due)
+            assertEquals(2L, reset.relativeSeconds.value)
+            assertEquals(BigDecimal(22), window(result).usedPercent.value)
+        }
+    }
+
+    @Test fun invalidEvaluationClocksCannotAuthorizeResetDue() {
+        val input = M0Fixtures.usage(M0Fixtures.window(absolute = value(1)))
+        for (clock in listOf(Instant.ofEpochSecond(-1), Instant.EPOCH, Instant.ofEpochSecond(0, 1000))) {
+            val result = normalize(input, evaluated = clock)
+            val reset = window(result).reset
+            assertEquals(now, result.observedAt)
+            assertEquals(Instant.ofEpochSecond(1), reset.absolute.value)
+            assertNull(reset.due)
+            assertEquals(BigDecimal(22), window(result).usedPercent.value)
+        }
+        assertEquals(true, window(normalize(input, evaluated = Instant.ofEpochSecond(1))).reset.due)
+    }
+
     @Test fun ownerReceiptKeepsUnknownObservationClockAndNumericFacts() {
         val input = UsageInput(
             primary = M0Fixtures.window(5, 604800, value(1791756793), value(488197)), secondary = Input.Null,

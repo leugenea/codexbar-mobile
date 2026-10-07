@@ -71,8 +71,11 @@ internal object PrimitiveNormalizer {
         instant { LocalDateTime.parse(it.dropLast(1)).toInstant(ZoneOffset.UTC) }
     }
 
+    /** M0 requires integer epoch seconds >= 1, even for subsecond UTC inputs. */
+    fun positiveEpoch(value: Instant?): Instant? = value?.takeIf { it.epochSecond > 0 }
+
     fun instant(operation: () -> Instant): Field<Instant> = try {
-        known(operation())
+        positiveEpoch(operation())?.let { known(it) } ?: malformed(Reason.OUT_OF_RANGE)
     } catch (_: DateTimeException) {
         malformed(Reason.OUT_OF_RANGE)
     } catch (_: ArithmeticException) {
