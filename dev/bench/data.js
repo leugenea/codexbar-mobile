@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791330585738,
+  "lastUpdate": 1791333061061,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -91,6 +91,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/7ff439f25996cfdaff21b96949a9e5d7a0cff20b"
         },
         "date": 1791330581742,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "008266111544b144b5d803ce56615d9688440f63",
+          "message": "chore(python): bump jsonschema (#29)\n\nBumps the minor-and-patch group with 1 update in the /tools/research directory: [jsonschema](https://github.com/python-jsonschema/jsonschema).\n\n\nUpdates `jsonschema` from 4.25.1 to 4.26.0\n- [Release notes](https://github.com/python-jsonschema/jsonschema/releases)\n- [Changelog](https://github.com/python-jsonschema/jsonschema/blob/main/CHANGELOG.rst)\n- [Commits](https://github.com/python-jsonschema/jsonschema/compare/v4.25.1...v4.26.0)\n\n---\nupdated-dependencies:\n- dependency-name: jsonschema\n  dependency-version: 4.26.0\n  dependency-type: direct:production\n  update-type: version-update:semver-minor\n  dependency-group: minor-and-patch\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-10-07T03:30:37+03:00",
+          "tree_id": "e0caed078db155c9670052c39a890680404831d5",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/008266111544b144b5d803ce56615d9688440f63"
+        },
+        "date": 1791333060329,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
