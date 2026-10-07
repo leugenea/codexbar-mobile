@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791376516397,
+  "lastUpdate": 1791379710990,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -431,6 +431,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/21ae45e1e7f4ff759c63720171d3e0df9283f26c"
         },
         "date": 1791376512301,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "eb0813f6231761d7574dc9a0554bd926581473b0",
+          "message": "feat(m3a): AndroidKeyStore credential persistence (#46)",
+          "timestamp": "2026-10-07T16:28:01+03:00",
+          "tree_id": "a547b45e41946ce09f8cd4a94b5acef39a0e72b1",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/eb0813f6231761d7574dc9a0554bd926581473b0"
+        },
+        "date": 1791379710130,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
