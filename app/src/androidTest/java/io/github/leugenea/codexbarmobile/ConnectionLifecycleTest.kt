@@ -283,11 +283,33 @@ class ConnectionLifecycleTest {
     private fun assertSavedStateHasNoSecrets(scenario: ActivityScenario<MainActivity>) {
         val bundle = Bundle()
         var diagnostics = ""
+        var owner: ConnectionController? = null
         scenario.onActivity {
-            InstrumentationRegistry.getInstrumentation().callActivityOnSaveInstanceState(it, bundle)
-            diagnostics = it.connection.state.value.toString() + it.connection.state.value.auth.toString()
-            assertTrue(it.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0)
+            assertEquals("Before saved-state capture", Lifecycle.State.RESUMED, it.lifecycle.currentState)
+            owner = it.connection
         }
+        // ComponentActivity.onSaveInstanceState demotes its LifecycleRegistry to CREATED.
+        // Calling it on a resumed Activity leaves ActivityScenario thinking it is still
+        // RESUMED, while Compose unregisters the root. Stop through the scenario first
+        // so the real resume below restores both lifecycle and Compose registration.
+        scenario.moveToState(Lifecycle.State.CREATED)
+        try {
+            scenario.onActivity {
+                InstrumentationRegistry.getInstrumentation().callActivityOnSaveInstanceState(it, bundle)
+                diagnostics = it.connection.state.value.toString() + it.connection.state.value.auth.toString()
+                assertTrue(it.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0)
+            }
+        } finally {
+            scenario.moveToState(Lifecycle.State.RESUMED)
+        }
+        compose.waitForIdle()
+        scenario.onActivity {
+            assertEquals("After saved-state capture", Lifecycle.State.RESUMED, it.lifecycle.currentState)
+            assertSame("Saved-state capture must keep the connection owner", owner, it.connection)
+        }
+        // A resumed scenario alone is not proof that the Compose root is usable.
+        // Query semantics on the test thread, never inside onActivity.
+        compose.onNodeWithTag("connection-tab").assertExists()
         val parcel = Parcel.obtain()
         val bytes = try { parcel.writeBundle(bundle); parcel.marshall() } finally { parcel.recycle() }
         for (secret in listOf(CODE, ACCESS, REFRESH, "synthetic-device", "synthetic-authorization", "synthetic-verifier")) {
