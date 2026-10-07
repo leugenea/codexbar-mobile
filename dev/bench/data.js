@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791405290987,
+  "lastUpdate": 1791405293085,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1181,6 +1181,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/f76cea965492bacb25fd0f01951ae8a01ace1962"
         },
         "date": 1791399148560,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "93dc5af7199d39f9ca51f5c816435e56924f2e2f",
+          "message": "feat(m3a): decode both WHAM payloads into normalized models (#53)",
+          "timestamp": "2026-10-07T23:34:20+03:00",
+          "tree_id": "e505c3dbaceb022dbc5afe90718b85edd027e6d6",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/93dc5af7199d39f9ca51f5c816435e56924f2e2f"
+        },
+        "date": 1791405292811,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
