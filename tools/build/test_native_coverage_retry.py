@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 
 import coverage_gate
 import native_coverage_retry as retry
-from verify_test_reports import CLASS, CREDENTIAL_CASES, CREDENTIAL_CLASS, EXPECTED
+from verify_test_reports import CLASS, CONNECTION_CASES, CONNECTION_CLASS, CREDENTIAL_CASES, CREDENTIAL_CLASS, EXPECTED
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRATCH = Path(os.environ.get("RUNNER_TEMP", os.environ.get("BUILD_CONTRACT_SCRATCH", tempfile.gettempdir())))
@@ -33,6 +33,8 @@ def synthetic_reports(build, failed=False):
         if kind == "native":
             for name in sorted(CREDENTIAL_CASES):
                 ET.SubElement(suite, "testcase", classname=CREDENTIAL_CLASS, name=name)
+            for name in sorted(CONNECTION_CASES):
+                ET.SubElement(suite, "testcase", classname=CONNECTION_CLASS, name=name)
         suite.set("tests", str(len(list(suite))))
         ET.ElementTree(suite).write(directory / "SYNTHETIC.xml")
 

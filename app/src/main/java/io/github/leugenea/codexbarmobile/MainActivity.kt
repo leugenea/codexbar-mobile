@@ -1,6 +1,15 @@
 package io.github.leugenea.codexbarmobile
 
 import android.os.Bundle
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.view.WindowManager
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.compose.runtime.collectAsState
+import io.github.leugenea.codexbarmobile.auth.AuthState
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -45,19 +54,58 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
+    internal lateinit var connection: ConnectionController
+        private set
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        val owner = ViewModelProvider(this, object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                modelClass.cast(ConnectionOwner(connectionFactory(applicationContext)))!!
+        })[ConnectionOwner::class.java]
+        connection = owner.controller
         enableEdgeToEdge()
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
-                // Bundle-restored preview selection only; no file, account, history or credential store.
+                // Only harmless preview/navigation choices are Bundle-restored, never connection state.
                 var savedPreview by rememberSaveable { mutableStateOf(Preview.Disconnected.savedKey) }
-                OfflineShell(
-                    state = OfflineShellState.restore(savedPreview),
-                    onStateChange = { savedPreview = it.preview.savedKey },
-                )
+                var connectionTab by rememberSaveable { mutableStateOf(false) }
+                val connectionState by connection.state.collectAsState()
+                Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                        OutlinedButton(onClick = { connectionTab = false }, modifier = Modifier.testTag("offline-tab")) {
+                            Text(stringResource(R.string.offline_tab))
+                        }
+                        OutlinedButton(onClick = { connectionTab = true }, modifier = Modifier.testTag("connection-tab")) {
+                            Text(stringResource(R.string.connection_tab))
+                        }
+                    }
+                    if (connectionTab) ConnectionScreen(connectionState, connection, ::openVerificationBrowser)
+                    else OfflineShell(
+                        state = OfflineShellState.restore(savedPreview),
+                        onStateChange = { savedPreview = it.preview.savedKey },
+                    )
+                }
             }
         }
+    }
+
+    internal fun openVerificationBrowser() {
+        val awaiting = connection.state.value.auth as? AuthState.AwaitingUser ?: return
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(awaiting.verificationUrl)).addCategory(Intent.CATEGORY_BROWSABLE)
+        try {
+            browserLauncher(this, intent)
+        } catch (_: ActivityNotFoundException) {
+            connection.browserFailed()
+        } catch (_: SecurityException) {
+            connection.browserFailed()
+        }
+    }
+
+    internal companion object {
+        var connectionFactory: (Context) -> ConnectionController = NativeConnection::create
+        var browserLauncher: (MainActivity, Intent) -> Unit = { activity, intent -> activity.startActivity(intent) }
     }
 }
 

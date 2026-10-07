@@ -1,24 +1,34 @@
 # CodexBar Mobile
 
 An independent, unofficial Android phone project. It is not affiliated with or
-endorsed by OpenAI or CodexBar. **The app is currently an offline shell, not a
-working account or provider client.**
+endorsed by OpenAI or CodexBar. **The app retains an offline preview and includes
+an owner-operated native connection feasibility gate, not supported provider access.**
 
 ## What works today
 
 - Disconnected, frozen loading, simulated error and demo-usage previews.
 - Hand-authored sample percentages, clearly labeled as samples.
-- Preview selection restored across Activity recreation; no account data store.
-- Android launcher, Compose UI, JVM state tests and hosted native smoke tests.
+- Preview selection restored across Activity recreation; preview actions never request provider data.
+- A separate connection gate: connect/cancel, fixed system-browser device login,
+  Keystore-backed local storage and sign-out, and only the two selected read-only routes.
+- Safe numeric/date/status observations with independent endpoint clocks.
+- Android launcher, Compose UI, JVM state tests and hosted synthetic native tests.
 
-There is no authentication, live provider connection, credential storage, account
-history, graphs, live reset countdown or signed production release. CI debug APKs
-are test outputs, not signed release deliverables. Minimum Android version is
-Android 8.0 (API 26).
+The connection gate always reports **binding UNRESOLVED / NOT_GO**. Receiving tokens
+or HTTP 200 does not establish account/workspace association. Owner live verification
+on a physical phone is a separate stop/go decision after merging the wiring; CI uses
+only fake transport and synthetic data. Pending login lives only in memory: Activity
+recreation retains one bounded attempt, while process death requires restarting login.
+Restored credentials remain unresolved and cause no automatic provider requests.
 
-The app declares INTERNET, with cleartext traffic explicitly disabled. This is
-network infrastructure only: the offline previews make no provider traffic until
-separately gated auth/usage features land.
+There is no complete refresh/re-auth lifecycle, account history, graphs, live reset
+countdown or signed production release. CI debug APKs are test outputs, not signed
+release deliverables. Minimum Android version is Android 8.0 (API 26).
+
+The app declares INTERNET, with cleartext traffic explicitly disabled. Offline
+previews make no provider traffic. Explicit connection is the only entry into the
+selected auth flow and two quota/reset GET endpoints; no activation/purchase, account
+header, desktop impersonation or extra route is used.
 
 Future provider work is gated separately. The [research](docs/research/m0.md)
 discusses private interfaces, OAuth-client authorization, provider terms and

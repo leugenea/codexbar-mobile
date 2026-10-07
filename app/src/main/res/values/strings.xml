@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">CodexBar Mobile (unofficial demo)</string>
+    <string name="app_name">CodexBar Mobile (unofficial)</string>
     <string name="shell_title">CodexBar Mobile</string>
     <string name="demo_identity">Unofficial · offline demo</string>
     <string name="connection_identity">Not authenticated · not connected</string>
@@ -10,7 +10,7 @@
     <string name="preview_error">Error</string>
     <string name="preview_demo">Demo usage</string>
     <string name="disconnected_title">No account connected</string>
-    <string name="disconnected_detail">Explore the interface with sample data. This build cannot sign in or contact a provider.</string>
+    <string name="disconnected_detail">Explore this separate offline preview with sample data. Preview actions never sign in or contact a provider.</string>
     <string name="show_fixture">Show offline sample</string>
     <string name="loading_title">Loading preview</string>
     <string name="loading_detail">Simulated loading only. No request is running. Choose when to show the sample.</string>
@@ -25,5 +25,25 @@
     <string name="sample_used_percent">Sample: %1$d%% used</string>
     <string name="reset_sample">Reset information is not available in this demo. There is no live countdown, banked-reset inventory or provider observation.</string>
     <string name="reset_preview">Return to disconnected</string>
-    <string name="no_live_features">Only the preview selection is saved for screen recreation. No credentials, account history or live connection are stored.</string>
+    <string name="no_live_features">This offline preview saves only its screen selection. It never starts provider requests or displays a connected account.</string>
+    <string name="offline_tab">Offline preview</string>
+    <string name="connection_tab">Connection gate</string>
+    <string name="gate_identity">Unofficial · native feasibility gate</string>
+    <string name="gate_boundary">Binding = UNRESOLVED · NOT_GO. Token receipt and HTTP 200 do not establish an account or workspace. Owner verification is still required.</string>
+    <string name="gate_lifecycle">Device login must be enabled in security settings or by your workspace admin. The single bounded login continues while you use the system browser; Cancel stops it. Recreation keeps this in-memory attempt. Process death drops pending login: restart required. Restored credentials remain unresolved; no automatic reads or refresh.</string>
+    <string name="gate_state">State: %1$s · problem: %2$s</string>
+    <string name="gate_exchange_completed">Selected exchange: HTTP 200 · credentials persisted · identity unverified · token lifetime unknown</string>
+    <string name="gate_connect">Connect for two read-only observations</string>
+    <string name="gate_cancel">Cancel work</string>
+    <string name="gate_browser">Open system browser</string>
+    <string name="gate_sign_out">Sign out locally (delete key and credentials)</string>
+    <string name="gate_endpoint">%1$s · HTTP %2$s · observed at %3$s · error %4$s</string>
+    <string name="gate_five_hour">Five-hour (18000 s)</string>
+    <string name="gate_weekly">Weekly (604800 s)</string>
+    <string name="gate_window_state">%1$s: %2$s</string>
+    <string name="gate_window">Duration %1$s s · used %2$s%% · reset instant %3$s · reset after %4$s s · discrepancy %5$s</string>
+    <string name="gate_flags">Provider allowed %1$s · limit reached %2$s</string>
+    <string name="gate_summary_count">Usage banked available_count: %1$s</string>
+    <string name="gate_inventory_count">Inventory banked available_count: %1$s</string>
+    <string name="gate_expiry">Banked expiry: %1$s</string>
 </resources>
