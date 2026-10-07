@@ -1,0 +1,35 @@
+name: Feature request
+description: Propose a bounded change without promising provider access.
+title: "feature: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The app is an independent unofficial offline shell. Future provider/auth work needs separate authorization and validation.
+        Never include tokens, passwords, device codes or raw account data. For vulnerabilities follow the security policy instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and proposed scope
+      description: Describe the user scenario, smallest useful change and exclusions.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance and alternatives
+      description: Observable behavior, safe tests and alternatives. Use synthetic or sanitized evidence only.
+    validations:
+      required: true
+  - type: input
+    id: related
+    attributes:
+      label: Related issues or public references
+      description: Link existing work; do not paste private provider responses.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Public-report safety
+      options:
+        - label: My proposal and evidence contain no tokens, passwords, device codes or raw account data.
+          required: true

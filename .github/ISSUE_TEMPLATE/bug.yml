@@ -1,0 +1,42 @@
+name: Bug report
+description: Report an offline-shell or repository-tooling defect.
+title: "bug: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities use the security policy, not this public form.
+        Never include tokens, passwords, device codes or raw account data in logs, screenshots or attachments. Use synthetic or sanitized evidence only.
+  - type: input
+    id: version
+    attributes:
+      label: Affected commit or build
+      description: Commit SHA or CI run link, not private account details.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Android API/device model or host OS/tool versions; omit device identifiers.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Minimal offline or synthetic steps; include expected and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Safe diagnostics or CI links only. Remove private data before posting.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Public-report safety
+      options:
+        - label: I removed tokens, passwords, device codes and raw account data from all evidence.
+          required: true
