@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791363284076,
+  "lastUpdate": 1791374639158,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -363,6 +363,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/3a939e9571dee650b2c0e719074b086b8506ef3c"
         },
         "date": 1791363279810,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c59fb2ea2690053371f89a60b4d4918bbc2b6965",
+          "message": "feat(m3a): allow INTERNET only with cleartext off and exact permission allowlist gates (#42)\n\n* feat(m3a): allow INTERNET only with cleartext off and exact permission allowlist gates (#41)\n\n* fix(m3a): verify reinstalled APK permissions and gate release manifest and overlays (#41)",
+          "timestamp": "2026-10-07T15:03:31+03:00",
+          "tree_id": "aab2100cec3d17da1f07173aa2c24aaf7e5e1039",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/c59fb2ea2690053371f89a60b4d4918bbc2b6965"
+        },
+        "date": 1791374638610,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
