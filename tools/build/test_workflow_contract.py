@@ -13,7 +13,8 @@ import xml.etree.ElementTree as ET
 from verify_manifests import (APP_PERMISSIONS, PACKAGE, RECEIVER_PERMISSION, SOURCE_PERMISSIONS, check_apk_dump,
                               check_installed_dump, check_installed_path, check_manifest, check_permissions,
                               check_source_manifests)
-from verify_test_reports import CLASS, CREDENTIAL_CASES, CREDENTIAL_CLASS, EXPECTED, verify_reports
+from verify_test_reports import (CLASS, CONNECTION_CASES, CONNECTION_CLASS, CREDENTIAL_CASES,
+                                 CREDENTIAL_CLASS, EXPECTED, verify_reports)
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRATCH = Path(os.environ.get("RUNNER_TEMP", os.environ.get("BUILD_CONTRACT_SCRATCH", tempfile.gettempdir())))
@@ -558,6 +559,8 @@ class SyntheticReportTests(unittest.TestCase):
         if kind == "native":
             for name in sorted(CREDENTIAL_CASES - ({missing} if missing else set())):
                 ET.SubElement(suite, "testcase", classname=CREDENTIAL_CLASS, name=name)
+            for name in sorted(CONNECTION_CASES - ({missing} if missing else set())):
+                ET.SubElement(suite, "testcase", classname=CONNECTION_CLASS, name=name)
         root = suite
         for depth in range(container_depth):
             container = ET.Element("testsuites", failures="0", errors="0", skipped="0")
@@ -575,7 +578,8 @@ class SyntheticReportTests(unittest.TestCase):
                 with self.subTest(kind=kind, container_depth=depth):
                     self.write_report(kind, container_depth=depth)
                     result = verify_reports(self.directory, kind)
-                    self.assertEqual(result["testCount"], len(EXPECTED[kind]) + (len(CREDENTIAL_CASES) if kind == "native" else 0))
+                    self.assertEqual(result["testCount"], len(EXPECTED[kind]) +
+                                     (len(CREDENTIAL_CASES) + len(CONNECTION_CASES) if kind == "native" else 0))
 
     def test_rejects_missing_tests(self):
         for kind in EXPECTED:
@@ -599,6 +603,22 @@ class SyntheticReportTests(unittest.TestCase):
                 case.set("classname", CLASS["native"])
         ET.ElementTree(root).write(path, encoding="unicode")
         with self.assertRaisesRegex(ValueError, "Missing real native credential"):
+            verify_reports(self.directory, "native")
+
+    def test_mandatory_connection_cases_match_source_and_cannot_be_omitted_or_spoofed(self):
+        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/ConnectionLifecycleTest.kt").read_text()
+        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), CONNECTION_CASES)
+        for missing in CONNECTION_CASES:
+            self.write_report("native", missing=missing)
+            with self.assertRaisesRegex(ValueError, "Missing real native connection"):
+                verify_reports(self.directory, "native")
+        path = self.write_report("native")
+        root = ET.parse(path).getroot()
+        for case in root.iter("testcase"):
+            if case.get("classname") == CONNECTION_CLASS:
+                case.set("classname", CLASS["native"])
+        ET.ElementTree(root).write(path, encoding="unicode")
+        with self.assertRaisesRegex(ValueError, "Missing real native connection"):
             verify_reports(self.directory, "native")
 
     def test_rejects_failures_errors_and_skips(self):

@@ -39,6 +39,16 @@ CREDENTIAL_CASES = {
 }
 
 
+CONNECTION_CLASS = "io.github.leugenea.codexbarmobile.ConnectionLifecycleTest"
+CONNECTION_CASES = {
+    "activityLaunchesOnlyFixedSystemBrowserIntentAndCancelClearsOwnedCode",
+    "recreationAndBackgroundKeepOneBoundedOwnerAndFinishCancelsPolling",
+    "fakeExchangeUsesRealKeystoreTwoReadsSeparateClocksAndLocalSignOut",
+    "freshOwnerRestoresOnlyUnresolvedCredentialsWithoutRequestsAndBrowserFailureIsSafe",
+    "failedReadRetainsUnresolvedSessionAndSignOutCancelsInFlightTransport",
+}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -68,6 +78,10 @@ def verify_reports(directory: Path, kind: str) -> dict:
         credential_missing = CREDENTIAL_CASES - credential_actual
         if credential_missing:
             raise ValueError(f"Missing real native credential tests: {sorted(credential_missing)}")
+        connection_actual = {case["name"] for case in cases if case["class"] == CONNECTION_CLASS}
+        connection_missing = CONNECTION_CASES - connection_actual
+        if connection_missing:
+            raise ValueError(f"Missing real native connection tests: {sorted(connection_missing)}")
     if not cases:
         raise ValueError(f"No executed {kind} tests")
     return {"kind": kind, "testCount": len(cases), "reports": [str(p) for p in reports], "testcases": cases}
