@@ -19,15 +19,25 @@ persistent history store. Retry only selects the loading preview; displaying a
 sample only selects demo. No timer, background request or live reset observation
 runs. Resources label all samples and connection absence explicitly.
 
-The manifest has no INTERNET permission. Backup/extraction rules exclude app
-data. There is no transport, OAuth client, provider parser or credential store.
+The source manifest requests INTERNET only, with `usesCleartextTraffic="false"`.
+The exact merged/APK/installed allowlist also includes the existing AndroidX Core
+signature-only `io.github.leugenea.codexbarmobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`;
+it is not another platform/network permission. Gates reject any missing or extra
+permission and any Network Security Config override. The manifest flag is sufficient
+for the current API 26 minimum / API 37 target; moving to target API 38 or adding
+a Network Security Config requires a separately reviewed cleartext policy update.
+Debug/test builds do not opt into device cleartext; JVM local-server tests do not
+need that opt-in. This replaces the historical no-INTERNET invariant, not the
+offline demo boundary: the UI still initiates no requests. Backup/extraction rules
+exclude app data. There is no OAuth client, provider parser or credential store.
 These safeguards describe this shell, not an audited future authentication system.
 
 ## Verification boundaries
 
 - `app/src/test`: JVM state transitions, restore behavior and percentage validation.
-- `app/src/androidTest`: real production Activity/launcher, installed INTERNET
-  permission absence, preview actions, recreation and landscape UI checks.
+- `app/src/androidTest`: real production Activity/launcher, exact installed permission
+  allowlist and effective cleartext-off policy, preview actions, recreation and
+  landscape UI checks.
 - `tools/build`: scaffold/workflow/toolchain/strict dependency contracts, manifests,
   JUnit and compatible class-ID/freshness/denominator coverage validation.
 - `tools/research`: offline fixture/schema contracts; not a production provider parser.

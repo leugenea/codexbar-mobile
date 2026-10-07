@@ -6,6 +6,8 @@ import re
 import unittest
 import xml.etree.ElementTree as ET
 
+from verify_manifests import check_source_manifests
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -317,10 +319,19 @@ class ToolchainContract(unittest.TestCase):
         self.assertIn("actual.every { it.version == expected[2] }", inventory)
         self.assertNotIn("write_sdk_package_metadata.py", (ROOT / "tools/build/verify-hosted-toolchain.sh").read_text())
 
-    def test_no_network_permission_and_honest_four_state_shell(self):
+    def test_app_manifest_overlays_cannot_broaden_network_policy(self):
+        check_source_manifests(ROOT)
+
+    def test_internet_only_cleartext_off_and_honest_four_state_shell(self):
         ns = "{http://schemas.android.com/apk/res/android}"
         manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
-        self.assertEqual(manifest.findall("uses-permission"), [])
+        permissions = {node.get(ns + "name") for node in manifest
+                       if node.tag in ("uses-permission", "uses-permission-sdk-23")}
+        self.assertEqual(permissions, {"android.permission.INTERNET"})
+        application = manifest.find("application")
+        assert application is not None
+        self.assertEqual(application.get(ns + "usesCleartextTraffic"), "false")
+        self.assertIsNone(application.get(ns + "networkSecurityConfig"))
         activity = manifest.find("application/activity")
         self.assertEqual(activity.get(ns + "exported"), "true")
         self.assertEqual(activity.find("intent-filter/category").get(ns + "name"), "android.intent.category.LAUNCHER")

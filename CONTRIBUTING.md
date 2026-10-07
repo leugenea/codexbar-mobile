@@ -64,6 +64,23 @@ JDK/SDK installed, this non-emulator invocation is available:
 **Android emulators and instrumented tests run only in hosted CI, never on the NAS.**
 Do not run [run-hosted-native-smoke.sh](tools/build/run-hosted-native-smoke.sh) locally.
 
+## Network policy
+
+The app source requests INTERNET only. Merged manifests, APKs and installed app
+packages must request exactly INTERNET plus the existing AndroidX Core signature-only
+receiver permission; no extra permission is accepted. Cleartext is explicitly off
+in every app build, with no debug/test override. JVM local-server fixtures do not
+need device cleartext access. The permission is infrastructure, not a live-provider
+feature: offline previews still initiate no requests until auth/usage features land.
+
+Both hosted graphs generate `processReleaseManifest` as well as the debug manifest;
+the shared gate requires both generated policies. Release assembly is not otherwise
+part of CI, so this adds manifest merging only, not release compilation/signing.
+App variant manifest overlays and destructive/protected-policy merge directives
+are rejected. The native script checks the debug APK, binds its SHA-256, reinstalls
+that same file after AGP test cleanup, requires a package-specific `pm path`, checks
+actual `dumpsys` requested permissions, then uninstalls with a recorded status.
+
 ## Hosted runtime and coverage
 
 [Android CI](.github/workflows/android.yml) uses hosted Ubuntu 24.04, isolated SDKs
@@ -77,7 +94,7 @@ Build job command (the init script defines the observation task):
 ./gradlew --no-daemon --dependency-verification strict --no-build-cache \
   --no-configuration-cache --rerun-tasks --stacktrace --info --continue \
   -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
-  :app:lintDebug :app:assembleDebug :app:compileDebugUnitTestKotlin \
+  :app:lintDebug :app:assembleDebug :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
   :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest
 python3 tools/build/verify_manifests.py
 python3 tools/build/verify_test_reports.py jvm
