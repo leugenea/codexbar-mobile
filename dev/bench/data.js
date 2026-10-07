@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791333075902,
+  "lastUpdate": 1791333078252,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -297,6 +297,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/008266111544b144b5d803ce56615d9688440f63"
         },
         "date": 1791333063373,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "aaac172e854148290cee236cacb351c0d84e64e1",
+          "message": "chore(actions): bump actions/setup-python from 5.6.0 to 7.0.0 (#30)\n\nBumps [actions/setup-python](https://github.com/actions/setup-python) from 5.6.0 to 7.0.0.\n- [Release notes](https://github.com/actions/setup-python/releases)\n- [Commits](https://github.com/actions/setup-python/compare/v5.6.0...5fda3b95a4ea91299a34e894583c3862153e4b97)\n\n---\nupdated-dependencies:\n- dependency-name: actions/setup-python\n  dependency-version: 7.0.0\n  dependency-type: direct:production\n  update-type: version-update:semver-major\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>\nCo-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>",
+          "timestamp": "2026-10-07T03:30:47+03:00",
+          "tree_id": "d2cc7a361ef8cb983bfa0397f52c02aa08468aef",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/aaac172e854148290cee236cacb351c0d84e64e1"
+        },
+        "date": 1791333077879,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
