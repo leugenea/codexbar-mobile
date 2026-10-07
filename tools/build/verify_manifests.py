@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 ANDROID = "{http://schemas.android.com/apk/res/android}"
+TOOLS = "{http://schemas.android.com/tools}"
 PACKAGE = "io.github.leugenea.codexbarmobile"
 RECEIVER_PERMISSION = PACKAGE + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
 SOURCE_PERMISSIONS = frozenset({"android.permission.INTERNET"})
@@ -22,10 +23,36 @@ def check_permissions(permissions, expected=APP_PERMISSIONS) -> list[str]:
     return sorted(actual)
 
 
+def check_merge_policy(manifest, path: Path) -> None:
+    for node in manifest.iter():
+        if node.get(TOOLS + "node") in {"remove", "removeAll", "replace"}:
+            raise ValueError(f"Destructive manifest merge directive: {path}")
+        for directive in ("remove", "replace"):
+            attributes = node.get(TOOLS + directive)
+            if attributes is None:
+                continue
+            names = {name.strip().split(":")[-1] for name in attributes.split(",")}
+            if (node.tag in {"permission", "uses-permission", "uses-permission-sdk-23"}
+                    or names & {"usesCleartextTraffic", "networkSecurityConfig"}):
+                raise ValueError(f"Protected manifest policy merge directive: {path}")
+        if node.get(ANDROID + "networkSecurityConfig") is not None:
+            raise ValueError(f"Cleartext policy override is forbidden: {path}")
+
+
+def check_source_manifests(root: Path) -> dict:
+    # App variants must inherit the reviewed main policy, not merge an overlay.
+    overlays = sorted(path for path in (root / "app/src").glob("*/AndroidManifest.xml")
+                      if path.parent.name not in {"main", "test", "androidTest"})
+    if overlays:
+        raise ValueError(f"App manifest source-set overlays are forbidden: {overlays}")
+    return check_manifest(root / "app/src/main/AndroidManifest.xml", SOURCE_PERMISSIONS)
+
+
 def check_manifest(path: Path, expected=APP_PERMISSIONS) -> dict:
     manifest = ET.parse(path).getroot()
     if manifest.tag != "manifest":
         raise ValueError(f"Not an Android manifest: {path}")
+    check_merge_policy(manifest, path)
     nodes = [node for node in manifest if node.tag in ("uses-permission", "uses-permission-sdk-23")]
     if any(node.get(ANDROID + "maxSdkVersion") is not None for node in nodes):
         raise ValueError(f"Conditional manifest permission: {path}")
@@ -103,27 +130,44 @@ def check_installed_dump(text: str) -> list[str]:
     return result
 
 
+def check_installed_path(text: str) -> None:
+    paths = text.splitlines()
+    pattern = (r"package:/data/app/(?:[^/\s]+/)*" + re.escape(PACKAGE)
+               + r"-[^/\s]+/(?:base|split_[^/\s]+)\.apk")
+    if not paths or any(not re.fullmatch(pattern, path) for path in paths):
+        raise ValueError("Missing or wrong installed package path")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apk-permissions", type=Path)
     parser.add_argument("--apk-xmltree", type=Path)
+    parser.add_argument("--installed-path", type=Path)
     parser.add_argument("--installed-package", type=Path)
     args = parser.parse_args()
-    if args.apk_permissions or args.apk_xmltree or args.installed_package:
-        if not (args.apk_permissions and args.apk_xmltree and args.installed_package):
-            parser.error("APK permissions, XML tree and installed package dump are required together")
-        check_apk_dump(args.apk_permissions.read_text(), args.apk_xmltree.read_text())
-        check_installed_dump(args.installed_package.read_text())
-        print("APK and installed package: exact permission allowlist; APK cleartext disabled; "
-              "installed cleartext policy is asserted by native tests")
+    if args.apk_permissions or args.apk_xmltree or args.installed_path or args.installed_package:
+        if bool(args.apk_permissions) != bool(args.apk_xmltree):
+            parser.error("APK permissions and XML tree are required together")
+        if args.installed_package and not (args.apk_permissions and args.installed_path):
+            parser.error("Installed dump requires the APK observations and installed path")
+        if args.apk_permissions:
+            check_apk_dump(args.apk_permissions.read_text(), args.apk_xmltree.read_text())
+        if args.installed_path:
+            check_installed_path(args.installed_path.read_text())
+        if args.installed_package:
+            check_installed_dump(args.installed_package.read_text())
+        print("Supplied APK/path/installed observations verified; installed cleartext policy "
+              "is asserted by native tests")
         return
-    paths = (ROOT / "app/src/main/AndroidManifest.xml",
-             ROOT / "app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml")
-    receipt = [check_manifest(paths[0], SOURCE_PERMISSIONS), check_manifest(paths[1])]
+    receipt = [check_source_manifests(ROOT)]
+    for variant in ("debug", "release"):
+        path = (ROOT / "app/build/intermediates/merged_manifests" / variant
+                / f"process{variant.title()}Manifest/AndroidManifest.xml")
+        receipt.append(check_manifest(path))
     destination = ROOT / "evidence/verified-manifests.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(receipt, indent=2) + "\n")
-    print("Source and merged debug app manifests: exact permission allowlist; cleartext disabled")
+    print("Source and merged debug/release app manifests: exact permission allowlist; cleartext disabled")
 
 
 if __name__ == "__main__":

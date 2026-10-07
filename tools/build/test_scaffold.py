@@ -6,6 +6,8 @@ import re
 import unittest
 import xml.etree.ElementTree as ET
 
+from verify_manifests import check_source_manifests
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -318,19 +320,7 @@ class ToolchainContract(unittest.TestCase):
         self.assertNotIn("write_sdk_package_metadata.py", (ROOT / "tools/build/verify-hosted-toolchain.sh").read_text())
 
     def test_app_manifest_overlays_cannot_broaden_network_policy(self):
-        ns = "{http://schemas.android.com/apk/res/android}"
-        for path in (ROOT / "app/src").glob("*/AndroidManifest.xml"):
-            if path.parent.name in {"main", "test", "androidTest"}:
-                continue
-            manifest = ET.parse(path).getroot()
-            with self.subTest(path=path):
-                permissions = {node.get(ns + "name") for node in manifest
-                               if node.tag in ("uses-permission", "uses-permission-sdk-23")}
-                self.assertLessEqual(permissions, {"android.permission.INTERNET"})
-                self.assertEqual(manifest.findall("permission"), [])
-                for application in manifest.findall("application"):
-                    self.assertIn(application.get(ns + "usesCleartextTraffic"), (None, "false"))
-                    self.assertIsNone(application.get(ns + "networkSecurityConfig"))
+        check_source_manifests(ROOT)
 
     def test_internet_only_cleartext_off_and_honest_four_state_shell(self):
         ns = "{http://schemas.android.com/apk/res/android}"

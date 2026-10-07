@@ -1,14 +1,18 @@
 """Cheap build source/workflow contracts and explicitly synthetic report-parser tests."""
+import hashlib
+import json
 import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
 from verify_manifests import (APP_PERMISSIONS, PACKAGE, RECEIVER_PERMISSION, SOURCE_PERMISSIONS, check_apk_dump,
-                              check_installed_dump, check_manifest, check_permissions)
+                              check_installed_dump, check_installed_path, check_manifest, check_permissions,
+                              check_source_manifests)
 from verify_test_reports import CLASS, EXPECTED, verify_reports
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -275,7 +279,9 @@ class WorkflowContracts(unittest.TestCase):
             self.assertNotIn(unsafe, script)
         final_gate = script.split("if (( test_status != 0 )); then exit \"$test_status\"; fi", 1)[1]
         for status in ("manifest_status", "native_report_status", "jvm_report_status", "aapt_status",
-                       "apk_xmltree_status", "installed_path_status", "installed_dump_status", "permission_status"):
+                       "apk_xmltree_status", "apk_hash_status", "apk_policy_status", "install_hash_status",
+                       "install_status", "installed_path_status", "installed_path_policy_status",
+                       "installed_dump_status", "permission_status", "uninstall_status"):
             self.assertIn(status + " == 0", final_gate)
         installation = script.split("--install ", 1)[1].split("2>&1", 1)[0]
         self.assertEqual(installation.strip(), 'platform-tools emulator "$image"')
@@ -292,11 +298,11 @@ class WorkflowContracts(unittest.TestCase):
                            "--gradle-user-home", " -g "):
                 self.assertNotIn(unsafe, command)
         self.assertEqual(re.findall(r":app:(\w+)", strict), [
-            "verifyResolvedToolchain", "lintDebug", "assembleDebug", "compileDebugUnitTestKotlin",
+            "verifyResolvedToolchain", "lintDebug", "assembleDebug", "processReleaseManifest", "compileDebugUnitTestKotlin",
             "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest",
         ])
         self.assertEqual(re.findall(r":app:(\w+)", connected), [
-            "verifyResolvedToolchain", "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
+            "verifyResolvedToolchain", "processReleaseManifest", "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
             "testDebugUnitTest", "connectedDebugAndroidTest", "jacocoDebugCoverageVerification",
         ])
         self.assertIn('${GRADLE_USER_HOME:?}', script)
@@ -606,6 +612,222 @@ class SyntheticReportTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Missing real"):
             verify_reports(self.directory, "native")
 
+    def synthetic_manifest(self, permissions=APP_PERMISSIONS):
+        declarations = (f'<permission android:name="{RECEIVER_PERMISSION}" android:protectionLevel="signature"/>'
+                        if permissions == APP_PERMISSIONS else '')
+        return ('<manifest xmlns:android="http://schemas.android.com/apk/res/android" '
+                'xmlns:tools="http://schemas.android.com/tools">'
+                + ''.join(f'<uses-permission android:name="{name}"/>' for name in sorted(permissions))
+                + declarations + '<application android:usesCleartextTraffic="false"/></manifest>')
+
+    def write_synthetic_manifest_tree(self):
+        files = {
+            'app/src/main/AndroidManifest.xml': self.synthetic_manifest(SOURCE_PERMISSIONS),
+            'app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml': self.synthetic_manifest(),
+            'app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml': self.synthetic_manifest(),
+            'tools/build/verify_manifests.py': (ROOT / 'tools/build/verify_manifests.py').read_text(),
+        }
+        for name, text in files.items():
+            path = self.directory / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+
+    def run_manifest_cli(self):
+        return subprocess.run([sys.executable, '-B', 'tools/build/verify_manifests.py'],
+                              cwd=self.directory, text=True, capture_output=True, timeout=5)
+
+    def test_normal_manifest_cli_requires_and_checks_release(self):
+        self.write_synthetic_manifest_tree()
+        self.assertEqual(self.run_manifest_cli().returncode, 0)
+        receipt = json.loads((self.directory / 'evidence/verified-manifests.json').read_text())
+        self.assertEqual(len(receipt), 3)
+        self.assertIn('/release/processReleaseManifest/', receipt[2]['manifest'])
+        release = self.directory / 'app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml'
+        valid = release.read_text()
+        for text, error in (
+            (valid.replace('<uses-permission android:name="android.permission.INTERNET"/>', ''), 'allowlist'),
+            (valid.replace('usesCleartextTraffic="false"', 'usesCleartextTraffic="true"'), 'Cleartext'),
+            (valid.replace('usesCleartextTraffic="false"', 'usesCleartextTraffic="false" android:networkSecurityConfig="@xml/unsafe"'), 'Cleartext'),
+            (valid.replace('protectionLevel="signature"', 'protectionLevel="normal"'), 'signature-only'),
+        ):
+            with self.subTest(release_mutation=error):
+                release.write_text(text)
+                result = self.run_manifest_cli()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(error, result.stderr)
+        release.unlink()
+        self.assertNotEqual(self.run_manifest_cli().returncode, 0)
+
+    def test_variant_overlay_reviewer_bypass_is_rejected_by_source_and_cli(self):
+        self.write_synthetic_manifest_tree()
+        for variant in ('release', 'debug', 'freeRelease'):
+            path = self.directory / f'app/src/{variant}/AndroidManifest.xml'
+            path.parent.mkdir(parents=True, exist_ok=True)
+            # The reviewer's INTERNET-removal bypass; even a benign overlay is forbidden.
+            for content in ('<uses-permission android:name="android.permission.INTERNET" tools:node="remove"/>', ''):
+                with self.subTest(variant=variant, content=content):
+                    path.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android" '
+                                    'xmlns:tools="http://schemas.android.com/tools">' + content + '</manifest>')
+                    with self.assertRaisesRegex(ValueError, 'overlays'):
+                        check_source_manifests(self.directory)
+                    result = self.run_manifest_cli()
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn('overlays', result.stderr)
+            path.unlink()
+
+    def test_protected_source_merge_directives_fail_closed(self):
+        self.write_synthetic_manifest_tree()
+        main = self.directory / 'app/src/main/AndroidManifest.xml'
+        valid = main.read_text()
+        for element, directive in (
+            ('uses-permission', 'tools:node="remove"'),
+            ('uses-permission', 'tools:node="replace"'),
+            ('uses-permission', 'tools:node="removeAll"'),
+            ('uses-permission', 'tools:remove="android:name"'),
+            ('uses-permission', 'tools:replace="android:name"'),
+            ('application', 'tools:node="replace"'),
+            ('application', 'tools:remove="android:label, android:usesCleartextTraffic"'),
+            ('application', 'tools:replace="android:usesCleartextTraffic"'),
+            ('application', 'tools:remove="android:networkSecurityConfig"'),
+            ('application', 'android:networkSecurityConfig="@xml/unsafe"'),
+        ):
+            with self.subTest(element=element, directive=directive):
+                main.write_text(valid.replace('<' + element + ' ', '<' + element + ' ' + directive + ' ', 1))
+                with self.assertRaisesRegex(ValueError, 'directive|override'):
+                    check_source_manifests(self.directory)
+                self.assertNotEqual(self.run_manifest_cli().returncode, 0)
+
+    def run_synthetic_installed_observation(self, mutation='', graph_exit=0):
+        # Execute the shipped post-graph shell against explicitly synthetic SDK tools.
+        # Start uninstalled, reproducing AGP cleanup; never invoke a real device/SDK.
+        self.write_synthetic_manifest_tree()
+        sdk = self.directory / 'SYNTHETIC-sdk'
+        apk = self.directory / 'app/build/outputs/apk/debug/app-debug.apk'
+        apk.parent.mkdir(parents=True, exist_ok=True)
+        apk.write_bytes(b'SYNTHETIC APK bytes, not an Android artifact')
+        evidence = self.directory / 'evidence/native'
+        evidence.mkdir(parents=True, exist_ok=True)
+        (self.directory / 'events.txt').write_text('')
+        (self.directory / 'installed').unlink(missing_ok=True)
+        permissions = f'package: {PACKAGE}\n' + ''.join(
+            f"uses-permission: name='{name}'\n" for name in sorted(APP_PERMISSIONS))
+        tree = ('  E: permission (line=1)\n'
+                f'    A: android:name(0x01010003)="{RECEIVER_PERMISSION}"\n'
+                '    A: android:protectionLevel(0x01010009)=(type 0x11)0x2\n'
+                '  E: application (line=2)\n    A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0x0\n')
+        dump = f'  Package [{PACKAGE}] (synthetic):\n    requested permissions:\n' + ''.join(
+            f'      {name}\n' for name in sorted(APP_PERMISSIONS)) + '    install permissions:\n'
+        if mutation == 'extra-installed-permission':
+            dump = dump.replace('    install permissions:', '      android.permission.CAMERA\n    install permissions:')
+        if mutation == 'unsafe-apk':
+            tree = tree.replace('0x12)0x0', '0x12)0xffffffff')
+        for name, text in (('permissions.txt', permissions), ('tree.txt', tree), ('dump.txt', dump)):
+            (self.directory / name).write_text(text)
+        common = (f'#!{sys.executable}\nimport os, sys\nfrom pathlib import Path\n'
+                  'args = sys.argv[1:]\nmutation = os.environ["SYNTHETIC_MUTATION"]\n'
+                  'with open("events.txt", "a") as log: log.write(" ".join(args) + "\\n")\n')
+        tools = {
+            'build-tools/36.0.0/aapt': common + '''
+if args[1] == 'permissions':
+    print(Path('permissions.txt').read_text(), end='')
+else:
+    print(Path('tree.txt').read_text(), end='')
+    if mutation == 'mutated-apk':
+        with open(args[2], 'ab') as apk: apk.write(b'mutated after inspection')
+''',
+            'platform-tools/adb': common + f'''
+args = args[2:]  # -s serial
+installed = Path('installed')
+if args[0] == 'install':
+    if mutation == 'install-failure': sys.exit(7)
+    installed.write_text('synthetic installed state')
+    print('no success receipt' if mutation == 'install-no-success' else 'Success')
+elif args[:3] == ['shell', 'pm', 'path']:
+    if installed.exists() and mutation != 'missing-package':
+        package = 'wrong.package' if mutation == 'wrong-package' else '{PACKAGE}'
+        print(f'package:/data/app/~~synthetic/{{package}}-synthetic/base.apk')
+    if mutation == 'path-failure': sys.exit(8)
+elif args[:3] == ['shell', 'dumpsys', 'package']:
+    print(Path('dump.txt').read_text() if installed.exists() else 'Unable to find package: {PACKAGE}')
+    if mutation == 'dump-failure': sys.exit(9)
+elif args[0] == 'uninstall':
+    installed.unlink(missing_ok=True)
+    print('Success')
+    if mutation == 'uninstall-failure': sys.exit(10)
+else:
+    sys.exit(99)
+''',
+            'bin/python3': common + f'os.execv({sys.executable!r}, [{sys.executable!r}] + args)\n',
+        }
+        for name, text in tools.items():
+            path = sdk / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+            path.chmod(0o755)
+        script = (ROOT / 'tools/build/run-hosted-native-smoke.sh').read_text()
+        block = '# Inspect and bind' + script.split('# Inspect and bind', 1)[1]
+        shell = ('set -uo pipefail\nset +e\n'
+                 'adb="$ANDROID_HOME/platform-tools/adb"\n'
+                 f'test_status={graph_exit}\nmanifest_status=0\nnative_report_status=0\njvm_report_status=0\n'
+                 + block)
+        environment = dict(os.environ, ANDROID_HOME=str(sdk), ANDROID_SERIAL='SYNTHETIC-serial',
+                           SYNTHETIC_MUTATION=mutation, PATH=str(sdk / 'bin') + os.pathsep + os.environ['PATH'])
+        result = subprocess.run(['bash', '-c', shell], cwd=self.directory, env=environment,
+                                text=True, capture_output=True, timeout=10)
+        events = (self.directory / 'events.txt').read_text().splitlines()
+        statuses = dict(line.split('=', 1) for line in (evidence / 'installed-observation-status.txt').read_text().splitlines())
+        self.assertFalse((self.directory / 'installed').exists(), 'Cleanup must remove synthetic installed state')
+        return result, events, statuses
+
+    def test_post_agp_uninstall_reinstalls_verified_apk_before_observing_once(self):
+        script = (ROOT / 'tools/build/run-hosted-native-smoke.sh').read_text()
+        self.assertLess(script.index('coverage_attempt=2\ndone'), script.index('# Inspect and bind'))
+        self.assertEqual(script.count('"$adb" -s "$ANDROID_SERIAL" install -r "$apk"'), 1)
+        result, events, statuses = self.run_synthetic_installed_observation()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(all(value == '0' for value in statuses.values()), statuses)
+        self.assertEqual([line.split()[0] for line in events],
+                         ['dump', 'dump', 'tools/build/verify_manifests.py', '-s', '-s',
+                          'tools/build/verify_manifests.py', '-s', 'tools/build/verify_manifests.py', '-s'])
+        adb_events = [line.split()[2:] for line in events if line.startswith('-s ')]
+        self.assertEqual(adb_events, [
+            ['install', '-r', 'app/build/outputs/apk/debug/app-debug.apk'],
+            ['shell', 'pm', 'path', PACKAGE], ['shell', 'dumpsys', 'package', PACKAGE], ['uninstall', PACKAGE]])
+        digest = (self.directory / 'evidence/native/inspected-apk.sha256').read_text().split()[0]
+        apk = self.directory / 'app/build/outputs/apk/debug/app-debug.apk'
+        self.assertEqual(digest, hashlib.sha256(apk.read_bytes()).hexdigest())
+        self.assertEqual(events[5], 'tools/build/verify_manifests.py --installed-path evidence/native/installed-package-path.txt')
+        self.assertIn('--installed-package evidence/native/installed-package.txt', events[7])
+
+    def test_installed_observation_fails_closed_and_preserves_graph_error(self):
+        for mutation, failed_status in (
+            ('mutated-apk', 'install_hash_exit'), ('unsafe-apk', 'apk_policy_exit'),
+            ('install-failure', 'install_exit'), ('install-no-success', 'install_exit'),
+            ('missing-package', 'installed_path_policy_exit'), ('wrong-package', 'installed_path_policy_exit'),
+            ('path-failure', 'installed_path_exit'), ('dump-failure', 'installed_dump_exit'),
+            ('extra-installed-permission', 'permission_exit'), ('uninstall-failure', 'uninstall_exit'),
+        ):
+            with self.subTest(mutation=mutation):
+                result, events, statuses = self.run_synthetic_installed_observation(mutation)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotEqual(statuses[failed_status], '0')
+                self.assertEqual(sum(' uninstall ' in line for line in events), 1)
+                if mutation in {'mutated-apk', 'unsafe-apk'}:
+                    self.assertFalse(any(' install ' in line for line in events))
+                if mutation in {'missing-package', 'wrong-package', 'path-failure'}:
+                    self.assertFalse(any(' dumpsys ' in line for line in events))
+        result, _, _ = self.run_synthetic_installed_observation('missing-package', graph_exit=23)
+        self.assertEqual(result.returncode, 23, 'Original graph failure takes precedence')
+
+    def test_installed_path_requires_nonempty_exact_package(self):
+        valid = f'package:/data/app/~~synthetic/{PACKAGE}-synthetic/base.apk\n'
+        check_installed_path(valid)
+        check_installed_path(valid.replace('\n', '\r\n'))
+        for text in ('', '\n', 'Unable to find package: ' + PACKAGE, valid.replace(PACKAGE, 'wrong.package'),
+                     valid.replace('package:', ''), valid + 'unrelated\n'):
+            with self.subTest(path=text), self.assertRaisesRegex(ValueError, 'installed package path'):
+                check_installed_path(text)
+
     def test_source_and_merged_manifest_parser_fails_closed(self):
         manifest = self.directory / "SYNTHETIC-AndroidManifest.xml"
         prefix = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
@@ -671,6 +893,8 @@ class SyntheticReportTests(unittest.TestCase):
             f'      {name}\n' for name in sorted(APP_PERMISSIONS)) + '    install permissions:\n      android.permission.INTERNET: granted=true\n'
         self.assertEqual(check_installed_dump(text), sorted(APP_PERMISSIONS))
         for bad, error in (
+                ('', "identity"),
+                ('Unable to find package: ' + PACKAGE, "identity"),
                 (text.replace('    install permissions:', '      android.permission.CAMERA\n    install permissions:'), "allowlist"),
                 (text.replace('      android.permission.INTERNET\n', ''), "allowlist"),
                 (text.replace(PACKAGE, 'synthetic.wrong.package'), "identity"),

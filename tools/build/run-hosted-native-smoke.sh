@@ -165,7 +165,7 @@ while :; do
   timeout --signal=TERM --kill-after=30s "${remaining}s" ./gradlew --no-daemon --dependency-verification strict \
     --no-build-cache --no-configuration-cache --rerun-tasks \
     --stacktrace --info --console=plain -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
-    :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest \
+    :app:processReleaseManifest :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest \
     :app:connectedDebugAndroidTest :app:jacocoDebugCoverageVerification \
     2>&1 | tee evidence/native/strict-connected.log "$attempt_dir/strict-connected.log"
   test_status=$?
@@ -206,23 +206,66 @@ python3 tools/build/verify_test_reports.py native
 native_report_status=$?
 python3 tools/build/verify_test_reports.py jvm
 jvm_report_status=$?
-"$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions app/build/outputs/apk/debug/app-debug.apk \
+# Inspect and bind the exact APK before reinstalling it after AGP's uninstall.
+# This is outside the retry loop: installed observations run only on the final attempt.
+apk='app/build/outputs/apk/debug/app-debug.apk'
+sha256sum "$apk" > evidence/native/inspected-apk.sha256
+apk_hash_status=$?
+"$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions "$apk" \
   > evidence/native/apk-permissions.txt
 aapt_status=$?
-"$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree app/build/outputs/apk/debug/app-debug.apk AndroidManifest.xml \
+"$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml \
   > evidence/native/apk-manifest-xmltree.txt
 apk_xmltree_status=$?
-timeout 15 "$adb" -s "$ANDROID_SERIAL" shell pm path io.github.leugenea.codexbarmobile \
-  > evidence/native/installed-package-path.txt
-installed_path_status=$?
-timeout 15 "$adb" -s "$ANDROID_SERIAL" shell dumpsys package io.github.leugenea.codexbarmobile \
-  > evidence/native/installed-package.txt
-installed_dump_status=$?
 python3 tools/build/verify_manifests.py --apk-permissions evidence/native/apk-permissions.txt \
-  --apk-xmltree evidence/native/apk-manifest-xmltree.txt --installed-package evidence/native/installed-package.txt
-permission_status=$?
+  --apk-xmltree evidence/native/apk-manifest-xmltree.txt
+apk_policy_status=$?
+sha256sum --check evidence/native/inspected-apk.sha256 > evidence/native/install-apk-hash-check.txt 2>&1
+install_hash_status=$?
+install_status=1
+installed_path_status=1
+installed_path_policy_status=1
+installed_dump_status=1
+permission_status=1
+# Missing/mutated/unverified APKs must never reach adb install.
+if (( apk_hash_status == 0 && aapt_status == 0 && apk_xmltree_status == 0 && apk_policy_status == 0 && install_hash_status == 0 )); then
+  timeout 30 "$adb" -s "$ANDROID_SERIAL" install -r "$apk" > evidence/native/installed-package-install.txt 2>&1
+  install_status=$?
+  if (( install_status == 0 )); then
+    grep -Eq $'^Success\r?$' evidence/native/installed-package-install.txt
+    install_status=$?
+  fi
+  if (( install_status == 0 )); then
+    timeout 15 "$adb" -s "$ANDROID_SERIAL" shell pm path io.github.leugenea.codexbarmobile \
+      > evidence/native/installed-package-path.txt
+    installed_path_status=$?
+    python3 tools/build/verify_manifests.py --installed-path evidence/native/installed-package-path.txt
+    installed_path_policy_status=$?
+    if (( installed_path_status == 0 && installed_path_policy_status == 0 )); then
+      timeout 15 "$adb" -s "$ANDROID_SERIAL" shell dumpsys package io.github.leugenea.codexbarmobile \
+        > evidence/native/installed-package.txt
+      installed_dump_status=$?
+      python3 tools/build/verify_manifests.py --apk-permissions evidence/native/apk-permissions.txt \
+        --apk-xmltree evidence/native/apk-manifest-xmltree.txt \
+        --installed-path evidence/native/installed-package-path.txt --installed-package evidence/native/installed-package.txt
+      permission_status=$?
+    fi
+  fi
+fi
+# Always attempt cleanup, including a partial/failed installation or failed observation.
+timeout 15 "$adb" -s "$ANDROID_SERIAL" uninstall io.github.leugenea.codexbarmobile \
+  > evidence/native/installed-package-uninstall.txt 2>&1
+uninstall_status=$?
+if (( uninstall_status == 0 )); then
+  grep -Eq $'^Success\r?$' evidence/native/installed-package-uninstall.txt
+  uninstall_status=$?
+fi
+printf 'apk_hash_exit=%s\naapt_exit=%s\napk_xmltree_exit=%s\napk_policy_exit=%s\ninstall_hash_exit=%s\ninstall_exit=%s\ninstalled_path_exit=%s\ninstalled_path_policy_exit=%s\ninstalled_dump_exit=%s\npermission_exit=%s\nuninstall_exit=%s\n' \
+  "$apk_hash_status" "$aapt_status" "$apk_xmltree_status" "$apk_policy_status" "$install_hash_status" "$install_status" "$installed_path_status" \
+  "$installed_path_policy_status" "$installed_dump_status" "$permission_status" "$uninstall_status" \
+  > evidence/native/installed-observation-status.txt
 set -e
 # Preserve the original graph failure, rather than masking it with cleanup/parsers.
 if (( test_status != 0 )); then exit "$test_status"; fi
-(( manifest_status == 0 && native_report_status == 0 && jvm_report_status == 0 && aapt_status == 0 && apk_xmltree_status == 0 && installed_path_status == 0 && installed_dump_status == 0 && permission_status == 0 ))
+(( manifest_status == 0 && native_report_status == 0 && jvm_report_status == 0 && apk_hash_status == 0 && aapt_status == 0 && apk_xmltree_status == 0 && apk_policy_status == 0 && install_hash_status == 0 && install_status == 0 && installed_path_status == 0 && installed_path_policy_status == 0 && installed_dump_status == 0 && permission_status == 0 && uninstall_status == 0 ))
 printf '%s\n' 'boundary=native-tests-and-apk-permissions-pass' >> evidence/native/boundaries.txt

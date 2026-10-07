@@ -18,7 +18,7 @@ REQUIRED_FILES = GUIDES + FORMS + (PR_TEMPLATE, CONFIG, ".gitignore", "LICENSE")
 LINK = re.compile(r"\[[^\]\n]+\]\(([^)\s]+)\)")
 SECRET = re.compile(r"\b(?:tokens?|passwords?|device[ _-]?codes?|raw[ _-]?account[ _-]?data)\b", re.I)
 # AGP-provided tasks are declared via the Android plugin/variant, not tasks.register.
-ANDROID_TASKS = {"assembleDebug", "lintDebug", "testDebugUnitTest",
+ANDROID_TASKS = {"assembleDebug", "lintDebug", "testDebugUnitTest", "processReleaseManifest",
                  "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
                  "assembleDebugAndroidTest", "connectedDebugAndroidTest"}
 REQUIRED_CHECK_CONTEXTS = {("android.yml", "Android CI result"),
