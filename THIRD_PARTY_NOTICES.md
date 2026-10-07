@@ -44,7 +44,7 @@ license/NOTICE texts against the actual APK, including embedded components.
 
 | Component | Use / license findings |
 | --- | --- |
-| Gradle 9.8.0, AGP 9.4.1, Kotlin Gradle/Compose compiler 2.4.20 | Build/compiler; primary projects Apache-2.0 |
+| Gradle 9.8.1, AGP 9.4.1, Kotlin Gradle/Compose compiler 2.4.20 | Build/compiler; primary projects Apache-2.0 |
 | Temurin / OpenJDK 17 | Build/JVM; GPL-2.0 with file-specific Classpath exception and additional notices |
 | Android SDK, Build Tools, command-line tools, emulator and API 36 Google APIs image | SDK/component agreement terms; not blanket Apache-2.0 |
 | JUnit 4.13.2 | JVM tests; EPL-1.0 |

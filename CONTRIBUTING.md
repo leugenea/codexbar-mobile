@@ -23,7 +23,7 @@ Use [SECURITY](SECURITY.md) for vulnerabilities, not public issues.
 ## Current toolchain
 
 The build files and workflows, not the historical M0 selection, are authoritative:
-Gradle 9.8.0 (checksum-pinned wrapper), AGP 9.4.1, Kotlin/Compose compiler 2.4.20,
+Gradle 9.8.1 (checksum-pinned wrapper), AGP 9.4.1, Kotlin/Compose compiler 2.4.20,
 Compose BOM 2026.09.00 / UI 1.12.1 / Material3 1.4.0, coroutines 1.11.0 and
 Temurin JDK 17. AGP uses built-in Kotlin with the explicit higher KGP classpath.
 Compile/target SDK is 37 (minor 0), minimum SDK 26, Build Tools 36.0.0.

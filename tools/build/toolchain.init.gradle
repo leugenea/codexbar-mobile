@@ -61,7 +61,7 @@ gradle.projectsEvaluated {
             output.parentFile.mkdirs()
             output.text = JsonOutput.prettyPrint(JsonOutput.toJson(receipt)) + '\n'
             // Assert the reviewed project pins directly; no parallel approval receipt.
-            assert receipt.gradle == '9.8.0'
+            assert receipt.gradle == '9.8.1'
             assert receipt.agp == '9.4.1'
             assert receipt.javaMajor == '17'
             assert receipt.javaRuntime ==~ /17(?:[.+-].*)?/
