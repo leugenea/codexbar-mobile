@@ -98,14 +98,15 @@ internal class ConnectionController(
 
     private suspend fun login(owner: Long, replacement: io.github.leugenea.codexbarmobile.credentials.SessionGeneration) {
         deletions.await()
-        if (store.delete(replacement) is CredentialResult.Failure) {
+        val admitted = store.replaceSession(replacement)
+        if (admitted is CredentialResult.Failure) {
             publish(owner, ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.STORAGE))
             return
         }
         val context = kotlinx.coroutines.currentCoroutineContext()
         synchronized(this) {
             if (closed || revision != owner) return
-            authenticator.start(CoroutineScope(context))
+            authenticator.start(CoroutineScope(context), (admitted as CredentialResult.Success).value)
         }
         val terminal = authenticator.state.first { auth ->
             publish(owner, ConnectionState(ConnectionPhase.AUTHENTICATING, auth))
@@ -119,7 +120,6 @@ internal class ConnectionController(
     }
 
     private suspend fun connected(owner: Long, terminal: AuthState.Connected) {
-        publish(owner, ConnectionState(ConnectionPhase.READING, terminal))
         when (val credentials = store.read(terminal.generation)) {
             is CredentialResult.Failure -> publish(owner, ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.STORAGE))
             is CredentialResult.Success -> {
@@ -127,6 +127,7 @@ internal class ConnectionController(
                     if (closed || revision != owner) return
                     session.adopt(credentials.value)
                 }
+                publish(owner, ConnectionState(ConnectionPhase.READING, terminal))
                 observe(owner, terminal)
             }
         }
@@ -136,7 +137,12 @@ internal class ConnectionController(
     fun readUsage(refreshSession: Boolean = false) {
         synchronized(this) {
             if (closed || deleting || mutableState.value.busy) return
-            val active = session.snapshot() as? SessionResult.Ready ?: return
+            val active = session.snapshot() as? SessionResult.Ready
+            if (active == null) {
+                if (mutableState.value.phase in setOf(ConnectionPhase.RESTORED, ConnectionPhase.OBSERVED))
+                    publish(revision, displaced())
+                return
+            }
             revision++
             val owner = revision
             work?.cancel()
@@ -146,7 +152,7 @@ internal class ConnectionController(
                 observe(owner, AuthState.Connected(active.envelope.generation), refreshed as? SessionResult.Failed)
             }
             work = next
-            mutableState.value = ConnectionState(ConnectionPhase.READING, AuthState.Connected(active.envelope.generation))
+            publish(owner, ConnectionState(ConnectionPhase.READING, AuthState.Connected(active.envelope.generation)))
             if (!closed && revision == owner) next.start()
         }
     }
@@ -157,7 +163,7 @@ internal class ConnectionController(
             EndpointObservation(io.github.leugenea.codexbarmobile.transport.ReadOperation.RESET_INVENTORY, error = refreshFailure.problem.readError()),
         )
         val status = session.snapshot()
-        val reauth = status is SessionResult.Failed && status.problem in setOf(SessionProblem.REAUTHORIZE, SessionProblem.STORAGE)
+        val reauth = status is SessionResult.Failed
         publish(owner, ConnectionState(if (reauth) ConnectionPhase.REAUTH_REQUIRED else ConnectionPhase.OBSERVED,
             auth = if (reauth) AuthState.Idle else auth, observations = if (reauth) null else facts,
             problem = if (reauth) ConnectionProblem.AUTH else if (facts.successful) null else ConnectionProblem.READ))
@@ -224,8 +230,16 @@ internal class ConnectionController(
     }
 
     private fun publish(owner: Long, state: ConnectionState) {
-        synchronized(this) { if (!closed && revision == owner) mutableState.value = state }
+        synchronized(this) {
+            if (closed || revision != owner) return
+            val connected = state.auth as? AuthState.Connected
+            val stale = connected?.let { !store.isActive(it.generation) } ?:
+                (state.phase == ConnectionPhase.RESTORED && session.snapshot() is SessionResult.Failed)
+            mutableState.value = if (stale) displaced() else state
+        }
     }
+
+    private fun displaced() = ConnectionState(ConnectionPhase.REAUTH_REQUIRED, problem = ConnectionProblem.AUTH)
 
     fun close() {
         synchronized(this) {

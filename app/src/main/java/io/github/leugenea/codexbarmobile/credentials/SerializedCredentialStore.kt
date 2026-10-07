@@ -18,6 +18,8 @@ class SerializedCredentialStore(private val persistence: CredentialPersistence) 
         SessionGeneration(namespace).also { active = it }
     }
 
+    override fun isActive(generation: SessionGeneration): Boolean = synchronized(ownership) { active === generation }
+
     override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> = synchronized(ownership) {
         if (active !== generation) return@synchronized stale()
         when (val result = safely(CredentialFailure.CORRUPT) { persistence.read() }) {
@@ -50,6 +52,13 @@ class SerializedCredentialStore(private val persistence: CredentialPersistence) 
         if (active !== generation) return@synchronized stale()
         active = null
         safely(CredentialFailure.FAILED_WRITE) { persistence.delete() }
+    }
+
+    override fun replaceSession(generation: SessionGeneration): CredentialResult<SessionGeneration> = synchronized(ownership) {
+        when (val deleted = delete(generation)) {
+            is CredentialResult.Failure -> deleted
+            is CredentialResult.Success -> CredentialResult.Success(openSession())
+        }
     }
 
     private fun commit(

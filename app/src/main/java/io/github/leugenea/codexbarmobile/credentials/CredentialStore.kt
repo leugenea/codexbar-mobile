@@ -23,9 +23,13 @@ sealed interface CredentialResult<out T> {
  */
 interface CredentialStore {
     fun openSession(): SessionGeneration
+    /** Runtime capability only: no decrypt/read or rotation-marker mutation. */
+    fun isActive(generation: SessionGeneration): Boolean
     fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope>
     fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation): CredentialResult<CredentialEnvelope>
     fun delete(generation: SessionGeneration): CredentialResult<Unit>
+    /** Delete and allocate replacement atomically; delayed auth cannot reopen a displaced slot. */
+    fun replaceSession(generation: SessionGeneration): CredentialResult<SessionGeneration>
     /** Protected adapters persist an uncertainty marker before sending a refresh. */
     fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = CredentialResult.Success(Unit)
     /** Clear only after a complete durable write or a documented transient failure. */

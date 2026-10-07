@@ -109,10 +109,12 @@ class ConnectionControllerTest {
             val store = object : CredentialStore {
                 private val delegate = SerializedCredentialStore(persistence)
                 override fun openSession() = delegate.openSession()
+                override fun isActive(generation: SessionGeneration) = delegate.isActive(generation)
                 override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> =
                     failure?.let { CredentialResult.Failure(it) } ?: CredentialResult.Success(syntheticEnvelope(generation))
                 override fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation) = delegate.replace(envelope, cancellation)
                 override fun delete(generation: SessionGeneration) = delegate.delete(generation)
+                override fun replaceSession(generation: SessionGeneration) = delegate.replaceSession(generation)
             }
             val controller = ConnectionController(store, DeviceCodeAuthenticator(fake, store), NativeFeasibilityReader(fake),
                 CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))

@@ -60,7 +60,7 @@ internal class NativeFeasibilityReader(
         try {
             while (true) {
                 currentCoroutineContext().ensureActive()
-                val result = transport.await(ProviderHttpRequest.Get(url(operation), token), request.deadline)
+                val result = request(ProviderHttpRequest.Get(url(operation), token), request.deadline, session, credentials)
                 currentCoroutineContext().ensureActive()
                 val receivedAt = clock.now().wall
                 val decision = policy.evaluate(request, attempt, result)
@@ -88,6 +88,18 @@ internal class NativeFeasibilityReader(
             return EndpointObservation(operation, error = ReadError.INVALID_RESPONSE)
         }
     }
+
+    private suspend fun request(
+        request: ProviderHttpRequest.Get, deadline: ReadDeadline, session: SessionCoordinator?,
+        credentials: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope?,
+    ): TransportResult {
+        if (!valid(session, credentials)) return TransportResult.Failure(TransportFailure.CANCELLED)
+        val result = transport.await(request, deadline)
+        return if (valid(session, credentials)) result else TransportResult.Failure(TransportFailure.CANCELLED)
+    }
+
+    private fun valid(session: SessionCoordinator?, credentials: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope?) =
+        session == null || (credentials != null && session.accepts(credentials))
 
     private suspend fun refresh(
         session: SessionCoordinator?, credentials: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope?, deadline: ReadDeadline,

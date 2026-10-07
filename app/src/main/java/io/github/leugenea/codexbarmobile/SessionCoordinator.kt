@@ -29,7 +29,15 @@ internal class SessionCoordinator(
         current = envelope
     }
 
-    @Synchronized fun snapshot(): SessionResult = current?.let(SessionResult::Ready) ?: SessionResult.Failed(problem)
+    @Synchronized fun snapshot(): SessionResult {
+        // Every live coordinator consults the shared slot, not its private cached envelope.
+        // A pending rotation blocks protected restoration, but not this capability check.
+        current?.let { if (!store.isActive(it.generation)) retire() }
+        return current?.let(SessionResult::Ready) ?: SessionResult.Failed(problem)
+    }
+
+    fun accepts(envelope: CredentialEnvelope): Boolean =
+        (snapshot() as? SessionResult.Ready)?.envelope?.generation === envelope.generation
 
     /** Retiring a sent refresh is uncertain: never restore a possibly consumed token. */
     @Synchronized fun retire() {
@@ -56,7 +64,9 @@ internal class SessionCoordinator(
     suspend fun refresh(rejected: CredentialEnvelope, deadline: ReadDeadline): SessionResult {
         if (deadline.isExpired(clock.now())) return SessionResult.Failed(SessionProblem.TRANSIENT)
         val pending = synchronized(this) {
-            val active = current ?: return SessionResult.Failed(problem)
+            val checked = snapshot()
+            if (checked is SessionResult.Failed) return checked
+            val active = (checked as SessionResult.Ready).envelope
             if (active.generation !== rejected.generation) return SessionResult.Failed(SessionProblem.STALE)
             if (active !== rejected) return SessionResult.Ready(active)
             flight?.takeIf { it.envelope === rejected } ?: launchRefresh(rejected, deadline)
@@ -64,7 +74,13 @@ internal class SessionCoordinator(
         val remaining = deadline.expiresAtMillis - clock.now().monotonicMillis
         if (remaining <= 0) return SessionResult.Failed(SessionProblem.TRANSIENT)
         val settled = withTimeoutOrNull(remaining) { pending.result.await() } ?: SessionResult.Failed(SessionProblem.TRANSIENT)
-        return if (deadline.isExpired(clock.now())) SessionResult.Failed(SessionProblem.TRANSIENT) else settled
+        return settleWaiter(settled, deadline)
+    }
+
+    private fun settleWaiter(result: SessionResult, deadline: ReadDeadline): SessionResult = when {
+        result is SessionResult.Ready && !accepts(result.envelope) -> SessionResult.Failed(SessionProblem.STALE)
+        deadline.isExpired(clock.now()) -> SessionResult.Failed(SessionProblem.TRANSIENT)
+        else -> result
     }
 
     private fun launchRefresh(envelope: CredentialEnvelope, deadline: ReadDeadline): Flight {
@@ -88,7 +104,7 @@ internal class SessionCoordinator(
             SessionResult.Failed(SessionProblem.TRANSIENT)
         }
         synchronized(this) {
-            if (flight !== owner || current !== owner.envelope) return
+            if (!accepts(owner.envelope) || flight !== owner || current !== owner.envelope) return
             when (result) {
                 is SessionResult.Ready -> current = result.envelope
                 is SessionResult.Failed -> if (result.problem in setOf(SessionProblem.REAUTHORIZE, SessionProblem.STORAGE)) {
@@ -110,8 +126,10 @@ internal class SessionCoordinator(
     private suspend fun requestRefresh(owner: Flight, deadline: ReadDeadline): SessionResult {
         val refresh = owner.envelope.refreshToken ?: return SessionResult.Failed(SessionProblem.REAUTHORIZE)
         currentCoroutineContext().ensureActive()
+        if (!accepts(owner.envelope)) return SessionResult.Failed(SessionProblem.STALE)
         val prepared = store.beginRotation(owner.envelope.generation)
-        if (prepared is CredentialResult.Failure) return SessionResult.Failed(SessionProblem.STORAGE)
+        if (prepared is CredentialResult.Failure) return SessionResult.Failed(prepared.sessionProblem())
+        if (!accepts(owner.envelope)) return SessionResult.Failed(SessionProblem.STALE)
         val response = try {
             transport.await(AuthProtocol.refreshRequest(refresh), deadline)
         } catch (cancelled: CancellationException) {
@@ -120,6 +138,7 @@ internal class SessionCoordinator(
             return transient(owner, SessionProblem.TRANSIENT)
         }
         currentCoroutineContext().ensureActive()
+        if (!accepts(owner.envelope)) return SessionResult.Failed(SessionProblem.STALE)
         return refreshResponse(owner, response, refresh)
     }
 
@@ -147,15 +166,22 @@ internal class SessionCoordinator(
 
     private suspend fun persist(owner: Flight, tokens: AuthTokens): SessionResult = suspendCancellableCoroutine { continuation ->
         continuation.invokeOnCancellation { owner.write.cancel() }
+        if (!accepts(owner.envelope)) {
+            continuation.resumeWith(Result.success(SessionResult.Failed(SessionProblem.STALE)))
+            return@suspendCancellableCoroutine
+        }
         val updated = CredentialEnvelope(owner.envelope.generation, tokens.access, tokens.refresh)
         val saved = store.replace(updated, owner.write)
         val result = when {
-            saved is CredentialResult.Failure -> SessionResult.Failed(SessionProblem.STORAGE)
+            saved is CredentialResult.Failure -> SessionResult.Failed(saved.sessionProblem())
             store.finishRotation(updated.generation) is CredentialResult.Failure -> SessionResult.Failed(SessionProblem.STORAGE)
             else -> SessionResult.Ready(updated)
         }
         continuation.resumeWith(Result.success(result))
     }
+
+    private fun CredentialResult.Failure.sessionProblem() =
+        if (category == CredentialFailure.STALE_GENERATION) SessionProblem.STALE else SessionProblem.STORAGE
 
     private class Flight(val envelope: CredentialEnvelope) {
         val result = CompletableDeferred<SessionResult>()

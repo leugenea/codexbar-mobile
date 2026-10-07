@@ -317,7 +317,7 @@ class DeviceCodeAuthenticatorTest {
         assertSame(AuthState.Exchanging, f.auth.state.value)
         f.store.openSession()
         f.fake.calls.last().reply(SyntheticAuth.response(SyntheticAuth.TOKENS))
-        f.failed(AuthStage.STORE, AuthFailure.STALE_OWNER)
+        f.failed(AuthStage.EXCHANGE, AuthFailure.STALE_OWNER)
         assertNull(f.persistence.saved)
         assertEquals(0, f.persistence.commits)
     }

@@ -50,6 +50,8 @@ CONNECTION_CASES = {
     "nativeLogoutDuringRefreshAndReplacementRejectLateRotatedCredentials",
     "nativeKeyLossCorruptionAndInterruptedRotationRestoreFailClosedToReauth",
     "nativeFailedRotationWriteQuarantinesRealStoreBeforeReauth",
+    "nativeTwoLiveOwnersLogoutWhileUsageIsHeldRejectsOldGeneration",
+    "nativeTwoLiveOwnersReplacementWhileUsageIsHeldRejectsOldGeneration",
 }
 
 

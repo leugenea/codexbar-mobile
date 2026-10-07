@@ -63,6 +63,12 @@ request. Its admitted synchronous deletion cannot be dropped by Activity finish 
 the worker begins. A shared deletion barrier prevents a new Activity owner from
 restoring or signing in ahead of an already admitted logout. Account replacement
 retires the preceding generation and deletes its durable credentials before new auth.
+Deletion and allocation of the replacement capability share the slot's serialized
+lane; the delayed authenticator uses that admitted capability instead of reopening
+the slot. Every live owner checks the shared kernel's active capability at request
+admission/retry, between endpoints, refresh settlement/persistence and publication.
+This runtime check never decrypts credentials or clears a pending-rotation marker.
+A displaced read owner requires sign-in again and discards its observations.
 
 After a successful selected exchange/persistence, the reader issues only the two
 selected GET routes. Each logical read has a 30-second deadline and bounded,

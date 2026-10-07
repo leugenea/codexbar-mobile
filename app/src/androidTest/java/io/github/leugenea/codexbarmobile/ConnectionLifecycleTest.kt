@@ -414,6 +414,62 @@ class ConnectionLifecycleTest {
         // New Activity/store owners model storage restoration, not actual process death/reboot.
     }
 
+    @Test
+    fun nativeTwoLiveOwnersLogoutWhileUsageIsHeldRejectsOldGeneration() {
+        twoLiveOwners(replace = false)
+    }
+
+    @Test
+    fun nativeTwoLiveOwnersReplacementWhileUsageIsHeldRejectsOldGeneration() {
+        twoLiveOwners(replace = true)
+    }
+
+    private fun twoLiveOwners(replace: Boolean) {
+        launch().use { scenario ->
+            openGate(scenario)
+            click("connect")
+            await(scenario, "two-owner initial code") { it.auth is AuthState.AwaitingUser }
+            fake.poll.complete(Unit)
+            await(scenario, "two-owner initial session") { it.phase == ConnectionPhase.OBSERVED }
+            fake.holdReads = true
+            click("read-usage")
+            bounded("two-owner held usage GET") { fake.reads.size == 1 }
+            val held = fake.reads.single()
+            val slot = NativeConnection.session(context)
+            val actual = KeystoreCredentialStore(context, slot)
+            val newer = NativeConnection.create(context, fake, fake.clock, fake::pause)
+            try {
+                bounded("second live real-Keystore owner restored", { newer.state.value.toString() }) {
+                    newer.state.value.phase == ConnectionPhase.RESTORED
+                }
+                fake.holdReads = false
+                if (replace) newer.connect() else newer.signOut()
+                val phase = if (replace) ConnectionPhase.OBSERVED else ConnectionPhase.SIGNED_OUT
+                bounded("new owner $phase", { newer.state.value.toString() }) { newer.state.value.phase == phase }
+                val requests = fake.calls.size
+                val bytes = if (replace) KeystoreCredentialStore.file(context, slot).readBytes() else null
+                held(response(USAGE))
+                await(scenario, "displaced owner requires reauth without inventory") { it.phase == ConnectionPhase.REAUTH_REQUIRED }
+                assertEquals("Old owner must not admit inventory", requests, fake.calls.size)
+                scenario.onActivity {
+                    assertNull(it.connection.state.value.observations)
+                    it.connection.readUsage()
+                    it.connection.readUsage(refreshSession = true)
+                    assertTrue(it.connection.session.snapshot() is SessionResult.Failed)
+                }
+                assertEquals("No new old-generation GET or refresh", requests, fake.calls.size)
+                if (bytes == null) {
+                    assertFalse(keyExists(slot))
+                    assertFalse(KeystoreCredentialStore.file(context, slot).exists())
+                } else {
+                    assertArrayEquals("No stale write after replacement", bytes, KeystoreCredentialStore.file(context, slot).readBytes())
+                    val generation = (newer.state.value.auth as AuthState.Connected).generation
+                    assertTrue(actual.read(generation) is CredentialResult.Success)
+                }
+            } finally { newer.close() }
+        }
+    }
+
     private fun launch(): ActivityScenario<MainActivity> = ActivityScenario.launch(MainActivity::class.java)
 
     private fun openGate(scenario: ActivityScenario<MainActivity>, phase: ConnectionPhase = ConnectionPhase.IDLE) {

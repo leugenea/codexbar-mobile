@@ -18,10 +18,12 @@ class KeystoreCredentialStore(context: Context, localSessionId: UUID) : Credenti
     private val owner = sharedOwner(context, localSessionId)
 
     override fun openSession(): SessionGeneration = owner.openSession()
+    override fun isActive(generation: SessionGeneration): Boolean = owner.isActive(generation)
     override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> = owner.read(generation)
     override fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation): CredentialResult<CredentialEnvelope> =
         owner.kernel.replace(envelope, cancellation)
     override fun delete(generation: SessionGeneration): CredentialResult<Unit> = owner.delete(generation)
+    override fun replaceSession(generation: SessionGeneration) = owner.replaceSession(generation)
     override fun beginRotation(generation: SessionGeneration) = owner.beginRotation(generation)
     override fun finishRotation(generation: SessionGeneration) = owner.finishRotation(generation)
 
@@ -49,6 +51,8 @@ internal class CredentialSlotOwner(private val persistence: ProtectedCredentialP
     override fun openSession(): SessionGeneration = synchronized(lane) {
         kernel.openSession().also(persistence::activate)
     }
+    override fun isActive(generation: SessionGeneration): Boolean = kernel.isActive(generation)
+
     override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> = synchronized(lane) {
         kernel.read(generation)
     }
@@ -56,6 +60,11 @@ internal class CredentialSlotOwner(private val persistence: ProtectedCredentialP
         kernel.replace(envelope, cancellation)
     override fun delete(generation: SessionGeneration): CredentialResult<Unit> = synchronized(lane) {
         kernel.delete(generation)
+    }
+    override fun replaceSession(generation: SessionGeneration): CredentialResult<SessionGeneration> = synchronized(lane) {
+        kernel.replaceSession(generation).also {
+            if (it is CredentialResult.Success) persistence.activate(it.value)
+        }
     }
     override fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = synchronized(lane) {
         when (val read = kernel.read(generation)) {
