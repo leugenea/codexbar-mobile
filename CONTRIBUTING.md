@@ -7,9 +7,12 @@ Keep repository prose, code comments, issue/PR text and commit messages in Engli
 Discuss behavior changes before expanding scope. Add meaningful tests for behavior
 changes; TDD/test-first or deliberately failing CI is not required.
 
-Keep changes small and obtain independent full-diff review. Merge only the
-reviewed exact head with all applicable hosted checks green, using squash merge;
-verify all applicable main workflows and artifacts at the exact merge SHA.
+Keep changes small and obtain independent full-diff review. The strict required
+status-check policy requires PR branches to be up to date with `main` before
+merge. After updating a branch, obtain review and green hosted checks on the new
+exact head. Merge only the reviewed exact head with all applicable hosted checks
+green, using squash merge; verify all applicable main workflows and artifacts at
+the exact merge SHA.
 Documentation-only PRs are not exempt. Store history and review evidence in
 GitHub issues/PRs, not committed receipts or generated reports.
 

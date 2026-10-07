@@ -2,7 +2,7 @@
 
 ## Current settings
 
-As of October 2026, the active repository ruleset
+As of October 7, 2026, the active repository ruleset
 [`protect-main`](https://github.com/leugenea/codexbar-mobile/rules/24633110)
 targets the default branch (`main`), with no excluded refs or bypass actors.
 
@@ -15,23 +15,24 @@ targets the default branch (`main`), with no excluded refs or bypass actors.
 | Unattributed Copilot pull requests | Additional-approval flag enabled; no effect while the ruleset requires zero approvals |
 | Additional review requirements | Stale approvals are not dismissed; code-owner review and approval of the latest push are not required; no required reviewers configured |
 | Allowed merge methods | `merge`, `squash`, `rebase` in the PR rule; the separate linear-history rule still prevents merge commits on `main` |
-| Required status checks | Rule enabled with strict/up-to-date policy, but the required-check list is **empty**; no named CI checks are currently required by this ruleset |
+| Required status checks | `Android CI result`, `Repository policy result` and `Validate research fixtures and schemas`, bound to the GitHub Actions integration; strict/up-to-date policy enabled |
 | New branch creation | The status-check rule is not exempted on creation |
 
-The delivery procedure in [CONTRIBUTING](../CONTRIBUTING.md) still requires
-independent review and green exact-head hosted gates. Those procedural
-requirements must not be confused with configured approval/check enforcement.
-This document does not authorize a settings change; the owner must approve any
-configuration update.
+The strict status-check policy requires PR branches to be up to date with `main`
+before merge. The delivery procedure in [CONTRIBUTING](../CONTRIBUTING.md) also
+requires independent review and green exact-head hosted gates; independent
+approval remains procedural, not a configured approval requirement. This document
+does not authorize a settings change; the owner must approve any configuration
+update.
 
-## Recommended check contexts
+## Check contexts and enforcement
 
 Names below are job display names, not workflow titles. All declared PR gates run
 even for documentation-only changes; metrics are informational. The aggregate
 results reject failed or skipped required producer jobs. The **Required** entries
-below are recommendations, not currently configured required status checks.
+below are configured required status checks in `protect-main`.
 
-| Workflow file | Exact check context | Recommendation |
+| Workflow file | Exact check context | Enforcement |
 | --- | --- | --- |
 | `android.yml` | `Build, lint and unit tests (strict dependency verification)` | Covered by required aggregate |
 | `android.yml` | `Instrumented tests and coverage (API 36 emulator)` | Covered by required aggregate |
@@ -56,7 +57,6 @@ Sources: [Android](../.github/workflows/android.yml),
 | Pull requests | Retain required PRs; no direct delivery to main |
 | Review | Require at least one independent approval; dismiss stale approvals and require approval of the latest head |
 | Discussions | Retain required review-conversation resolution |
-| Required checks | Add `Android CI result`, `Repository policy result` and `Validate research fixtures and schemas`; retain strict/up-to-date policy and require success on the exact reviewed head |
 | Metrics | Keep code-metrics jobs informational, not required status checks |
 | Merge | Restrict allowed methods to squash, consistent with the delivery procedure and required linear history |
 | Destructive changes | Retain blocked non-fast-forward updates and branch deletion |
