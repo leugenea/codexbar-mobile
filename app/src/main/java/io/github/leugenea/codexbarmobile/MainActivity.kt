@@ -4,7 +4,7 @@ import android.os.Bundle
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 import android.view.WindowManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -93,7 +93,7 @@ class MainActivity : ComponentActivity() {
 
     internal fun openVerificationBrowser() {
         val awaiting = connection.state.value.auth as? AuthState.AwaitingUser ?: return
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(awaiting.verificationUrl)).addCategory(Intent.CATEGORY_BROWSABLE)
+        val intent = Intent(Intent.ACTION_VIEW, awaiting.verificationUrl.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
         try {
             browserLauncher(this, intent)
         } catch (_: ActivityNotFoundException) {
