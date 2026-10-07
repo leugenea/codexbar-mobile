@@ -40,7 +40,7 @@ Documentation-only changes still receive all declared PR gates.
 - [Third-party notices and open attribution gaps](THIRD_PARTY_NOTICES.md)
 - [Code-quality measurement](docs/code-quality.md) and the
   [complexity/duplication chart](https://leugenea.github.io/codexbar-mobile/dev/bench/)
-- [Recommended, currently unconfigured protections](docs/repository-protection.md)
+- [Current repository protections and recommendations](docs/repository-protection.md)
 
 ## License
 

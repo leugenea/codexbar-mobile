@@ -22,6 +22,6 @@
   files. Generated logs/reports belong in external scratch or CI artifacts.
 - One writer per worktree. Independent full-diff review and green exact-head hosted
   checks precede squash merge; verify applicable exact-merge main workflows and
-  artifacts afterward. Read [protection recommendations](docs/repository-protection.md);
+  artifacts afterward. Read [current protections and recommendations](docs/repository-protection.md);
   do not change repository settings without explicit owner approval.
 - Report executed checks separately from source inspection and pending hosted gates.

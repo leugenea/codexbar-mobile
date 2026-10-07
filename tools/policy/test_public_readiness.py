@@ -68,8 +68,16 @@ def check_contexts(table, workflows):
     assert documented == actual, f"Workflow/document contexts differ: {documented ^ actual}"
     names = [name for _, name in actual]
     assert len(names) == len(set(names)), "Check contexts must be unique"
-    for file, _, category in rows:
-        allowed = {"Informational", "Main-only; not required for PRs"} if file == "code-metrics.yml" else {"Required"}
+    required = {("android.yml", "Android CI result"),
+                ("repository-policy.yml", "Repository policy result"),
+                ("research-contract.yml", "Validate research fixtures and schemas")}
+    for file, name, category in rows:
+        if file == "code-metrics.yml":
+            allowed = {"Informational", "Main-only; not required for PRs"}
+        elif (file, name) in required:
+            allowed = {"Required"}
+        else:
+            allowed = {"Covered by required aggregate"}
         assert category.strip() in allowed, f"Unexpected check recommendation: {category}"
 
 
@@ -207,6 +215,16 @@ class PublicReadinessTests(unittest.TestCase):
         for table in ("| `android.yml` | `Renamed` | Required |", "no rows",
                       "| `android.yml` | `Build` | Required |\n| `android.yml` | `Build` | Required |"):
             with self.assertRaises(AssertionError):
+                check_contexts(table, workflows)
+
+    def test_context_checker_rejects_required_check_recommendation_drift(self):
+        for file, name, category in (
+                ("android.yml", "Android CI result", "Covered by required aggregate"),
+                ("android.yml", "Build, lint and unit tests (strict dependency verification)", "Required"),
+                ("code-metrics.yml", "Code erosion (Kotlin complexity)", "Required")):
+            workflows = {file: {"jobs": {"job": {"name": name}}}}
+            table = f"| `{file}` | `{name}` | {category} |"
+            with self.subTest(name=name), self.assertRaises(AssertionError):
                 check_contexts(table, workflows)
 
     def test_pr_checker_rejects_secret_fields_and_prompts(self):

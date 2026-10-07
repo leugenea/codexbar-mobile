@@ -87,6 +87,14 @@ waits for ADB/boot readiness, then invokes JVM/native tests and
 JUnit results and records phase outcomes. See the script for its hosted-only
 command and timeout environment, rather than inventing a local device procedure.
 
+The script permits **one bounded retry** only after passing JVM/native suites,
+with ADB-offline evidence at collection and empty or truncated native coverage
+from the same checkout/run/attempt. It preserves the failed graph's data and
+logs, waits for device readiness, then reruns the complete JVM/native/coverage
+graph within the original 15-minute graph budget. It never combines coverage
+across attempts or retries failing tests, timeouts, other invalid datasets or a
+coverage-threshold failure. See [the retry guard](tools/build/native_coverage_retry.py).
+
 Coverage minimum: **90%** JaCoCo **INSTRUCTION** over the compatible JVM +
 instrumented execution-data union. JaCoCo 0.8.15 analyzes the complete debug
 project-class snapshot, including handwritten Activity/Compose/lambda/companion
