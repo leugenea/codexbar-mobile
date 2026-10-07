@@ -6,6 +6,9 @@
   comments and GitHub delivery text in English.
 - Preserve the independent unofficial offline-shell boundary. Do not introduce
   provider/auth/storage/history/graph behavior under a documentation task.
+- Preserve the exact INTERNET-only source permission set (plus the existing AndroidX
+  signature-only receiver permission in merged/APK/installed sets) and cleartext-off
+  policy in all app builds. Offline previews must not initiate provider requests.
 - Add tests for behavior changes. No mandatory TDD, RED commit or test-first order.
 - Coverage minimum: **90%** JaCoCo **INSTRUCTION**, compatible JVM + instrumented
   union; never weaken the threshold or handwritten denominator/exclusions.

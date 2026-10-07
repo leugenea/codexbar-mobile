@@ -317,10 +317,31 @@ class ToolchainContract(unittest.TestCase):
         self.assertIn("actual.every { it.version == expected[2] }", inventory)
         self.assertNotIn("write_sdk_package_metadata.py", (ROOT / "tools/build/verify-hosted-toolchain.sh").read_text())
 
-    def test_no_network_permission_and_honest_four_state_shell(self):
+    def test_app_manifest_overlays_cannot_broaden_network_policy(self):
+        ns = "{http://schemas.android.com/apk/res/android}"
+        for path in (ROOT / "app/src").glob("*/AndroidManifest.xml"):
+            if path.parent.name in {"main", "test", "androidTest"}:
+                continue
+            manifest = ET.parse(path).getroot()
+            with self.subTest(path=path):
+                permissions = {node.get(ns + "name") for node in manifest
+                               if node.tag in ("uses-permission", "uses-permission-sdk-23")}
+                self.assertLessEqual(permissions, {"android.permission.INTERNET"})
+                self.assertEqual(manifest.findall("permission"), [])
+                for application in manifest.findall("application"):
+                    self.assertIn(application.get(ns + "usesCleartextTraffic"), (None, "false"))
+                    self.assertIsNone(application.get(ns + "networkSecurityConfig"))
+
+    def test_internet_only_cleartext_off_and_honest_four_state_shell(self):
         ns = "{http://schemas.android.com/apk/res/android}"
         manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
-        self.assertEqual(manifest.findall("uses-permission"), [])
+        permissions = {node.get(ns + "name") for node in manifest
+                       if node.tag in ("uses-permission", "uses-permission-sdk-23")}
+        self.assertEqual(permissions, {"android.permission.INTERNET"})
+        application = manifest.find("application")
+        assert application is not None
+        self.assertEqual(application.get(ns + "usesCleartextTraffic"), "false")
+        self.assertIsNone(application.get(ns + "networkSecurityConfig"))
         activity = manifest.find("application/activity")
         self.assertEqual(activity.get(ns + "exported"), "true")
         self.assertEqual(activity.find("intent-filter/category").get(ns + "name"), "android.intent.category.LAUNCHER")

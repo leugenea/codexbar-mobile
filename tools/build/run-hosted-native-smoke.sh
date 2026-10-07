@@ -209,13 +209,20 @@ jvm_report_status=$?
 "$ANDROID_HOME/build-tools/36.0.0/aapt" dump permissions app/build/outputs/apk/debug/app-debug.apk \
   > evidence/native/apk-permissions.txt
 aapt_status=$?
-python3 - <<'PY'
-from pathlib import Path
-assert 'android.permission.INTERNET' not in Path('evidence/native/apk-permissions.txt').read_text()
-PY
+"$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree app/build/outputs/apk/debug/app-debug.apk AndroidManifest.xml \
+  > evidence/native/apk-manifest-xmltree.txt
+apk_xmltree_status=$?
+timeout 15 "$adb" -s "$ANDROID_SERIAL" shell pm path io.github.leugenea.codexbarmobile \
+  > evidence/native/installed-package-path.txt
+installed_path_status=$?
+timeout 15 "$adb" -s "$ANDROID_SERIAL" shell dumpsys package io.github.leugenea.codexbarmobile \
+  > evidence/native/installed-package.txt
+installed_dump_status=$?
+python3 tools/build/verify_manifests.py --apk-permissions evidence/native/apk-permissions.txt \
+  --apk-xmltree evidence/native/apk-manifest-xmltree.txt --installed-package evidence/native/installed-package.txt
 permission_status=$?
 set -e
 # Preserve the original graph failure, rather than masking it with cleanup/parsers.
 if (( test_status != 0 )); then exit "$test_status"; fi
-(( manifest_status == 0 && native_report_status == 0 && jvm_report_status == 0 && aapt_status == 0 && permission_status == 0 ))
+(( manifest_status == 0 && native_report_status == 0 && jvm_report_status == 0 && aapt_status == 0 && apk_xmltree_status == 0 && installed_path_status == 0 && installed_dump_status == 0 && permission_status == 0 ))
 printf '%s\n' 'boundary=native-tests-and-apk-permissions-pass' >> evidence/native/boundaries.txt

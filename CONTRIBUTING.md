@@ -64,6 +64,15 @@ JDK/SDK installed, this non-emulator invocation is available:
 **Android emulators and instrumented tests run only in hosted CI, never on the NAS.**
 Do not run [run-hosted-native-smoke.sh](tools/build/run-hosted-native-smoke.sh) locally.
 
+## Network policy
+
+The app source requests INTERNET only. Merged manifests, APKs and installed app
+packages must request exactly INTERNET plus the existing AndroidX Core signature-only
+receiver permission; no extra permission is accepted. Cleartext is explicitly off
+in every app build, with no debug/test override. JVM local-server fixtures do not
+need device cleartext access. The permission is infrastructure, not a live-provider
+feature: offline previews still initiate no requests until auth/usage features land.
+
 ## Hosted runtime and coverage
 
 [Android CI](.github/workflows/android.yml) uses hosted Ubuntu 24.04, isolated SDKs

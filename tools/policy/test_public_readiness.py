@@ -208,11 +208,22 @@ class PublicReadinessTests(unittest.TestCase):
         text = " ".join((ROOT / "SECURITY.md").read_text().split())
         self.assertIn("GitHub private vulnerability reporting is enabled.", text)
         self.assertIn("https://github.com/leugenea/codexbar-mobile/security/advisories/new", text)
-        self.assertNotIn("disabled", text.lower())
+        self.assertNotRegex(text.lower(), r"(?:private vulnerability reporting|reporting channel) is disabled")
         self.assertIn("If the form is unavailable, do not disclose the vulnerability publicly", text)
         self.assertIn("a non-sensitive issue asking how to report privately", text)
         self.assertIn("with no exploit details or private data", text)
         self.assertIn("No response-time guarantee is asserted.", text)
+
+    def test_public_guides_describe_permission_infrastructure_not_provider_traffic(self):
+        for file in ("README.md", "SECURITY.md", "ARCHITECTURE.md", "AGENTS.md", "CONTRIBUTING.md"):
+            text = ' '.join((ROOT / file).read_text().split())
+            with self.subTest(file=file):
+                self.assertIn("INTERNET", text)
+                self.assertIn("cleartext", text.lower())
+                self.assertNotRegex(text, r"(?i)(?:has|have|with) no INTERNET permission")
+        security = ' '.join((ROOT / "SECURITY.md").read_text().split())
+        self.assertIn("still makes no provider traffic", security)
+        self.assertIn("auth/usage features must land separately", security)
 
     def test_link_checker_rejects_missing_target_and_escape(self):
         for link in ("missing-readiness-document.md", "../outside.md"):

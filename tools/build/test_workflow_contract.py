@@ -7,7 +7,8 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-from verify_manifests import check_manifest
+from verify_manifests import (APP_PERMISSIONS, PACKAGE, RECEIVER_PERMISSION, SOURCE_PERMISSIONS, check_apk_dump,
+                              check_installed_dump, check_manifest, check_permissions)
 from verify_test_reports import CLASS, EXPECTED, verify_reports
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -215,10 +216,17 @@ class WorkflowContracts(unittest.TestCase):
             self.assertFalse((source_dir / "BootstrapCompileTest.kt").exists())
         native = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/OfflineShellSmokeTest.kt").read_text()
         for actual in ("createEmptyComposeRule", "ActivityScenario.launch(intent)", "scenario.recreate()",
-                       "compose.waitUntil", "last state=", "assertManifestHasNoInternet()",
+                       "compose.waitUntil", "last state=", "assertInstalledNetworkPolicy()",
                        "assertIsSelected()", "assertIdentity()", "ProgressBarRangeInfo",
                        "SemanticsActions.GetTextLayoutResult"):
             self.assertIn(actual, native)
+        permission_set = re.search(r'setOf\((.*?)\),', native, re.S)
+        assert permission_set is not None
+        self.assertEqual(set(re.findall(r'"([^"]+)"', permission_set[1])), APP_PERMISSIONS)
+        for policy in ("ApplicationInfo.FLAG_USES_CLEARTEXT_TRAFFIC",
+                       "NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted",
+                       "PermissionInfo.PROTECTION_SIGNATURE", "receiver.protectionLevel"):
+            self.assertIn(policy, native)
         for shortcut in ("setContent", "runBlocking(", "Thread.sleep(", "BuildConfig"):
             self.assertNotIn(shortcut, "\n".join(line for line in native.splitlines() if not line.strip().startswith("/**")))
 
@@ -257,11 +265,18 @@ class WorkflowContracts(unittest.TestCase):
                          "--dependency-verification strict", '${GRADLE_USER_HOME:?}',
                          ":app:connectedDebugAndroidTest", "verify_test_reports.py native",
                          "diagnostic-screen.png", "logcat-live.txt", "project-sdk-before.sha256",
-                         "system-images;android-36;google_apis;x86_64", "--channel=0"):
+                         "system-images;android-36;google_apis;x86_64", "--channel=0",
+                         "aapt\" dump permissions", "aapt\" dump xmltree",
+                         "shell dumpsys package io.github.leugenea.codexbarmobile",
+                         "verify_manifests.py --apk-permissions", "--apk-xmltree", "--installed-package"):
             self.assertIn(contract, script)
         for unsafe in ("--dependency-verification off", "--write-verification-metadata", "testInstrumentationRunnerArguments",
                        "--tests ", "--dry-run", "system-images;android-37"):
             self.assertNotIn(unsafe, script)
+        final_gate = script.split("if (( test_status != 0 )); then exit \"$test_status\"; fi", 1)[1]
+        for status in ("manifest_status", "native_report_status", "jvm_report_status", "aapt_status",
+                       "apk_xmltree_status", "installed_path_status", "installed_dump_status", "permission_status"):
+            self.assertIn(status + " == 0", final_gate)
         installation = script.split("--install ", 1)[1].split("2>&1", 1)[0]
         self.assertEqual(installation.strip(), 'platform-tools emulator "$image"')
 
@@ -594,17 +609,82 @@ class SyntheticReportTests(unittest.TestCase):
     def test_source_and_merged_manifest_parser_fails_closed(self):
         manifest = self.directory / "SYNTHETIC-AndroidManifest.xml"
         prefix = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
-        manifest.write_text(prefix + '<application/></manifest>')
-        self.assertEqual(check_manifest(manifest)["requestedPermissions"], [])
-        for tag in ("uses-permission", "uses-permission-sdk-23"):
-            manifest.write_text(prefix + f'<{tag} android:name="android.permission.INTERNET"/></manifest>')
-            with self.assertRaisesRegex(ValueError, "requests INTERNET"):
-                check_manifest(manifest)
+        application = '<application android:usesCleartextTraffic="false"/>'
+        for expected in (SOURCE_PERMISSIONS, APP_PERMISSIONS):
+            for tag in ("uses-permission", "uses-permission-sdk-23"):
+                permissions = ''.join(f'<{tag} android:name="{name}"/>' for name in sorted(expected))
+                declaration = (f'<permission android:name="{RECEIVER_PERMISSION}" android:protectionLevel="signature"/>'
+                               if expected == APP_PERMISSIONS else '')
+                valid = prefix + permissions + declaration + application + '</manifest>'
+                manifest.write_text(valid)
+                self.assertEqual(check_manifest(manifest, expected)["requestedPermissions"], sorted(expected))
+                mutations = [
+                    (valid.replace(application, '<uses-permission android:name="android.permission.CAMERA"/>' + application), "allowlist"),
+                    (valid.replace(permissions, ''), "allowlist"),
+                    (valid.replace('usesCleartextTraffic="false"', 'usesCleartextTraffic="true"'), "Cleartext"),
+                    (valid.replace('android:usesCleartextTraffic="false"', ''), "Cleartext"),
+                    (valid.replace('usesCleartextTraffic="false"', 'usesCleartextTraffic="false" android:networkSecurityConfig="@xml/unsafe"'), "Cleartext"),
+                    (valid.replace('android:name="android.permission.INTERNET"', 'android:name="android.permission.INTERNET" android:maxSdkVersion="27"'), "Conditional"),
+                ]
+                if declaration:
+                    mutations.extend([
+                        (valid.replace(declaration, ""), "signature-only"),
+                        (valid.replace('protectionLevel="signature"', 'protectionLevel="normal"'), "signature-only"),
+                        (valid.replace('protectionLevel="signature"', 'protectionLevel="dangerous"'), "signature-only"),
+                    ])
+                for text, error in mutations:
+                    with self.subTest(expected=expected, tag=tag, mutation=text):
+                        manifest.write_text(text)
+                        with self.assertRaisesRegex(ValueError, error):
+                            check_manifest(manifest, expected)
         manifest.write_text("<unrelated/>")
         with self.assertRaisesRegex(ValueError, "Not an Android manifest"):
             check_manifest(manifest)
         with self.assertRaises(FileNotFoundError):
             check_manifest(self.directory / "missing.xml")
+
+    def test_apk_dump_requires_exact_permissions_and_cleartext_off(self):
+        permissions = f'package: {PACKAGE}\n' + ''.join(
+            f"uses-permission: name='{name}'\n" for name in sorted(APP_PERMISSIONS))
+        declaration = (f'  E: permission (line=3)\n'
+                       f'    A: android:name(0x01010003)="{RECEIVER_PERMISSION}" (Raw: "{RECEIVER_PERMISSION}")\n'
+                       '    A: android:protectionLevel(0x01010009)=(type 0x11)0x2\n')
+        xmltree = declaration + '  E: application (line=4)\n    A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0x0\n'
+        self.assertEqual(check_apk_dump(permissions, xmltree), sorted(APP_PERMISSIONS))
+        for bad_permissions, bad_tree, error in (
+                (permissions + "uses-permission: name='android.permission.CAMERA'\n", xmltree, "allowlist"),
+                (permissions.replace("uses-permission: name='android.permission.INTERNET'\n", ''), xmltree, "allowlist"),
+                (permissions.replace("INTERNET'", "INTERNET' maxSdkVersion='27'"), xmltree, "conditional"),
+                (permissions.replace(PACKAGE, 'synthetic.wrong.package'), xmltree, "identity"),
+                (permissions, xmltree.replace('0x0\n', '0xffffffff\n'), "cleartext"),
+                (permissions, xmltree.replace(declaration, ''), "declaration"),
+                (permissions, xmltree.replace('0x11)0x2', '0x11)0x0'), "signature-only"),
+                (permissions, xmltree.replace('0x11)0x2', '0x11)0x1'), "signature-only"),
+                (permissions, declaration, "cleartext"),
+                (permissions, xmltree + '    A: android:networkSecurityConfig(0x01010527)=@0x7f010000\n', "cleartext")):
+            with self.subTest(permissions=bad_permissions, tree=bad_tree):
+                with self.assertRaisesRegex(ValueError, error):
+                    check_apk_dump(bad_permissions, bad_tree)
+
+    def test_installed_dump_requires_exact_requested_permissions(self):
+        text = f'Packages:\n  Package [{PACKAGE}] (synthetic):\n    flags=[ DEBUGGABLE HAS_CODE ]\n    requested permissions:\n' + ''.join(
+            f'      {name}\n' for name in sorted(APP_PERMISSIONS)) + '    install permissions:\n      android.permission.INTERNET: granted=true\n'
+        self.assertEqual(check_installed_dump(text), sorted(APP_PERMISSIONS))
+        for bad, error in (
+                (text.replace('    install permissions:', '      android.permission.CAMERA\n    install permissions:'), "allowlist"),
+                (text.replace('      android.permission.INTERNET\n', ''), "allowlist"),
+                (text.replace(PACKAGE, 'synthetic.wrong.package'), "identity"),
+                (text.replace('requested permissions:', 'unrelated section:'), "requested permissions"),
+                (text.replace('    install permissions:', '    requested permissions:'), "requested permissions")):
+            with self.subTest(text=bad), self.assertRaisesRegex(ValueError, error):
+                check_installed_dump(bad)
+
+    def test_permission_allowlist_rejects_unexpected_and_missing_permissions(self):
+        self.assertEqual(check_permissions(APP_PERMISSIONS), sorted(APP_PERMISSIONS))
+        for actual in (APP_PERMISSIONS | {'android.permission.CAMERA'},
+                       APP_PERMISSIONS - {'android.permission.INTERNET'}, set()):
+            with self.assertRaisesRegex(ValueError, 'allowlist'):
+                check_permissions(actual)
 
 if __name__ == "__main__":
     unittest.main()

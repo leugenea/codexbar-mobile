@@ -17,9 +17,11 @@ passwords, device codes or raw account data, including in private reports.
 ## Supported scope and current safeguards
 
 Development fixes target `main`. There is no signed production release or promise
-of maintained older releases. The current offline shell has no INTERNET permission,
-provider traffic, authentication or credentials stored. Only a preview selection
-is saved for Activity recreation. Manifest backup/extraction rules exclude app data;
+of maintained older releases. The app declares INTERNET as network infrastructure,
+with cleartext traffic explicitly disabled in every app build. The offline shell
+still makes no provider traffic and has no authentication or credentials stored;
+auth/usage features must land separately before provider traffic is enabled.
+Only a preview selection is saved for Activity recreation. Manifest backup/extraction rules exclude app data;
 that declaration is not proof of future encrypted credential storage.
 
 PR workflows run on hosted runners with no live credentials; strict Gradle checksum
