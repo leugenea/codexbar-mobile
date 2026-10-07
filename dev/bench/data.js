@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791358340728,
+  "lastUpdate": 1791360584241,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -261,6 +261,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/ad98b52df81415b194813c92ceaf13675802a4b2"
         },
         "date": 1791358336051,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3d54f279a923bd6433db41ab3d70d0fa5ac74be2",
+          "message": "feat(m3a): cancellable transport boundary and deterministic read-error policy (#36)",
+          "timestamp": "2026-10-07T11:09:22+03:00",
+          "tree_id": "807bd3ba400ff5800e50ec2614c5a6420d1d0344",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/3d54f279a923bd6433db41ab3d70d0fa5ac74be2"
+        },
+        "date": 1791360583760,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
