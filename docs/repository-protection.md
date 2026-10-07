@@ -12,7 +12,7 @@ targets the default branch (`main`), with no excluded refs or bypass actors.
 | History | Linear history required |
 | Pull requests | Required; zero required approving reviews |
 | Review conversations | Resolution required |
-| Unattributed changes | Extra approval required |
+| Unattributed Copilot pull requests | Additional-approval flag enabled; no effect while the ruleset requires zero approvals |
 | Additional review requirements | Stale approvals are not dismissed; code-owner review and approval of the latest push are not required; no required reviewers configured |
 | Allowed merge methods | `merge`, `squash`, `rebase` in the PR rule; the separate linear-history rule still prevents merge commits on `main` |
 | Required status checks | Rule enabled with strict/up-to-date policy, but the required-check list is **empty**; no named CI checks are currently required by this ruleset |
