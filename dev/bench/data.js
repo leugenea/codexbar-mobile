@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791333093266,
+  "lastUpdate": 1791357832167,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -193,6 +193,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/d762d88029035fb034f79aac8eaa99c3d06e7b8d"
         },
         "date": 1791333089282,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e665126fb19603795719363255a1d8299c708acb",
+          "message": "docs: add public repository guidance, templates and readiness checks (#33)\n\n* docs: add public repository guidance, templates and readiness checks (#16)\n\n* chore: scope build ignores to Gradle outputs (#16)\n\n* docs: point security policy at enabled private vulnerability reporting (#16)\n\n* docs: describe active protect-main ruleset and coverage retry (#16)\n\n* docs: clarify unattributed-changes ruleset flag (#16)",
+          "timestamp": "2026-10-07T10:23:24+03:00",
+          "tree_id": "8f4eabff8fb0d9d7aa6c4f5c34b03fd3042b6460",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/e665126fb19603795719363255a1d8299c708acb"
+        },
+        "date": 1791357831584,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
