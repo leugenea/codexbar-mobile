@@ -23,6 +23,7 @@ done
 }
 "$actionlint" --version
 "$shellcheck" --version
+# tools/policy discovery includes public guides, links and template readiness.
 for suite in tools/build tools/research tools/metrics tools/policy; do
   "$python" -B -m unittest discover -s "$suite" -p 'test_*.py' -v
 done
