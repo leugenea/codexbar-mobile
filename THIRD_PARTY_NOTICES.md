@@ -18,10 +18,18 @@ configuration-resolved transitive closure still need hosted verification.
 | Activity Compose 1.13.0 | Android Open Source Project / AndroidX contributors | Apache-2.0 |
 | kotlinx-coroutines-android / core-jvm 1.11.0 | JetBrains / Kotlin contributors | Apache-2.0 |
 | OkHttp / okhttp-android 5.5.0 | Square and Lysine contributors | Apache-2.0 |
+| Public Suffix List data bundled in okhttp-android 5.5.0 | Mozilla Foundation / publicsuffix.org contributors | MPL-2.0 |
 | Okio / okio-jvm 3.18.1 (OkHttp transitive) | Square and Lysine contributors | Apache-2.0 |
 | kotlinx-serialization-json / core 1.11.0 (JSON tree only) | JetBrains / Kotlin contributors | Apache-2.0 |
 | AndroidX Annotation 1.10.0 / Startup 1.2.0 (OkHttp Android transitives) | Android Open Source Project / AndroidX contributors | Apache-2.0 |
 | Kotlin standard library (2.4.20 present in the acquisition graph) | JetBrains / Kotlin contributors | Apache-2.0; selected runtime version not yet established here |
+
+Public Suffix List data ships as `assets/PublicSuffixDatabase.list` inside
+okhttp-android, unmodified by this project. OkHttp compiles the original list into
+its data format. Source form is available from [publicsuffix.org](https://publicsuffix.org/list/)
+and the [tagged OkHttp repository](https://github.com/square/okhttp/blob/parent-5.5.0/okhttp/src/jvmTest/resources/okhttp3/internal/publicsuffix/public_suffix_list.dat).
+See the [upstream Public Suffix List NOTICE](https://github.com/square/okhttp/blob/parent-5.5.0/okhttp/src/jvmTest/resources/okhttp3/internal/publicsuffix/NOTICE)
+and [MPL-2.0 terms](https://mozilla.org/MPL/2.0/); this embedded data is not Apache-2.0.
 
 Additional runtime candidate families in the reviewed acquisition graph include
 Compose animation/foundation/runtime, AndroidX lifecycle/core/collection,
