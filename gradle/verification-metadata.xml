@@ -876,6 +876,9 @@
          <artifact name="tracing-1.1.0.module">
             <sha256 value="b1fed4309623b6f20bc817d8fbd70e4ea7085e40647694cd399ae58d2f0049e3" origin="Independent M1 audit: publisher SHA256 sidecar/module; not authenticated publisher identity" />
          </artifact>
+         <artifact name="tracing-1.1.0.pom">
+            <sha256 value="f1db502b5d539d94dfb6c659deb76872b1e9d8266d7aa4083868a29c33c22917" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated"/>
+         </artifact>
       </component>
       <component group="androidx.tracing" name="tracing" version="1.2.0">
          <artifact name="tracing-1.2.0.aar">
@@ -2214,6 +2217,12 @@
          <artifact name="kotlin-stdlib-2.4.20.module">
             <sha256 value="afb28052ac6c3d605c0f661816ea653e073eb039682fed35bfa6cdc704c0911c" origin="Independent M1 audit: weaker published SHA1 + freshly retrieved original SHA256; not authenticated publisher identity" />
          </artifact>
+         <artifact name="kotlin-stdlib-2.4.20-all.jar">
+            <sha256 value="74d9d7cf112bbf3d14612bb9fb867456a0ae36398d330df8178f0de42a61f476" origin="Independent A4 audit: T3-published-SHA1; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="kotlin-stdlib-2.4.20.pom">
+            <sha256 value="bd69b382dba8e2b7ae3846375eb2f1389017eb908987277051ae4e3acec8c938" origin="Independent A4 audit: T3-published-SHA1; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
       </component>
       <component group="org.jetbrains.kotlin" name="kotlin-stdlib-jdk7" version="2.2.10">
          <artifact name="kotlin-stdlib-jdk7-2.2.10.jar">
@@ -2611,5 +2620,158 @@
          </artifact>
       </component>
    <!-- END independently audited M2 coverage delta -->
+      <component group="androidx.annotation" name="annotation" version="1.2.0">
+         <artifact name="annotation-1.2.0.module">
+            <sha256 value="2efcab81ef91b211bacd206eaacd995a51f633a2e96b57a8fc00144c5f9c56b3" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated"/>
+         </artifact>
+      </component>
+      <component group="androidx.annotation" name="annotation" version="1.10.0">
+         <artifact name="annotation-1.10.0.module">
+            <sha256 value="5b2d4387f384e5913a4aec979a20ece13bb5ce992bc90a962dea1feea7fa89e9" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="annotation-1.10.0.pom">
+            <sha256 value="880f7bf4b35d060746cbef319d4a052b4bd826bb71b40500e55319721ffa4e76" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="annotation-metadata-1.10.0.jar">
+            <sha256 value="01d5a6d012ed76387f89734f9f15ddf0cc4d69879308f923030559bb84f3407e" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+      </component>
+      <component group="androidx.annotation" name="annotation-jvm" version="1.10.0">
+         <artifact name="annotation-jvm-1.10.0.jar">
+            <sha256 value="ddd072ddbb553178e205517ce777b2f05aa9e412982d9ecb4eedc74f1212f697" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="annotation-jvm-1.10.0.module">
+            <sha256 value="42afca374194273e4067b937cfc447bd3c8c4fd441f41d44f954050dfd6106dd" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="annotation-jvm-1.10.0.pom">
+            <sha256 value="5eece0903b4810aa1da85414dc4c2746046d878a543aa12dd4f1fe74171f7506" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+      </component>
+      <component group="androidx.startup" name="startup-runtime" version="1.2.0">
+         <artifact name="startup-runtime-1.2.0.aar">
+            <sha256 value="f51d361d17b30b09cfb9e2aebf301d113f99437cbf462a066092795fb60eddd2" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="startup-runtime-1.2.0.module">
+            <sha256 value="39387ad16429950ac100a055bc7cc809b0ecef86da29c5b41f2fb0d2ff063c1c" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="startup-runtime-1.2.0.pom">
+            <sha256 value="69594163d8bb148df97a9fbb5aa8a92486bb8961db5f73871b8a84122616593b" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+      </component>
+      <component group="com.squareup.okhttp3" name="mockwebserver3" version="5.5.0">
+         <artifact name="mockwebserver3-5.5.0.jar">
+            <sha256 value="f8c1dccd0a63067fe56f66ed357b244a04866cac508b898a4c899326cf0d46c2" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+         <artifact name="mockwebserver3-5.5.0.module">
+            <sha256 value="052eaf8753e63b2ed9070ece9a6bfe2aa47a12d3b8ee981eb5cf7d1a0de9635c" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+         <artifact name="mockwebserver3-5.5.0.pom">
+            <sha256 value="e8bcc230283b4ca4c949d149f343204cba55efca538916dbd7b4bb5527458085" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+      </component>
+      <component group="com.squareup.okhttp3" name="okhttp" version="5.5.0">
+         <artifact name="okhttp-5.5.0.module">
+            <sha256 value="1d667d70d7c4994927afd46d840e31e4a454935fa58f0c3429a26b425dc0abe0" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+         <artifact name="okhttp-5.5.0.pom">
+            <sha256 value="1e5299d973d19a225d741795d28c64298105fffe2e060f07282d2b24a4a1da37" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+         <artifact name="okhttp-metadata-5.5.0.jar">
+            <sha256 value="aebaab3fe77633befcf69fd0ee3052083999a7eaa98d6f2f7c4b498e7bdbb732" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+      </component>
+      <component group="com.squareup.okhttp3" name="okhttp-android" version="5.5.0">
+         <artifact name="okhttp-android-5.5.0.module">
+            <sha256 value="a2589cd0455bd01f34ecc1635d198689ccbdd00adbe028ffd34624df7cfe618e" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+         <artifact name="okhttp-android-5.5.0.pom">
+            <sha256 value="9e707dd79d04b92a6da7f3fdd135ac6f55ff97e462e0c4daed29c6e894c965b4" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+         <artifact name="okhttp.aar">
+            <sha256 value="6c7fd12f092e64ca2eae0b8a8023900c0d7ffec57888cf8abc8085c6f42e1dcc" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+      </component>
+      <component group="com.squareup.okhttp3" name="okhttp-jvm" version="5.5.0">
+         <artifact name="okhttp-jvm-5.5.0.jar">
+            <sha256 value="234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+         <artifact name="okhttp-jvm-5.5.0.module">
+            <sha256 value="9eca37ac762e29c8a49a35306df97bb2c536f1069e04357ad911926202c27bbc" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+         <artifact name="okhttp-jvm-5.5.0.pom">
+            <sha256 value="e72ea7261789a91b5a60920c8fd2ee860d0584765aadde249548c2ed1dba4631" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+      </component>
+      <component group="com.squareup.okio" name="okio" version="3.18.1">
+         <artifact name="okio-3.18.1.module">
+            <sha256 value="1616f212eabcb6c1c2d04ff5c80d9132c0e5f4e408c659d5ee47aef28ebc5d10" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+         <artifact name="okio-3.18.1.pom">
+            <sha256 value="3320a24236b2b43db1515b56587b18a8a1cdf238f4465e20e3e19e5f4fd10214" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+         <artifact name="okio-metadata-3.18.1.jar">
+            <sha256 value="6d9746592170dee6db877969b520a5f79d974083835c911a3e1a58295ee51f67" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+      </component>
+      <component group="com.squareup.okio" name="okio-jvm" version="3.18.1">
+         <artifact name="okio-jvm-3.18.1.jar">
+            <sha256 value="b97b640557a650d15411f2be29aef558c4e422a83653cb18ba494311dbed18be" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+         <artifact name="okio-jvm-3.18.1.module">
+            <sha256 value="3581865143cbe7556e1975be4c823834a7b775534de856d0b355c77af946027b" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+         <artifact name="okio-jvm-3.18.1.pom">
+            <sha256 value="6457712bf7dfdfa0d1b25a303600288c34a1ff8613d55c24c8c99bcc63301dd0" origin="Independent A4 audit: PGP signature verified against upstream-pinned fingerprint 5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked"/>
+         </artifact>
+      </component>
+      <component group="org.jetbrains.kotlinx" name="kotlinx-serialization-bom" version="1.11.0">
+         <artifact name="kotlinx-serialization-bom-1.11.0.pom">
+            <sha256 value="3be221b6da86dcda51cac6c4b2404b89e95ab09cc8d06a05689be2ef36735dec" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+      </component>
+      <component group="org.jetbrains.kotlinx" name="kotlinx-serialization-core" version="1.11.0">
+         <artifact name="kotlinx-serialization-core-1.11.0.module">
+            <sha256 value="4e011406f2c2285a5a9ba8c3b6471ac168f6e82af82b1a93b71a0731d270364e" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="kotlinx-serialization-core-1.11.0.pom">
+            <sha256 value="3133773fbcf9822a7f3a5e85ab19941e67bd289bf5fc3182d9db4d1cab86eb22" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="kotlinx-serialization-core-metadata-1.11.0.jar">
+            <sha256 value="5f0d16dc5d0803b73e14bba9045507565d2fa7b0186d0dc3824a9403a071d07b" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+      </component>
+      <component group="org.jetbrains.kotlinx" name="kotlinx-serialization-core-jvm" version="1.11.0">
+         <artifact name="kotlinx-serialization-core-jvm-1.11.0.jar">
+            <sha256 value="f4a801c647d4351327cd9e1ac4113e2be9ea37a64ab0abae269c25a52e28f35d" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="kotlinx-serialization-core-jvm-1.11.0.module">
+            <sha256 value="d8bee6e8a51d7c169bd6060abbc6b2d4e7bc419a265cd705d47824b83f1bd0b6" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="kotlinx-serialization-core-jvm-1.11.0.pom">
+            <sha256 value="83039385976fdc494241f4572558a136e7b21116d7279b26daf335478bfacb57" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+      </component>
+      <component group="org.jetbrains.kotlinx" name="kotlinx-serialization-json" version="1.11.0">
+         <artifact name="kotlinx-serialization-json-1.11.0.module">
+            <sha256 value="9316b64e1d0de0a8c74134b460916dcf6d19e627941b4c4eeb63e07e907111af" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="kotlinx-serialization-json-1.11.0.pom">
+            <sha256 value="2bd8c5e79d2fee8183a45ed869024e1d74571936960b18125d603b0718f536e3" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="kotlinx-serialization-json-metadata-1.11.0.jar">
+            <sha256 value="57788c37107f55fa980ef36c157e70ecef573158a762783bfd30ed4824419e80" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+      </component>
+      <component group="org.jetbrains.kotlinx" name="kotlinx-serialization-json-jvm" version="1.11.0">
+         <artifact name="kotlinx-serialization-json-jvm-1.11.0.jar">
+            <sha256 value="563a25b4eb5c9128ae9c2479f3d1a5c44dcd176112b91cf03682e906eba5c935" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="kotlinx-serialization-json-jvm-1.11.0.module">
+            <sha256 value="44ce6b756f93c90ac3da73f35ed0ab036f43b73f57f3563ccac9e152f411272d" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+         <artifact name="kotlinx-serialization-json-jvm-1.11.0.pom">
+            <sha256 value="dc6ffce390f328d9bca740a63b91092afd09f4473a1f2a80d77d64b3c5b505d3" origin="Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; PGP cryptographically verified against keyserver key (publisher identity unbound)"/>
+         </artifact>
+      </component>
    </components>
 </verification-metadata>
