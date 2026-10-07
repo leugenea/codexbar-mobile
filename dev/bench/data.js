@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791376513139,
+  "lastUpdate": 1791376516397,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -841,6 +841,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/c59fb2ea2690053371f89a60b4d4918bbc2b6965"
         },
         "date": 1791374641308,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "21ae45e1e7f4ff759c63720171d3e0df9283f26c",
+          "message": "feat(m3a): audited OkHttp adapter and strict JSON boundary (#43)\n\n* feat(m3a): audited OkHttp adapter and strict JSON boundary (#40)\n\n* docs: attribute MPL-2.0 Public Suffix List bundled in okhttp-android (#40)",
+          "timestamp": "2026-10-07T15:34:45+03:00",
+          "tree_id": "5910d0ccbea3f69d42596e6f99e02a0a64669395",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/21ae45e1e7f4ff759c63720171d3e0df9283f26c"
+        },
+        "date": 1791376515813,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
