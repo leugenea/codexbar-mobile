@@ -12,16 +12,26 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 NS = "{https://schema.gradle.org/dependency-verification}"
 METADATA_PATH = "gradle/verification-metadata.xml"
-# Full reviewed union: 602 base toolchain pairs + the 17 JaCoCo pairs approved in PR #17.
+# Full reviewed union: base toolchain, M2 coverage and the A4 HTTP/JSON graph.
 # Dependency updates must review the XML pair delta and update this digest in
 # the same PR. No parallel artifact list or audit receipt is maintained.
-APPROVED_METADATA_SHA256 = "ba94604993d8d03d66d6e8b48fcdeb258aec36b62c3e851da32a6bed064434a3"
+APPROVED_METADATA_SHA256 = "1a4bb1ba071de078de6c6a2031f78a25075111bcdae6f2496c5b7114e84f3121"
 # Historical origin labels must match the unchanged, independently audited XML.
 APPROVED_ORIGINS = {
     f"Independent {milestone} audit: {evidence}; not authenticated publisher identity"
     for milestone in ("M1", "M2")
     for evidence in ("publisher SHA256 sidecar/module",
                      "weaker published SHA1 + freshly retrieved original SHA256")
+}
+# Exact reviewed A4 annotations, not prefix matching or checksum-only identity claims.
+APPROVED_ORIGINS |= {
+    "Independent A4 audit: PGP signature verified against upstream-pinned fingerprint "
+    "5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked",
+    "Independent A4 audit: T2-published-SHA256; publisher identity not authenticated",
+    "Independent A4 audit: T2-published-SHA256; publisher identity not authenticated; "
+    "PGP cryptographically verified against keyserver key (publisher identity unbound)",
+    "Independent A4 audit: T3-published-SHA1; publisher identity not authenticated; "
+    "PGP cryptographically verified against keyserver key (publisher identity unbound)",
 }
 
 

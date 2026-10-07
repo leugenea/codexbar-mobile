@@ -17,6 +17,10 @@ configuration-resolved transitive closure still need hosted verification.
 | Compose UI 1.12.1, Material3 1.4.0 | Android Open Source Project / AndroidX contributors | Apache-2.0 |
 | Activity Compose 1.13.0 | Android Open Source Project / AndroidX contributors | Apache-2.0 |
 | kotlinx-coroutines-android / core-jvm 1.11.0 | JetBrains / Kotlin contributors | Apache-2.0 |
+| OkHttp / okhttp-android 5.5.0 | Square and Lysine contributors | Apache-2.0 |
+| Okio / okio-jvm 3.18.1 (OkHttp transitive) | Square and Lysine contributors | Apache-2.0 |
+| kotlinx-serialization-json / core 1.11.0 (JSON tree only) | JetBrains / Kotlin contributors | Apache-2.0 |
+| AndroidX Annotation 1.10.0 / Startup 1.2.0 (OkHttp Android transitives) | Android Open Source Project / AndroidX contributors | Apache-2.0 |
 | Kotlin standard library (2.4.20 present in the acquisition graph) | JetBrains / Kotlin contributors | Apache-2.0; selected runtime version not yet established here |
 
 Additional runtime candidate families in the reviewed acquisition graph include
@@ -36,6 +40,7 @@ license/NOTICE texts against the actual APK, including embedded components.
 | Temurin / OpenJDK 17 | Build/JVM; GPL-2.0 with file-specific Classpath exception and additional notices |
 | Android SDK, Build Tools, command-line tools, emulator and API 36 Google APIs image | SDK/component agreement terms; not blanket Apache-2.0 |
 | JUnit 4.13.2 | JVM tests; EPL-1.0 |
+| MockWebServer3 5.5.0 / OkHttp JVM 5.5.0 | Localhost JVM-test support; Square and Lysine contributors; Apache-2.0; not release-runtime declarations |
 | AndroidX Compose UI tests/manifest, test runner 1.7.0 and test-ext JUnit 1.3.0 | Native test APK/debug-only support; Apache-2.0 |
 | JaCoCo 0.8.15 / ASM | Debug coverage; EPL-2.0 / BSD-3-Clause |
 | Python and typing-extensions | CI validators; PSF / PSF-2.0 plus bundled notices |
