@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791360586717,
+  "lastUpdate": 1791361364610,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -295,6 +295,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/3d54f279a923bd6433db41ab3d70d0fa5ac74be2"
         },
         "date": 1791360583760,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3a8b5a42412d84aecb3da710bdfff4e661f303b7",
+          "message": "docs: describe required status checks in protect-main (#38)",
+          "timestamp": "2026-10-07T11:22:18+03:00",
+          "tree_id": "914bec240275cb2817a41864d76b46bc832da7b7",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/3a8b5a42412d84aecb3da710bdfff4e661f303b7"
+        },
+        "date": 1791361363983,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
