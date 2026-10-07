@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791397254494,
+  "lastUpdate": 1791399145961,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -533,6 +533,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/82bcaff89eddb30376641186280aa25c224cf731"
         },
         "date": 1791397249787,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f76cea965492bacb25fd0f01951ae8a01ace1962",
+          "message": "feat(m3a): first native auth and quota-read gate wiring (#49)\n\n* feat(m3a): first native auth and quota-read gate wiring with fake CI scenarios (#48)\n\n* fix(m3a): use toUri for browser intent to satisfy UseKtx lint (#48)\n\n* test(m3a): move activity to CREATED before saved-state scrub check (#48)",
+          "timestamp": "2026-10-07T21:51:59+03:00",
+          "tree_id": "56376768688560307137a971544cecf2da6c321e",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/f76cea965492bacb25fd0f01951ae8a01ace1962"
+        },
+        "date": 1791399145137,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
