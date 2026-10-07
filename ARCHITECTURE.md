@@ -41,7 +41,8 @@ MainActivity / Activity ViewModelStore
     -> ConnectionController
         -> A7 DeviceCodeAuthenticator -> A4 HttpTransportAdapter
         -> A6 KeystoreCredentialStore (binding Unresolved)
-        -> NativeFeasibilityReader -> A2 ReadPolicy + A4 + A1 validation
+        -> NativeFeasibilityReader -> A2 ReadPolicy + A4 JSON boundary
+            -> A9 UsageResponseParser / BankedResetResponseParser -> A1 normalization
 ```
 
 MainActivity builds a fixed ACTION_VIEW/BROWSABLE intent for the system browser.
@@ -63,12 +64,17 @@ cancellable A2 backoff. A 401 reports reauthorization required without implement
 A10 refresh; generic 403 remains forbidden, not session expiry. The narrow projection
 shows validated duration-identified five-hour/weekly percentages, resets, provider
 flags, banked counts and UTC expiry facts, with independent endpoint observation
-times. It is not A9's complete decoder or B/C presentation/refresh work.
+times. Both endpoints now use the production A9 decoders; no independent A8 JSON
+fact extractor remains. Decoders retain missing/null/wrong-type knowledge and all
+window/item siblings through A1, without treating M0 fixtures as provider guarantees.
+Full normalized observations remain in memory; endpoint/result diagnostics redact
+arbitrary provider strings and identities. The screen still renders only its existing
+allowlisted numeric/date facts, not B/C presentation or refresh work.
 
 Every state reports binding UNRESOLVED / NOT_GO. Token receipt and HTTP 200 do not
 resolve account association. CI uses fake transport and synthetic protocol data;
 owner-operated physical-phone sign-in, actual process-kill/relaunch and the live
-stop/go decision remain separate gates before A9/A10/B/C work.
+stop/go decision are separate evidence boundaries, not established by parser tests.
 
 ## Verification boundaries
 
@@ -81,6 +87,10 @@ stop/go decision remain separate gates before A9/A10/B/C work.
 - `tools/research`: offline fixture/schema contracts; not a production provider parser.
 - `tools/metrics`: informational production Kotlin complexity/duplication reporting.
 - `tools/policy`: script/supply-chain policy and public-readiness contracts.
+- `UsageResponseParserTest` / `BankedResetResponseParserTest`: unchanged attributed
+  M0 wire mocks/vectors plus original strict-type, precision, sibling, clock and
+  discrepancy mutations. `NativeFeasibilityReaderTest` verifies both mixed-success
+  orders through the same production decoders without inventing an atomic snapshot.
 - `ConnectionControllerTest`: no-network orchestration, cancellation/stale results,
   storage/browser/read failures, strict allowlisted projection and bounded backoff.
 - `ConnectionLifecycleTest`: real Activity intent seam, recreation/background/finish,
@@ -103,7 +113,7 @@ values. Public sources and successful token receipt still do not establish Andro
 account/workspace association or service distribution permission.
 
 The native gate implements only the selected initial connect/two-read/local-delete
-boundary. Complete refresh/re-auth, authoritative association, broad response decoding,
-usage polish and automatic refresh remain separate blocked work. History, graphs,
-further providers, signing and distribution remain future scope.
+boundary with production usage/inventory decoding. Complete refresh/re-auth,
+authoritative association, usage polish and automatic refresh remain separate work.
+History, graphs, further providers, signing and distribution remain future scope.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
