@@ -1,8 +1,11 @@
 package io.github.leugenea.codexbarmobile
 
 import android.content.pm.ActivityInfo
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.content.pm.PermissionInfo
 import android.content.res.Configuration
+import android.security.NetworkSecurityPolicy
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -45,7 +48,7 @@ class OfflineShellSmokeTest {
             assertIdentity()
             compose.onNodeWithText("No account connected")
                 .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
-            assertManifestHasNoInternet()
+            assertInstalledNetworkPolicy()
             compose.onNodeWithTag("show-fixture").performScrollTo().assertHasClickAction().performClick()
             awaitState("disconnected sample action", Preview.Demo)
             assertDemo()
@@ -173,11 +176,26 @@ class OfflineShellSmokeTest {
         }
     }
 
-    private fun assertManifestHasNoInternet() {
+    private fun assertInstalledNetworkPolicy() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
         assertNotNull(info)
-        assertFalse("Installed APK must not request INTERNET", info.requestedPermissions.orEmpty()
-            .contains("android.permission.INTERNET"))
+        assertEquals(
+            "Installed APK must request exactly the approved permission set",
+            setOf("android.permission.INTERNET",
+                "io.github.leugenea.codexbarmobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"),
+            info.requestedPermissions.orEmpty().toSet(),
+        )
+        val receiver = context.packageManager.getPermissionInfo(
+            "io.github.leugenea.codexbarmobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION", 0,
+        )
+        assertEquals("Installed receiver permission must remain signature-only",
+            PermissionInfo.PROTECTION_SIGNATURE, receiver.protectionLevel)
+        assertEquals("Installed APK must disable cleartext", 0,
+            context.applicationInfo.flags and ApplicationInfo.FLAG_USES_CLEARTEXT_TRAFFIC)
+        assertFalse("Effective global cleartext policy must be disabled",
+            NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted)
+        assertFalse("Local test servers must not broaden device cleartext policy",
+            NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted("localhost"))
     }
 }

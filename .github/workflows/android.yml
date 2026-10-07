@@ -88,7 +88,7 @@ jobs:
           ./gradlew --no-daemon --dependency-verification strict --no-build-cache --no-configuration-cache --rerun-tasks \
             --stacktrace --info --continue \
             -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
-            :app:lintDebug :app:assembleDebug :app:compileDebugUnitTestKotlin \
+            :app:lintDebug :app:assembleDebug :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
             :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
             2>&1 | tee evidence/strict.log
           python3 tools/build/verify_manifests.py

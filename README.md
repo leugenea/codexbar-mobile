@@ -16,6 +16,10 @@ history, graphs, live reset countdown or signed production release. CI debug APK
 are test outputs, not signed release deliverables. Minimum Android version is
 Android 8.0 (API 26).
 
+The app declares INTERNET, with cleartext traffic explicitly disabled. This is
+network infrastructure only: the offline previews make no provider traffic until
+separately gated auth/usage features land.
+
 Future provider work is gated separately. The [research](docs/research/m0.md)
 discusses private interfaces, OAuth-client authorization, provider terms and
 distribution risk. An observed endpoint or an upstream open-source license does
