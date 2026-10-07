@@ -21,6 +21,9 @@ SECRET = re.compile(r"\b(?:tokens?|passwords?|device[ _-]?codes?|raw[ _-]?accoun
 ANDROID_TASKS = {"assembleDebug", "lintDebug", "testDebugUnitTest",
                  "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
                  "assembleDebugAndroidTest", "connectedDebugAndroidTest"}
+REQUIRED_CHECK_CONTEXTS = {("android.yml", "Android CI result"),
+                           ("repository-policy.yml", "Repository policy result"),
+                           ("research-contract.yml", "Validate research fixtures and schemas")}
 
 
 def relative_links(text, source, root):
@@ -68,17 +71,28 @@ def check_contexts(table, workflows):
     assert documented == actual, f"Workflow/document contexts differ: {documented ^ actual}"
     names = [name for _, name in actual]
     assert len(names) == len(set(names)), "Check contexts must be unique"
-    required = {("android.yml", "Android CI result"),
-                ("repository-policy.yml", "Repository policy result"),
-                ("research-contract.yml", "Validate research fixtures and schemas")}
     for file, name, category in rows:
         if file == "code-metrics.yml":
             allowed = {"Informational", "Main-only; not required for PRs"}
-        elif (file, name) in required:
+        elif (file, name) in REQUIRED_CHECK_CONTEXTS:
             allowed = {"Required"}
         else:
             allowed = {"Covered by required aggregate"}
-        assert category.strip() in allowed, f"Unexpected check recommendation: {category}"
+        assert category.strip() in allowed, f"Unexpected check enforcement: {category}"
+
+
+def required_status_checks(text, workflows):
+    sections = text.split("## Current settings", 1)
+    assert len(sections) == 2, "Current settings section absent"
+    current = sections[1].split("\n## ", 1)[0]
+    rows = re.findall(r"^\| Required status checks \| ([^|]+) \|$", current, re.M)
+    assert len(rows) == 1, "Required status-check setting absent or duplicated"
+    names = re.findall(r"`([^`]+)`", rows[0])
+    expected = {name for _, name in REQUIRED_CHECK_CONTEXTS}
+    assert len(names) == len(expected) and set(names) == expected, "Configured check names drift"
+    for file, name in REQUIRED_CHECK_CONTEXTS:
+        actual = {job["name"] for job in workflows[file]["jobs"].values()}
+        assert name in actual, f"Required check absent from workflow: {file}: {name}"
 
 
 def safe_pr_template(text):
@@ -174,6 +188,11 @@ class PublicReadinessTests(unittest.TestCase):
                      for path in (ROOT / ".github/workflows").glob("*.yml")}
         check_contexts((ROOT / "docs/repository-protection.md").read_text(), workflows)
 
+    def test_current_required_status_checks_match_workflow_job_names(self):
+        workflows = {file: yaml.safe_load((ROOT / ".github/workflows" / file).read_text())
+                     for file, _ in REQUIRED_CHECK_CONTEXTS}
+        required_status_checks((ROOT / "docs/repository-protection.md").read_text(), workflows)
+
     def test_templates_do_not_request_secrets(self):
         for file in FORMS:
             safe_form(yaml.safe_load((ROOT / file).read_text()))
@@ -217,7 +236,7 @@ class PublicReadinessTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 check_contexts(table, workflows)
 
-    def test_context_checker_rejects_required_check_recommendation_drift(self):
+    def test_context_checker_rejects_required_check_enforcement_drift(self):
         for file, name, category in (
                 ("android.yml", "Android CI result", "Covered by required aggregate"),
                 ("android.yml", "Build, lint and unit tests (strict dependency verification)", "Required"),
@@ -226,6 +245,23 @@ class PublicReadinessTests(unittest.TestCase):
             table = f"| `{file}` | `{name}` | {category} |"
             with self.subTest(name=name), self.assertRaises(AssertionError):
                 check_contexts(table, workflows)
+
+    def test_required_status_checker_rejects_documented_name_drift(self):
+        text = (ROOT / "docs/repository-protection.md").read_text()
+        workflows = {file: {"jobs": {"job": {"name": name}}}
+                     for file, name in REQUIRED_CHECK_CONTEXTS}
+        for replacement in ("", "`Renamed`", "`Android CI result`, `Extra check`",
+                            "`Android CI result`, `Android CI result`"):
+            with self.subTest(replacement=replacement), self.assertRaises(AssertionError):
+                required_status_checks(text.replace("`Android CI result`", replacement), workflows)
+
+    def test_required_status_checker_rejects_workflow_name_drift(self):
+        text = (ROOT / "docs/repository-protection.md").read_text()
+        for renamed in REQUIRED_CHECK_CONTEXTS:
+            workflows = {file: {"jobs": {"job": {"name": "Renamed" if (file, name) == renamed else name}}}
+                         for file, name in REQUIRED_CHECK_CONTEXTS}
+            with self.subTest(renamed=renamed), self.assertRaises(AssertionError):
+                required_status_checks(text, workflows)
 
     def test_pr_checker_rejects_secret_fields_and_prompts(self):
         text = (ROOT / PR_TEMPLATE).read_text()
