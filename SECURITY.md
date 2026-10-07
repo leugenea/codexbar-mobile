@@ -2,18 +2,16 @@
 
 ## Reporting a vulnerability
 
-Do not disclose vulnerabilities in public issues or PRs. Use GitHub private
-vulnerability reporting: repository **Security → Report a vulnerability**, or
+GitHub private vulnerability reporting is enabled. Do not disclose vulnerabilities
+in public issues or PRs. Use repository **Security → Report a vulnerability**, or
 [the private reporting form](https://github.com/leugenea/codexbar-mobile/security/advisories/new).
 
-**Private reporting is currently disabled.** The owner must enable it before this
-policy is usable and before merge. If the form is unavailable, do not post the
-vulnerability publicly: open only a non-sensitive request to enable private
-reporting, with no exploit details or private data. No alternate private channel
-or response-time guarantee is asserted here.
+If the form is unavailable, do not disclose the vulnerability publicly: open only
+a non-sensitive issue asking how to report privately, with no exploit details or
+private data. No response-time guarantee is asserted.
 
-Once available, include affected commit/build, impact, minimal reproduction and
-possible mitigation. Use synthetic or sanitized evidence. Never send tokens,
+In your private report, include affected commit/build, impact, minimal reproduction
+and possible mitigation. Use synthetic or sanitized evidence. Never send tokens,
 passwords, device codes or raw account data, including in private reports.
 
 ## Supported scope and current safeguards

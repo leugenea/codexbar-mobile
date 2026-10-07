@@ -2,4 +2,4 @@ blank_issues_enabled: false
 contact_links:
   - name: Security policy and private reporting
     url: https://github.com/leugenea/codexbar-mobile/blob/main/SECURITY.md
-    about: Do not disclose vulnerabilities publicly. Read the policy and private-reporting availability first.
+    about: Do not disclose vulnerabilities publicly. Use GitHub private vulnerability reporting through the security policy.
