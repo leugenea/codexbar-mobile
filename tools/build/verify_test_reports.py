@@ -1,4 +1,4 @@
-"""Real offline-shell test-result gate. Synthetic unit tests validate this parser, not Android."""
+"""Real mandatory test-result gate. Synthetic unit tests validate this parser, not Android."""
 import argparse
 import json
 from pathlib import Path
@@ -28,6 +28,17 @@ CLASS = {
 }
 
 
+CREDENTIAL_CLASS = "io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStoreTest"
+CREDENTIAL_CASES = {
+    "realKeystoreRoundTripFreshInstanceAndRandomizedIv",
+    "missingKeystoreKeyFailsClosedWithoutRecreationOverCiphertext",
+    "realKeystoreRejectsCiphertextIvMetadataAndCrossSessionSubstitution",
+    "injectedAtomicFileFailurePreservesCommittedCredentials",
+    "localLogoutDeletesOwnedKeystoreKeyAndCiphertextAndInvalidatesOwner",
+    "ciphertextUsesNoBackupDirectoryAndBothBackupFormatsExcludeAllAppData",
+}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -52,6 +63,11 @@ def verify_reports(directory: Path, kind: str) -> dict:
     missing = EXPECTED[kind] - actual
     if missing:
         raise ValueError(f"Missing real {kind} offline-shell tests: {sorted(missing)}")
+    if kind == "native":
+        credential_actual = {case["name"] for case in cases if case["class"] == CREDENTIAL_CLASS}
+        credential_missing = CREDENTIAL_CASES - credential_actual
+        if credential_missing:
+            raise ValueError(f"Missing real native credential tests: {sorted(credential_missing)}")
     if not cases:
         raise ValueError(f"No executed {kind} tests")
     return {"kind": kind, "testCount": len(cases), "reports": [str(p) for p in reports], "testcases": cases}
@@ -67,7 +83,7 @@ def main() -> None:
     destination = ROOT / "evidence" / ("native" if args.kind == "native" else "jvm")
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "executed-tests.json").write_text(json.dumps(receipt, indent=2) + "\n")
-    print(f"{args.kind}: {receipt['testCount']} executed tests, all required offline-shell cases present; no failures/errors/skips")
+    print(f"{args.kind}: {receipt['testCount']} executed tests, all required cases present; no failures/errors/skips")
 
 
 if __name__ == "__main__":
