@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class ToolchainContract(unittest.TestCase):
     def test_wrapper_source_and_independent_jar_checksum(self):
         expected = {
-            "gradle/wrapper/gradle-wrapper.jar": "238e777fcddd7e34f9708186085def2abd6e08e658505b38718d79d74c21abd5",
+            "gradle/wrapper/gradle-wrapper.jar": "3b8a25775a69158b5ad2b1d17a80a88dc7b40a352a73eb27d06c612a7ce68e98",
             "gradlew": "e01b5c97892572c82405c02b96a3382379100e7d825ce7c48883d95c26928750",
             "gradlew.bat": "ad2fac6060c5b929bed15d428e09483e52747d0120874346861ad4ec324af64c",
         }
@@ -22,8 +22,8 @@ class ToolchainContract(unittest.TestCase):
             self.assertEqual(hashlib.sha256((ROOT / path).read_bytes()).hexdigest(), digest, path)
         self.assertTrue((ROOT / "gradlew").stat().st_mode & 0o111)
         wrapper = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()
-        self.assertIn("distributionUrl=https\\://services.gradle.org/distributions/gradle-9.8.0-bin.zip", wrapper)
-        self.assertIn("distributionSha256Sum=bafd5ce9cfaea0fbccfdc8439a1ac42fbd4cd9c89dc9a988228d8a2639a58e6c", wrapper)
+        self.assertIn("distributionUrl=https\\://services.gradle.org/distributions/gradle-9.8.1-bin.zip", wrapper)
+        self.assertIn("distributionSha256Sum=dce76f55f8e251a3a1f130eb120f30b3d271de2b76c9b0729d316b5a1b6dc01f", wrapper)
 
     def test_current_toolchain_and_install_policy(self):
         baseline = json.loads((ROOT / "docs/research/m0/toolchain.json").read_text())
@@ -53,7 +53,7 @@ class ToolchainContract(unittest.TestCase):
 
     def test_runtime_toolchain_assertions_and_lint_remain_strict(self):
         inventory = (ROOT / "tools/build/toolchain.init.gradle").read_text()
-        self.assertIn("assert receipt.gradle == '9.8.0'", inventory)
+        self.assertIn("assert receipt.gradle == '9.8.1'", inventory)
         self.assertIn("assert receipt.agp == '9.4.1'", inventory)
         for module in ("kotlin-gradle-plugin", "kotlin-compiler-embeddable",
                        "kotlin-compose-compiler-plugin-embeddable"):
