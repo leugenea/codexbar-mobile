@@ -20,6 +20,7 @@ internal class SessionCoordinator(
     private val scope: CoroutineScope,
     private val clock: TransportClock = SystemTransportClock,
     private val storageDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val invalidated: () -> Unit = {},
 ) {
     @Volatile private var current: CredentialEnvelope? = null
     @Volatile private var problem = SessionProblem.STALE
@@ -68,6 +69,7 @@ internal class SessionCoordinator(
         current = null
         problem = SessionProblem.REAUTHORIZE
         quarantine(rejected.generation)
+        invalidated()
         awaitRemoval()
     }
 
@@ -141,6 +143,7 @@ internal class SessionCoordinator(
                 current = null
                 problem = result.problem
                 quarantine(owner.envelope.generation)
+                invalidated()
                 if (!awaitRemoval()) { problem = SessionProblem.STORAGE; return SessionResult.Failed(SessionProblem.STORAGE) }
             }
         }

@@ -139,8 +139,33 @@ never recomputed, and discrepancies keep precedence while container facts remain
 visible. Endpoint errors and stale-generation isolation keep their existing precedence.
 Full normalized observations remain in memory; endpoint/result diagnostics redact
 arbitrary provider strings and identities. The screen still renders only its existing
-allowlisted numeric/date facts, not B/C presentation. The existing gate has explicit
-read/session-refresh controls and a minimal sign-in-again action; no periodic traffic.
+allowlisted numeric/date facts, not B/C rendering. The gate has explicit
+read/session-refresh controls and a minimal sign-in-again action.
+
+B2's `UsageRefresh` is a subordinate scheduler in that same owner scope/lane, not
+another session owner. The opt-in live gate observes `repeatOnLifecycle(STARTED)`;
+identity-tagged observers keep one disappearing Activity from cancelling another
+visible observer. Connect/manual read activates refresh for the current generation.
+Protected restoration remains dormant until an explicit action, including when the
+restored gate is opened: default offline previews and fresh-runtime restoration
+remain no-network. After activation, foreground resume requests one bounded cycle;
+manual/resume/connect triggers coalesce while a cycle is in flight. Foreground loss
+cancels eligible reads, local ticks and polls but never owns token rotation or auth.
+A10's independent rotation settlement and durable quarantine rules are unchanged;
+only an explicit manual read unlocks a retained transient token-refresh failure,
+never an automatic poll or lifecycle-resume trigger.
+
+Visible polling admits no earlier than 60 seconds after the preceding cycle's
+admission; each endpoint operation has its own 30-second logical deadline. A2's
+deferred Retry-After monotonic boundary survives in the endpoint outcome and holds
+later triggers/polls (conservatively the whole cycle) until that boundary. Usage and
+inventory publish independently, each retaining latest outcome, last successful
+observation and monotonic successful clock. Errors do not replace successes; stale
+starts at 15 minutes without that endpoint succeeding. A local one-second tick only
+reevaluates freshness/evaluation time; B1 projects reset countdowns on demand and
+retains percentages after reset passes. No tick requests I/O, invents zero, rolls a
+reset forward or adds history. Owner retirement synchronously invalidates this cache;
+old-generation/cancelled completions cannot publish or enqueue a successor read.
 
 Every state reports binding UNRESOLVED / identity UNVERIFIED. Token receipt and HTTP
 200 do not resolve account association. The owner accepted this single identity-unverified
@@ -206,7 +231,7 @@ account/workspace association or service distribution permission.
 The native gate implements selected connect, explicit two-read/session-refresh,
 rotation/re-auth and local-delete boundaries with production usage/inventory decoding.
 Authoritative association is unavailable and is not inferred. Usage polish and
-automatic refresh remain separate B/C work; B2 must consume the session/repository API
-rather than reimplement token rotation or login.
+rendering remain separate B/C work; B2 consumes the session/repository API
+rather than reimplementing token rotation or login.
 History, graphs, further providers, signing and distribution remain future scope.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).

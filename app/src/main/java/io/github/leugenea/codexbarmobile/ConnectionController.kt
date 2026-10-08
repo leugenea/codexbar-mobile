@@ -17,6 +17,7 @@ internal class ConnectionState(
     val auth: AuthState = AuthState.Idle,
     val observations: FeasibilityObservations? = null,
     val problem: ConnectionProblem? = null,
+    val refresh: UsageRefreshState = UsageRefreshState(),
 ) {
     val busy: Boolean get() = phase in setOf(ConnectionPhase.RESTORING, ConnectionPhase.AUTHENTICATING, ConnectionPhase.READING, ConnectionPhase.SIGNING_OUT)
     override fun toString(): String = "ConnectionState(phase=$phase, binding=UNRESOLVED, identity=UNVERIFIED, problem=$problem)"
@@ -36,11 +37,12 @@ internal class ConnectionController(
     mutationDispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1),
     private val storageWaitMillis: Long = 5_000L,
     private val storageDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    refreshClock: io.github.leugenea.codexbarmobile.transport.TransportClock = reader.clock,
 ) {
     private val ownerScope = CoroutineScope(scope.coroutineContext + mutationDispatcher)
     private val mutableState = MutableStateFlow(ConnectionState(ConnectionPhase.RESTORING))
     val state: StateFlow<ConnectionState> = mutableState
-    internal val session = reader.session(store, ownerScope, storageDispatcher)
+    internal val session = reader.session(store, ownerScope, storageDispatcher, ::sessionInvalidated)
     private val authenticatedReader = AuthenticatedProviderReader(session, reader)
     private var work: Job? = null
     private var revision = 0L
@@ -48,6 +50,7 @@ internal class ConnectionController(
     private var deletion: Deferred<CredentialResult<Unit>>? = null
     private var closed = false
     private val stopped = CompletableDeferred<Unit>()
+    private val usageRefresh = UsageRefresh(ownerScope, refreshClock, ::refreshUsage, ::refreshChanged)
 
     init { work = ownerScope.launch { restore() } }
 
@@ -117,38 +120,67 @@ internal class ConnectionController(
             }
             is CredentialResult.Success -> {
                 session.adopt(credentials.value)
-                publish(owner, ConnectionState(ConnectionPhase.READING, terminal))
-                observe(owner, terminal)
+                publish(owner, ConnectionState(ConnectionPhase.RESTORED, terminal))
+                usageRefresh.request()
             }
         }
     }
 
-    /** Explicit requests only; no periodic work, service or scheduling. */
     fun readUsage(refreshSession: Boolean = false) = command {
-        if (mutableState.value.busy || cleanupPending()) return@command
-        val active = session.snapshot() as? SessionResult.Ready ?: return@command
-        val owner = ++revision
-        work?.cancel()
-        session.retryTransient()
-        mutableState.value = ConnectionState(ConnectionPhase.READING, AuthState.Connected(active.envelope.generation))
-        work = ownerScope.launch {
-            val result = if (refreshSession) session.refresh(active.envelope, session.deadline()) else null
-            observe(owner, AuthState.Connected(active.envelope.generation), result as? SessionResult.Failed)
+        if (cleanupPending() || session.snapshot() !is SessionResult.Ready) return@command
+        usageRefresh.request(refreshSession, explicit = true)
+    }
+
+    /** Observer identities keep one Activity from cancelling another visible Activity. */
+    fun usageForeground(observer: Any, foreground: Boolean) = command {
+        usageRefresh.foreground(observer, foreground)
+    }
+
+    private fun refreshChanged(refresh: UsageRefreshState) {
+        val previous = mutableState.value
+        val phase = if (previous.phase == ConnectionPhase.READING && !refresh.refreshing) ConnectionPhase.OBSERVED else previous.phase
+        mutableState.value = ConnectionState(phase, previous.auth, refresh.observations, previous.problem, refresh)
+    }
+
+    private suspend fun refreshUsage(refreshSession: Boolean, explicit: Boolean,
+        observed: (EndpointObservation) -> Unit, admissionDeferred: (Long) -> Unit) {
+        if (cleanupPending()) return
+        val active = session.snapshot() as? SessionResult.Ready ?: return
+        val owner = revision
+        val auth = AuthState.Connected(active.envelope.generation)
+        if (explicit) session.retryTransient()
+        publish(owner, ConnectionState(ConnectionPhase.READING, auth, usageRefresh.state.observations,
+            refresh = usageRefresh.state))
+        val result = if (refreshSession) session.refresh(active.envelope, session.deadline()) else null
+        observe(owner, auth, observed, admissionDeferred, result as? SessionResult.Failed)
+    }
+
+    private suspend fun observe(owner: Long, auth: AuthState, observed: (EndpointObservation) -> Unit,
+        admissionDeferred: (Long) -> Unit,
+        refreshFailure: SessionResult.Failed? = null) {
+        val facts = if (refreshFailure == null) authenticatedReader.read(observed, admissionDeferred) else FeasibilityObservations(
+            EndpointObservation(io.github.leugenea.codexbarmobile.transport.ReadOperation.USAGE, error = refreshFailure.problem.readError()),
+            EndpointObservation(io.github.leugenea.codexbarmobile.transport.ReadOperation.RESET_INVENTORY, error = refreshFailure.problem.readError()),
+        ).also { observed(it.usage); observed(it.inventory) }
+        if (!current(owner) || session.snapshot() is SessionResult.Failed) return
+        publish(owner, observedState(auth, facts))
+    }
+
+    /** A10 terminal settlement must outlive the lifecycle-cancellable usage waiter. */
+    private fun sessionInvalidated() {
+        val owner = revision
+        usageRefresh.reset()
+        publish(owner, ConnectionState(ConnectionPhase.READING))
+        ownerScope.launch {
+            val removed = session.awaitRemoval()
+            publish(owner, if (removed) ConnectionState(ConnectionPhase.REAUTH_REQUIRED, problem = ConnectionProblem.AUTH)
+                else storageFailure())
         }
     }
 
-    private suspend fun observe(owner: Long, auth: AuthState, refreshFailure: SessionResult.Failed? = null) {
-        val facts = if (refreshFailure == null) authenticatedReader.read() else FeasibilityObservations(
-            EndpointObservation(io.github.leugenea.codexbarmobile.transport.ReadOperation.USAGE, error = refreshFailure.problem.readError()),
-            EndpointObservation(io.github.leugenea.codexbarmobile.transport.ReadOperation.RESET_INVENTORY, error = refreshFailure.problem.readError()),
-        )
-        if (!current(owner)) return
-        val reauth = session.snapshot() is SessionResult.Failed
-        if (reauth && !session.awaitRemoval()) { publish(owner, storageFailure()); return }
-        publish(owner, ConnectionState(if (reauth) ConnectionPhase.REAUTH_REQUIRED else ConnectionPhase.OBSERVED,
-            auth = if (reauth) AuthState.Idle else auth, observations = if (reauth) null else facts,
-            problem = if (reauth) ConnectionProblem.AUTH else if (facts.successful) null else ConnectionProblem.READ))
-    }
+    private fun observedState(auth: AuthState, facts: FeasibilityObservations) =
+        ConnectionState(ConnectionPhase.OBSERVED, auth, usageRefresh.state.observations,
+            problem = if (facts.successful) null else ConnectionProblem.READ, refresh = usageRefresh.state)
 
     fun cancel() = command { cancelTo(ConnectionState(ConnectionPhase.CANCELLED)) }
     fun browserFailed() = command { cancelTo(ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.BROWSER)) }
@@ -209,6 +241,7 @@ internal class ConnectionController(
 
     private fun retire(): Long {
         revision++
+        usageRefresh.reset()
         work?.cancel()
         authenticator.cancel()
         session.retire()
@@ -223,6 +256,7 @@ internal class ConnectionController(
     fun close() = command {
         closed = true
         retire()
+        usageRefresh.close()
         mutableState.value = ConnectionState(ConnectionPhase.CANCELLED)
         ownerScope.launch {
             // Do not clear a holder while an old deletion can still erase its successor.

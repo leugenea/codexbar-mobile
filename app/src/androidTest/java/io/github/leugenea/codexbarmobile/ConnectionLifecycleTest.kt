@@ -202,14 +202,16 @@ class ConnectionLifecycleTest {
             compose.onNodeWithText("Weekly (604800 s): KNOWN").performScrollTo().assertExists()
             compose.onNodeWithText("Inventory banked available_count: 2").performScrollTo().assertExists()
             compose.onNodeWithText("Banked expiry: 2026-10-22T20:31:56.833553Z").performScrollTo().assertExists()
+            val beforeRecreation = fake.calls.size
             scenario.recreate()
+            bounded("recreated live gate admits one resumed cycle") { fake.calls.size == beforeRecreation + 2 }
             await(scenario, "recreated observed state") { it.phase == ConnectionPhase.OBSERVED }
-            assertEquals(5, fake.calls.size)
+            assertEquals(beforeRecreation + 2, fake.calls.size)
             click("sign-out")
             await(scenario, "local key and file deletion") { it.phase == ConnectionPhase.SIGNED_OUT }
             assertFalse(KeystoreCredentialStore.file(context, session).exists())
             assertFalse(keyExists(session))
-            assertEquals(5, fake.calls.size)
+            assertEquals(beforeRecreation + 2, fake.calls.size)
         }
     }
 
@@ -318,8 +320,9 @@ class ConnectionLifecycleTest {
             assertFalse(File(KeystoreCredentialStore.file(context, slot).parentFile, "rotation-pending").exists())
             val beforeRecreation = fake.calls.size
             scenario.recreate()
+            bounded("rotated session resumes one read cycle") { fake.calls.size == beforeRecreation + 2 }
             await(scenario, "rotation survives Activity recreation") { it.phase == ConnectionPhase.OBSERVED }
-            assertEquals(beforeRecreation, fake.calls.size)
+            assertEquals(beforeRecreation + 2, fake.calls.size)
             fake.refreshStatus = 401
             click("refresh-session")
             await(scenario, "terminal refresh requires reauth") { it.phase == ConnectionPhase.REAUTH_REQUIRED }
@@ -482,7 +485,18 @@ class ConnectionLifecycleTest {
             val phase = if (replace) ConnectionPhase.OBSERVED else ConnectionPhase.SIGNED_OUT
             await(scenario, "shared-owner $phase") { it.phase == phase }
             assertEquals("Retired usage transport cancelled", 1, fake.cancelledReads)
+            // Local B2 ticks legitimately replace ConnectionState while the gate is visible.
+            // Pause only that scheduler before the strict retired-generation identity oracle.
+            click("offline-tab")
+            compose.waitForIdle()
+            settleOwnerCommands()
+            await(scenario, "shared-owner paused $phase") { it.phase == phase }
+            val previousAttempt = shared.state.value.refresh.usage.attempt
             assertRetiredReadCannotAffectSharedOwner(scenario, shared, held, replace)
+            click("connection-tab")
+            if (replace) await(scenario, "shared-owner foreground refresh settled") {
+                it.phase == ConnectionPhase.OBSERVED && it.refresh.usage.attempt !== previousAttempt
+            }
             assertSavedStateHasNoSecrets(scenario)
         }
     }
@@ -497,7 +511,7 @@ class ConnectionLifecycleTest {
         val requests = fake.calls.size
         val current = shared.state.value
         held(response(USAGE))
-        await(scenario, "late old-generation response discarded") { it.phase == current.phase }
+        settleOwnerCommands()
         assertSame("No stale observations after replacement/logout", current, shared.state.value)
         assertEquals("Old generation must not admit inventory", requests, fake.calls.size)
         if (bytes == null) {
@@ -529,7 +543,7 @@ class ConnectionLifecycleTest {
         val changesState = tag in setOf("connect", "read-usage", "refresh-session", "sign-out", "cancel-connect")
         val before = if (changesState) NativeConnection.get(context).state.value else null
         val node = compose.onNodeWithTag(tag)
-        if (tag != "connection-tab") node.performScrollTo()
+        if (tag !in setOf("offline-tab", "connection-tab")) node.performScrollTo()
         node.performClick()
         if (before == null) return
         if (expectTransition) bounded("$tag owner admission", { NativeConnection.get(context).state.value.toString() }) {
@@ -549,7 +563,12 @@ class ConnectionLifecycleTest {
         var last = "no Activity"
         bounded(step, { last }) {
             var matches = false
-            scenario.onActivity { last = it.connection.state.value.toString(); matches = test(it.connection.state.value) }
+            scenario.onActivity {
+                val state = it.connection.state.value
+                last = "$state, refreshing=${state.refresh.refreshing}"
+                // Endpoint facts can be OBSERVED before the current B2 flight has settled.
+                matches = test(state) && (state.phase != ConnectionPhase.OBSERVED || !state.refresh.refreshing)
+            }
             matches
         }
     }
@@ -570,6 +589,7 @@ class ConnectionLifecycleTest {
         // Calling it on a resumed Activity leaves ActivityScenario thinking it is still
         // RESUMED, while Compose unregisters the root. Stop through the scenario first
         // so the real resume below restores both lifecycle and Compose registration.
+        val previousAttempt = owner!!.state.value.refresh.usage.attempt
         scenario.moveToState(Lifecycle.State.CREATED)
         try {
             scenario.onActivity {
@@ -581,6 +601,9 @@ class ConnectionLifecycleTest {
             scenario.moveToState(Lifecycle.State.RESUMED)
         }
         compose.waitForIdle()
+        if (previousAttempt != null) bounded("saved-state resume refresh completes", { owner.state.value.toString() }) {
+            owner.state.value.refresh.usage.attempt !== previousAttempt && !owner.state.value.refresh.refreshing
+        }
         scenario.onActivity {
             assertEquals("After saved-state capture", Lifecycle.State.RESUMED, it.lifecycle.currentState)
             assertSame("Saved-state capture must keep the connection owner", owner, it.connection)
@@ -637,28 +660,30 @@ class ConnectionLifecycleTest {
             else if (heldRead) reads += terminal
             else {
                 millis.incrementAndGet()
-                val body = when (request.url.encodedPath) {
-                    "/api/accounts/deviceauth/usercode" -> """{"device_auth_id":"synthetic-device","user_code":"$CODE"}"""
-                    "/api/accounts/deviceauth/token" -> """{"authorization_code":"synthetic-authorization","code_verifier":"synthetic-verifier"}"""
-                    "/oauth/token" -> if (refreshing) """{"access_token":"$ROTATED_ACCESS","refresh_token":"$ROTATED_REFRESH"}"""
-                        else """{"access_token":"$ACCESS","refresh_token":"$REFRESH"}"""
-                    ReadOperation.USAGE.path -> USAGE
-                    ReadOperation.RESET_INVENTORY.path -> INVENTORY
-                    else -> error("Unexpected synthetic route")
-                }
-                val status = when {
-                    refreshing -> refreshStatus
-                    request is ProviderHttpRequest.Get && rejectOriginalBearer &&
-                        request.bearer.copyBytes().toString(Charsets.UTF_8) == ACCESS -> 401
-                    request is ProviderHttpRequest.Get -> readStatus
-                    else -> 200
-                }
-                terminal(response(body, status))
+                terminal(response(body(request, refreshing), status(request, refreshing)))
             }
             return CancellationHandle {
                 if (heldRead) cancelledReads++
                 if (heldRefresh) cancelledRefreshes++
             }
+        }
+
+        private fun body(request: ProviderHttpRequest, refreshing: Boolean): String = when (request.url.encodedPath) {
+            "/api/accounts/deviceauth/usercode" -> """{"device_auth_id":"synthetic-device","user_code":"$CODE"}"""
+            "/api/accounts/deviceauth/token" -> """{"authorization_code":"synthetic-authorization","code_verifier":"synthetic-verifier"}"""
+            "/oauth/token" -> if (refreshing) """{"access_token":"$ROTATED_ACCESS","refresh_token":"$ROTATED_REFRESH"}"""
+                else """{"access_token":"$ACCESS","refresh_token":"$REFRESH"}"""
+            ReadOperation.USAGE.path -> USAGE
+            ReadOperation.RESET_INVENTORY.path -> INVENTORY
+            else -> error("Unexpected synthetic route")
+        }
+
+        private fun status(request: ProviderHttpRequest, refreshing: Boolean): Int = when {
+            refreshing -> refreshStatus
+            request is ProviderHttpRequest.Get && rejectOriginalBearer &&
+                request.bearer.copyBytes().toString(Charsets.UTF_8) == ACCESS -> 401
+            request is ProviderHttpRequest.Get -> readStatus
+            else -> 200
         }
     }
 

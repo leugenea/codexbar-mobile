@@ -55,6 +55,13 @@ CONNECTION_CASES = {
 }
 
 
+USAGE_REFRESH_CLASS = "io.github.leugenea.codexbarmobile.UsageRefreshLifecycleTest"
+USAGE_REFRESH_CASES = {
+    "homeCancelsEligibleReadAndReturningTaskRefreshesOnce",
+    "activityRecreationKeepsOneOwnerAndCoalescesRefresh",
+}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -80,14 +87,15 @@ def verify_reports(directory: Path, kind: str) -> dict:
     if missing:
         raise ValueError(f"Missing real {kind} offline-shell tests: {sorted(missing)}")
     if kind == "native":
-        credential_actual = {case["name"] for case in cases if case["class"] == CREDENTIAL_CLASS}
-        credential_missing = CREDENTIAL_CASES - credential_actual
-        if credential_missing:
-            raise ValueError(f"Missing real native credential tests: {sorted(credential_missing)}")
-        connection_actual = {case["name"] for case in cases if case["class"] == CONNECTION_CLASS}
-        connection_missing = CONNECTION_CASES - connection_actual
-        if connection_missing:
-            raise ValueError(f"Missing real native connection tests: {sorted(connection_missing)}")
+        for label, classname, required in (
+            ("credential", CREDENTIAL_CLASS, CREDENTIAL_CASES),
+            ("connection", CONNECTION_CLASS, CONNECTION_CASES),
+            ("usage refresh", USAGE_REFRESH_CLASS, USAGE_REFRESH_CASES),
+        ):
+            actual_names = {case["name"] for case in cases if case["class"] == classname}
+            missing_names = required - actual_names
+            if missing_names:
+                raise ValueError(f"Missing real native {label} tests: {sorted(missing_names)}")
     if not cases:
         raise ValueError(f"No executed {kind} tests")
     return {"kind": kind, "testCount": len(cases), "reports": [str(p) for p in reports], "testcases": cases}

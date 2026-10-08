@@ -9,6 +9,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.time.Instant
 
@@ -20,6 +21,7 @@ internal class EndpointObservation(
     val error: ReadError? = null,
     val usage: UsageObservation? = null,
     val inventory: BankedResetObservation? = null,
+    val notBeforeMillis: Long? = null,
 ) {
     // Keep the A8 screen's allowlisted facts without maintaining a second JSON parser.
     val availableCount: Field<Long>? get() = inventory?.reportedAvailableCount
@@ -35,14 +37,15 @@ internal data class FeasibilityObservations(val usage: EndpointObservation, val 
 /** A2 owns read policy, A4 owns I/O/JSON syntax, A9 decodes through A1 validation. */
 internal class NativeFeasibilityReader(
     private val transport: AuthTransport,
-    private val clock: TransportClock = SystemTransportClock,
+    internal val clock: TransportClock = SystemTransportClock,
     private val pause: suspend (Long) -> Unit = { delay(it) },
 ) {
     private val policy = ReadPolicy(clock, ReadBackoff { retry -> retry * 1_000L })
 
     fun session(store: io.github.leugenea.codexbarmobile.credentials.CredentialStore, scope: kotlinx.coroutines.CoroutineScope,
-        storageDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO) =
-        SessionCoordinator(store, transport, scope, clock, storageDispatcher)
+        storageDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
+        invalidated: () -> Unit = {}) =
+        SessionCoordinator(store, transport, scope, clock, storageDispatcher, invalidated)
 
     suspend fun read(bearer: SensitiveValue): FeasibilityObservations {
         val usage = endpoint(ReadOperation.USAGE, bearer)
@@ -52,7 +55,15 @@ internal class NativeFeasibilityReader(
     internal suspend fun endpoint(
         operation: ReadOperation, bearer: SensitiveValue, usage: UsageObservation? = null,
         session: SessionCoordinator? = null, envelope: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope? = null,
-        alreadyRefreshed: Boolean = false,
+        alreadyRefreshed: Boolean = false, admissionDeferred: (Long) -> Unit = {},
+    ): EndpointObservation = withTimeoutOrNull(ReadDeadline.MAX_DURATION_MILLIS) {
+        boundedEndpoint(operation, bearer, usage, session, envelope, alreadyRefreshed, admissionDeferred)
+    } ?: EndpointObservation(operation, error = ReadError.DEADLINE_EXCEEDED)
+
+    private suspend fun boundedEndpoint(
+        operation: ReadOperation, bearer: SensitiveValue, usage: UsageObservation?,
+        session: SessionCoordinator?, envelope: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope?,
+        alreadyRefreshed: Boolean, admissionDeferred: (Long) -> Unit,
     ): EndpointObservation {
         var credentials = envelope
         var token = bearer
@@ -65,6 +76,8 @@ internal class NativeFeasibilityReader(
                 currentCoroutineContext().ensureActive()
                 val receivedAt = clock.now().wall
                 val decision = policy.evaluate(request, attempt, result)
+                // Preserve A2's boundary on the owner lane before a cancellable retry wait.
+                decision.notBeforeMillis?.let(admissionDeferred)
                 val status = (result as? TransportResult.Response)?.status
                 when (decision.action) {
                     ReadAction.SUCCEED -> return project(operation, result as TransportResult.Response, receivedAt, usage)
@@ -79,7 +92,7 @@ internal class NativeFeasibilityReader(
                         }
                     }
                     else -> {
-                        return finished(operation, status, decision.error, session, credentials)
+                        return finished(operation, status, decision.error, session, credentials, decision.notBeforeMillis)
                     }
                 }
             }
@@ -110,10 +123,10 @@ internal class NativeFeasibilityReader(
 
     private suspend fun finished(
         operation: ReadOperation, status: Int?, error: ReadError?, session: SessionCoordinator?,
-        credentials: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope?,
+        credentials: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope?, notBeforeMillis: Long?,
     ): EndpointObservation {
         if (error == ReadError.REAUTHORIZE && credentials != null) session?.requireReauthorization(credentials)
-        return EndpointObservation(operation, status, error = error)
+        return EndpointObservation(operation, status, error = error, notBeforeMillis = notBeforeMillis)
     }
 
     private fun project(
