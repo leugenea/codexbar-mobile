@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791456145044,
+  "lastUpdate": 1791475031501,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -737,6 +737,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/346c69d189b44400deac3f7b374c6ee7e68f3cfd"
         },
         "date": 1791456142730,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2f5fdec78fbad479aba3e54d57f9c98472973490",
+          "message": "feat(m3b): lifecycle-owned coalesced usage refresh (#64)\n\n* feat(m3b): lifecycle-owned coalesced usage refresh (#63)\n\n* test(m3b): settle current-generation B2 refresh before A10 identity oracles (#63)\n\n* fix(m3b): keep Retry-After boundary across foreground cancellation; tab clicks without scroll (#63)",
+          "timestamp": "2026-10-08T18:56:40+03:00",
+          "tree_id": "a2147b65df1650429aa1bb9fcbcb76f1928c7b92",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/2f5fdec78fbad479aba3e54d57f9c98472973490"
+        },
+        "date": 1791475030585,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
