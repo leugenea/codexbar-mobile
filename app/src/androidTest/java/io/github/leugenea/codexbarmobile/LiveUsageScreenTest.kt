@@ -26,6 +26,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.IntSize
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -324,7 +325,32 @@ class LiveUsageScreenTest {
         compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         assertTrue("No native text layout for $tag", layouts.isNotEmpty())
-        layouts.forEach { assertFalse("$tag: size=${it.size}, constraints=${it.layoutInput.constraints}", it.hasVisualOverflow) }
+        layouts.forEach { layout ->
+            val lines = (0 until layout.lineCount).map {
+                "${layout.getLineLeft(it)}..${layout.getLineRight(it)} (ellipsis=${layout.isLineEllipsized(it)})"
+            }
+            assertTrue("$tag: text=${layout.layoutInput.text}, size=${layout.size}, " +
+                "paragraph=${layout.multiParagraph.width} x ${layout.multiParagraph.height}, " +
+                "constraints=${layout.layoutInput.constraints}, lines=$lines", textFitsMeasuredBounds(layout))
+            // Calibrate both clipping axes against the same native line metrics, not a wider parent.
+            assertFalse("$tag: horizontal clipping must fail the oracle",
+                textFitsMeasuredBounds(layout.copy(size = IntSize(0, layout.size.height))))
+            assertFalse("$tag: vertical clipping must fail the oracle",
+                textFitsMeasuredBounds(layout.copy(size = IntSize(layout.size.width, 0))))
+        }
+    }
+
+    private fun textFitsMeasuredBounds(layout: TextLayoutResult): Boolean {
+        // Compose 1.12.1 TextStringSimpleNode rebuilds semantics with the loose parent maxWidth,
+        // but retains the measured Text size. Thus didOverflowWidth can mean 479 < 1752 even
+        // when every line fits. These Start-aligned labels need actual line extents instead.
+        // Keep height/max-line overflow, complete text coverage and ellipsis fail-closed.
+        return layout.lineCount > 0 && !layout.didOverflowHeight &&
+            layout.getLineEnd(layout.lineCount - 1) == layout.layoutInput.text.length &&
+            (0 until layout.lineCount).all {
+                !layout.isLineEllipsized(it) && layout.getLineLeft(it) >= 0f &&
+                    layout.getLineRight(it) <= layout.size.width
+            }
     }
 
     private fun waitFor(step: String, condition: () -> Boolean) {
