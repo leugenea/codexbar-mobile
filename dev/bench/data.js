@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791475034798,
+  "lastUpdate": 1791482343685,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -771,6 +771,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/2f5fdec78fbad479aba3e54d57f9c98472973490"
         },
         "date": 1791475030585,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8bc51a750eea20d1c42e20ebb4fd1c3129331c0d",
+          "message": "feat(m3b): render accessible live usage windows and all refresh states (#66)\n\n* feat(m3b): render accessible live usage windows and refresh states (#65)\n\n* fix(m3b): single accessibility owner for window percent; SdkSuppress-only test gate (#65)\n\n* test(m3b): measure live-label overflow by native line extents, not loose semantics width (#65)",
+          "timestamp": "2026-10-08T20:58:07+03:00",
+          "tree_id": "20b1b33ce60a7e892991e12b42279dd6b5144ff1",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/8bc51a750eea20d1c42e20ebb4fd1c3129331c0d"
+        },
+        "date": 1791482341332,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
