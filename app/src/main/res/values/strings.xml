@@ -72,4 +72,12 @@
         <item quantity="one">%1$d hour</item>
         <item quantity="other">%1$d hours</item>
     </plurals>
+    <string name="entitlement_known">Provider-reported banked entitlements</string>
+    <string name="entitlement_empty">Provider reports no available banked entitlements</string>
+    <string name="entitlement_unsupported">Banked entitlement information unsupported</string>
+    <string name="entitlement_unknown">Banked entitlement information unknown</string>
+    <string name="entitlement_inaccessible">Banked entitlement information inaccessible</string>
+    <string name="entitlement_malformed">Malformed banked entitlement information</string>
+    <string name="entitlement_discrepant">Conflicting banked entitlement information · provider counts retained</string>
+    <string name="entitlement_expiry">Banked entitlement expiry</string>
 </resources>
