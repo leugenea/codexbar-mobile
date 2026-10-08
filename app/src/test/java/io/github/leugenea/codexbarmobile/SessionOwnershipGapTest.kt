@@ -148,13 +148,17 @@ class SessionOwnershipGapTest {
         private val released = CountDownLatch(1)
         private val armed = AtomicBoolean(false)
         private val generation = AtomicReference<SessionGeneration?>()
+        private val selectedWorker = AtomicReference<Thread?>()
         private var authRequestHints = 0 // Accessed only on the selected old worker.
 
         fun arm(owner: SessionGeneration) { generation.set(owner); armed.set(true) }
 
+        // Coroutine debug mode changes the name, never this explicitly registered identity.
+        fun selectWorker() { selectedWorker.set(Thread.currentThread()) }
+
         fun afterValidation(owner: SessionGeneration, valid: Boolean, rotationPrepared: Boolean) {
             if (!valid || !armed.get() || generation.get() !== owner ||
-                Thread.currentThread().name != OLD_WORKER) return
+                Thread.currentThread() !== selectedWorker.get()) return
             val stack = Thread.currentThread().stackTrace
             fun at(type: String, method: String) = stack.any {
                 it.className.endsWith(type) && it.methodName == method
@@ -301,7 +305,7 @@ class SessionOwnershipGapTest {
         }
 
         fun withWorker(action: () -> Unit, assertions: (Worker) -> Unit) {
-            val worker = Worker(action)
+            val worker = Worker { gate.selectWorker(); action() }
             try { assertions(worker) } finally {
                 gate.release()
                 worker.awaitFinished() // Rethrow thread failures, including gate assertions.
