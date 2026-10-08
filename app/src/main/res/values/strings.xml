@@ -49,4 +49,27 @@
     <string name="gate_summary_count">Usage banked available_count: %1$s</string>
     <string name="gate_inventory_count">Inventory banked available_count: %1$s</string>
     <string name="gate_expiry">Banked expiry: %1$s</string>
+    <!-- B1: absolute labels truncate to the containing hour, not an exact reset/expiry. -->
+    <string name="time_absolute">%1$s, %2$s (hour precision)</string>
+    <string name="time_absolute_offset">%1$s, %2$s UTC%3$s (hour precision)</string>
+    <string name="time_remaining">%1$s remaining</string>
+    <string name="time_less_than_hour">&lt;1h remaining</string>
+    <string name="time_awaiting_refresh">Reset passed · awaiting refresh</string>
+    <string name="time_expired">Entitlement expired</string>
+    <string name="time_unknown_target">Time unavailable</string>
+    <string name="time_unknown_clock">Remaining time unavailable · clock unknown</string>
+    <string name="time_discrepant">Conflicting time information</string>
+    <string name="time_snapshot_observed">As observed · freshness not guaranteed</string>
+    <string name="time_snapshot_unknown">Snapshot freshness unknown</string>
+    <string name="time_snapshot_stale">Stale snapshot · awaiting refresh</string>
+    <string name="time_clock_before_observation">Clock is before snapshot observation</string>
+    <string name="time_days_hours">%1$s %2$s</string>
+    <plurals name="time_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <plurals name="time_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
 </resources>
