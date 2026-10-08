@@ -127,6 +127,16 @@ flags, banked counts and UTC expiry facts, with independent endpoint observation
 times. Both endpoints now use the production A9 decoders; no independent A8 JSON
 fact extractor remains. Decoders retain missing/null/wrong-type knowledge and all
 window/item siblings through A1, without treating M0 fixtures as provider guarantees.
+Banked inventory also retains the `credits` row-container knowledge/reason and array
+size independently of provider counts and individual row validity. The pure C1
+`EntitlementPresentation` retains this field: absent/null map from A1 UNAVAILABLE to
+UNKNOWN, with MISSING/PROVIDER_NULL reasons still distinct; wrong-type containers map
+to MALFORMED. Invalid JSON remains an endpoint INVALID_RESPONSE/MALFORMED failure,
+not an invented observation. A valid array with malformed rows stays KNOWN at the
+container level and PARTIAL at the inventory level; C1 preserves the row failures.
+EMPTY requires an explicitly empty array and a provider-reported zero; counts are
+never recomputed, and discrepancies keep precedence while container facts remain
+visible. Endpoint errors and stale-generation isolation keep their existing precedence.
 Full normalized observations remain in memory; endpoint/result diagnostics redact
 arbitrary provider strings and identities. The screen still renders only its existing
 allowlisted numeric/date facts, not B/C presentation. The existing gate has explicit

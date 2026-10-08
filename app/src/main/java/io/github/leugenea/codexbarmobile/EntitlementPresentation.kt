@@ -55,6 +55,7 @@ internal class PresentedEntitlements(
     val issues: Set<InventoryIssue> = emptySet(),
     val summaryError: ReadError? = null,
     val inventoryError: ReadError? = null,
+    val inventoryRowContainer: Field<Int>? = null,
 )
 
 /** Read-only A9 projection. B1 alone reevaluates expiry; no time math, parser, I/O or history. */
@@ -79,6 +80,7 @@ internal object EntitlementPresentation {
             observation?.summaryObservedAt ?: endpoints.usage.usage?.observedAt, observation?.observedAt,
             observation?.inventoryRowCount, observation?.completeness ?: Completeness.UNKNOWN,
             items, issues, endpoints.usage.error, endpoints.inventory.error,
+            inventoryRowContainer = observation?.inventoryRowContainer,
         )
     }
 
@@ -137,10 +139,15 @@ internal object EntitlementPresentation {
         if (observation == null) return EntitlementState.UNKNOWN
         if (issues.any { it in discrepancies }) return EntitlementState.DISCREPANT
         val countState = fieldState(observation.reportedAvailableCount)
-        val incomplete = incompleteState(listOf(countState) + items.map { it.state })
+        // A1 missing/null -> UNAVAILABLE -> UNKNOWN; invalid container -> MALFORMED.
+        // Keep container reasons visible even when an endpoint error or discrepancy takes precedence.
+        val containerState = fieldState(observation.inventoryRowContainer)
+        val incomplete = incompleteState(listOf(countState, containerState) + items.map { it.state })
         if (incomplete != null) return incomplete
         if (observation.completeness != Completeness.COMPLETE) return EntitlementState.UNKNOWN
-        return if (observation.reportedAvailableCount.value == 0L) EntitlementState.EMPTY else EntitlementState.KNOWN
+        return if (observation.reportedAvailableCount.value == 0L && observation.inventoryRowContainer.value == 0) {
+            EntitlementState.EMPTY
+        } else EntitlementState.KNOWN
     }
 
     private fun errorState(error: ReadError): EntitlementState = when (error) {
