@@ -16,6 +16,7 @@ import java.util.UUID
  */
 class KeystoreCredentialStore(context: Context, localSessionId: UUID) : CredentialStore {
     private val owner = sharedOwner(context, localSessionId)
+    override val ownership: SessionOwnership get() = owner.ownership
 
     override fun openSession(): SessionGeneration = owner.openSession()
     override fun isActive(generation: SessionGeneration): Boolean = owner.isActive(generation)
@@ -46,34 +47,37 @@ class KeystoreCredentialStore(context: Context, localSessionId: UUID) : Credenti
 /** The outer lock makes capability creation and persistence rebinding one atomic operation. */
 internal class CredentialSlotOwner(private val persistence: ProtectedCredentialPersistence) : CredentialStore {
     internal val kernel = SerializedCredentialStore(persistence)
-    private val lane = Any()
+    override val ownership: SessionOwnership get() = kernel.ownership
 
-    override fun openSession(): SessionGeneration = synchronized(lane) {
+    override fun openSession(): SessionGeneration = ownership.serialized {
         kernel.openSession().also(persistence::activate)
     }
     override fun isActive(generation: SessionGeneration): Boolean = kernel.isActive(generation)
 
-    override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> = synchronized(lane) {
+    override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> = ownership.serialized {
         kernel.read(generation)
     }
     override fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation): CredentialResult<CredentialEnvelope> =
         kernel.replace(envelope, cancellation)
-    override fun delete(generation: SessionGeneration): CredentialResult<Unit> = synchronized(lane) {
+    override fun delete(generation: SessionGeneration): CredentialResult<Unit> = ownership.serialized {
         kernel.delete(generation)
     }
-    override fun replaceSession(generation: SessionGeneration): CredentialResult<SessionGeneration> = synchronized(lane) {
+    override fun replaceSession(generation: SessionGeneration): CredentialResult<SessionGeneration> = ownership.serialized {
         kernel.replaceSession(generation).also {
             if (it is CredentialResult.Success) persistence.activate(it.value)
         }
     }
-    override fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = synchronized(lane) {
+    override fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = ownership.serialized {
         when (val read = kernel.read(generation)) {
             is CredentialResult.Failure -> read
             is CredentialResult.Success -> persistence.rotation(generation, pending = true)
         }
     }
-    override fun finishRotation(generation: SessionGeneration): CredentialResult<Unit> = synchronized(lane) {
-        persistence.rotation(generation, pending = false)
+    override fun finishRotation(generation: SessionGeneration): CredentialResult<Unit> = ownership.serialized {
+        when (val checked = kernel.finishRotation(generation)) {
+            is CredentialResult.Failure -> checked
+            is CredentialResult.Success -> persistence.rotation(generation, pending = false)
+        }
     }
 }
 

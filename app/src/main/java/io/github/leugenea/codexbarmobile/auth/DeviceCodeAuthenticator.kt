@@ -21,9 +21,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.flow.MutableStateFlow
+import io.github.leugenea.codexbarmobile.credentials.SequencedStateFlow
+import io.github.leugenea.codexbarmobile.transport.CancellationHandle
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -40,29 +40,43 @@ class DeviceCodeAuthenticator(
     private val clock: TransportClock = SystemTransportClock,
     private val pause: suspend (Long) -> Unit = { delay(it) },
 ) {
-    private val mutableState = MutableStateFlow<AuthState>(AuthState.Idle)
-    val state: StateFlow<AuthState> = mutableState.asStateFlow()
+    private val ownership = store.ownership
+    private val mutableState = SequencedStateFlow<AuthState>(ownership, AuthState.Idle)
+    val state: StateFlow<AuthState> = mutableState
     private var active: Attempt? = null
+    private var connectedBinding: CancellationHandle? = null
 
     fun start(scope: CoroutineScope, generation: SessionGeneration? = null): Job {
-        val (previous, attempt) = synchronized(this) {
+        val (previous, attempt) = ownership.serialized {
+            if (generation != null && !ownership.isActive(generation)) return rejected(scope)
+            connectedBinding?.cancel()
+            connectedBinding = null
             val previous = active
             val owner = Attempt(generation ?: store.openSession())
             owner.job = scope.launch(start = CoroutineStart.LAZY) { run(owner) }
             active = owner
-            mutableState.value = AuthState.RequestingCode
+            owner.binding = ownership.onDisplaced(owner.generation) {
+                finish(owner, AuthState.Failed(owner.stage, AuthFailure.STALE_OWNER))
+                stop(owner)
+            }
+            if (active === owner) mutableState.value = AuthState.RequestingCode
             previous to owner
         }
         // Job completion handlers can synchronously start/cancel another owner. No
         // ownership or state writes follow cancellation of the detached predecessor.
         stop(previous)
         attempt.job.invokeOnCompletion { finish(attempt, AuthState.Cancelled) }
-        attempt.job.start()
+        ownership.defer { attempt.job.start() }
         return attempt.job
     }
 
+    private fun rejected(scope: CoroutineScope): Job {
+        if (active == null) mutableState.value = AuthState.Failed(AuthStage.USERCODE, AuthFailure.STALE_OWNER)
+        return scope.launch(start = CoroutineStart.LAZY) {}.also { ownership.defer { it.cancel() } }
+    }
+
     fun cancel() {
-        val previous = synchronized(this) {
+        val previous = ownership.serialized {
             val owner = active ?: return
             active = null
             mutableState.value = AuthState.Cancelled
@@ -71,10 +85,15 @@ class DeviceCodeAuthenticator(
         stop(previous)
     }
 
+    internal fun displacedState(): AuthState.Failed = ownership.serialized {
+        mutableState.value as? AuthState.Failed ?: AuthState.Failed(active?.stage ?: AuthStage.USERCODE, AuthFailure.STALE_OWNER)
+    }
+
     private fun stop(owner: Attempt?) {
         if (owner == null) return
+        owner.binding?.cancel()
         owner.cancellation.cancel()
-        owner.job.cancel()
+        ownership.defer { owner.job.cancel() }
     }
 
     private suspend fun run(owner: Attempt) {
@@ -156,7 +175,7 @@ class DeviceCodeAuthenticator(
         val duration = end?.let { minOf(remaining(it), ReadDeadline.MAX_DURATION_MILLIS) }
             ?: ReadDeadline.MAX_DURATION_MILLIS
         val deadline = ReadDeadline.after(clock.now(), duration)
-        val result = transport.await(request, deadline)
+        val result = transport.await(request, deadline, ownership, owner.generation)
         currentCoroutineContext().ensureActive()
         ensureOwner(owner)
         if (end != null) remaining(end)
@@ -205,22 +224,32 @@ class DeviceCodeAuthenticator(
     private suspend fun publish(owner: Attempt, state: AuthState) {
         currentCoroutineContext().ensureActive()
         ensureOwner(owner)
-        synchronized(this) { if (active === owner) mutableState.value = state }
+        ownership.ifActive(owner.generation) {
+            if (active === owner) mutableState.value = state
+        }
         // An undispatched observer may synchronously cancel or replace this attempt.
         currentCoroutineContext().ensureActive()
     }
 
     private fun finish(owner: Attempt, state: AuthState) {
-        synchronized(this) {
+        ownership.serialized {
             if (active !== owner) return
             active = null
-            mutableState.value = if (state is AuthState.Connected && !store.isActive(owner.generation))
+            owner.binding?.cancel()
+            mutableState.value = if (state is AuthState.Connected && !ownership.isActive(owner.generation))
                 AuthState.Failed(AuthStage.STORE, AuthFailure.STALE_OWNER) else state
+            if (mutableState.value is AuthState.Connected) {
+                connectedBinding = ownership.onDisplaced(owner.generation) {
+                    mutableState.value = AuthState.Failed(AuthStage.STORE, AuthFailure.STALE_OWNER)
+                    connectedBinding = null
+                }
+            }
         }
     }
 
     private class Attempt(val generation: SessionGeneration) {
         val cancellation = CredentialCancellation()
+        var binding: CancellationHandle? = null
         var stage = AuthStage.USERCODE
         lateinit var job: Job
     }

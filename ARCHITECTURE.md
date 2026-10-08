@@ -65,9 +65,15 @@ restoring or signing in ahead of an already admitted logout. Account replacement
 retires the preceding generation and deletes its durable credentials before new auth.
 Deletion and allocation of the replacement capability share the slot's serialized
 lane; the delayed authenticator uses that admitted capability instead of reopening
-the slot. Every live owner checks the shared kernel's active capability at request
-admission/retry, between endpoints, refresh settlement/persistence and publication.
-This runtime check never decrypts credentials or clears a pending-rotation marker.
+the slot. All adapters and runtime owners for that slot share one ownership sequencer.
+Displacement, generation validation plus transport enqueue, and committed observable-state
+assignment execute on that lane; `isActive` snapshots alone never authorize an effect.
+Displacement proactively clears old observations and cancels the exact detached jobs.
+Synchronous transport completions, job cancellation and StateFlow collector wakeups run
+outside the lane, not under a storage/runtime lock. A delayed wakeup reads the latest
+committed state; an observer snapshot already admitted before displacement remains an
+in-flight delivery, not permission for another request, durable write or publication.
+This runtime arbitration never decrypts credentials or clears a pending-rotation marker.
 A displaced read owner requires sign-in again and discards its observations.
 
 After a successful selected exchange/persistence, the reader issues only the two

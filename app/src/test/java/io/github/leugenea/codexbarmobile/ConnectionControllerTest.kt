@@ -108,6 +108,7 @@ class ConnectionControllerTest {
             val persistence = FakeCredentialPersistence()
             val store = object : CredentialStore {
                 private val delegate = SerializedCredentialStore(persistence)
+                override val ownership get() = delegate.ownership
                 override fun openSession() = delegate.openSession()
                 override fun isActive(generation: SessionGeneration) = delegate.isActive(generation)
                 override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> =

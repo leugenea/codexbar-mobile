@@ -10,18 +10,17 @@ import java.util.concurrent.CancellationException
  */
 class SerializedCredentialStore(private val persistence: CredentialPersistence) : CredentialStore {
     private val namespace = LocalCredentialNamespace()
-    private val ownership = Any()
+    override val ownership = SessionOwnership()
     private val replacements = Any()
-    private var active: SessionGeneration? = null
 
-    override fun openSession(): SessionGeneration = synchronized(ownership) {
-        SessionGeneration(namespace).also { active = it }
+    override fun openSession(): SessionGeneration = ownership.serialized {
+        SessionGeneration(namespace).also(ownership::activate)
     }
 
-    override fun isActive(generation: SessionGeneration): Boolean = synchronized(ownership) { active === generation }
+    override fun isActive(generation: SessionGeneration): Boolean = ownership.isActive(generation)
 
-    override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> = synchronized(ownership) {
-        if (active !== generation) return@synchronized stale()
+    override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> = ownership.serialized {
+        if (!ownership.isActive(generation)) return@serialized stale()
         when (val result = safely(CredentialFailure.CORRUPT) { persistence.read() }) {
             is CredentialResult.Failure -> result
             is CredentialResult.Success -> if (result.value.generation === generation) result else stale()
@@ -32,29 +31,29 @@ class SerializedCredentialStore(private val persistence: CredentialPersistence) 
         envelope: CredentialEnvelope,
         cancellation: CredentialCancellation,
     ): CredentialResult<CredentialEnvelope> = synchronized(replacements) {
-        val rejected = synchronized(ownership) { rejection(envelope.generation, cancellation) }
+        val rejected = ownership.serialized { rejection(envelope.generation, cancellation) }
         if (rejected != null) return@synchronized rejected
         when (val staged = safely(CredentialFailure.FAILED_WRITE) { persistence.prepare(envelope) }) {
-            is CredentialResult.Failure -> synchronized(ownership) {
+            is CredentialResult.Failure -> ownership.serialized {
                 rejection(envelope.generation, cancellation) ?: staged
             }
             is CredentialResult.Success -> commit(envelope, staged.value, cancellation)
         }
     }
 
-    override fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = synchronized(ownership) {
-        if (active !== generation) stale() else CredentialResult.Success(Unit)
+    override fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = ownership.serialized {
+        if (!ownership.isActive(generation)) stale() else CredentialResult.Success(Unit)
     }
 
     override fun finishRotation(generation: SessionGeneration): CredentialResult<Unit> = beginRotation(generation)
 
-    override fun delete(generation: SessionGeneration): CredentialResult<Unit> = synchronized(ownership) {
-        if (active !== generation) return@synchronized stale()
-        active = null
+    override fun delete(generation: SessionGeneration): CredentialResult<Unit> = ownership.serialized {
+        if (!ownership.isActive(generation)) return@serialized stale()
+        ownership.activate(null)
         safely(CredentialFailure.FAILED_WRITE) { persistence.delete() }
     }
 
-    override fun replaceSession(generation: SessionGeneration): CredentialResult<SessionGeneration> = synchronized(ownership) {
+    override fun replaceSession(generation: SessionGeneration): CredentialResult<SessionGeneration> = ownership.serialized {
         when (val deleted = delete(generation)) {
             is CredentialResult.Failure -> deleted
             is CredentialResult.Success -> CredentialResult.Success(openSession())
@@ -67,7 +66,7 @@ class SerializedCredentialStore(private val persistence: CredentialPersistence) 
         cancellation: CredentialCancellation,
     ): CredentialResult<CredentialEnvelope> {
         try {
-            return synchronized(ownership) {
+            return ownership.serialized {
                 rejection(envelope.generation, cancellation) ?: cancellation.commit {
                     when (val result = safely(CredentialFailure.FAILED_WRITE) { staged.commit() }) {
                         is CredentialResult.Failure -> result
@@ -85,7 +84,7 @@ class SerializedCredentialStore(private val persistence: CredentialPersistence) 
         generation: SessionGeneration,
         cancellation: CredentialCancellation,
     ): CredentialResult.Failure? = when {
-        active !== generation -> stale()
+        !ownership.isActive(generation) -> stale()
         cancellation.isCancelled() -> CredentialResult.Failure(CredentialFailure.CANCELLED)
         else -> null
     }

@@ -22,6 +22,8 @@ sealed interface CredentialResult<out T> {
  * Success of replace is publication permission only after complete durable replacement.
  */
 interface CredentialStore {
+    /** Shared by every adapter and live runtime owner of this exact slot. */
+    val ownership: SessionOwnership
     fun openSession(): SessionGeneration
     /** Runtime capability only: no decrypt/read or rotation-marker mutation. */
     fun isActive(generation: SessionGeneration): Boolean

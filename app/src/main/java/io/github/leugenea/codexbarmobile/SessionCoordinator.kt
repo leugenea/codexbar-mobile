@@ -20,39 +20,48 @@ internal class SessionCoordinator(
     private val scope: CoroutineScope,
     private val clock: TransportClock = SystemTransportClock,
 ) {
+    private val ownership = store.ownership
+    private var binding: CancellationHandle? = null
     private var current: CredentialEnvelope? = null
     private var problem = SessionProblem.STALE
     private var flight: Flight? = null
 
-    @Synchronized fun adopt(envelope: CredentialEnvelope) {
+    fun adopt(envelope: CredentialEnvelope): Unit = ownership.serialized {
         retire()
+        if (!ownership.isActive(envelope.generation)) return
         current = envelope
+        binding = ownership.onDisplaced(envelope.generation) { retire() }
     }
 
-    @Synchronized fun snapshot(): SessionResult {
+    fun snapshot(): SessionResult = ownership.serialized {
         // Every live coordinator consults the shared slot, not its private cached envelope.
         // A pending rotation blocks protected restoration, but not this capability check.
-        current?.let { if (!store.isActive(it.generation)) retire() }
+        current?.let { if (!ownership.isActive(it.generation)) retire() }
         return current?.let(SessionResult::Ready) ?: SessionResult.Failed(problem)
     }
 
-    fun accepts(envelope: CredentialEnvelope): Boolean =
-        (snapshot() as? SessionResult.Ready)?.envelope?.generation === envelope.generation
+    fun accepts(envelope: CredentialEnvelope): Boolean = store.isActive(envelope.generation) &&
+        ownership.serialized { current?.generation === envelope.generation && ownership.isActive(envelope.generation) }
+
+    suspend fun request(envelope: CredentialEnvelope, request: ProviderHttpRequest, deadline: ReadDeadline): TransportResult =
+        transport.await(request, deadline, ownership, envelope.generation)
 
     /** Retiring a sent refresh is uncertain: never restore a possibly consumed token. */
-    @Synchronized fun retire() {
+    fun retire(): Unit = ownership.serialized {
+        binding?.cancel()
+        binding = null
         val detached = flight
         flight = null
         current = null
         problem = SessionProblem.STALE
         detached?.takeUnless { it.result.isCompleted }?.let {
             it.write.cancel()
-            it.job.cancel()
+            ownership.defer { it.job.cancel() }
             store.delete(it.envelope.generation)
         }
     }
 
-    @Synchronized fun requireReauthorization(rejected: CredentialEnvelope) {
+    fun requireReauthorization(rejected: CredentialEnvelope): Unit = ownership.serialized {
         if (current !== rejected) return
         retire()
         problem = SessionProblem.REAUTHORIZE
@@ -63,7 +72,7 @@ internal class SessionCoordinator(
 
     suspend fun refresh(rejected: CredentialEnvelope, deadline: ReadDeadline): SessionResult {
         if (deadline.isExpired(clock.now())) return SessionResult.Failed(SessionProblem.TRANSIENT)
-        val pending = synchronized(this) {
+        val pending = ownership.serialized {
             val checked = snapshot()
             if (checked is SessionResult.Failed) return checked
             val active = (checked as SessionResult.Ready).envelope
@@ -88,8 +97,8 @@ internal class SessionCoordinator(
         // Install before start: synchronous transports/observers cannot create a second flight.
         owner.job = scope.launch(start = CoroutineStart.LAZY) { runRefresh(owner, deadline) }
         flight = owner
-        owner.job.invokeOnCompletion { owner.result.complete(SessionResult.Failed(SessionProblem.STALE)) }
-        owner.job.start()
+        owner.job.invokeOnCompletion { ownership.defer { owner.result.complete(SessionResult.Failed(SessionProblem.STALE)) } }
+        ownership.defer { owner.job.start() }
         return owner
     }
 
@@ -103,11 +112,13 @@ internal class SessionCoordinator(
         } catch (_: Exception) {
             SessionResult.Failed(SessionProblem.TRANSIENT)
         }
-        synchronized(this) {
-            if (!accepts(owner.envelope) || flight !== owner || current !== owner.envelope) return
+        ownership.serialized {
+            if (!ownership.isActive(owner.envelope.generation) || flight !== owner || current !== owner.envelope) return
             when (result) {
                 is SessionResult.Ready -> current = result.envelope
                 is SessionResult.Failed -> if (result.problem in setOf(SessionProblem.REAUTHORIZE, SessionProblem.STORAGE)) {
+                    binding?.cancel()
+                    binding = null
                     current = null
                     problem = result.problem
                     store.delete(owner.envelope.generation)
@@ -115,11 +126,11 @@ internal class SessionCoordinator(
             }
             // Retain a settled failure for this exact token: concurrent readers share the
             // result rather than retrying an old refresh token. A new explicit read can retry.
-            owner.result.complete(result)
+            ownership.defer { owner.result.complete(result) }
         }
     }
 
-    @Synchronized fun retryTransient() {
+    fun retryTransient() = ownership.serialized {
         if (flight?.result?.isCompleted == true && current === flight?.envelope) flight = null
     }
 
@@ -131,7 +142,7 @@ internal class SessionCoordinator(
         if (prepared is CredentialResult.Failure) return SessionResult.Failed(prepared.sessionProblem())
         if (!accepts(owner.envelope)) return SessionResult.Failed(SessionProblem.STALE)
         val response = try {
-            transport.await(AuthProtocol.refreshRequest(refresh), deadline)
+            transport.await(AuthProtocol.refreshRequest(refresh), deadline, ownership, owner.envelope.generation)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {

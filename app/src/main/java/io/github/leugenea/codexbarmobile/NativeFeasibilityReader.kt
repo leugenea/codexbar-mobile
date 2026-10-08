@@ -94,7 +94,8 @@ internal class NativeFeasibilityReader(
         credentials: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope?,
     ): TransportResult {
         if (!valid(session, credentials)) return TransportResult.Failure(TransportFailure.CANCELLED)
-        val result = transport.await(request, deadline)
+        val result = if (session == null || credentials == null) transport.await(request, deadline)
+            else session.request(credentials, request, deadline)
         return if (valid(session, credentials)) result else TransportResult.Failure(TransportFailure.CANCELLED)
     }
 
