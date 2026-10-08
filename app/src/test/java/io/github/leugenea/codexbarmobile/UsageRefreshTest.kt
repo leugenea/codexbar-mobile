@@ -111,6 +111,98 @@ class UsageRefreshTest {
         assertNull(state.refresh.usage.attempt!!.error)
     } }
 
+    @Test fun usageRetryWaitSurvivesForegroundCancellationAndDefersResumeAndManual() = runTest {
+        retryWaitSurvivesForegroundCancellation(ReadOperation.USAGE, 1)
+    }
+
+    @Test fun inventoryRetryWaitSurvivesForegroundCancellationAndDefersResumeAndManual() = runTest {
+        retryWaitSurvivesForegroundCancellation(ReadOperation.RESET_INVENTORY, 2)
+    }
+
+    private suspend fun TestScope.retryWaitSurvivesForegroundCancellation(
+        operation: ReadOperation, initialGets: Int,
+    ) = fixture {
+        val limited = SyntheticAuth.response("{}", 429, RetryAfter.NotBefore(10_000))
+        if (operation == ReadOperation.USAGE) fake.usageResult = limited else fake.inventoryResult = limited
+        visible(true); manual()
+        assertEquals(initialGets, fake.gets.size)
+        assertTrue(state.refresh.refreshing)
+        assertNull(state.refresh.inventory.attempt)
+        advance(1_000)
+        visible(false)
+        assertFalse(state.refresh.refreshing)
+        assertNull(state.refresh.inventory.attempt)
+        fake.usageResult = SyntheticAuth.response(USAGE)
+        fake.inventoryResult = SyntheticAuth.response(INVENTORY)
+        fake.heldPath = ReadOperation.USAGE.path
+        visible(true); manual(); manual()
+        advance(8_999)
+        assertEquals(initialGets, fake.gets.size)
+        advance(1)
+        assertEquals(initialGets + 1, fake.gets.size)
+        val resumed = fake.gets.last()
+        assertEquals(10_000L, resumed.started)
+        manual()
+        assertEquals(initialGets + 1, fake.gets.size)
+        resumed.reply(SyntheticAuth.response(USAGE)); settle()
+        assertEquals(initialGets + 2, fake.gets.size)
+        assertFalse(state.refresh.refreshing)
+        assertEquals(10_000L, state.refresh.usage.successfulAtMillis)
+        assertEquals(10_000L, state.refresh.inventory.successfulAtMillis)
+        assertEquals(0, fake.refreshes)
+    }
+
+    @Test fun replacingGenerationClearsAnUnfinishedRetryAfterBoundary() = runTest { fixture {
+        fake.usageResult = SyntheticAuth.response("{}", 429, RetryAfter.NotBefore(10_000))
+        visible(true); manual()
+        advance(1_000)
+        visible(false)
+        owner.signOut(); settle()
+        assertEquals(ConnectionPhase.SIGNED_OUT, state.phase)
+        assertNull(state.observations)
+        assertNull(persistence.durable)
+        fake.usageResult = SyntheticAuth.response(USAGE)
+        visible(true)
+        assertEquals(1, fake.gets.size)
+        owner.connect(); settle(); advance(5_000)
+        assertEquals(ConnectionPhase.OBSERVED, state.phase)
+        assertEquals(listOf(0L, 6_000L, 6_000L), fake.gets.map { it.started })
+        assertNotNull(persistence.durable)
+        advance(4_000)
+        assertEquals(3, fake.gets.size)
+        assertEquals(6_000L, state.refresh.usage.successfulAtMillis)
+    } }
+
+    @Test fun deferredManualReadWithoutLifecycleObserversStillRunsAtTheBoundary() = runTest { fixture {
+        fake.usageResult = SyntheticAuth.response("{}", 429, RetryAfter.NotBefore(120_000))
+        manual()
+        assertEquals(2, fake.gets.size)
+        fake.usageResult = SyntheticAuth.response(USAGE)
+        manual()
+        advance(119_999)
+        assertEquals(2, fake.gets.size)
+        advance(1)
+        assertEquals(listOf(0L, 0L, 120_000L, 120_000L), fake.gets.map { it.started })
+        advance(60_000)
+        assertEquals(4, fake.gets.size)
+    } }
+
+    @Test fun deferredManualReadReplacesTheLaterAutomaticPollWakeup() = runTest { fixture {
+        fake.usageResult = SyntheticAuth.response("{}", 429, RetryAfter.NotBefore(10_000))
+        visible(true); manual()
+        advance(12_000)
+        assertEquals(listOf(0L, 10_000L, 12_000L, 12_000L), fake.gets.map { it.started })
+        assertEquals(14_000L, state.refresh.usage.attempt!!.notBeforeMillis)
+        assertFalse(state.refresh.refreshing)
+        fake.heldPath = ReadOperation.USAGE.path
+        manual()
+        advance(1_999)
+        assertEquals(4, fake.gets.size)
+        advance(1)
+        assertEquals(5, fake.gets.size)
+        assertEquals(14_000L, fake.gets.last().started)
+    } }
+
     @Test fun usageAndInventoryBecomeStaleIndependentlyAtFifteenMinutes() = runTest { fixture {
         fake.heldPath = ReadOperation.RESET_INVENTORY.path
         visible(true); manual()

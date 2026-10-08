@@ -55,15 +55,15 @@ internal class NativeFeasibilityReader(
     internal suspend fun endpoint(
         operation: ReadOperation, bearer: SensitiveValue, usage: UsageObservation? = null,
         session: SessionCoordinator? = null, envelope: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope? = null,
-        alreadyRefreshed: Boolean = false,
+        alreadyRefreshed: Boolean = false, admissionDeferred: (Long) -> Unit = {},
     ): EndpointObservation = withTimeoutOrNull(ReadDeadline.MAX_DURATION_MILLIS) {
-        boundedEndpoint(operation, bearer, usage, session, envelope, alreadyRefreshed)
+        boundedEndpoint(operation, bearer, usage, session, envelope, alreadyRefreshed, admissionDeferred)
     } ?: EndpointObservation(operation, error = ReadError.DEADLINE_EXCEEDED)
 
     private suspend fun boundedEndpoint(
         operation: ReadOperation, bearer: SensitiveValue, usage: UsageObservation?,
         session: SessionCoordinator?, envelope: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope?,
-        alreadyRefreshed: Boolean,
+        alreadyRefreshed: Boolean, admissionDeferred: (Long) -> Unit,
     ): EndpointObservation {
         var credentials = envelope
         var token = bearer
@@ -76,6 +76,8 @@ internal class NativeFeasibilityReader(
                 currentCoroutineContext().ensureActive()
                 val receivedAt = clock.now().wall
                 val decision = policy.evaluate(request, attempt, result)
+                // Preserve A2's boundary on the owner lane before a cancellable retry wait.
+                decision.notBeforeMillis?.let(admissionDeferred)
                 val status = (result as? TransportResult.Response)?.status
                 when (decision.action) {
                     ReadAction.SUCCEED -> return project(operation, result as TransportResult.Response, receivedAt, usage)

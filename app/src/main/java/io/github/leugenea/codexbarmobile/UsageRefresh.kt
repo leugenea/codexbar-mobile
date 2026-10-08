@@ -41,7 +41,7 @@ internal data class UsageRefreshState(
 internal class UsageRefresh(
     private val scope: CoroutineScope,
     private val clock: TransportClock,
-    private val read: suspend (Boolean, Boolean, (EndpointObservation) -> Unit) -> Unit,
+    private val read: suspend (Boolean, Boolean, (EndpointObservation) -> Unit, (Long) -> Unit) -> Unit,
     private val changed: (UsageRefreshState) -> Unit,
 ) {
     var state = UsageRefreshState()
@@ -88,7 +88,11 @@ internal class UsageRefresh(
 
     private fun drain() {
         if (!pending || !eligible || flight != null) return
-        if (clock.now().monotonicMillis < notBeforeMillis) { schedule(); return }
+        if (clock.now().monotonicMillis < notBeforeMillis) {
+            // A pending explicit/resume read wakes at the boundary, not an older poll floor.
+            poll?.cancel(); poll = null
+            schedule(); return
+        }
         pending = false
         val force = forceSession.also { forceSession = false }
         val explicit = explicitRead.also { explicitRead = false }
@@ -96,10 +100,13 @@ internal class UsageRefresh(
         nextPollMillis = saturatedAdd(clock.now().monotonicMillis, POLL_MILLIS)
         poll?.cancel(); poll = null
         val job = scope.launch(start = CoroutineStart.LAZY) {
-            read(force, explicit) { observation ->
+            read(force, explicit, { observation ->
                 currentCoroutineContextCheck(owner)
                 accept(observation)
-            }
+            }, { at ->
+                currentCoroutineContextCheck(owner)
+                notBeforeMillis = maxOf(notBeforeMillis, at)
+            })
         }
         flight = job
         // Completion also runs for cancellation before the coroutine body ever entered.
@@ -131,7 +138,7 @@ internal class UsageRefresh(
     }
 
     private fun schedule() {
-        if (!activated || !visible || flight != null || poll != null) return
+        if (!activated || !eligible || (!visible && !pending) || flight != null || poll != null) return
         val at = maxOf(if (pending) 0L else nextPollMillis, notBeforeMillis)
         poll = scope.launch {
             delay((at - clock.now().monotonicMillis).coerceAtLeast(0))

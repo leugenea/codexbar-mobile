@@ -543,7 +543,7 @@ class ConnectionLifecycleTest {
         val changesState = tag in setOf("connect", "read-usage", "refresh-session", "sign-out", "cancel-connect")
         val before = if (changesState) NativeConnection.get(context).state.value else null
         val node = compose.onNodeWithTag(tag)
-        if (tag != "connection-tab") node.performScrollTo()
+        if (tag !in setOf("offline-tab", "connection-tab")) node.performScrollTo()
         node.performClick()
         if (before == null) return
         if (expectTransition) bounded("$tag owner admission", { NativeConnection.get(context).state.value.toString() }) {

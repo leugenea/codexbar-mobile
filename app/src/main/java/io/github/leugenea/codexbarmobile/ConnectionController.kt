@@ -142,7 +142,8 @@ internal class ConnectionController(
         mutableState.value = ConnectionState(phase, previous.auth, refresh.observations, previous.problem, refresh)
     }
 
-    private suspend fun refreshUsage(refreshSession: Boolean, explicit: Boolean, observed: (EndpointObservation) -> Unit) {
+    private suspend fun refreshUsage(refreshSession: Boolean, explicit: Boolean,
+        observed: (EndpointObservation) -> Unit, admissionDeferred: (Long) -> Unit) {
         if (cleanupPending()) return
         val active = session.snapshot() as? SessionResult.Ready ?: return
         val owner = revision
@@ -151,12 +152,13 @@ internal class ConnectionController(
         publish(owner, ConnectionState(ConnectionPhase.READING, auth, usageRefresh.state.observations,
             refresh = usageRefresh.state))
         val result = if (refreshSession) session.refresh(active.envelope, session.deadline()) else null
-        observe(owner, auth, observed, result as? SessionResult.Failed)
+        observe(owner, auth, observed, admissionDeferred, result as? SessionResult.Failed)
     }
 
     private suspend fun observe(owner: Long, auth: AuthState, observed: (EndpointObservation) -> Unit,
+        admissionDeferred: (Long) -> Unit,
         refreshFailure: SessionResult.Failed? = null) {
-        val facts = if (refreshFailure == null) authenticatedReader.read(observed) else FeasibilityObservations(
+        val facts = if (refreshFailure == null) authenticatedReader.read(observed, admissionDeferred) else FeasibilityObservations(
             EndpointObservation(io.github.leugenea.codexbarmobile.transport.ReadOperation.USAGE, error = refreshFailure.problem.readError()),
             EndpointObservation(io.github.leugenea.codexbarmobile.transport.ReadOperation.RESET_INVENTORY, error = refreshFailure.problem.readError()),
         ).also { observed(it.usage); observed(it.inventory) }
