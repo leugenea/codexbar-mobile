@@ -138,10 +138,10 @@ class AuthenticatedProviderReaderTest {
         val fake = AuthFake()
         val clock = AuthClock()
         val persistence = FakeCredentialPersistence()
-        val store = SerializedCredentialStore(persistence, removalExecutor = java.util.concurrent.Executor { it.run() })
+        val store = SerializedCredentialStore(persistence)
         val initial = syntheticEnvelope(store.openSession())
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-        val session = SessionCoordinator(store, fake, scope, clock)
+        val session = SessionCoordinator(store, fake, scope, clock, Dispatchers.Unconfined)
         val reader = AuthenticatedProviderReader(session, NativeFeasibilityReader(fake, clock, clock::pause))
         init {
             store.replace(initial, CredentialCancellation())

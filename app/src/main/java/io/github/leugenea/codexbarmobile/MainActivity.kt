@@ -2,12 +2,9 @@ package io.github.leugenea.codexbarmobile
 
 import android.os.Bundle
 import android.content.ActivityNotFoundException
-import android.content.Context
 import android.content.Intent
 import androidx.core.net.toUri
 import android.view.WindowManager
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.compose.runtime.collectAsState
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import androidx.activity.ComponentActivity
@@ -60,11 +57,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        val owner = ViewModelProvider(this, object : ViewModelProvider.Factory {
-            override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                modelClass.cast(ConnectionOwner(connectionFactory(applicationContext)))!!
-        })[ConnectionOwner::class.java]
-        connection = owner.controller
+        // Activities observe the process owner; destruction never closes its work.
+        connection = NativeConnection.get(applicationContext)
         enableEdgeToEdge()
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
@@ -104,7 +98,6 @@ class MainActivity : ComponentActivity() {
     }
 
     internal companion object {
-        var connectionFactory: (Context) -> ConnectionController = NativeConnection::create
         var browserLauncher: (MainActivity, Intent) -> Unit = { activity, intent -> activity.startActivity(intent) }
     }
 }

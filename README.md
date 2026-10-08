@@ -22,7 +22,8 @@ tokens or HTTP 200 does not establish account/workspace association. The owner a
 this single identity-unverified session and recorded A8 GO on 2026-10-07 in issue #48.
 Refresh/rotation/local-logout verification on the exact candidate remains a separate
 owner gate; CI uses only fake transport and synthetic data. Pending login lives only in memory: Activity
-recreation retains one bounded attempt, while process death requires restarting login.
+recreation and finish/relaunch share one process-owned bounded attempt; no Activity
+owns or cancels it. Process death requires restarting login.
 Restored credentials remain unresolved and cause no automatic provider requests.
 
 There is no periodic refresh, account history, graphs, live reset countdown or signed

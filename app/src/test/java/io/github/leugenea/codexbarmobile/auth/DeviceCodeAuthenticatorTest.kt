@@ -468,7 +468,7 @@ class DeviceCodeAuthenticatorTest {
         val fake = AuthFake()
         val persistence = AuthPersistence()
         val store = SerializedCredentialStore(persistence)
-        val auth = DeviceCodeAuthenticator(fake, store, clock, clock::pause)
+        val auth = DeviceCodeAuthenticator(fake, store, clock, clock::pause, Dispatchers.Unconfined)
         fun start() = auth.start(scope)
         fun failed(stage: AuthStage, category: AuthFailure) {
             assertEquals(AuthState.Failed(stage, category), auth.state.value)

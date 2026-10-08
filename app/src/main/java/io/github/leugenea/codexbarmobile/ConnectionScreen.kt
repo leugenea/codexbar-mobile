@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
 import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
@@ -33,24 +32,33 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 
-/** Retained across recreation, not process death; no SavedStateHandle or Activity reference. */
-internal class ConnectionOwner(val controller: ConnectionController) : ViewModel() {
-    override fun onCleared() { controller.close() }
-}
-
+/** One holder for the entire default application process, not one entry per Activity or slot. */
 internal object NativeConnection {
-    private val deletions = ConnectionDeletionBarrier()
-    /** Persist only the random LOCAL slot selector, never a provider account or pending login. */
-    fun create(context: Context): ConnectionController = create(context, null, SystemTransportClock) { delay(it) }
+    private var controller: ConnectionController? = null
+    internal var factory: (Context) -> ConnectionController = ::create
+
+    @Synchronized fun get(context: Context): ConnectionController =
+        controller ?: factory(context.applicationContext).also { controller = it }
+
+    /** Instrumentation only: drain old durable work before allowing a new owner. */
+    @Synchronized internal fun resetForTests() {
+        controller?.let { old -> kotlinx.coroutines.runBlocking {
+            kotlinx.coroutines.withTimeout(5_000) { old.shutdown() }
+        } }
+        controller = null
+    }
+
+    fun create(context: Context): ConnectionController = create(context.applicationContext, null, SystemTransportClock) { delay(it) }
 
     internal fun create(context: Context, fakeTransport: AuthTransport?, clock: TransportClock,
         pause: suspend (Long) -> Unit): ConnectionController {
-        val session = try { session(context) } catch (_: Exception) { null }
-        val store = KeystoreCredentialStore(context, session ?: UUID.randomUUID())
-        val transport = fakeTransport ?: productionTransport(context)
+        val app = context.applicationContext
+        val session = try { session(app) } catch (_: Exception) { null }
+        val store = KeystoreCredentialStore(app, session ?: UUID.randomUUID())
+        val transport = fakeTransport ?: productionTransport(app)
         return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),
             NativeFeasibilityReader(transport, clock, pause),
-            CoroutineScope(SupervisorJob() + Dispatchers.IO), storageReady = session != null, deletions = deletions)
+            CoroutineScope(SupervisorJob() + Dispatchers.IO), storageReady = session != null)
     }
 
     private fun productionTransport(context: Context): AuthTransport {

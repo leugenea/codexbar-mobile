@@ -40,8 +40,9 @@ internal class NativeFeasibilityReader(
 ) {
     private val policy = ReadPolicy(clock, ReadBackoff { retry -> retry * 1_000L })
 
-    fun session(store: io.github.leugenea.codexbarmobile.credentials.CredentialStore, scope: kotlinx.coroutines.CoroutineScope) =
-        SessionCoordinator(store, transport, scope, clock)
+    fun session(store: io.github.leugenea.codexbarmobile.credentials.CredentialStore, scope: kotlinx.coroutines.CoroutineScope,
+        storageDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO) =
+        SessionCoordinator(store, transport, scope, clock, storageDispatcher)
 
     suspend fun read(bearer: SensitiveValue): FeasibilityObservations {
         val usage = endpoint(ReadOperation.USAGE, bearer)
@@ -107,7 +108,7 @@ internal class NativeFeasibilityReader(
     ): SessionResult = if (session == null || credentials == null) SessionResult.Failed(SessionProblem.REAUTHORIZE)
         else session.refresh(credentials, deadline)
 
-    private fun finished(
+    private suspend fun finished(
         operation: ReadOperation, status: Int?, error: ReadError?, session: SessionCoordinator?,
         credentials: io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope?,
     ): EndpointObservation {

@@ -31,9 +31,10 @@ class KeystoreCredentialStoreTest {
         val generation = store.openSession()
         success(store.replace(envelope(generation), CredentialCancellation()))
         val first = CredentialBinaryFormat.sealed(target.readBytes(), session)
-        val restored = success(KeystoreCredentialStore(context, session).read(generation))
+        val restarted = KeystoreCredentialStore(context, session)
+        val restored = success(restarted.read(restarted.openSession()))
         assertTokens(restored)
-        assertSame(generation, restored.generation)
+        assertTrue(restarted.isActive(restored.generation))
         assertSame(AccountWorkspaceBinding.Unresolved, restored.accountWorkspace)
         // Independent adapter/kernel models durable readback, NOT real process termination.
         val fresh = owner()
@@ -79,7 +80,7 @@ class KeystoreCredentialStoreTest {
         target.writeBytes(original)
         val other = UUID.randomUUID()
         val foreign = ProtectedCredentialPersistence(AtomicCredentialFile(target), AndroidCredentialCipher(alias), other)
-        val owner = CredentialSlotOwner(foreign)
+        val owner = protectedStore(foreign)
         failure(CredentialFailure.CORRUPT, owner.read(owner.openSession()))
         // A changed but structurally valid authenticated binding also fails GCM authentication.
         val alteredHeader = CredentialBinaryFormat.header(other)
@@ -156,7 +157,7 @@ class KeystoreCredentialStoreTest {
         return sections
     }
 
-    private fun owner(beforeRename: () -> Unit = {}) = CredentialSlotOwner(ProtectedCredentialPersistence(
+    private fun owner(beforeRename: () -> Unit = {}) = protectedStore(ProtectedCredentialPersistence(
         AtomicCredentialFile(target, beforeRename), AndroidCredentialCipher(alias), session,
     ))
     private fun keys(): KeyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }

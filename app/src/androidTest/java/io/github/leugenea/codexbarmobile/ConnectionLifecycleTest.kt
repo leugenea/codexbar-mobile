@@ -1,8 +1,9 @@
 package io.github.leugenea.codexbarmobile
 
 import android.content.ActivityNotFoundException
-import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.os.Parcel
 import android.view.WindowManager
@@ -23,6 +24,8 @@ import io.github.leugenea.codexbarmobile.auth.AuthTransport
 import io.github.leugenea.codexbarmobile.credentials.*
 import io.github.leugenea.codexbarmobile.transport.*
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -35,26 +38,31 @@ import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicLong
 
-/** Hosted only: production Activity/ViewModel + real A6, no sockets, no live sign-in. */
+/** Hosted only: production Activity/process owner + real A6, no sockets, no live sign-in. */
 @RunWith(AndroidJUnit4::class)
 class ConnectionLifecycleTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private val fake = NativeFake()
     private var factories = 0
-    private val defaultFactory = MainActivity.connectionFactory
+    private val defaultFactory = NativeConnection.factory
     private val defaultLauncher = MainActivity.browserLauncher
 
     @Before fun setup() {
+        NativeConnection.resetForTests()
+        val installed = context.packageManager.getActivityInfo(ComponentName(context, MainActivity::class.java), 0)
+        assertEquals(ActivityInfo.LAUNCH_SINGLE_TASK, installed.launchMode)
+        assertEquals("Launcher uses the default app process", context.packageName, installed.processName)
         cleanStore()
-        MainActivity.connectionFactory = { app ->
+        NativeConnection.factory = { app ->
             factories++
             NativeConnection.create(app, fake, fake.clock, fake::pause)
         }
     }
 
     @After fun cleanup() {
-        MainActivity.connectionFactory = defaultFactory
+        NativeConnection.resetForTests()
+        NativeConnection.factory = defaultFactory
         MainActivity.browserLauncher = defaultLauncher
         cleanStore()
     }
@@ -130,12 +138,25 @@ class ConnectionLifecycleTest {
             assertEquals(1, fake.calls.size)
             assertSavedStateHasNoSecrets(scenario)
             scenario.close()
-            assertEquals(ConnectionPhase.CANCELLED, original!!.state.value.phase)
-            fake.poll.complete(Unit)
-            assertNull(original.state.value.observations)
+            assertTrue(original!!.state.value.auth is AuthState.AwaitingUser)
+            assertSame(original, NativeConnection.get(context))
+            assertNull(original!!.state.value.observations)
             assertEquals(1, fake.calls.size)
         } finally { scenario.close() }
-        // A fresh Activity owner is a restart simulation, not an actual process-kill claim.
+        launch().use { resumed ->
+            await(resumed, "finish preserves pending process login") { it.auth is AuthState.AwaitingUser }
+            resumed.onActivity { assertSame(original, it.connection) }
+            assertEquals(1, factories)
+            assertEquals(1, fake.calls.size)
+        }
+        // Keep the mandatory historical test name. Explicit runtime reset, not
+        // Activity finish, cancels polling and models loss of process memory.
+        NativeConnection.resetForTests()
+        bounded("runtime reset cancels polling", { original!!.state.value.toString() }) {
+            original!!.state.value.phase == ConnectionPhase.CANCELLED
+        }
+        fake.poll.complete(Unit)
+        assertNull(original!!.state.value.observations)
         launch().use { restarted ->
             await(restarted, "fresh owner drops pending login") { it.phase == ConnectionPhase.IDLE }
             assertEquals(2, factories)
@@ -160,10 +181,9 @@ class ConnectionLifecycleTest {
             assertEquals(listOf(ReadOperation.USAGE.path, ReadOperation.RESET_INVENTORY.path),
                 fake.calls.filter { it is ProviderHttpRequest.Get }.map { it.url.encodedPath })
             val session = NativeConnection.session(context)
-            val store = KeystoreCredentialStore(context, session)
-            val restored = store.read((state.auth as AuthState.Connected).generation) as CredentialResult.Success
-            assertEquals(AccountWorkspaceBinding.Unresolved, restored.value.accountWorkspace)
-            assertEquals(ACCESS, restored.value.accessToken.copyBytes().toString(Charsets.UTF_8))
+            val restored = persistedEnvelope(session)
+            assertEquals(AccountWorkspaceBinding.Unresolved, restored.accountWorkspace)
+            assertEquals(ACCESS, restored.accessToken.copyBytes().toString(Charsets.UTF_8))
             assertTrue(KeystoreCredentialStore.file(context, session).isFile)
             assertTrue(keyExists(session))
             assertSavedStateHasNoSecrets(scenario)
@@ -202,6 +222,7 @@ class ConnectionLifecycleTest {
             fake.poll.complete(Unit)
             await(scenario, "stored synthetic session") { it.phase == ConnectionPhase.OBSERVED }
         }
+        NativeConnection.resetForTests() // Fresh runtime, not an Activity-scoped owner.
         val requests = fake.calls.size
         launch().use { scenario ->
             openGate(scenario, ConnectionPhase.RESTORED)
@@ -214,10 +235,11 @@ class ConnectionLifecycleTest {
         val original = selector.readText()
         try {
             for (corrupt in listOf("synthetic-corrupt", "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")) {
+                NativeConnection.resetForTests()
                 selector.writeText(corrupt)
                 launch().use { scenario ->
                     openGate(scenario, ConnectionPhase.FAILED)
-                    click("connect")
+                    click("connect", expectTransition = false)
                     click("sign-out")
                     await(scenario, "corrupt local selector fails closed") { it.problem == ConnectionProblem.STORAGE }
                     assertEquals(requests, fake.calls.size)
@@ -265,6 +287,7 @@ class ConnectionLifecycleTest {
             fake.poll.complete(Unit)
             await(scenario, "initial stored session") { it.phase == ConnectionPhase.OBSERVED }
         }
+        NativeConnection.resetForTests()
         val requests = fake.calls.size
         launch().use { scenario ->
             openGate(scenario, ConnectionPhase.RESTORED)
@@ -273,10 +296,8 @@ class ConnectionLifecycleTest {
             click("read-usage")
             await(scenario, "401 rotation and bounded retry") { it.phase == ConnectionPhase.OBSERVED }
             val slot = NativeConnection.session(context)
-            val store = KeystoreCredentialStore(context, slot)
+            val saved = persistedEnvelope(slot)
             scenario.onActivity {
-                val generation = (it.connection.state.value.auth as AuthState.Connected).generation
-                val saved = (store.read(generation) as CredentialResult.Success).value
                 assertEquals(ROTATED_ACCESS, saved.accessToken.copyBytes().toString(Charsets.UTF_8))
                 assertEquals(ROTATED_REFRESH, saved.refreshToken!!.copyBytes().toString(Charsets.UTF_8))
                 assertTrue(it.connection.state.value.observations!!.successful)
@@ -303,6 +324,7 @@ class ConnectionLifecycleTest {
             assertFalse(keyExists(slot))
             assertFalse(KeystoreCredentialStore.file(context, slot).exists())
         }
+        NativeConnection.resetForTests()
         launch().use { scenario -> openGate(scenario); assertSavedStateHasNoSecrets(scenario) }
     }
 
@@ -327,11 +349,9 @@ class ConnectionLifecycleTest {
             fake.holdRefresh = false
             click("connect")
             await(scenario, "replacement session stored") { it.phase == ConnectionPhase.OBSERVED }
-            val store = KeystoreCredentialStore(context, slot)
             late(response("""{"access_token":"$ROTATED_ACCESS","refresh_token":"$ROTATED_REFRESH"}"""))
+            val saved = persistedEnvelope(slot)
             scenario.onActivity {
-                val generation = (it.connection.state.value.auth as AuthState.Connected).generation
-                val saved = (store.read(generation) as CredentialResult.Success).value
                 assertEquals(ACCESS, saved.accessToken.copyBytes().toString(Charsets.UTF_8))
                 assertEquals(REFRESH, saved.refreshToken!!.copyBytes().toString(Charsets.UTF_8))
             }
@@ -346,7 +366,7 @@ class ConnectionLifecycleTest {
     @Test
     fun nativeFailedRotationWriteQuarantinesRealStoreBeforeReauth() {
         val failWrite = java.util.concurrent.atomic.AtomicBoolean()
-        MainActivity.connectionFactory = { app ->
+        NativeConnection.factory = { app ->
             val actual = KeystoreCredentialStore(app, NativeConnection.session(app))
             val store = object : CredentialStore by actual {
                 override fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation): CredentialResult<CredentialEnvelope> =
@@ -375,6 +395,7 @@ class ConnectionLifecycleTest {
             assertEquals(1, fake.refreshCount)
             assertSavedStateHasNoSecrets(scenario)
         }
+        NativeConnection.resetForTests()
         launch().use { scenario -> openGate(scenario); assertEquals(1, fake.refreshCount) }
     }
 
@@ -389,6 +410,7 @@ class ConnectionLifecycleTest {
             return generation
         }
         for (mutation in listOf("pending", "key", "ciphertext")) {
+            NativeConnection.resetForTests()
             cleanStore()
             val generation = install()
             when (mutation) {
@@ -411,7 +433,7 @@ class ConnectionLifecycleTest {
                 assertFalse(keyExists(slot))
             }
         }
-        // New Activity/store owners model storage restoration, not actual process death/reboot.
+        // Explicit holder resets model storage restoration, not actual process death/reboot.
     }
 
     @Test
@@ -425,48 +447,62 @@ class ConnectionLifecycleTest {
     }
 
     private fun twoLiveOwners(replace: Boolean) {
+        // Historical mandatory names retained: two callers now share the process
+        // controller, never construct competing owners for the same durable slot.
         launch().use { scenario ->
             openGate(scenario)
             click("connect")
-            await(scenario, "two-owner initial code") { it.auth is AuthState.AwaitingUser }
+            await(scenario, "shared-owner initial code") { it.auth is AuthState.AwaitingUser }
             fake.poll.complete(Unit)
-            await(scenario, "two-owner initial session") { it.phase == ConnectionPhase.OBSERVED }
+            await(scenario, "shared-owner initial session") { it.phase == ConnectionPhase.OBSERVED }
+            val shared = NativeConnection.get(context)
+            scenario.onActivity { assertSame(shared, it.connection) }
+            assertSame(shared, NativeConnection.get(context.applicationContext))
+            assertEquals(1, factories)
             fake.holdReads = true
             click("read-usage")
-            bounded("two-owner held usage GET") { fake.reads.size == 1 }
+            bounded("shared-owner held usage GET") { fake.reads.size == 1 }
             val held = fake.reads.single()
-            val slot = NativeConnection.session(context)
-            val actual = KeystoreCredentialStore(context, slot)
-            val newer = NativeConnection.create(context, fake, fake.clock, fake::pause)
-            try {
-                bounded("second live real-Keystore owner restored", { newer.state.value.toString() }) {
-                    newer.state.value.phase == ConnectionPhase.RESTORED
-                }
-                fake.holdReads = false
-                if (replace) newer.connect() else newer.signOut()
-                val phase = if (replace) ConnectionPhase.OBSERVED else ConnectionPhase.SIGNED_OUT
-                bounded("new owner $phase", { newer.state.value.toString() }) { newer.state.value.phase == phase }
-                val requests = fake.calls.size
-                val bytes = if (replace) KeystoreCredentialStore.file(context, slot).readBytes() else null
-                held(response(USAGE))
-                await(scenario, "displaced owner requires reauth without inventory") { it.phase == ConnectionPhase.REAUTH_REQUIRED }
-                assertEquals("Old owner must not admit inventory", requests, fake.calls.size)
-                scenario.onActivity {
-                    assertNull(it.connection.state.value.observations)
-                    it.connection.readUsage()
-                    it.connection.readUsage(refreshSession = true)
-                    assertTrue(it.connection.session.snapshot() is SessionResult.Failed)
-                }
-                assertEquals("No new old-generation GET or refresh", requests, fake.calls.size)
-                if (bytes == null) {
-                    assertFalse(keyExists(slot))
-                    assertFalse(KeystoreCredentialStore.file(context, slot).exists())
-                } else {
-                    assertArrayEquals("No stale write after replacement", bytes, KeystoreCredentialStore.file(context, slot).readBytes())
-                    val generation = (newer.state.value.auth as AuthState.Connected).generation
-                    assertTrue(actual.read(generation) is CredentialResult.Success)
-                }
-            } finally { newer.close() }
+            fake.holdReads = false
+            shared.signOut()
+            await(scenario, "shared-owner logout retires held usage") { it.phase == ConnectionPhase.SIGNED_OUT }
+            if (replace) shared.connect()
+            val phase = if (replace) ConnectionPhase.OBSERVED else ConnectionPhase.SIGNED_OUT
+            await(scenario, "shared-owner $phase") { it.phase == phase }
+            assertEquals("Retired usage transport cancelled", 1, fake.cancelledReads)
+            assertRetiredReadCannotAffectSharedOwner(scenario, shared, held, replace)
+            assertSavedStateHasNoSecrets(scenario)
+        }
+    }
+
+    private fun assertRetiredReadCannotAffectSharedOwner(
+        scenario: ActivityScenario<MainActivity>, shared: ConnectionController,
+        held: (TransportResult) -> Unit, replace: Boolean,
+    ) {
+        val slot = NativeConnection.session(context)
+        val file = KeystoreCredentialStore.file(context, slot)
+        val bytes = if (replace) file.readBytes() else null
+        val requests = fake.calls.size
+        val current = shared.state.value
+        held(response(USAGE))
+        await(scenario, "late old-generation response discarded") { it.phase == current.phase }
+        assertSame("No stale observations after replacement/logout", current, shared.state.value)
+        assertEquals("Old generation must not admit inventory", requests, fake.calls.size)
+        if (bytes == null) {
+            scenario.onActivity {
+                assertNull(it.connection.state.value.observations)
+                it.connection.readUsage()
+                it.connection.readUsage(refreshSession = true)
+                assertTrue(it.connection.session.snapshot() is SessionResult.Failed)
+            }
+            settleOwnerCommands()
+            assertEquals("No new old-generation GET or refresh", requests, fake.calls.size)
+            assertFalse(keyExists(slot))
+            assertFalse(file.exists())
+        } else {
+            assertArrayEquals("No stale write after replacement", bytes, file.readBytes())
+            assertEquals(ACCESS, persistedEnvelope(slot).accessToken.copyBytes().toString(Charsets.UTF_8))
+            assertTrue(shared.session.snapshot() is SessionResult.Ready)
         }
     }
 
@@ -477,10 +513,25 @@ class ConnectionLifecycleTest {
         await(scenario, "initial $phase") { it.phase == phase }
         click("connection-tab")
     }
-    private fun click(tag: String) {
+    private fun click(tag: String, expectTransition: Boolean = true) {
+        val changesState = tag in setOf("connect", "read-usage", "refresh-session", "sign-out", "cancel-connect")
+        val before = if (changesState) NativeConnection.get(context).state.value else null
         val node = compose.onNodeWithTag(tag)
         if (tag != "connection-tab") node.performScrollTo()
         node.performClick()
+        if (before == null) return
+        if (expectTransition) bounded("$tag owner admission", { NativeConnection.get(context).state.value.toString() }) {
+            NativeConnection.get(context).state.value !== before
+        } else {
+            settleOwnerCommands()
+            assertSame("$tag rejected without mutation", before, NativeConnection.get(context).state.value)
+        }
+    }
+    private fun settleOwnerCommands() {
+        try { runBlocking { withTimeout(5_000) { NativeConnection.get(context).commandsSettled() } } }
+        catch (error: kotlinx.coroutines.TimeoutCancellationException) {
+            throw AssertionError("owner command receipt: ${NativeConnection.get(context).state.value}", error)
+        }
     }
     private fun await(scenario: ActivityScenario<MainActivity>, step: String, test: (ConnectionState) -> Boolean) {
         var last = "no Activity"
@@ -538,6 +589,11 @@ class ConnectionLifecycleTest {
         val session = NativeConnection.session(context)
         val store = KeystoreCredentialStore(context, session)
         store.delete(store.openSession())
+    }
+    private fun persistedEnvelope(slot: java.util.UUID): CredentialEnvelope {
+        val store = KeystoreCredentialStore(context, slot)
+        // A separate inspection store owns its own capability, not the controller's.
+        return (store.read(store.openSession()) as CredentialResult.Success).value
     }
     private fun keyExists(session: java.util.UUID): Boolean = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         .containsAlias(KeystoreCredentialStore.alias(context, session))

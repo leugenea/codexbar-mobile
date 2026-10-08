@@ -36,9 +36,9 @@ exclude app data. The default offline preview initiates no provider requests.
 A separate Connection gate screen is opt-in and never uses the offline fixtures:
 
 ```text
-MainActivity / Activity ViewModelStore
-    -> ConnectionOwner / worker scope (no Activity or saved-state reference)
-    -> ConnectionController
+MainActivity / thin StateFlow observer
+    -> NativeConnection.get(applicationContext) / one lazy process owner
+    -> ConnectionController / process-lifetime SupervisorJob + IO scope
         -> A7 DeviceCodeAuthenticator -> A4 HttpTransportAdapter
         -> A10 SessionCoordinator -> selected token endpoint via A4
             -> A6 KeystoreCredentialStore (binding Unresolved)
@@ -48,60 +48,52 @@ MainActivity / Activity ViewModelStore
 
 MainActivity builds a fixed ACTION_VIEW/BROWSABLE intent for the system browser.
 The code is displayed from A7's owned memory, never saved or copied. One bounded
-attempt survives Activity recreation and backgrounding into the browser. Finishing
-the Activity closes its ViewModel and cancels work. Process death drops pending
-login; it is not reconstructed from Bundle, an intent or a persisted code.
+attempt survives Activity recreation, backgrounding into the browser and Activity
+finish. Every Activity observes the same process-scoped controller; no ViewModel or
+Activity coroutine owns authentication, refresh, reads or local deletion. The lazy
+holder constructs from applicationContext only. `singleTask` reduces duplicate
+launcher instances, but does not establish correctness: even multiple Activity
+observers must share the holder. Manifest gates require the default app process and
+reject component process overrides. Process death drops pending login; it is not
+reconstructed from Bundle, an intent or a persisted code. The test-only holder reset
+closes the old controller before clearing it and explicitly models a fresh runtime;
+Activity finish/relaunch alone is not a restoration or process-death simulation.
 
 The only durable selector is a random local UUID under noBackupFilesDir; it selects
-A6's encrypted slot and is not account/workspace identity. A fresh owner may restore
-credentials only as Unresolved, without automatic network requests. The selected flow
-provides no authoritative token lifetime: there is no inferred TTL, JWT inspection or
-expiry schedule. Key loss, corruption or an interrupted rotation restores as re-auth
-required, never a usable old credential. Local sign-out invalidates/cancels auth, read
-and refresh work and deletes the A6 key and ciphertext; it makes no remote revocation
-request. Its admitted removal is owned by the slot's independent I/O runner, not by
-an Activity coroutine; Activity finish cancels runtime waiters immediately without
-dropping removal. A shared deletion barrier prevents a new Activity owner from
-restoring or signing in ahead of an already admitted logout. Account replacement
-retires the preceding generation and deletes its durable credentials before new auth.
-Logout/replacement command admission reserves the barrier and optional replacement
-capability before displacing any live owner, including a command from a stale controller.
-Ordinary restoration-only displacement does not reserve or delete durable credentials.
-Durable key/file removal then runs outside the runtime lane. Runners are exactly-once
-and chain through completion callbacks, without parking a thread on a predecessor.
-Restoration and deletion waiters suspend cancellably, with a 30-second storage-wait
-bound; legacy synchronous storage callers have an interruptible bounded wait. Timeout
-reports and notifies truthful storage failure even while removal is held, but neither
-clears the barrier nor claims durable success. Only
-the actual removal outcome opens storage/request admission. Runtime cancellation is
-never queued behind I/O; terminal re-auth/sign-out publication waits for that outcome.
-Rebinding never waits for I/O, and a displaced replacement cannot reopen over its
-successor. The delayed
-authenticator uses only its still-active admitted capability, after durable deletion.
-All adapters and runtime owners for that slot share one process-lifetime ownership
-sequencer. The registry retains the slot owner strongly (without an Activity/Context)
-so a cancelled controller or garbage collection cannot manufacture a second kernel
-while an independent removal runner is still alive.
-Displacement, generation validation plus transport enqueue, and committed observable-state
-assignment execute on that lane; `isActive` snapshots alone never authorize an effect.
-Displacement proactively clears old observations and cancels the exact detached jobs.
-Synchronous transport completions, job cancellation and StateFlow collector wakeups run
-outside the lane, not under a storage/runtime lock. A delayed wakeup reads the latest
-committed state; an observer snapshot already admitted before displacement remains an
-in-flight delivery, not permission for another request, durable write or publication.
-This runtime arbitration never decrypts credentials or clears a pending-rotation marker.
-A displaced read owner requires sign-in again and discards its observations.
-Quarantine immediately revokes its capability and clears credentials/observations,
-but stays busy until durable deletion completes: REAUTH_REQUIRED and SIGNED_OUT
-cannot authorize UI completion ahead of key/file removal. Deletion-time observer
-wakeups are deferred until the barrier settles, but detached-job/scope cancellation
-runs immediately outside the lane. Durable runners are queued before cancellation
-callbacks, so a reentrant callback cannot prevent removal from starting. Local logout's
-busy SIGNING_OUT admission remains observable after its durable runner is queued;
-its Activity barrier suspends a reentrant new owner's restoration. A failed removal
-is conservatively a storage failure, not a successful quarantine/logout publication.
-Key-loss/corrupt/interrupted-rotation restoration likewise removes the unsafe pair
-before publishing re-auth.
+A6's encrypted slot and is not account/workspace identity. A fresh process owner may
+restore credentials only as Unresolved, without automatic network requests. The
+selected flow provides no authoritative token lifetime: there is no inferred TTL,
+JWT inspection or expiry schedule. Key loss, corruption or an interrupted rotation
+restores as re-auth required, never a usable old credential.
+
+One process owner holds the store, authenticator and session. It serializes runtime
+commands, request enqueue and state publication on `Dispatchers.IO.limitedParallelism(1)`.
+No suspension separates a generation check from request enqueue. Blocking protected
+I/O runs on the separate storage dispatcher and re-enters the owner lane for checked
+publication. Commands are asynchronous; observers may enqueue commands but cannot
+reenter the current mutation. The owner retires/cancels superseded work; there is no cross-controller ownership
+registry, displaced Activity owner or shared Activity deletion barrier. Local sign-out
+invalidates auth, reads and refresh and deletes the A6 key and ciphertext without a
+remote revocation request. Account replacement deletes the preceding durable pair
+before new authentication. Durable removal precedes successful SIGNED_OUT or
+REAUTH_REQUIRED publication; removal failures are storage failures, not success.
+The process scope, rather than an Activity lifecycle, owns this work. Generation and
+cancellation checks reject late results and writes after logout or replacement. The
+uncertainty marker keeps interrupted rotation fail-closed across a fresh runtime.
+
+Busy Connect/read commands coalesce. Account replacement while a read is pending
+is explicit Cancel or Sign out, then Connect; a busy Connect does not claim success.
+Local removals are process-owned coroutine children. Runtime waiters suspend
+cancellably with a five-second storage bound; timeout publishes FAILED/STORAGE,
+not SIGNED_OUT or REAUTH_REQUIRED, and never releases a still-running removal.
+Connect/read admission stays closed until the actual durable outcome. A completed
+failed removal can be retried explicitly, never by silently restoring its old token.
+The small `CredentialDeletion.complete()` ticket remains only for non-I/O revocation
+and exactly-once A3 durable completion; it has no executor, future, process registry
+or cross-owner arbitration. A3 uses a short generation/commit-admission monitor
+and a separate I/O monitor: cancellation/revocation cannot block behind fsync, and
+a previously admitted irreversible commit settles before deletion. The test-only
+holder reset waits for old owner children before allowing a fresh owner.
 
 After a successful selected exchange/persistence, the reader issues only the two
 selected GET routes. Each logical read has a 30-second deadline and bounded,
@@ -121,8 +113,9 @@ rotation-marker failure quarantines the session and requires sign-in; no possibl
 consumed old token is reused. A non-secret, fsynced uncertainty marker under the owned
 no-backup slot prevents interrupted or unsuccessfully deleted rotations from restoring
 unsafe credentials. Successful complete-envelope persistence or a documented transient
-result clears that marker. Cancel/finish during an unfinished refresh deletes its
-uncertain credentials. Generation checks reject late writes/results after logout or
+result clears that marker. Explicit cancel or owner shutdown during an unfinished
+refresh deletes its uncertain credentials; Activity finish does not shut down the owner.
+Generation checks reject late writes/results after logout or
 replacement; diagnostics expose categories, never token values or error descriptions.
 The narrow projection
 shows validated duration-identified five-hour/weekly percentages, resets, provider
@@ -164,12 +157,21 @@ A8 sign-in alone does not close parent #4.
   refresh, durable-before-publication, write-failure quarantine, cancellation/replacement,
   terminal/transient classification, accepted rotation across deadline expiry and one
   shared 401 allowance; existing A2 policy-vector tests remain the read-policy oracle.
+- `ProcessSessionOwnerTest`: two observer/commander clients of the production-default
+  owner lane; held reads/refresh/removal, late results, bounded cancellation, timeout
+  notifications without barrier bypass, repeated logout and observer detachment.
+- `DurableQuarantineTest`: held protected key/file removal across refresh/write/marker
+  failure, terminal GET, corrupt restore, replacement and logout; durable terminal
+  states and both real removal attempts are preserved.
 - `CredentialPersistenceTest`: uncertainty marker, fresh-owner rejection, deletion
   failure quarantine and generation-safe marker operations with synthetic persistence.
-- `ConnectionLifecycleTest`: real Activity intent seam, recreation/background/finish,
+- `ConnectionLifecycleTest`: real Activity intent seam, process-owner retention across
+  recreation/background/finish/relaunch, explicit holder-reset cancellation,
   saved Bundle/redacted diagnostics, synthetic exchange/rotation through real A6,
-  fresh-owner restoration, key loss/corruption/interrupted rotation, re-auth UI,
-  failed-rotation-write quarantine and local deletion with late-refresh rejection.
+  fresh-runtime restoration, key loss/corruption/interrupted rotation, re-auth UI,
+  failed-rotation-write quarantine, shared-holder callers and local deletion/replacement
+  with late-read/refresh rejection. Mandatory historical test names remain unchanged;
+  their assertions exercise the process-owner contract, not multiple competing controllers.
   These hosted fakes are not live system-browser sign-in or process-death proof.
 
 Coverage minimum: **90%** JaCoCo **INSTRUCTION** over the JVM + instrumented union,

@@ -32,11 +32,11 @@ internal class AuthClock : TransportClock {
 
 internal class AuthFake : AuthTransport {
     class Call(val request: ProviderHttpRequest, val deadline: ReadDeadline, val terminal: (TransportResult) -> Unit) {
-        var cancelled = false
+        @Volatile var cancelled = false
         fun reply(result: TransportResult) = terminal(result)
     }
-    val calls = mutableListOf<Call>()
-    var respond: (Call) -> Unit = {}
+    val calls = java.util.concurrent.CopyOnWriteArrayList<Call>()
+    @Volatile var respond: (Call) -> Unit = {}
     override fun execute(request: ProviderHttpRequest, deadline: ReadDeadline, terminal: (TransportResult) -> Unit): CancellationHandle {
         val call = Call(request, deadline, terminal)
         calls += call

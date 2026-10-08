@@ -24,8 +24,10 @@ system-browser device-code flow, the same selected token endpoint for session re
 and two read-only WHAM endpoints only. The native gate is not authoritative
 account/workspace association or a supported client.
 
-A retained Activity ViewModel owns one bounded login/read worker; it does not hold the
-Activity. Device codes stay in owned memory, never Bundle/SavedStateHandle/clipboard,
+One lazy process-scoped owner controls bounded login/read/refresh work. Activities
+only observe and submit commands; recreation, backgrounding and finish do not stop
+the process-owned work. The holder uses applicationContext only and retains no
+Activity. Launcher singleTask is defense in depth, not the ownership boundary. Device codes stay in owned memory, never Bundle/SavedStateHandle/clipboard,
 logs or exception diagnostics. The Activity sets FLAG_SECURE. Process death drops a
 pending login; encrypted credentials may restore only as unresolved, without automatic
 requests. Credentials use A6 AndroidKeyStore AES-GCM and an atomic no-backup ciphertext
@@ -33,8 +35,9 @@ slot; its random local selector is also under noBackupFilesDir, not provider ide
 Sign-out cancels owned auth/read/refresh work and deletes the slot key and ciphertext
 locally; it does not revoke remote sessions. Account replacement invalidates the old
 generation and deletes its credentials before new authentication. Late results cannot
-publish old account data or persist into a newer generation; a shared local-deletion
-barrier protects fresh Activity owners. Backup/extraction rules exclude app data.
+publish old account data or persist into a newer generation. Durable deletion
+completes before SIGNED_OUT/REAUTH_REQUIRED; cancellable wait timeouts report
+STORAGE failure without permitting new traffic or writes over pending removal. Backup/extraction rules exclude app data.
 Native fake tests and the owner's physical-phone session are separate evidence boundaries.
 
 Refresh is serialized per session. Complete rotated credentials are durably saved
