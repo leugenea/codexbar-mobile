@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791487634604,
+  "lastUpdate": 1791494034424,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -839,6 +839,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/b34e3fd9ad9350aa446c6cf669faa0eb77213f25"
         },
         "date": 1791487631140,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b2dd4c04aa35e8643e5950724219ee9aa94144a8",
+          "message": "feat(m4a): define truthful history samples and segmentation contracts (#75)",
+          "timestamp": "2026-10-09T00:13:26+03:00",
+          "tree_id": "f37c3c318868b06fd30c9246755cc42be98a615f",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/b2dd4c04aa35e8643e5950724219ee9aa94144a8"
+        },
+        "date": 1791494033595,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
