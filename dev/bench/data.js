@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791441575443,
+  "lastUpdate": 1791441577447,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1249,6 +1249,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/93dc5af7199d39f9ca51f5c816435e56924f2e2f"
         },
         "date": 1791405292811,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f868ebf11ea8a30a6d72c2991f7cae947758546d",
+          "message": "feat(m3a): single-owner session lifecycle: serialized refresh, re-auth, local logout (#55)\n\n* feat(m3a): serialized refresh, re-auth and local logout session isolation (#54)\n\n* fix(m3a): revalidate shared slot generation for every live session owner (#54)\n\n* fix(m3a): linearize session displacement with request admission and publication (#54)\n\n* test(m3a): select gap worker by thread identity, not coroutine-debug name (#54)\n\n* fix(m3a): publish quarantine/sign-out only after durable deletion completes (#54)\n\n* fix(m3a): reserve deletion barrier atomically with displacement; cancellable bounded waits (#54)\n\n* refactor(m3a): single process-wide session owner + singleTask; remove cross-owner sequencer (#54)\n\n* test(m3a): make awaitPhase top-level so nested fixture can use it (#54)\n\n* fix(m3a): restrict NativeConnection test seams with @VisibleForTesting (#54)",
+          "timestamp": "2026-10-08T09:39:14+03:00",
+          "tree_id": "a568763770ea7ab0e0821025e46234a635b3d706",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/f868ebf11ea8a30a6d72c2991f7cae947758546d"
+        },
+        "date": 1791441577249,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
