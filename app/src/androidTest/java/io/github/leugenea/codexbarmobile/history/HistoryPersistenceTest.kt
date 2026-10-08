@@ -2,6 +2,7 @@ package io.github.leugenea.codexbarmobile.history
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteFullException
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -47,8 +48,13 @@ class HistoryPersistenceTest {
     }
     private fun store(limits: HistoryStorageLimits = HistoryStorageLimits(), hooks: HistoryStorageHooks = object : HistoryStorageHooks {}): SQLiteHistoryStore =
         SQLiteHistoryStore(directory, limits, hooks).also { stores.add(it) }
-    private fun created(store: SQLiteHistoryStore): HistoryAccess = (store.createPartition() as HistoryAccessOutcome.Bound).access
-    private fun restored(store: SQLiteHistoryStore, partition: HistoryPartition): HistoryAccess = (store.adopt(partition) as HistoryAccessOutcome.Bound).access
+    private fun created(store: SQLiteHistoryStore): HistoryAccess = bound("create partition", store.createPartition())
+    private fun restored(store: SQLiteHistoryStore, partition: HistoryPartition): HistoryAccess = bound("adopt partition", store.adopt(partition))
+    private fun bound(step: String, outcome: HistoryAccessOutcome): HistoryAccess = when (outcome) {
+        is HistoryAccessOutcome.Bound -> outcome.access
+        is HistoryAccessOutcome.Unavailable -> throw AssertionError("$step: expected Bound; actual=Unavailable(${outcome.reason})")
+        HistoryAccessOutcome.Corrupt -> throw AssertionError("$step: expected Bound; actual=Corrupt")
+    }
     private fun admission(access: HistoryAccess, ordinal: Long, seconds: Long = ordinal - 1, percent: String = "12.37500000000000000001", monotonic: Long? = seconds * 1000 + 1000,
         clockEpoch: ClockEpoch = epoch): HistoryAdmission {
         val window = WindowInput(Input.Value(18000L), Input.Value(BigDecimal(percent)), Input.Value(1_800_003_600L), Input.Invalid)
@@ -522,6 +528,7 @@ class HistoryPersistenceTest {
     }
 
     @Test fun historyArtifactsUseNoBackupDirectoryWithMemoryTemporariesAndUnchangedBackupRules() {
+        verifyNativeSchemaPragmaSetters()
         val context = ApplicationProvider.getApplicationContext<Context>()
         val defaultDirectory = File(context.noBackupFilesDir, "usage-history").canonicalFile
         assertFalse("default history directory must be a fresh synthetic fixture", defaultDirectory.exists())
@@ -539,6 +546,44 @@ class HistoryPersistenceTest {
         access.delete(access.partition)
         assertEquals(setOf("binding", "lane"), directory.listFiles()!!.map { it.name }.toSet())
         assertFalse(database().exists())
+    }
+
+    /** Exercise production configuration without the store's safe exception-to-outcome boundary. */
+    private fun verifyNativeSchemaPragmaSetters() {
+        assertTrue("create independent synthetic schema fixture", directory.mkdirs())
+        val partition = HistoryPartition(UUID(0, 41))
+        val limits = HistoryStorageLimits(bytes = 524_288)
+        val expected = HistoryDiskState(HistoryCursor(partition, lastOrdinal = 7))
+        try {
+            HistorySchema(database(), limits).use { schema ->
+                openSchema("create", schema, partition, create = true)
+                assertEquals(HistoryDiskState(HistoryCursor(partition)), schema.state(partition))
+                assertEquals(0L, schema.count())
+                assertTrue("configured page ceiling", schema.spacePages() in 0 until limits.databasePages)
+                schema.transaction { schema.writeState(expected) }
+            }
+            HistorySchema(database(), limits).use { schema ->
+                openSchema("reopen", schema, partition, create = false)
+                assertEquals(expected, schema.state(partition))
+                assertTrue("reopened page ceiling", schema.spacePages() in 0 until limits.databasePages)
+            }
+            assertEquals(setOf("history.db"), directory.listFiles()!!.map { it.name }.toSet())
+        } finally { directory.deleteRecursively() }
+        assertFalse("remove independent synthetic schema fixture", directory.exists())
+    }
+
+    private fun openSchema(step: String, schema: HistorySchema, partition: HistoryPartition, create: Boolean) {
+        try { schema.open(partition, create) } catch (failure: Exception) {
+            // Only fixed categories escape: never a database path, SQL payload or raw Throwable.
+            val category = when (failure) {
+                is SQLiteException -> if (failure.message?.contains("Queries can be performed using SQLiteDatabase query or rawQuery methods only.") == true) "SQLITE_NONQUERY_RESULT" else "SQLITE_OTHER"
+                is HistoryCorruption -> "CORRUPT"
+                is HistoryStorageException -> "UNAVAILABLE(${failure.reason})"
+                is IOException -> "IO"
+                else -> "OTHER"
+            }
+            throw AssertionError("native schema $step: failure=$category")
+        }
     }
 
     private fun await(step: String, gate: CountDownLatch, last: String) {

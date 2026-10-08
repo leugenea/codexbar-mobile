@@ -33,7 +33,6 @@ internal class HistorySchema(private val file: File, private val limits: History
 
     private fun initialize(partition: HistoryPartition) {
         database.execSQL("PRAGMA page_size=4096")
-        database.execSQL("PRAGMA max_page_count=${limits.databasePages}")
         transaction {
             database.execSQL(STATE_SQL)
             database.execSQL(OBSERVATIONS_SQL)
@@ -58,8 +57,9 @@ internal class HistorySchema(private val file: File, private val limits: History
         database.execSQL("PRAGMA synchronous=FULL")
         database.execSQL("PRAGMA temp_store=MEMORY")
         database.execSQL("PRAGMA cache_size=-256")
-        database.execSQL("PRAGMA journal_size_limit=0")
-        database.execSQL("PRAGMA secure_delete=ON") // Logical removal only; not forensic erasure.
+        // These setters return a row; Android execSQL rejects SQLITE_ROW.
+        if (number("PRAGMA journal_size_limit=0") != 0L) throw HistoryCorruption()
+        if (number("PRAGMA secure_delete=ON") != 1L) throw HistoryCorruption() // Logical removal only; not forensic erasure.
         if (number("PRAGMA temp_store") != 2L || number("PRAGMA synchronous") != 2L) throw HistoryCorruption()
         if (number("PRAGMA max_page_count=${limits.databasePages}") > limits.databasePages) {
             throw HistoryStorageException(HistoryUnavailable.STORAGE_FULL)
