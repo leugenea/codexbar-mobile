@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791487631800,
+  "lastUpdate": 1791487634604,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1657,6 +1657,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/8bc51a750eea20d1c42e20ebb4fd1c3129331c0d"
         },
         "date": 1791482346445,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b34e3fd9ad9350aa446c6cf669faa0eb77213f25",
+          "message": "feat(m3c): render read-only banked-reset inventory with account-safe refresh (#68)\n\n* feat(m3c): render read-only banked-reset inventory with account-safe refresh (#67)\n\n* test(m3c): scope raw-instant oracle to the banked section subtree (#67)",
+          "timestamp": "2026-10-08T22:26:43+03:00",
+          "tree_id": "40174d03a735388f95cc2f546a62eac7821e9738",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/b34e3fd9ad9350aa446c6cf669faa0eb77213f25"
+        },
+        "date": 1791487634156,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
