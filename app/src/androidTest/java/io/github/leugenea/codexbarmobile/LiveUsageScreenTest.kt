@@ -284,7 +284,16 @@ class LiveUsageScreenTest {
             assertBankedOwner("banked-inventory", "1 available banked reset")
             assertViewOnlyBanked()
             assertEquals(0, fake.posts.get())
-            compose.onAllNodes(hasText("999999", substring = true)).assertCountEquals(0)
+            // The pre-existing A8 diagnostic dump legitimately retains raw expiry facts outside C2.
+            compose.onNodeWithTag("banked-section", useUnmergedTree = true).assertExists()
+            val banked = hasTestTag("banked-section") or hasAnyAncestor(hasTestTag("banked-section"))
+            val rawInstantOrBalance = hasText("999999", substring = true) or
+                hasContentDescription("999999", substring = true) or
+                SemanticsMatcher("State description contains raw instant or purchased balance") {
+                    it.config.contains(SemanticsProperties.StateDescription) &&
+                        it.config[SemanticsProperties.StateDescription].contains("999999")
+                }
+            compose.onAllNodes(banked and rawInstantOrBalance, useUnmergedTree = true).assertCountEquals(0)
             compose.onNodeWithTag("banked-status").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
         }
     }
