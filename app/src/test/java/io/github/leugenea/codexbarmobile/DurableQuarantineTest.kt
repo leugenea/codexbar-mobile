@@ -136,10 +136,6 @@ class DurableQuarantineTest {
         }
     }
 
-    private suspend fun awaitPhase(controller: ConnectionController, phase: ConnectionPhase) {
-        withTimeout(5_000) { controller.state.first { it.phase == phase } }
-    }
-
     /** Synthetic durable-file seam; native acceptance retains real AtomicCredentialFile/fsync. */
     private class MemoryCredentialFile : CredentialFile {
         private val bytes = AtomicReference<ByteArray?>()
@@ -266,4 +262,8 @@ class DurableQuarantineTest {
         fun absent() { assertEquals(1, deletes); assertFalse(keyExists.get()); assertFalse(target.exists()) }
         override fun close() { gate?.release(); controllers.forEach { runBlocking { withTimeout(5_000) { it.shutdown() } } }; observers.cancel() }
     }
+}
+
+private suspend fun awaitPhase(controller: ConnectionController, phase: ConnectionPhase) {
+    withTimeout(5_000) { controller.state.first { it.phase == phase } }
 }
