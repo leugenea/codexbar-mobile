@@ -72,7 +72,7 @@ class DeviceCodeAuthenticator(
 
     private fun rejected(scope: CoroutineScope): Job {
         if (active == null) mutableState.value = AuthState.Failed(AuthStage.USERCODE, AuthFailure.STALE_OWNER)
-        return scope.launch(start = CoroutineStart.LAZY) {}.also { ownership.defer { it.cancel() } }
+        return scope.launch(start = CoroutineStart.LAZY) {}.also { ownership.afterLane { it.cancel() } }
     }
 
     fun cancel() {
@@ -93,7 +93,7 @@ class DeviceCodeAuthenticator(
         if (owner == null) return
         owner.binding?.cancel()
         owner.cancellation.cancel()
-        ownership.defer { owner.job.cancel() }
+        ownership.afterLane { owner.job.cancel() }
     }
 
     private suspend fun run(owner: Attempt) {

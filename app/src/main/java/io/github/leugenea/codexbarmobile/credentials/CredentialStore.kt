@@ -25,6 +25,8 @@ interface CredentialStore {
     /** Shared by every adapter and live runtime owner of this exact slot. */
     val ownership: SessionOwnership
     fun openSession(): SessionGeneration
+    /** Atomic command admission: reserve removal before displacing the current owner. */
+    fun admitCommandRemoval(replacement: Boolean): CredentialRemoval
     /** Runtime capability only: no decrypt/read or rotation-marker mutation. */
     fun isActive(generation: SessionGeneration): Boolean
     fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope>
@@ -42,8 +44,14 @@ interface CredentialStore {
 
 /** An exactly-once durable removal reserved before runtime retirement; complete outside the lane. */
 interface CredentialDeletion {
+    /** Start the exactly-once runner independently of lifecycle waiters. */
+    fun start()
     fun complete(): CredentialResult<Unit>
+    suspend fun await(): CredentialResult<Unit>
 }
+
+/** Only an account-replacement command receives a successor capability. */
+class CredentialRemoval(val deletion: CredentialDeletion, val successor: SessionGeneration?)
 
 /**
  * A6 implements protected I/O, not A3. All methods return categorical outcomes.

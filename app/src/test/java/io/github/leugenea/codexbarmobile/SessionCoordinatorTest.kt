@@ -275,7 +275,7 @@ class SessionCoordinatorTest {
         val fake = AuthFake()
         val clock = AuthClock()
         val persistence = FakeCredentialPersistence()
-        val store = decorate(SerializedCredentialStore(persistence))
+        val store = decorate(SerializedCredentialStore(persistence, removalExecutor = java.util.concurrent.Executor { it.run() }))
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val session = SessionCoordinator(store, fake, scope, clock)
         val initial = syntheticEnvelope(store.openSession(), refresh = refresh)

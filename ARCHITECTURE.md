@@ -59,19 +59,29 @@ provides no authoritative token lifetime: there is no inferred TTL, JWT inspecti
 expiry schedule. Key loss, corruption or an interrupted rotation restores as re-auth
 required, never a usable old credential. Local sign-out invalidates/cancels auth, read
 and refresh work and deletes the A6 key and ciphertext; it makes no remote revocation
-request. Its admitted synchronous deletion cannot be dropped by Activity finish before
-the worker begins. A shared deletion barrier prevents a new Activity owner from
+request. Its admitted removal is owned by the slot's independent I/O runner, not by
+an Activity coroutine; Activity finish cancels runtime waiters immediately without
+dropping removal. A shared deletion barrier prevents a new Activity owner from
 restoring or signing in ahead of an already admitted logout. Account replacement
 retires the preceding generation and deletes its durable credentials before new auth.
-Deletion admission and reservation of the replacement capability share the slot's
-serialized lane; durable key/file removal then runs outside that runtime lane. The
-slot-wide barrier is reserved during the same retirement mutation, before any
-successor can intervene; only its exactly-once I/O runner is deferred. It keeps
-restoration, write admission and rotation-marker operations behind removal, with a
-generation recheck after waiting. Rebinding never waits for I/O, and a displaced
-replacement cannot reopen over its successor. The delayed
+Logout/replacement command admission reserves the barrier and optional replacement
+capability before displacing any live owner, including a command from a stale controller.
+Ordinary restoration-only displacement does not reserve or delete durable credentials.
+Durable key/file removal then runs outside the runtime lane. Runners are exactly-once
+and chain through completion callbacks, without parking a thread on a predecessor.
+Restoration and deletion waiters suspend cancellably, with a 30-second storage-wait
+bound; legacy synchronous storage callers have an interruptible bounded wait. Timeout
+reports and notifies truthful storage failure even while removal is held, but neither
+clears the barrier nor claims durable success. Only
+the actual removal outcome opens storage/request admission. Runtime cancellation is
+never queued behind I/O; terminal re-auth/sign-out publication waits for that outcome.
+Rebinding never waits for I/O, and a displaced replacement cannot reopen over its
+successor. The delayed
 authenticator uses only its still-active admitted capability, after durable deletion.
-All adapters and runtime owners for that slot share one ownership sequencer.
+All adapters and runtime owners for that slot share one process-lifetime ownership
+sequencer. The registry retains the slot owner strongly (without an Activity/Context)
+so a cancelled controller or garbage collection cannot manufacture a second kernel
+while an independent removal runner is still alive.
 Displacement, generation validation plus transport enqueue, and committed observable-state
 assignment execute on that lane; `isActive` snapshots alone never authorize an effect.
 Displacement proactively clears old observations and cancels the exact detached jobs.
@@ -84,9 +94,10 @@ A displaced read owner requires sign-in again and discards its observations.
 Quarantine immediately revokes its capability and clears credentials/observations,
 but stays busy until durable deletion completes: REAUTH_REQUIRED and SIGNED_OUT
 cannot authorize UI completion ahead of key/file removal. Deletion-time observer
-wakeups and detached-job cancellation are deferred until the barrier settles, so a
-reentrant callback cannot wait on deletion that has not yet begun. Local logout's
-busy SIGNING_OUT admission remains observable after its ATOMIC runner is queued;
+wakeups are deferred until the barrier settles, but detached-job/scope cancellation
+runs immediately outside the lane. Durable runners are queued before cancellation
+callbacks, so a reentrant callback cannot prevent removal from starting. Local logout's
+busy SIGNING_OUT admission remains observable after its durable runner is queued;
 its Activity barrier suspends a reentrant new owner's restoration. A failed removal
 is conservatively a storage failure, not a successful quarantine/logout publication.
 Key-loss/corrupt/interrupted-rotation restoration likewise removes the unsafe pair

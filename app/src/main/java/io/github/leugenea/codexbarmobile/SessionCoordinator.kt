@@ -57,8 +57,8 @@ internal class SessionCoordinator(
         detached?.takeUnless { it.result.isCompleted }?.let {
             it.write.cancel()
             val admitted = store.admitDeletion(it.envelope.generation)
-            ownership.deferDeletion {
-                if (admitted is CredentialResult.Success) admitted.value.complete()
+            ownership.deferRemoval {
+                if (admitted is CredentialResult.Success) admitted.value.start()
                 it.job.cancel()
             }
         }
@@ -73,7 +73,7 @@ internal class SessionCoordinator(
 
     private fun quarantine(generation: SessionGeneration) {
         val admitted = store.admitDeletion(generation)
-        ownership.deferDeletion { if (admitted is CredentialResult.Success) admitted.value.complete() }
+        ownership.deferRemoval { if (admitted is CredentialResult.Success) admitted.value.start() }
     }
 
     fun deadline(): ReadDeadline = ReadDeadline.after(clock.now())

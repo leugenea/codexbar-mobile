@@ -2,6 +2,8 @@ package io.github.leugenea.codexbarmobile
 
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
+import io.github.leugenea.codexbarmobile.credentials.CredentialRemoval
+import io.github.leugenea.codexbarmobile.credentials.awaitStorage
 import io.github.leugenea.codexbarmobile.credentials.CredentialDeletion
 import io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope
 import io.github.leugenea.codexbarmobile.credentials.CredentialResult
@@ -37,7 +39,9 @@ internal class ConnectionState(
 internal class ConnectionDeletionBarrier {
     private var pending: CompletableDeferred<Unit>? = null
     @Synchronized fun admit(): CompletableDeferred<Unit> = CompletableDeferred<Unit>().also { pending = it }
-    suspend fun await() { snapshot()?.await() }
+    suspend fun await(): Boolean = kotlinx.coroutines.withTimeoutOrNull(
+        io.github.leugenea.codexbarmobile.credentials.STORAGE_WAIT_MILLIS,
+    ) { snapshot()?.await(); true } ?: false
     @Synchronized private fun snapshot() = pending
 }
 
@@ -67,12 +71,15 @@ internal class ConnectionController(
 
     init {
         work = scope.launch {
-            deletions.await()
+            if (!deletions.await()) {
+                publish(0, ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.STORAGE))
+                return@launch
+            }
             val generation = ownership.serialized {
                 if (closed || revision != 0L) return@launch
                 if (storageReady) store.openSession().also(::bind) else null
             }
-            val restored = if (generation != null) store.read(generation) else
+            val restored = if (generation != null) ownership.awaitSettled { store.read(generation) } else
                 CredentialResult.Failure(CredentialFailure.CORRUPT)
             val quarantined = quarantineRestore(generation, restored)
             val phase = if (!quarantined) ConnectionPhase.FAILED else when (restored) {
@@ -90,7 +97,7 @@ internal class ConnectionController(
         }
     }
 
-    private fun quarantineRestore(generation: SessionGeneration?, restored: CredentialResult<CredentialEnvelope>): Boolean {
+    private suspend fun quarantineRestore(generation: SessionGeneration?, restored: CredentialResult<CredentialEnvelope>): Boolean {
         if (generation == null || restored !is CredentialResult.Failure ||
             restored.category !in setOf(CredentialFailure.KEY_LOST, CredentialFailure.CORRUPT)) return true
         val admitted = ownership.serialized {
@@ -100,40 +107,32 @@ internal class ConnectionController(
             store.admitDeletion(generation)
         }
         // Restore remains busy until unsafe ciphertext/key removal (or the tombstone) settles.
-        return admitted is CredentialResult.Success && admitted.value.complete() is CredentialResult.Success
+        return admitted is CredentialResult.Success && admitted.value.await() is CredentialResult.Success
     }
 
     fun connect() {
         ownership.serialized {
             if (closed || deleting || !storageReady || mutableState.value.busy) return
             val owner = retire()
-            val replacement = store.openSession()
+            val replacement = store.admitCommandRemoval(replacement = true)
+            bind(requireNotNull(replacement.successor))
+            // The slot already owns its runner; this Activity owns only the login waiter.
             val next = scope.launch(start = CoroutineStart.LAZY) { login(owner, replacement) }
             work = next
             mutableState.value = ConnectionState(ConnectionPhase.AUTHENTICATING)
-            ownership.defer { if (!closed && revision == owner) next.start() }
+            ownership.afterLane { if (!closed && revision == owner) next.start() }
         }
     }
 
-    private suspend fun login(owner: Long, replacement: io.github.leugenea.codexbarmobile.credentials.SessionGeneration) {
-        deletions.await()
-        val admitted = store.replaceSession(replacement)
-        if (admitted is CredentialResult.Failure) {
+    private suspend fun login(owner: Long, replacement: CredentialRemoval) {
+        val deleted = if (deletions.await()) replacement.deletion.await() else
+            CredentialResult.Failure(CredentialFailure.FAILED_WRITE)
+        if (deleted is CredentialResult.Failure) {
             publish(owner, ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.STORAGE))
             return
         }
-        val context = kotlinx.coroutines.currentCoroutineContext()
-        ownership.serialized {
-            if (closed || revision != owner) return
-            val generation = (admitted as CredentialResult.Success).value
-            bind(generation)
-            ownership.defer {
-                ownership.serialized {
-                    if (!closed && revision == owner && ownership.isActive(generation))
-                        authenticator.start(CoroutineScope(context), generation)
-                }
-            }
-        }
+        val generation = requireNotNull(replacement.successor)
+        if (!startAuthentication(owner, generation, kotlinx.coroutines.currentCoroutineContext())) return
         val terminal = authenticator.state.first { auth ->
             publish(owner, ConnectionState(ConnectionPhase.AUTHENTICATING, auth))
             auth is AuthState.Connected || auth is AuthState.Failed || auth == AuthState.Cancelled
@@ -145,8 +144,20 @@ internal class ConnectionController(
         connected(owner, terminal)
     }
 
+    private fun startAuthentication(owner: Long, generation: SessionGeneration, context: kotlin.coroutines.CoroutineContext): Boolean =
+        ownership.serialized {
+            if (closed || revision != owner || !ownership.isActive(generation)) return false
+            ownership.defer {
+                ownership.serialized {
+                    if (!closed && revision == owner && ownership.isActive(generation))
+                        authenticator.start(CoroutineScope(context), generation)
+                }
+            }
+            true
+        }
+
     private suspend fun connected(owner: Long, terminal: AuthState.Connected) {
-        when (val credentials = store.read(terminal.generation)) {
+        when (val credentials = ownership.awaitSettled { store.read(terminal.generation) }) {
             is CredentialResult.Failure -> publish(owner, ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.STORAGE))
             is CredentialResult.Success -> {
                 ownership.serialized {
@@ -171,7 +182,7 @@ internal class ConnectionController(
             }
             revision++
             val owner = revision
-            work?.let { job -> ownership.defer { job.cancel() } }
+            work?.let { job -> ownership.afterLane { job.cancel() } }
             session.retryTransient()
             val next = scope.launch(start = CoroutineStart.LAZY) {
                 val refreshed = if (refreshSession) session.refresh(active.envelope, session.deadline()) else null
@@ -216,51 +227,45 @@ internal class ConnectionController(
         ownership.serialized {
             if (closed || deleting) return
             if (!storageReady) {
-                mutableState.value = ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.STORAGE)
+                commitState(ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.STORAGE))
                 return
             }
             val owner = retire()
             deleting = true
-            // Atomic admission ensures Activity finish cannot drop a requested local deletion
-            // before its synchronous store operation starts. No network or suspension inside.
-            // Capture the capability at admission: an old worker can never delete a newer login.
-            val generation = store.openSession()
-            val admitted = store.admitDeletion(generation)
+            // Reserve barrier/capability before displacement. An old worker can never
+            // turn this captured command into deletion of a later login.
+            val admitted = store.admitCommandRemoval(replacement = false).deletion
             val completion = deletions.admit()
-            // Launch/callbacks stay outside the lane. ATOMIC still executes admitted local
-            // deletion even if a synchronous observer closes the Activity's worker scope.
-            ownership.deferDeletion { delete(owner, admitted, completion) }
+            // The kernel queued durable work before callback-capable lifecycle effects.
+            ownership.afterLane { delete(owner, admitted, completion) }
             mutableState.value = ConnectionState(ConnectionPhase.SIGNING_OUT)
             // Preserve reentrant busy-admission observers after the runner is enqueued;
             // the separate Activity barrier makes their restoration suspension-safe.
-            mutableState.notifyDeletionAdmission()
+            mutableState.notifyWithoutDeletionWait()
         }
     }
 
-    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
-    private fun delete(owner: Long, admitted: CredentialResult<CredentialDeletion>, completion: CompletableDeferred<Unit>) {
-        val next = scope.launch(start = CoroutineStart.ATOMIC) {
-            try {
-                val result = when (admitted) {
-                    is CredentialResult.Failure -> admitted
-                    is CredentialResult.Success -> admitted.value.complete()
-                }
-                ownership.serialized {
-                    deleting = false
-                    publish(owner, ConnectionState(if (result is CredentialResult.Success) ConnectionPhase.SIGNED_OUT
-                        else ConnectionPhase.FAILED, problem = if (result is CredentialResult.Failure) ConnectionProblem.STORAGE else null))
-                }
-            } finally { completion.complete(Unit) }
+    private fun delete(owner: Long, admitted: CredentialDeletion, completion: CompletableDeferred<Unit>) {
+        // Starting durable work and ending the Activity waiter are separate ownership paths.
+        admitted.start()
+        val next = scope.launch {
+            val result = admitted.await()
+            ownership.serialized {
+                deleting = false
+                publish(owner, ConnectionState(if (result is CredentialResult.Success) ConnectionPhase.SIGNED_OUT
+                    else ConnectionPhase.FAILED, problem = if (result is CredentialResult.Failure) ConnectionProblem.STORAGE else null))
+            }
         }
         ownership.serialized { if (!closed && revision == owner) work = next }
-        next.invokeOnCompletion { completion.complete(Unit) }
+        // Only the real slot outcome releases restoration, not cancellation of this waiter.
+        ownership.defer { completion.complete(Unit) }
     }
 
     private fun retire(): Long {
         binding?.cancel()
         binding = null
         revision++
-        work?.let { job -> ownership.defer { job.cancel() } }
+        work?.let { job -> ownership.afterLane { job.cancel() } }
         authenticator.cancel()
         session.retire()
         return revision
@@ -274,8 +279,15 @@ internal class ConnectionController(
             if (closed || revision != owner) return
             val stale = !hint || (generation != null && !ownership.isActive(generation)) ||
                 (state.phase == ConnectionPhase.RESTORED && session.snapshot() is SessionResult.Failed)
-            mutableState.value = if (stale) displaced() else state
+            commitState(if (stale) displaced() else state)
         }
+    }
+
+    private fun commitState(state: ConnectionState) {
+        mutableState.value = state
+        // A timeout is truthful failure, not permission to clear a still-running removal.
+        if (state.phase == ConnectionPhase.FAILED && state.problem == ConnectionProblem.STORAGE)
+            mutableState.notifyWithoutDeletionWait()
     }
 
     private fun bind(generation: SessionGeneration) {
@@ -292,13 +304,17 @@ internal class ConnectionController(
             // the terminal re-auth state. The barrier also defers reentrant observer wakeups.
             val barrier = ownership.deletionBarrier()
             mutableState.value = if (barrier != null) ConnectionState(ConnectionPhase.SIGNING_OUT) else terminal
-            ownership.defer {
-                val settled = if (barrier?.join() == false)
-                    ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.STORAGE) else terminal
-                ownership.serialized {
-                    if (!closed && revision == owner) mutableState.value = settled
-                }
+            ownership.afterLane {
                 detached?.cancel()
+                if (barrier == null) return@afterLane
+                scope.launch {
+                    val succeeded = barrier.awaitStorage(ownership.storageWaitMillis)
+                    val settled = if (succeeded == true) terminal else
+                        ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.STORAGE)
+                    ownership.serialized {
+                        if (!closed && revision == owner) commitState(settled)
+                    }
+                }
             }
         }
     }
@@ -311,7 +327,7 @@ internal class ConnectionController(
             closed = true
             retire()
             mutableState.value = ConnectionState(ConnectionPhase.CANCELLED)
-            ownership.defer { scope.cancel() }
+            ownership.afterLane { scope.cancel() }
         }
     }
 }

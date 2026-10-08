@@ -229,7 +229,7 @@ class SharedSessionOwnersTest {
                 ))
             }
         }
-        private val kernel = SerializedCredentialStore(rebound)
+        private val kernel = SerializedCredentialStore(rebound, activate = { binding = it }, removalExecutor = java.util.concurrent.Executor { it.run() })
         val slot = object : CredentialStore by kernel {
             override fun openSession() = kernel.openSession().also { binding = it }
             override fun replaceSession(generation: SessionGeneration) = kernel.replaceSession(generation).also {
@@ -255,8 +255,12 @@ class SharedSessionOwnersTest {
         }
         fun controller(): ConnectionController {
             val adapter = object : CredentialStore by slot {
-                override fun replaceSession(generation: SessionGeneration) = slot.replaceSession(generation).also {
-                    afterReplacement?.invoke()
+                override fun admitCommandRemoval(replacement: Boolean): CredentialRemoval {
+                    val command = slot.admitCommandRemoval(replacement)
+                    val deletion = object : CredentialDeletion by command.deletion {
+                        override suspend fun await() = command.deletion.await().also { afterReplacement?.invoke() }
+                    }
+                    return CredentialRemoval(deletion, command.successor)
                 }
             }
             return ConnectionController(adapter, DeviceCodeAuthenticator(fake, adapter, clock, clock::pause),

@@ -48,7 +48,7 @@ private class OwnedAwait(
     fun start(transport: AuthTransport, request: ProviderHttpRequest, deadline: ReadDeadline) {
         ownership.serialized {
             if (settled || !continuation.isActive) return
-            if (!ownership.isActive(generation)) {
+            if (!ownership.isActive(generation) || ownership.deletionBarrier() != null) {
                 complete(TransportResult.Failure(TransportFailure.CANCELLED))
                 return
             }
@@ -62,7 +62,7 @@ private class OwnedAwait(
             if (settled) return
             settled = true
             binding?.cancel()
-            ownership.defer {
+            ownership.afterLane {
                 try { handle?.cancel() } finally {
                     if (continuation.isActive) continuation.resume(TransportResult.Failure(TransportFailure.CANCELLED))
                 }
@@ -77,7 +77,9 @@ private class OwnedAwait(
             binding?.cancel()
             val accepted = if (ownership.isActive(generation)) result
                 else TransportResult.Failure(TransportFailure.CANCELLED)
-            ownership.defer { continuation.resume(accepted) }
+            if (accepted == TransportResult.Failure(TransportFailure.CANCELLED))
+                ownership.afterLane { continuation.resume(accepted) }
+            else ownership.defer { continuation.resume(accepted) }
         }
     }
 }

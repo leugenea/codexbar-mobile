@@ -3,7 +3,6 @@ package io.github.leugenea.codexbarmobile.credentials
 import android.content.Context
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import java.io.File
-import java.lang.ref.WeakReference
 import java.security.UnrecoverableKeyException
 import java.util.UUID
 
@@ -19,6 +18,7 @@ class KeystoreCredentialStore(context: Context, localSessionId: UUID) : Credenti
     override val ownership: SessionOwnership get() = owner.ownership
 
     override fun openSession(): SessionGeneration = owner.openSession()
+    override fun admitCommandRemoval(replacement: Boolean) = owner.admitCommandRemoval(replacement)
     override fun isActive(generation: SessionGeneration): Boolean = owner.isActive(generation)
     override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> = owner.read(generation)
     override fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation): CredentialResult<CredentialEnvelope> =
@@ -30,27 +30,36 @@ class KeystoreCredentialStore(context: Context, localSessionId: UUID) : Credenti
     override fun finishRotation(generation: SessionGeneration) = owner.finishRotation(generation)
 
     internal companion object {
-        private val owners = mutableMapOf<String, WeakReference<CredentialSlotOwner>>()
+        // One process-lifetime owner per slot: outstanding removal cannot outlive its registry entry.
+        private val owners = mutableMapOf<String, CredentialSlotOwner>()
         fun file(context: Context, session: UUID): File = File(context.noBackupFilesDir, "credentials/$session/value.bin")
         fun alias(context: Context, session: UUID): String = "${context.packageName}.credentials.$session"
 
-        private fun sharedOwner(context: Context, session: UUID): CredentialSlotOwner = synchronized(owners) {
+        private fun sharedOwner(context: Context, session: UUID): CredentialSlotOwner {
             val file = file(context, session)
-            val path = file.canonicalPath
-            owners.entries.removeAll { it.value.get() == null }
-            owners[path]?.get() ?: CredentialSlotOwner(ProtectedCredentialPersistence(
-                AtomicCredentialFile(file), AndroidCredentialCipher(alias(context, session)), session, File(file.parentFile, "rotation-pending"),
-            )).also { owners[path] = WeakReference(it) }
+            return sharedOwner(file.canonicalPath) {
+                CredentialSlotOwner(ProtectedCredentialPersistence(
+                    AtomicCredentialFile(file), AndroidCredentialCipher(alias(context, session)), session, File(file.parentFile, "rotation-pending"),
+                ))
+            }
+        }
+
+        internal fun sharedOwner(path: String, create: () -> CredentialSlotOwner): CredentialSlotOwner = synchronized(owners) {
+            owners.getOrPut(path, create)
         }
     }
 }
 
 /** The kernel atomically rebinds capabilities; durable deletion never retains its runtime lane. */
-internal class CredentialSlotOwner(private val persistence: ProtectedCredentialPersistence) : CredentialStore {
-    internal val kernel = SerializedCredentialStore(persistence, persistence::activate)
+internal class CredentialSlotOwner(
+    private val persistence: ProtectedCredentialPersistence,
+    removalExecutor: java.util.concurrent.Executor = SerializedCredentialStore.durableRemovals,
+) : CredentialStore {
+    internal val kernel = SerializedCredentialStore(persistence, persistence::activate, removalExecutor)
     override val ownership: SessionOwnership get() = kernel.ownership
 
     override fun openSession(): SessionGeneration = kernel.openSession()
+    override fun admitCommandRemoval(replacement: Boolean) = kernel.admitCommandRemoval(replacement)
     override fun isActive(generation: SessionGeneration): Boolean = kernel.isActive(generation)
 
     override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> = kernel.read(generation)
@@ -59,13 +68,13 @@ internal class CredentialSlotOwner(private val persistence: ProtectedCredentialP
     override fun admitDeletion(generation: SessionGeneration): CredentialResult<CredentialDeletion> = kernel.admitDeletion(generation)
     override fun delete(generation: SessionGeneration): CredentialResult<Unit> = kernel.delete(generation)
     override fun replaceSession(generation: SessionGeneration): CredentialResult<SessionGeneration> = kernel.replaceSession(generation)
-    override fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = ownership.settled {
+    override fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = ownership.settled(generation) {
         when (val read = kernel.read(generation)) {
             is CredentialResult.Failure -> read
             is CredentialResult.Success -> persistence.rotation(generation, pending = true)
         }
     }
-    override fun finishRotation(generation: SessionGeneration): CredentialResult<Unit> = ownership.settled {
+    override fun finishRotation(generation: SessionGeneration): CredentialResult<Unit> = ownership.settled(generation) {
         when (val checked = kernel.finishRotation(generation)) {
             is CredentialResult.Failure -> checked
             is CredentialResult.Success -> persistence.rotation(generation, pending = false)

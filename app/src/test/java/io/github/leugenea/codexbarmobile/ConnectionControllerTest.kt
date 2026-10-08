@@ -107,9 +107,10 @@ class ConnectionControllerTest {
             val fake = AuthFake()
             val persistence = FakeCredentialPersistence()
             val store = object : CredentialStore {
-                private val delegate = SerializedCredentialStore(persistence)
+                private val delegate = SerializedCredentialStore(persistence, removalExecutor = java.util.concurrent.Executor { it.run() })
                 override val ownership get() = delegate.ownership
                 override fun openSession() = delegate.openSession()
+                override fun admitCommandRemoval(replacement: Boolean) = delegate.admitCommandRemoval(replacement)
                 override fun isActive(generation: SessionGeneration) = delegate.isActive(generation)
                 override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> =
                     failure?.let { CredentialResult.Failure(it) } ?: CredentialResult.Success(syntheticEnvelope(generation))
@@ -257,7 +258,7 @@ class ConnectionControllerTest {
             override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) { queue.add(block) }
         }
         val persistence = FakeCredentialPersistence()
-        val store = SerializedCredentialStore(persistence)
+        val store = SerializedCredentialStore(persistence, removalExecutor = java.util.concurrent.Executor { it.run() })
         val generation = store.openSession()
         val envelope = syntheticEnvelope(generation)
         store.replace(envelope, CredentialCancellation())
@@ -286,6 +287,7 @@ class ConnectionControllerTest {
         }
         Harness().use { h ->
             h.connect()
+            h.removalExecutor = java.util.concurrent.Executor { queue.add(it) }
             val deletions = ConnectionDeletionBarrier()
             val old = ConnectionController(h.store, DeviceCodeAuthenticator(h.fake, h.store, h.clock, h.clock::pause),
                 NativeFeasibilityReader(h.fake, h.clock, h.clock::pause), CoroutineScope(SupervisorJob() + dispatcher),
@@ -307,6 +309,7 @@ class ConnectionControllerTest {
                 assertEquals(ConnectionPhase.IDLE, newer.state.value.phase)
                 assertNull(h.persistence.durable)
                 assertEquals(2, h.persistence.deleteCount) // initial replacement + admitted logout.
+                h.removalExecutor = java.util.concurrent.Executor { it.run() }
                 newer.connect()
                 assertEquals(ConnectionPhase.OBSERVED, newer.state.value.phase)
                 assertNotNull(h.persistence.durable)
@@ -319,9 +322,10 @@ class ConnectionControllerTest {
         Harness().use { h ->
             h.connect()
             val restoringStore = object : CredentialStore by h.store {
-                override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> =
-                    h.persistence.durable?.let { CredentialResult.Success(CredentialEnvelope(generation, it.accessToken, it.refreshToken)) }
-                        ?: CredentialResult.Failure(CredentialFailure.MISSING)
+                override fun openSession(): SessionGeneration = h.store.openSession().also { generation ->
+                    // A distinct synthetic successor, not resurrection of the removed pair.
+                    check(h.store.replace(syntheticEnvelope(generation, "observer-successor"), CredentialCancellation()) is CredentialResult.Success)
+                }
             }
             var newer: ConnectionController? = null
             val observing = launch(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
@@ -376,11 +380,13 @@ class ConnectionControllerTest {
                 }
             }
             try {
+                h.removalExecutor = java.util.concurrent.Executor { queue.add(it) }
                 old.signOut()
                 assertNotNull("Deletion observer reached", newer)
                 while (queue.isNotEmpty()) queue.removeFirst().run()
                 assertNull(h.persistence.durable)
                 assertEquals(ConnectionPhase.IDLE, newer!!.state.value.phase)
+                h.removalExecutor = java.util.concurrent.Executor { it.run() }
                 newer.connect()
                 assertEquals(ConnectionPhase.OBSERVED, newer.state.value.phase)
                 val generation = (newer.state.value.auth as AuthState.Connected).generation
@@ -411,7 +417,8 @@ class ConnectionControllerTest {
         val fake = AuthFake()
         val clock = AuthClock()
         val persistence = FakeCredentialPersistence()
-        val store = SerializedCredentialStore(persistence)
+        var removalExecutor = java.util.concurrent.Executor { it.run() }
+        val store = SerializedCredentialStore(persistence, removalExecutor = java.util.concurrent.Executor { removalExecutor.execute(it) })
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val controller = ConnectionController(store, DeviceCodeAuthenticator(fake, store, clock, clock::pause),
             NativeFeasibilityReader(fake, clock, clock::pause), scope, ready)

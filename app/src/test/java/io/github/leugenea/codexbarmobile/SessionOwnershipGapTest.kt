@@ -220,7 +220,7 @@ class SessionOwnershipGapTest {
                 ))
             }
         }
-        val kernel = SerializedCredentialStore(rebound)
+        val kernel = SerializedCredentialStore(rebound, activate = { binding = it }, removalExecutor = java.util.concurrent.Executor { it.run() })
         val gate = GapGate(operation)
         val rotationPrepared = AtomicBoolean(false)
         val slot = object : CredentialStore by kernel {

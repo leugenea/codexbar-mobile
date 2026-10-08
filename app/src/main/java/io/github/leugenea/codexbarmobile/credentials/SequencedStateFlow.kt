@@ -24,9 +24,9 @@ internal class SequencedStateFlow<T>(private val ownership: SessionOwnership, in
                 ownership.defer { signals.value = revision.incrementAndGet() }
             }
         }
-    /** Busy logout admission is observable once its ATOMIC deletion runner has been queued. */
-    internal fun notifyDeletionAdmission() {
-        ownership.deferDeletion { signals.value = revision.incrementAndGet() }
+    /** Busy admission and truthful storage failure may be delivered while removal is held. */
+    internal fun notifyWithoutDeletionWait() {
+        ownership.afterLane { signals.value = revision.incrementAndGet() }
     }
 
     override val replayCache: List<T> get() = listOf(value)

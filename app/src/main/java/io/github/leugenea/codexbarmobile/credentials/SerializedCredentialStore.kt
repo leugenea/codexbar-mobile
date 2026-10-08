@@ -3,8 +3,9 @@ package io.github.leugenea.codexbarmobile.credentials
 import java.util.concurrent.CancellationException
 
 /**
- * Pure ownership/atomic-publication kernel. No credentials, platform storage or scheduling
- * are supplied here. Adapter operations must not reenter this store or call user callbacks.
+ * Pure ownership/atomic-publication kernel with an independently owned durable-removal
+ * executor. No credentials or platform storage are supplied here. Adapter operations
+ * must not reenter this store or call user callbacks.
  * Staging is serialized with other replacements, but outside the ownership lock so logout
  * and session replacement can invalidate an uncooperative staging worker immediately.
  */
@@ -12,20 +13,31 @@ class SerializedCredentialStore(
     private val persistence: CredentialPersistence,
     // Trusted capability-only rebinding: no I/O, suspension or observer callbacks.
     private val activate: (SessionGeneration?) -> Unit = {},
+    private val removalExecutor: java.util.concurrent.Executor = durableRemovals,
+    storageWaitMillis: Long = STORAGE_WAIT_MILLIS,
 ) : CredentialStore {
     private val namespace = LocalCredentialNamespace()
-    override val ownership = SessionOwnership()
+    override val ownership = SessionOwnership(storageWaitMillis)
     private val replacements = Any()
 
     override fun openSession(): SessionGeneration = ownership.serialized {
         SessionGeneration(namespace).also { activate(it); ownership.activate(it) }
     }
 
+    override fun admitCommandRemoval(replacement: Boolean): CredentialRemoval = ownership.serialized {
+        val successor = if (replacement) SessionGeneration(namespace) else null
+        activate(successor)
+        val admitted = ownership.beginCommandRemoval(successor)
+        val removal = Removal(admitted, successor)
+        ownership.deferRemoval { removal.start() }
+        CredentialRemoval(removal, successor)
+    }
+
     override fun isActive(generation: SessionGeneration): Boolean = ownership.isActive(generation)
 
     override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> {
         if (!isActive(generation)) return stale()
-        return ownership.settled {
+        return ownership.settled(generation) {
             if (!ownership.isActive(generation)) return@settled stale()
             when (val result = safely(CredentialFailure.CORRUPT) { persistence.read() }) {
                 is CredentialResult.Failure -> result
@@ -38,8 +50,8 @@ class SerializedCredentialStore(
         envelope: CredentialEnvelope,
         cancellation: CredentialCancellation,
     ): CredentialResult<CredentialEnvelope> = synchronized(replacements) {
-        val rejected = ownership.settled { rejection(envelope.generation, cancellation) }
-        if (rejected != null) return@synchronized rejected
+        val rejected = ownership.settled(envelope.generation) { rejection(envelope.generation, cancellation) ?: CredentialResult.Success(Unit) }
+        if (rejected is CredentialResult.Failure) return@synchronized rejected
         when (val staged = safely(CredentialFailure.FAILED_WRITE) { persistence.prepare(envelope) }) {
             is CredentialResult.Failure -> ownership.serialized {
                 rejection(envelope.generation, cancellation) ?: staged
@@ -70,20 +82,53 @@ class SerializedCredentialStore(
         is CredentialResult.Success -> admitted.value.complete()
     }
 
-    private inner class Removal(private val admitted: SessionOwnership.Deletion) : CredentialDeletion {
+    private inner class Removal(
+        private val admitted: SessionOwnership.Deletion,
+        private val successor: SessionGeneration? = null,
+    ) : CredentialDeletion {
         private val claimed = java.util.concurrent.atomic.AtomicBoolean()
-        private val result = java.util.concurrent.CompletableFuture<CredentialResult<Unit>>()
-        override fun complete(): CredentialResult<Unit> {
-            if (!claimed.compareAndSet(false, true)) return result.join()
-            var saved: CredentialResult<Unit> = CredentialResult.Failure(CredentialFailure.FAILED_WRITE)
-            try {
-                admitted.previous?.join()
-                saved = safely(CredentialFailure.FAILED_WRITE) { persistence.delete() }
-                return saved
-            } finally {
-                result.complete(saved)
-                ownership.finishDeletion(admitted, saved is CredentialResult.Success)
+        @Volatile private var result: CredentialResult<Unit> = CredentialResult.Failure(CredentialFailure.FAILED_WRITE)
+        override fun start() {
+            if (!claimed.compareAndSet(false, true)) return
+            // A predecessor completion schedules this runner; no thread waits for prior I/O.
+            val previous = admitted.previous
+            if (previous == null) schedule() else previous.whenComplete { _, _ -> schedule() }
+        }
+
+        private fun schedule() {
+            try { removalExecutor.execute(::remove) }
+            catch (_: Exception) { finish(CredentialResult.Failure(CredentialFailure.FAILED_WRITE)) }
+        }
+
+        private fun remove() = finish(safely(CredentialFailure.FAILED_WRITE) { persistence.delete() })
+
+        private fun finish(saved: CredentialResult<Unit>) {
+            ownership.serialized {
+                if (saved is CredentialResult.Failure && successor != null && ownership.isActive(successor)) {
+                    activate(null)
+                    ownership.activate(null)
+                }
             }
+            result = saved
+            ownership.finishDeletion(admitted, saved is CredentialResult.Success)
+        }
+
+        override fun complete(): CredentialResult<Unit> {
+            start()
+            return if (admitted.completion.waitStorage(ownership.storageWaitMillis) == null)
+                CredentialResult.Failure(CredentialFailure.FAILED_WRITE) else result
+        }
+
+        override suspend fun await(): CredentialResult<Unit> {
+            start()
+            return if (admitted.completion.awaitStorage(ownership.storageWaitMillis) == null)
+                CredentialResult.Failure(CredentialFailure.FAILED_WRITE) else result
+        }
+    }
+
+    internal companion object {
+        val durableRemovals = java.util.concurrent.Executors.newCachedThreadPool { task ->
+            Thread(task, "credential-removal").apply { isDaemon = true }
         }
     }
 
@@ -112,7 +157,7 @@ class SerializedCredentialStore(
         cancellation: CredentialCancellation,
     ): CredentialResult<CredentialEnvelope> {
         try {
-            return ownership.settled {
+            return ownership.settled(envelope.generation) {
                 rejection(envelope.generation, cancellation) ?: cancellation.commit {
                     when (val result = safely(CredentialFailure.FAILED_WRITE) { staged.commit() }) {
                         is CredentialResult.Failure -> result

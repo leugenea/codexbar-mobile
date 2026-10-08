@@ -8,9 +8,9 @@ import java.util.concurrent.locks.ReentrantLock
  * transport start share this lane. Never await a response here. Revocation mutations are
  * internal, callback-free operations; job cancellation and observer delivery are deferred.
  * A deletion barrier revokes runtime admission first, without retaining this lane across
- * key/file I/O. Deletion-time effects stay queued until its durable outcome is known.
+ * key/file I/O. Publication stays queued until the outcome; lifecycle cancellation does not.
  */
-class SessionOwnership {
+class SessionOwnership(internal val storageWaitMillis: Long = STORAGE_WAIT_MILLIS) {
     private val lock = ReentrantLock()
     private val pending = ThreadLocal<MutableList<() -> Unit>>()
     private var active: SessionGeneration? = null
@@ -22,26 +22,53 @@ class SessionOwnership {
     }
     private val afterDeletion = mutableListOf<() -> Unit>()
 
-    /** Wait outside the runtime lane, then recheck before admitting a durable operation. */
-    internal inline fun <T> settled(action: () -> T): T {
+    /** Legacy synchronous storage callers wait with a bound, outside the runtime lane. */
+    internal inline fun <T> settled(
+        generation: SessionGeneration? = null,
+        action: () -> CredentialResult<T>,
+    ): CredentialResult<T> {
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(storageWaitMillis)
         while (true) {
             val pending = serialized {
+                if (generation != null && !isActive(generation)) return CredentialResult.Failure(CredentialFailure.STALE_GENERATION)
                 val barrier = deletionBarrier()
                 if (barrier == null) return action()
                 barrier
             }
-            pending.join()
+            val remaining = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())
+            if (pending.waitStorage(remaining.coerceAtLeast(0)) == null) return CredentialResult.Failure(CredentialFailure.FAILED_WRITE)
         }
+    }
+
+    /** Coroutine callers suspend, cancel promptly, and revalidate on the lane after waking. */
+    internal suspend fun <T> awaitSettled(action: () -> CredentialResult<T>): CredentialResult<T> =
+        kotlinx.coroutines.withTimeoutOrNull(storageWaitMillis) { awaitLane(action) }
+            ?: CredentialResult.Failure(CredentialFailure.FAILED_WRITE)
+
+    private suspend fun <T> awaitLane(action: () -> CredentialResult<T>): CredentialResult<T> {
+        while (true) {
+            val barrier = serialized {
+                val barrier = deletionBarrier()
+                if (barrier == null) return action()
+                barrier
+            }
+            if (barrier.awaitStorage(storageWaitMillis) == null) return CredentialResult.Failure(CredentialFailure.FAILED_WRITE)
+        }
+    }
+
+    /** Command admission creates its barrier BEFORE displacing any live controller. */
+    internal fun beginCommandRemoval(successor: SessionGeneration?): Deletion = serialized {
+        val admitted = Deletion(deletionBarrier())
+        deletion = admitted
+        activate(successor)
+        admitted
     }
 
     @PublishedApi internal fun deletionBarrier() = deletion?.completion
 
     internal fun beginDeletion(generation: SessionGeneration, successor: SessionGeneration?): Deletion? = serialized {
         if (active !== generation) return@serialized null
-        val admitted = Deletion(deletionBarrier())
-        deletion = admitted
-        activate(successor)
-        admitted
+        beginCommandRemoval(successor)
     }
 
     internal fun finishDeletion(admitted: Deletion, succeeded: Boolean) {
@@ -85,8 +112,13 @@ class SessionOwnership {
         if (lock.isHeldByCurrentThread) requireNotNull(pending.get()).add { deliver(action) } else deliver(action)
     }
 
-    /** Reserved removal and its queued busy-admission signal bypass the barrier outside the lane. */
-    internal fun deferDeletion(action: () -> Unit) {
+    /** Durable runners are enqueued before callback-capable lifecycle/observer effects. */
+    internal fun deferRemoval(action: () -> Unit) {
+        if (lock.isHeldByCurrentThread) requireNotNull(pending.get()).add(0, action) else action()
+    }
+
+    /** Lifecycle cancellation and busy-admission signals never wait behind durable I/O. */
+    internal fun afterLane(action: () -> Unit) {
         if (lock.isHeldByCurrentThread) requireNotNull(pending.get()).add(action) else action()
     }
 
