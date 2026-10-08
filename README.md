@@ -13,7 +13,16 @@ an owner-operated native connection feasibility gate, not supported provider acc
   Keystore-backed local storage and sign-out, and only the two selected read-only routes.
 - Serialized session refresh/rotation with durable save before publication, bounded
   401 recovery, re-auth on terminal/write failures, and generation-isolated local logout.
-- Explicit stored-session read/refresh controls; no automatic cadence or invented token TTL.
+- Explicit stored-session read/refresh controls; no invented token TTL.
+- Live Material 3 usage windows with precise provider percentages and fractional bars,
+  five-hour/weekly duration labels (including weekly-only), independent permission/limit
+  flags, missing/error/stale/exhausted states and accessible status announcements.
+- Local absolute reset date/hour plus relative remainder, including `<1h` and awaiting
+  refresh; passed resets never zero usage. Absolute labels truncate to the containing
+  local hour; elapsed days/hours are floored from the original instant, not that label.
+- Foreground refresh after explicit activation: coalesced connect/resume/manual triggers,
+  polling no faster than 60 seconds, bounded cancellable reads and server Retry-After
+  deferral. Local countdown/freshness ticks do not request provider data.
 - Safe numeric/date/status observations with independent endpoint clocks.
 - Android launcher, Compose UI, JVM state tests and hosted synthetic native tests.
 
@@ -26,8 +35,9 @@ recreation and finish/relaunch share one process-owned bounded attempt; no Activ
 owns or cancels it. Process death requires restarting login.
 Restored credentials remain unresolved and cause no automatic provider requests.
 
-There is no periodic refresh, account history, graphs, live reset countdown or signed
-production release. CI debug APKs are test outputs, not signed
+There is no account history, graph calculation, polished banked-entitlement screen,
+background refresh service, widget or signed production release. Existing connection-gate
+banked facts remain diagnostics, not entitlement rendering. CI debug APKs are test outputs, not signed
 release deliverables. Minimum Android version is Android 8.0 (API 26).
 
 The app declares INTERNET, with cleartext traffic explicitly disabled. Offline

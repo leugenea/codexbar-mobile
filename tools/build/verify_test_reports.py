@@ -62,6 +62,19 @@ USAGE_REFRESH_CASES = {
 }
 
 
+LIVE_USAGE_CLASS = "io.github.leugenea.codexbarmobile.LiveUsageScreenTest"
+LIVE_USAGE_CASES = {
+    "fractionalWeeklyOnlyAndMissingResetHaveExactAccessibleSemantics",
+    "manualRefreshRetainsValuesAndAnnouncesRefreshingThenError",
+    "staleAndPassedResetReevaluateLocallyWithoutZeroOrNetwork",
+    "exhaustedBarDoesNotOverrideAllowedAndMalformedSiblingsRemainVisible",
+    "knownResetShowsSimultaneousLabelsAndRepeatedHourOffset",
+    "landscapeLongCopyHasNoNativeTextOverflow",
+    "recreationRestoresLiveTabAndOwnerAndOfflinePreviewStaysSeparate",
+    "disconnectedAndReauthorizationHaveAccessibleStatusAndNoInventedUsage",
+}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -91,6 +104,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
             ("credential", CREDENTIAL_CLASS, CREDENTIAL_CASES),
             ("connection", CONNECTION_CLASS, CONNECTION_CASES),
             ("usage refresh", USAGE_REFRESH_CLASS, USAGE_REFRESH_CASES),
+            ("live usage", LIVE_USAGE_CLASS, LIVE_USAGE_CASES),
         ):
             actual_names = {case["name"] for case in cases if case["class"] == classname}
             missing_names = required - actual_names
