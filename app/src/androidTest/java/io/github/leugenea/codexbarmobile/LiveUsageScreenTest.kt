@@ -268,6 +268,271 @@ class LiveUsageScreenTest {
         }
     }
 
+    @Test fun bankedAvailableHasSimultaneousExpiryAndSingleViewOnlyAnnouncements() {
+        installBanked()
+        launchLive().use {
+            read()
+            text("banked-status", "Provider-reported banked entitlements")
+            text("banked-summary-text", "Usage summary for inventory comparison: 1 available banked reset")
+            text("banked-inventory-text", "Inventory reports: 1 available banked reset")
+            text("banked-item-0-absolute", "Banked entitlement expiry: Oct 8, 2026, 00:00 (hour precision)")
+            text("banked-item-0-relative", "Banked entitlement expiry: <1h remaining")
+            text("banked-item-0-provider", "Provider status: available")
+            assertBankedOwner("banked-item-0", "<1h remaining")
+            compose.onNodeWithTag("banked-item-0").assert(SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription, "Provider-reported banked entitlements"))
+            assertBankedOwner("banked-inventory", "1 available banked reset")
+            assertViewOnlyBanked()
+            assertEquals(0, fake.posts.get())
+            // The pre-existing A8 diagnostic dump legitimately retains raw expiry facts outside C2.
+            compose.onNodeWithTag("banked-section", useUnmergedTree = true).assertExists()
+            val banked = hasTestTag("banked-section") or hasAnyAncestor(hasTestTag("banked-section"))
+            val rawInstantOrBalance = hasText("999999", substring = true) or
+                hasContentDescription("999999", substring = true) or
+                SemanticsMatcher("State description contains raw instant or purchased balance") {
+                    it.config.contains(SemanticsProperties.StateDescription) &&
+                        it.config[SemanticsProperties.StateDescription].contains("999999")
+                }
+            compose.onAllNodes(banked and rawInstantOrBalance, useUnmergedTree = true).assertCountEquals(0)
+            compose.onNodeWithTag("banked-status").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+        }
+    }
+
+    @Test fun bankedEmptyUnknownUnsupportedAndMalformedRemainExplicit() {
+        launchLive().use {
+            fake.usage = response(bankedUsage(0))
+            read()
+            text("banked-status", "Provider reports no available banked entitlements")
+            text("banked-inventory-text", "Inventory reports: 0 available banked resets")
+            text("banked-container", "Inventory rows: 0 rows")
+            compose.onNodeWithTag("banked-item-0").assertDoesNotExist()
+            for ((body, reason) in listOf("{\"available_count\":0}" to "unknown · field missing",
+                "{\"available_count\":0,\"credits\":null}" to "unknown · provider returned null")) {
+                fake.inventory = response(body)
+                read()
+                text("banked-status", "Banked entitlement information unknown")
+                text("banked-container", "Inventory rows: $reason")
+            }
+            fake.inventory = response("""{"available_count":0,"credits":false}""")
+            read()
+            text("banked-status", "Malformed banked entitlement information")
+            text("banked-container", "Inventory rows: malformed · wrong field type")
+            installBanked()
+            fake.inventory = response(bankedInventory(rows = bankedRow("\"2026-10-09T00:00:00+00:00\"")))
+            read()
+            text("banked-status", "Banked entitlement information unsupported")
+            text("banked-item-0-knowledge", "Expiry data: unsupported · unsupported format")
+            text("banked-item-0-relative", "Banked entitlement expiry: Time unavailable")
+            compose.onNodeWithTag("banked-item-0-absolute").assertDoesNotExist()
+            fake.inventory = response("""{"credits":[]}""")
+            fake.usage = response(bankedUsage(0))
+            read()
+            text("banked-inventory-text", "Inventory reports: unknown · field missing")
+            fake.inventory = response("""{"available_count":false,"credits":[]}""")
+            read()
+            text("banked-inventory-text", "Inventory reports: malformed · wrong field type")
+            assertViewOnlyBanked()
+        }
+    }
+
+    @Test fun bankedExpiredAndDiscrepantRetainBothCountsAndExpiry() {
+        installBanked()
+        fake.usage = response(bankedUsage(7))
+        launchLive().use {
+            read()
+            text("banked-status", "Conflicting banked entitlement information · provider counts retained")
+            text("banked-summary-text", "Usage summary for inventory comparison: 7 available banked resets")
+            text("banked-inventory-text", "Inventory reports: 1 available banked reset")
+            text("banked-issue-SUMMARY_COUNT_MISMATCH", "Usage summary and inventory counts disagree. Both provider counts are retained.")
+            clock.advance(3_600_000)
+            waitFor("local banked expiry crosses original instant") { owner.state.value.refresh.evaluatedAt == clock.now().wall }
+            text("banked-item-0-status", "Entitlement expired")
+            text("banked-item-0-relative", "Banked entitlement expiry: Entitlement expired")
+            text("banked-item-0-provider", "Provider status: available")
+            text("banked-item-0-absolute", "Banked entitlement expiry: Oct 8, 2026, 00:00 (hour precision)")
+            text("banked-issue-EXPIRED_AVAILABLE_ITEM", "A provider-available item has expired locally. The provider count is retained.")
+            text("banked-inventory-text", "Inventory reports: 1 available banked reset")
+            assertViewOnlyBanked()
+        }
+    }
+
+    @Test fun bankedMissingExpiryAndMalformedRowsKeepKnownSiblings() {
+        installBanked(2)
+        fake.inventory = response(bankedInventory(2, "null," + bankedRow("null")))
+        launchLive().use {
+            read()
+            text("banked-status", "Banked entitlement information unknown")
+            text("banked-item-0-row", "Row data: unknown · provider returned null")
+            text("banked-item-1-knowledge", "Expiry data: unknown · provider returned null")
+            text("banked-item-1-relative", "Banked entitlement expiry: Time unavailable")
+            fake.inventory = response(bankedInventory(2, "false," + bankedRow()))
+            read()
+            text("banked-status", "Malformed banked entitlement information")
+            text("banked-item-0-row", "Row data: malformed · wrong field type")
+            text("banked-item-1-relative", "Banked entitlement expiry: <1h remaining")
+            assertViewOnlyBanked()
+        }
+    }
+
+    @Test fun bankedInventoryFailureAndUsageFailureKeepIndependentClocks() {
+        installBanked()
+        launchLive().use {
+            read()
+            val inventory = owner.state.value.refresh.inventory
+            fake.usage = response("{}", 403)
+            fake.holdInventory = true
+            clock.advance(1_000)
+            click("live-refresh")
+            waitFor("usage-only failure published before held inventory") {
+                fake.heldInventory.size == 1 && owner.state.value.refresh.usage.attempt?.error == ReadError.FORBIDDEN
+            }
+            assertSame(inventory.success, owner.state.value.refresh.inventory.success)
+            assertSame(inventory.attempt, owner.state.value.refresh.inventory.attempt)
+            assertEquals(inventory.successfulAtMillis, owner.state.value.refresh.inventory.successfulAtMillis)
+            assertEquals(inventory.stale, owner.state.value.refresh.inventory.stale)
+            text("banked-status", "Provider-reported banked entitlements")
+            text("banked-inventory-clock", "Inventory observed at (UTC): 2026-10-08T00:00:00Z")
+            compose.onNodeWithTag("banked-error").assertDoesNotExist()
+            fake.heldInventory.single()(response("{}", 403))
+            waitFor("inventory error settles separately") { !owner.state.value.refresh.refreshing }
+            assertSame(inventory.success, owner.state.value.refresh.inventory.success)
+            assertEquals(inventory.successfulAtMillis, owner.state.value.refresh.inventory.successfulAtMillis)
+            text("banked-status", "Banked entitlement information inaccessible")
+            text("banked-error", "Inventory access forbidden · availability is not zero")
+            fake.holdInventory = false
+            fake.usage = response(bankedUsage())
+            fake.inventory = response("{}", 403)
+            read()
+            val usage = owner.state.value.refresh.usage
+            text("live-status", "Last successful usage observation")
+            text("live-five-hour-percent", "12.5% used")
+            assertEquals(clock.now().wall, usage.success?.observedAt)
+            assertEquals(1_000L, usage.successfulAtMillis)
+            text("banked-inventory-clock", "Inventory observed at (UTC): 2026-10-08T00:00:00Z")
+            text("banked-inventory-text", "Inventory reports: 1 available banked reset")
+        }
+    }
+
+    @Test fun bankedStaleAndRefreshCycleAreIndependentFromUsage() {
+        installBanked()
+        launchLive().use {
+            read()
+            clock.advance(900_000)
+            waitFor("banked inventory stales on its successful clock") { owner.state.value.refresh.inventory.stale }
+            fake.holdInventory = true
+            click("live-refresh")
+            waitFor("fresh usage while inventory remains stale") { fake.heldInventory.size == 1 && !owner.state.value.refresh.usage.stale }
+            text("banked-stale", "Inventory has not succeeded for at least 15 minutes. Retained entitlements may be out of date.")
+            text("banked-refreshing", "Refresh cycle in progress · retained inventory shown")
+            compose.onNodeWithTag("banked-refreshing").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+            compose.onNodeWithTag("live-stale").assertDoesNotExist()
+            fake.heldInventory.single()(fake.inventory)
+            waitFor("inventory success clears only its stale flag") { !owner.state.value.refresh.refreshing && !owner.state.value.refresh.inventory.stale }
+            compose.onNodeWithTag("banked-stale").assertDoesNotExist()
+            compose.onNodeWithTag("banked-refreshing").assertDoesNotExist()
+        }
+    }
+
+    @Test fun bankedLogoutDropsItemsBeforeLateInventoryCanReturn() = retiredBankedInventory(replace = false)
+
+    @Test fun bankedReplacementRejectsLateInventoryWhileNewAccountConnects() = retiredBankedInventory(replace = true)
+
+    private fun retiredBankedInventory(replace: Boolean) {
+        installBanked()
+        launchLive().use {
+            read()
+            fake.holdInventory = true
+            click("live-refresh")
+            waitFor("old banked inventory GET held") { fake.heldInventory.size == 1 }
+            val old = fake.heldInventory.single()
+            click("sign-out")
+            waitFor("logout retires inventory and deletes protected credentials") {
+                owner.state.value.phase == ConnectionPhase.SIGNED_OUT && fake.cancelledInventory.get() == 1
+            }
+            assertNoBankedItemsOrClocks()
+            if (replace) {
+                fake.holdLogin = true
+                fake.holdInventory = false
+                fake.usage = response(bankedUsage(0))
+                fake.inventory = response(bankedInventory(0, ""))
+                click("connect")
+                waitFor("replacement owns new login admission") { fake.heldLogin.size == 1 }
+                assertNoBankedItemsOrClocks()
+            }
+            val before = fake.gets.get()
+            old(response(bankedInventory()))
+            settleOwnerCommands()
+            assertNoBankedItemsOrClocks()
+            assertEquals(before, fake.gets.get())
+            if (replace) {
+                fake.heldLogin.single()(response(LOGIN))
+                waitFor("replacement publishes only its empty inventory") {
+                    owner.state.value.phase == ConnectionPhase.OBSERVED && !owner.state.value.refresh.refreshing
+                }
+                text("banked-status", "Provider reports no available banked entitlements")
+                text("banked-inventory-text", "Inventory reports: 0 available banked resets")
+                compose.onNodeWithTag("banked-item-0").assertDoesNotExist()
+            }
+        }
+    }
+
+    @Test fun bankedLandscapeLongCopyAndRecreationRemainReadable() {
+        installBanked(Long.MAX_VALUE)
+        fake.inventory = response(bankedInventory(Long.MAX_VALUE, bankedRow("\"2026-10-09T14:31:56.833553Z\"")))
+        launchLive().use { scenario ->
+            read()
+            val shared = owner
+            scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+            waitFor("banked real landscape configuration") {
+                var orientation = Configuration.ORIENTATION_UNDEFINED
+                scenario.onActivity { orientation = it.resources.configuration.orientation }
+                orientation == Configuration.ORIENTATION_LANDSCAPE && !owner.state.value.refresh.refreshing
+            }
+            listOf("banked-title", "banked-status", "banked-summary-text", "banked-inventory-text", "banked-limitations",
+                "banked-item-0-provider", "banked-item-0-absolute", "banked-item-0-relative", "banked-issue-AVAILABLE_ROW_COUNT_MISMATCH").forEach(::noOverflow)
+            text("banked-item-0-relative", "Banked entitlement expiry: 1 day 14 hours remaining")
+            val previous = shared.state.value.refresh.inventory.attempt
+            scenario.recreate()
+            waitFor("banked recreated root and resumed inventory settle") {
+                owner.state.value.refresh.inventory.attempt !== previous && !owner.state.value.refresh.refreshing &&
+                    compose.onAllNodes(hasTestTag("banked-section")).fetchSemanticsNodes().isNotEmpty()
+            }
+            scenario.onActivity { assertSame(shared, it.connection) }
+            text("banked-inventory-text", "Inventory reports: 9223372036854775807 available banked resets")
+            assertViewOnlyBanked()
+        }
+    }
+
+    private fun installBanked(count: Long = 1) {
+        fake.usage = response(bankedUsage(count))
+        fake.inventory = response(bankedInventory(count))
+    }
+
+    private fun assertBankedOwner(tag: String, value: String) {
+        val accessible = !SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility)
+        val valueMatcher = hasText(value, substring = true) or hasContentDescription(value, substring = true)
+        val row = hasTestTag(tag) or hasAnyAncestor(hasTestTag(tag))
+        compose.onAllNodes(valueMatcher and accessible and row, useUnmergedTree = true).assertCountEquals(1)
+        compose.onAllNodes(hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true).fetchSemanticsNodes()
+            .filter { it.config.contains(SemanticsProperties.Text) }.forEach {
+                assertTrue("Duplicate banked text must be hidden", it.config.contains(SemanticsProperties.HideFromAccessibility))
+            }
+    }
+
+    private fun assertViewOnlyBanked() {
+        val banked = hasTestTag("banked-section") or hasAnyAncestor(hasTestTag("banked-section"))
+        compose.onAllNodes(banked and SemanticsMatcher.keyIsDefined(SemanticsActions.OnClick), useUnmergedTree = true).assertCountEquals(0)
+        compose.onAllNodes(banked and SemanticsMatcher.keyIsDefined(SemanticsActions.OnLongClick), useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    private fun assertNoBankedItemsOrClocks() {
+        compose.onNodeWithTag("banked-item-0").assertDoesNotExist()
+        text("banked-inventory-text", "Inventory reports: unknown")
+        text("banked-summary-text", "Usage summary for inventory comparison: unknown")
+        text("banked-inventory-clock", "Inventory observed at (UTC): unknown")
+        text("banked-summary-clock", "Summary observed at (UTC): unknown")
+    }
+
     private fun launchLive(): ActivityScenario<MainActivity> {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         compose.waitForIdle()
@@ -382,23 +647,63 @@ class LiveUsageScreenTest {
 
     private class ScreenTransport : AuthTransport {
         @Volatile var usage: TransportResult = response(fiveHour("12.5"))
+        @Volatile var inventory: TransportResult = response("""{"available_count":0,"credits":[]}""")
         @Volatile var hold = false
+        @Volatile var holdInventory = false
+        @Volatile var holdLogin = false
         val gets = AtomicInteger()
+        val posts = AtomicInteger()
+        val cancelledInventory = AtomicInteger()
         val held = CopyOnWriteArrayList<(TransportResult) -> Unit>()
+        val heldInventory = CopyOnWriteArrayList<(TransportResult) -> Unit>()
+        val heldLogin = CopyOnWriteArrayList<(TransportResult) -> Unit>()
         override fun execute(request: ProviderHttpRequest, deadline: ReadDeadline,
             terminal: (TransportResult) -> Unit): CancellationHandle {
-            check(request is ProviderHttpRequest.Get) { "Unexpected synthetic method" }
-            gets.incrementAndGet()
+            return when (request) {
+                is ProviderHttpRequest.Get -> get(request, terminal)
+                is ProviderHttpRequest.FormPost, is ProviderHttpRequest.JsonPost -> post(request, terminal)
+            }
+        }
+
+        private fun post(request: ProviderHttpRequest, terminal: (TransportResult) -> Unit): CancellationHandle {
+            posts.incrementAndGet()
             when (request.url.encodedPath) {
-                ReadOperation.USAGE.path -> if (hold) held += terminal else terminal(usage)
-                ReadOperation.RESET_INVENTORY.path -> terminal(response("""{"available_count":0,"credits":[]}"""))
-                else -> error("Unexpected synthetic path")
+                "/api/accounts/deviceauth/usercode" -> {
+                    check(request is ProviderHttpRequest.JsonPost)
+                    if (holdLogin) heldLogin += terminal else terminal(response(LOGIN))
+                }
+                "/api/accounts/deviceauth/token" -> {
+                    check(request is ProviderHttpRequest.JsonPost)
+                    terminal(response("""{"authorization_code":"synthetic-c2-auth","code_verifier":"synthetic-c2-verifier"}"""))
+                }
+                "/oauth/token" -> {
+                    check(request is ProviderHttpRequest.FormPost)
+                    terminal(response("""{"access_token":"synthetic-c2-replacement-access","refresh_token":"synthetic-c2-replacement-refresh"}"""))
+                }
+                else -> error("Unexpected synthetic POST route")
             }
             return CancellationHandle {}
+        }
+
+        private fun get(request: ProviderHttpRequest.Get, terminal: (TransportResult) -> Unit): CancellationHandle {
+            gets.incrementAndGet()
+            val heldDetail = request.url.encodedPath == ReadOperation.RESET_INVENTORY.path && holdInventory
+            when (request.url.encodedPath) {
+                ReadOperation.USAGE.path -> if (hold) held += terminal else terminal(usage)
+                ReadOperation.RESET_INVENTORY.path -> if (heldDetail) heldInventory += terminal else terminal(inventory)
+                else -> error("Unexpected synthetic GET route")
+            }
+            return CancellationHandle { if (heldDetail) cancelledInventory.incrementAndGet() }
         }
     }
 
     private companion object {
+        const val LOGIN = """{"device_auth_id":"synthetic-c2-device","user_code":"SYNTHETIC-C2-CODE","interval":1}"""
+        fun bankedRow(expiry: String = "\"2026-10-08T00:59:59.999999Z\"", status: String = "available",
+            type: String = "codex_rate_limits", id: String = "synthetic-c2-row") =
+            """{"id":"$id","reset_type":"$type","status":"$status","granted_at":"2026-10-01T00:00:00Z","expires_at":$expiry}"""
+        fun bankedInventory(count: Long = 1, rows: String = bankedRow()) = """{"available_count":$count,"credits":[$rows]}"""
+        fun bankedUsage(count: Long = 1) = """{"rate_limit_reset_credits":{"available_count":$count},"credits":{"balance":"999999","has_credits":true},"rate_limit":{"allowed":true,"primary_window":{"limit_window_seconds":18000,"used_percent":12.5}}}"""
         fun fiveHour(percent: String, allowed: Boolean = true, reached: Boolean = false, reset: String = "") =
             """{"rate_limit":{"allowed":$allowed,"limit_reached":$reached,"primary_window":{"limit_window_seconds":18000,"used_percent":$percent$reset}}}"""
         fun weekly(percent: String) = """{"rate_limit":{"primary_window":{"limit_window_seconds":604800,"used_percent":$percent},"secondary_window":null}}"""

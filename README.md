@@ -23,6 +23,11 @@ an owner-operated native connection feasibility gate, not supported provider acc
 - Foreground refresh after explicit activation: coalesced connect/resume/manual triggers,
   polling no faster than 60 seconds, bounded cancellable reads and server Retry-After
   deferral. Local countdown/freshness ticks do not request provider data.
+- Read-only banked resets with provider summary/inventory counts, per-item status and
+  simultaneous local absolute/relative expiry (including `<1h` and expired items).
+  Empty, unknown with reasons, unsupported, inaccessible, malformed and conflicting
+  inventory remain distinct; stale/error inventory retains its own successful clock.
+  Counts are never recomputed from rows. No activation or purchase action exists.
 - Safe numeric/date/status observations with independent endpoint clocks.
 - Android launcher, Compose UI, JVM state tests and hosted synthetic native tests.
 
@@ -35,10 +40,15 @@ recreation and finish/relaunch share one process-owned bounded attempt; no Activ
 owns or cancels it. Process death requires restarting login.
 Restored credentials remain unresolved and cause no automatic provider requests.
 
-There is no account history, graph calculation, polished banked-entitlement screen,
-background refresh service, widget or signed production release. Existing connection-gate
-banked facts remain diagnostics, not entitlement rendering. CI debug APKs are test outputs, not signed
-release deliverables. Minimum Android version is Android 8.0 (API 26).
+Banked resets are count-only: no separate amount/unit is established or needed under
+the owner decision. Purchased credit balances are not banked resets. Missing/null or
+unsupported availability, status or expiry remain visible limitations, never zero or
+infinite lifetime. Summary counts/clocks are the C1 facts captured for the inventory
+comparison, not a recomputed current total; retained inventory may be older than usage.
+Refresh progress describes B2's shared read cycle, not an invented per-endpoint worker.
+There is no account history, graph calculation, background refresh service, widget
+or signed production release. CI debug APKs are test outputs, not signed release
+deliverables. Minimum Android version is Android 8.0 (API 26).
 
 The app declares INTERNET, with cleartext traffic explicitly disabled. Offline
 previews make no provider traffic. Explicit connection is the only entry into the

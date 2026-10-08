@@ -124,4 +124,55 @@
     <string name="live_cancelled">Usage request cancelled · last successful values retained</string>
     <string name="live_deadline">Usage request deadline exceeded · last successful values retained</string>
     <string name="live_operation_unsupported">Usage read operation unsupported</string>
+    <!-- C2: read-only banked resets, separate from usage resets and purchased balances. -->
+    <string name="banked_title">Banked resets · view only</string>
+    <string name="banked_refreshing">Refresh cycle in progress · retained inventory shown</string>
+    <string name="banked_stale">Inventory has not succeeded for at least 15 minutes. Retained entitlements may be out of date.</string>
+    <string name="banked_summary">Usage summary for inventory comparison: %1$s</string>
+    <string name="banked_inventory">Inventory reports: %1$s</string>
+    <string name="banked_summary_clock">Summary observed at (UTC): %1$s</string>
+    <string name="banked_inventory_clock">Inventory observed at (UTC): %1$s</string>
+    <string name="banked_container">Inventory rows: %1$s</string>
+    <string name="banked_item">Banked reset %1$d</string>
+    <string name="banked_row">Row data: %1$s</string>
+    <string name="banked_provider_status">Provider status: %1$s</string>
+    <string name="banked_type">Entitlement type: %1$s</string>
+    <string name="banked_expiry_knowledge">Expiry data: %1$s</string>
+    <string name="banked_expiry_value">Banked entitlement expiry: %1$s</string>
+    <string name="banked_field_reason">%1$s · %2$s</string>
+    <string name="banked_field_known">known</string>
+    <string name="banked_field_unknown">unknown</string>
+    <string name="banked_field_malformed">malformed</string>
+    <string name="banked_field_unsupported">unsupported</string>
+    <string name="banked_available">available</string>
+    <string name="banked_reset_type">banked quota reset</string>
+    <string name="banked_reason_missing">field missing</string>
+    <string name="banked_reason_null">provider returned null</string>
+    <string name="banked_reason_type">wrong field type</string>
+    <string name="banked_reason_range">value out of range</string>
+    <string name="banked_reason_format">unsupported format</string>
+    <string name="banked_reason_clock">evaluation clock required</string>
+    <string name="banked_issue_summary">Usage summary and inventory counts disagree. Both provider counts are retained.</string>
+    <string name="banked_issue_rows">Available count and inventory rows disagree. The count is not recomputed.</string>
+    <string name="banked_issue_expired">A provider-available item has expired locally. The provider count is retained.</string>
+    <string name="banked_issue_duplicate">Inventory contains duplicate item identities.</string>
+    <string name="banked_issue_status">An item has an unsupported or unknown provider status.</string>
+    <string name="banked_issue_type">An item has an unsupported or unknown reset type.</string>
+    <string name="banked_error_reauthorize">Inventory authorization required · sign in again</string>
+    <string name="banked_error_forbidden">Inventory access forbidden · availability is not zero</string>
+    <string name="banked_error_rate">Inventory read rate limited · server retry boundary retained</string>
+    <string name="banked_error_transient">Temporary inventory or network failure · last successful inventory retained</string>
+    <string name="banked_error_invalid">Inventory response invalid or too large · no availability inferred</string>
+    <string name="banked_error_cancelled">Inventory request cancelled · last successful inventory retained</string>
+    <string name="banked_error_deadline">Inventory request deadline exceeded · last successful inventory retained</string>
+    <string name="banked_error_unsupported">Inventory read unsupported</string>
+    <string name="banked_limitations">Counts only; no banked amount or unit is established. Purchased credits are not banked resets. Missing, null or unsupported availability, status and expiry remain explicit limitations, not zero or infinite lifetime. Expiry is not a periodic usage reset. Dates show the containing local hour; remaining days are elapsed 24-hour days. Identity remains unverified. No activation or purchase is available.</string>
+    <plurals name="banked_count">
+        <item quantity="one">%1$d available banked reset</item>
+        <item quantity="other">%1$d available banked resets</item>
+    </plurals>
+    <plurals name="banked_rows">
+        <item quantity="one">%1$d row</item>
+        <item quantity="other">%1$d rows</item>
+    </plurals>
 </resources>
