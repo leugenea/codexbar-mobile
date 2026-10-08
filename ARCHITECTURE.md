@@ -252,7 +252,7 @@ used percent minus B(t) in percentage points. Division uses DECIMAL128; exact pe
 are stored without rounding. Five-hour and weekly references stay independent. This is
 not prediction, a ratio, a derivative, projected exhaustion or an alarm.
 
-`HistoryStore` is a blocking port only. M4a-2 implements framework SQLite under
+`HistoryStore` is a blocking partition-scoped port. M4a-2 implements framework SQLite under
 `noBackupFilesDir`, bounded by 30 days / 100,000 admitted observations / 32 MiB, with no
 new dependency. Reads are explicitly limited, partition-filtered and ordinal-ordered;
 detached snapshots expose immutable points, segments, page content, pagination and typed
@@ -262,8 +262,8 @@ delete success means durable removal of the named partition's records/cursor/hig
 Retention does not reset high-water. M4a-4 revokes runtime sampling before deleting and
 reports deletion failure honestly. M4a-5 admits only real current-generation foreground
 observations, supplies clock provenance/gaps and publishes this read contract without
-allowing history failures to replace or block live quota. Persistence, credential
-lifecycle, numerical formulas, refresh admission and graph rendering remain downstream.
+allowing history failures to replace or block live quota. Credential lifecycle,
+numerical formulas, refresh admission and graph rendering remain downstream.
 
 `WindowHistoryTest` and `HistoryContractTest` use original synthetic normalized inputs,
 literal boundary expectations and a clearly labeled in-memory port illustration. They
@@ -272,6 +272,70 @@ correction/gap/clock rules, ordinal overflow/idempotency and detached bounded re
 They do not establish native persistence or integration. All new handwritten production
 classes remain in the unchanged >=90% compatible JVM/native INSTRUCTION denominator;
 actual JVM execution and whole-app coverage are hosted gates, not compilation claims.
+
+## Bounded native history persistence (M4a-2)
+
+`SQLiteHistoryStore.open(applicationContext)` owns one blocking serialized I/O lane,
+with a file lock rejecting a second adapter for the same directory. It is not a
+session/controller, and is not constructed by the live gate yet. The single durable
+binding matches the existing single local credential slot: `createPartition()` generates
+a fresh opaque UUID, while `adopt(partition)` only accepts the continuing ACTIVE binding
+and revokes the preceding runtime capability. Only the returned `HistoryAccess` implements
+the UUID-only port; cross-partition and stale-capability operations are rejected.
+
+Schema v1 stores observations plus a constant-sized cursor/high-water/retention state.
+The entry and next state commit in one FULL-synchronous rollback-journal transaction.
+The bounded binary encoding retains decimal scale/exponents, instants/nanoseconds,
+A1 categorical field knowledge, reset provenance and stable segment origin IDs. CRCs
+detect accidental damaged encodings, not malicious tampering or authenticity. Blobs are
+limited to 16 KiB, decimal precision to 128 digits, slots/windows to two; oversized
+samples fail explicitly without consuming an ID. The native page limit is at most 256
+entries plus one pagination lookahead; higher requests return CAPACITY.
+
+Count/byte maintenance evicts oldest admitted rows while preserving high-water/cursor.
+Age eviction uses only consecutive same-epoch observation wall/monotonic clocks with
+positive elapsed time and at most five seconds skew. Unknown-time statuses are not
+age-inferred; count/bytes still apply. The last admitted clock is persisted even for
+timestamp-less statuses, so they cannot hide monotonic/epoch anomalies. An anomaly or new epoch persistently suspends age
+eviction for that lifetime; no wall-only cold-start clock is trusted. Aging cannot run
+on open without a fresh trustworthy observation pair. Each applied bound retains its
+highest removed ordinal across reopen; age-unknown statuses may remain below that cutoff.
+
+All history files are under `noBackupFilesDir/usage-history`: database, DELETE rollback
+journal, fixed 32-byte binding/privacy fence, pending binding replacement and lane lock.
+Memory temporaries and primary-key-ordered queries avoid external sort files. The database
+uses 4096-byte pages with a conservative one-quarter directory allocation after 64 KiB
+control reserve, leaving headroom for rollback pages/sector headers and control replacement.
+Freed pages are reused: no WAL or VACUUM/second database. Byte maintenance may therefore
+evict before 100,000 observations; ceilings are maxima, not guaranteed capacity.
+
+`revoke()` retires runtime access without removing a continuing lifetime. `beginDelete()`
+immediately fences access and returns an idempotent blocking settlement ticket. Completion
+first fsyncs a DELETING binding, then removes the database artifacts and fsyncs the directory,
+then settles EMPTY. An already irreversible-admitted write settles ahead of deletion on
+the lane; queued stale writes cannot resurrect it. A pending durable fence is cleaned on
+reopen before adoption/creation. Unknown/deleted UUIDs are never created by adoption, so a
+fixed current/retired fence replaces an unbounded blacklist. A failed ticket retains the
+barrier; explicit `quarantineAndDelete()` may retry. Missing/damaged/interrupted control
+data fails closed. Database corruption and unsupported versions are typed, not empty;
+only explicit quarantine discards corrupt/unsupported data, preserving the privacy fence.
+
+M4a-4 must schedule and settle deletion before closing the adapter, keep successor
+credential-lifetime admission blocked on failure, and gate adoption by its protected
+credential lifetime. Runtime reservation alone is not a durable deletion receipt. If
+the filesystem refuses every fence write and removal, restart durability cannot be
+promised; failure is reported, never successful deletion. The adapter does not block or
+replace live auth/quota. No dependency, encryption, identity inference, sample timer,
+session wiring, baseline math or graph UI is introduced.
+
+`HistoryStoreContractTest` covers the pure bounded codec, trustworthy-clock policy and
+explicitly synthetic journal failure contracts. `HistoryPersistenceTest` covers actual
+SQLite files/transactions, fresh-adapter reopen, capability isolation, retirement, held
+commits/deletion, retention/count/physical budgets, interrupted maintenance, synthetic
+SQLite-full errors, corruption/version handling and explicit recovery. Its mandatory
+cases are checked by the unchanged fail-closed native report gate. Native execution and
+whole-app >=90% compatible JVM/native INSTRUCTION coverage remain hosted acceptance,
+not a source-compilation claim; neither is exempted or excluded.
 
 ## Verification boundaries
 
@@ -333,5 +397,5 @@ usage windows through B2/B1; C2 renders banked-reset counts/status/expiry throug
 with unknown facts and purchased-balance separation explicit.
 B2 consumes the session/repository API rather than reimplementing token rotation or login.
 Persistent history integration, numerical baselines, graphs, further providers, signing
-and distribution remain future scope. The M4a-1 pure contract above is not a live store.
+and distribution remain future scope. The history adapter above is not wired to live sampling.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
