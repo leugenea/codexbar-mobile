@@ -105,6 +105,7 @@ internal object NativeConnection {
 internal fun ConnectionScreen(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        LiveUsageScreen(state) { controller.readUsage() }
         Text(stringResource(R.string.gate_identity))
         Text(stringResource(R.string.gate_boundary))
         Text(stringResource(R.string.gate_lifecycle))

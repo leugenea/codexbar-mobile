@@ -138,9 +138,20 @@ EMPTY requires an explicitly empty array and a provider-reported zero; counts ar
 never recomputed, and discrepancies keep precedence while container facts remain
 visible. Endpoint errors and stale-generation isolation keep their existing precedence.
 Full normalized observations remain in memory; endpoint/result diagnostics redact
-arbitrary provider strings and identities. The screen still renders only its existing
-allowlisted numeric/date facts, not B/C rendering. The gate has explicit
-read/session-refresh controls and a minimal sign-in-again action.
+arbitrary provider strings and identities. B3's live Material 3 usage section consumes
+B2's retained usage success, latest attempt, freshness and evaluation time. Its pure
+`UsagePresentation` preserves exact decimal text (bounded plain expansion, exact
+exponent notation for extreme scales) alongside approximate fractional bar semantics;
+permission and limit flags remain independent. Duration-classified missing/ambiguous
+windows never become zero, and malformed fields do not hide independently known facts.
+B1 alone supplies reset absolute/relative labels, including unknown/sub-hour/passed and
+repeated-hour offsets. Status transitions use polite accessibility live regions; ordinary
+countdowns do not repeatedly announce. One wrapping, vertically scrollable content tree
+keeps actions reachable in landscape. Only the existing harmless tab/preview selection
+is Bundle-restored; usage stays with the process owner across Activity recreation, not
+with a saved credential or a persistent history store. The existing gate's allowlisted
+banked numeric/date facts remain diagnostics; C2 entitlement UI is not implemented.
+The gate retains explicit read/session-refresh controls and sign-in-again action.
 
 B2's `UsageRefresh` is a subordinate scheduler in that same owner scope/lane, not
 another session owner. The opt-in live gate observes `repeatOnLifecycle(STARTED)`;
@@ -230,8 +241,8 @@ account/workspace association or service distribution permission.
 
 The native gate implements selected connect, explicit two-read/session-refresh,
 rotation/re-auth and local-delete boundaries with production usage/inventory decoding.
-Authoritative association is unavailable and is not inferred. Usage polish and
-rendering remain separate B/C work; B2 consumes the session/repository API
-rather than reimplementing token rotation or login.
+Authoritative association is unavailable and is not inferred. B3 renders periodic
+usage windows through B2/B1; banked-entitlement rendering remains separate C2 work.
+B2 consumes the session/repository API rather than reimplementing token rotation or login.
 History, graphs, further providers, signing and distribution remain future scope.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
