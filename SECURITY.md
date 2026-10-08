@@ -64,5 +64,29 @@ session under Q1 and recorded A8 GO on 2026-10-07 (issue #48). A10 refresh/rotat
 re-auth and local logout require their own exact-candidate hosted and safe owner live
 checks; initial sign-in is not proof of refresh or parent #4 completion. Never infer
 workspace from tokens or add another endpoint/protocol to resolve it without approval.
+The standalone history adapter stores only bounded normalized numeric/time/categorical
+facts and opaque local credential-lifetime/clock UUIDs. It stores no credentials,
+provider/account identity, plan text or raw response. History is framework SQLite under
+`noBackupFilesDir/usage-history`, excluded by the existing cloud/D2D rules; the owner
+accepted sandbox-private history without Keystore encryption. It is not integrated into
+the live credential lifetime or refresh sampler yet. The ceilings are 30-day trusted
+observation aging, 100,000 observations and 32 MiB for the entire owned directory,
+including rollback journal/control replacements. Reads/fields are also bounded; unknown
+or anomalous clocks suspend aging without disabling count/byte bounds.
+
+History access is partition- and runtime-capability-scoped. Retirement revokes access;
+irreversible removal fsyncs a fixed external privacy fence before deleting database
+records/cursor/high-water. Reopen cleans a pending fence before admitting a successor.
+Corrupt, missing or interrupted control data does not silently create a new history;
+explicit quarantine/recovery discards database artifacts but never re-adopts a deleted
+partition. Unknown schema versions are reported, not silently migrated. Deletion is
+logical app-visible removal, not forensic erasure, encrypted-at-rest storage or remote
+revocation. Runtime reservation is not durable completion: the downstream lifetime
+owner must settle the ticket and report any storage failure. If all filesystem writes
+and removals fail, no unconditional restart/privacy guarantee is possible. Numeric/time
+history may still reveal usage patterns to someone with app-sandbox access. Native
+close/reopen fixtures do not establish literal process death, OS backup extraction or
+physical-device deletion behavior.
+
 Private-interface/terms risks in
 [research](docs/research/m0.md) remain unresolved integration constraints.

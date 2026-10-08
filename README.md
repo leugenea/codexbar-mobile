@@ -46,9 +46,15 @@ unsupported availability, status or expiry remain visible limitations, never zer
 infinite lifetime. Summary counts/clocks are the C1 facts captured for the inventory
 comparison, not a recomputed current total; retained inventory may be older than usage.
 Refresh progress describes B2's shared read cycle, not an invented per-endpoint worker.
-A dependency-free local usage-history model/reducer/store contract is defined for future
-persistence and graphs; it is not connected to live refresh and does not store samples yet.
-There is no persisted account history, graph calculation, background refresh service, widget
+A dependency-free framework SQLite history adapter implements the local usage-history
+contract, separately from live refresh. It uses a no-backup directory with 30-day
+trusted-observation aging, 100,000-observation and 32 MiB complete-directory ceilings,
+bounded reads and visible eviction metadata. It retains exact numeric/time facts, not
+credentials, plan text or provider identity; history is sandbox-private, not Keystore-encrypted.
+Local deletion is logical removal, not forensic erasure. The hosted test contract requires
+close/fresh-adapter persistence proof, not process-death or backup-extraction proof.
+No live samples are recorded yet: credential-lifetime wiring and refresh admission remain
+separate work. There is no verified-account history, graph calculation, background refresh service, widget
 or signed production release. CI debug APKs are test outputs, not signed release
 deliverables. Minimum Android version is Android 8.0 (API 26).
 

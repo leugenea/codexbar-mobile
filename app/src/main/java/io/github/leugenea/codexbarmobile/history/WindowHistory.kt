@@ -16,7 +16,7 @@ sealed interface HistoryReduction {
     data class Rejected(val reason: AdmissionRejection) : HistoryReduction
 }
 
-enum class AdmissionRejection { PARTITION_MISMATCH, ORDINAL_GAP }
+enum class AdmissionRejection { PARTITION_MISMATCH, ORDINAL_GAP, FIELD_CAPACITY, INVALID_SAMPLE }
 
 /** Pure constant-space append reducer; the store serializes and persists entry + cursor atomically. */
 object WindowHistory {

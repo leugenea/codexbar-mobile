@@ -18,7 +18,15 @@ data class HistoryReadQuery(
 
 enum class HistoryTruncation { AGE_RETENTION, OBSERVATION_CAP, BYTE_CAP }
 enum class HistoryContent { EMPTY, STATUS_ONLY, MEASUREMENTS }
-enum class HistoryUnavailable { IO_FAILURE, CLOSED, PARTITION_REVOKED, CAPACITY }
+enum class HistoryUnavailable {
+    IO_FAILURE, CLOSED, PARTITION_REVOKED, CAPACITY, READ_FAILURE, WRITE_FAILURE,
+    STORAGE_FULL, UNSUPPORTED_SCHEMA,
+}
+
+/** Highest ordinal evicted by this bound; age-unknown status entries may survive below it. */
+data class HistoryEvictionCutoff(val ordinal: Long) {
+    init { require(ordinal > 0) }
+}
 
 /**
  * Bounded, detached, ascending-ordinal, single-partition snapshot. Segment starts refer to
@@ -32,9 +40,12 @@ class HistoryReadSnapshot(
     val lastAdmitted: ObservationId?,
     val hasMore: Boolean,
     truncation: Collection<HistoryTruncation> = emptySet(),
+    cutoffs: Map<HistoryTruncation, HistoryEvictionCutoff> = emptyMap(),
 ) {
     val entries: List<HistoryEntry> = immutableList(entries)
     val truncation: Set<HistoryTruncation> = immutableSet(truncation)
+    val cutoffs: Map<HistoryTruncation, HistoryEvictionCutoff> =
+        java.util.Collections.unmodifiableMap(LinkedHashMap(cutoffs))
     val nextAfter: ObservationId? = this.entries.lastOrNull()?.id
     val content: HistoryContent = content(this.entries)
 
@@ -79,7 +90,7 @@ sealed interface HistoryDeleteOutcome {
 }
 
 /**
- * M4a-2 implements blocking I/O; its caller supplies the storage lane. No runtime owner here.
+ * Blocking I/O; the native adapter serializes it, and callers keep it off Main. No session owner.
  *
  * Append is serialized per partition, runs WindowHistory, and durably commits its entry,
  * cursor and high-water ordinal atomically. Only contiguous ordinals are admitted: read
@@ -90,7 +101,8 @@ sealed interface HistoryDeleteOutcome {
  *
  * Read never crosses partitions, sorts by ordinal (not timestamp) and honors the limit.
  * Retention deletion preserves high-water and cursor; report every applied retention bound.
- * Missing partitions read as an empty Ready snapshot; corrupt/unavailable never as empty.
+ * The port's empty snapshot is distinct from failure. The native capability layer rejects
+ * unadopted/revoked partitions before I/O; a newly created bound partition reads empty.
  * Explicit delete removes records, cursor and high-water ONLY for the named partition.
  * Successful deletion means durable removal; failures are typed, not a thrown raw exception.
  * M4a-4 revokes the runtime capability before deletion and never reuses a deleted partition.
