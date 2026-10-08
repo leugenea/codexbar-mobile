@@ -49,15 +49,15 @@ class ConnectionLifecycleTest {
     private val defaultLauncher = MainActivity.browserLauncher
 
     @Before fun setup() {
+        NativeConnection.factory = { app ->
+            factories++
+            NativeConnection.create(app, fake, fake.clock, fake::pause)
+        }
         NativeConnection.resetForTests()
         val installed = context.packageManager.getActivityInfo(ComponentName(context, MainActivity::class.java), 0)
         assertEquals(ActivityInfo.LAUNCH_SINGLE_TASK, installed.launchMode)
         assertEquals("Launcher uses the default app process", context.packageName, installed.processName)
         cleanStore()
-        NativeConnection.factory = { app ->
-            factories++
-            NativeConnection.create(app, fake, fake.clock, fake::pause)
-        }
     }
 
     @After fun cleanup() {
@@ -67,8 +67,20 @@ class ConnectionLifecycleTest {
         cleanStore()
     }
 
+    private fun assertResetRequiresInstalledTestFactoryAndPreservesOwner() {
+        val installedFactory = NativeConnection.factory
+        val owner = NativeConnection.get(context)
+        NativeConnection.factory = defaultFactory
+        try {
+            assertThrows(IllegalStateException::class.java) { NativeConnection.resetForTests() }
+            assertSame(owner, NativeConnection.get(context))
+            assertEquals(1, factories)
+        } finally { NativeConnection.factory = installedFactory }
+    }
+
     @Test
     fun activityLaunchesOnlyFixedSystemBrowserIntentAndCancelClearsOwnedCode() {
+        assertResetRequiresInstalledTestFactoryAndPreservesOwner()
         val intents = CopyOnWriteArrayList<Intent>()
         MainActivity.browserLauncher = { _, intent -> intents += Intent(intent) }
         launch().use { scenario ->

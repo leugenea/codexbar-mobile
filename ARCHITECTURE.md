@@ -58,6 +58,10 @@ reject component process overrides. Process death drops pending login; it is not
 reconstructed from Bundle, an intent or a persisted code. The test-only holder reset
 closes the old controller before clearing it and explicitly models a fresh runtime;
 Activity finish/relaunch alone is not a restoration or process-death simulation.
+The holder's factory setter, injected constructor and reset are marked
+`@VisibleForTesting(otherwise = NONE)`; lint rejects production callers without
+restricting the normal factory getter. Reset also requires an installed test factory.
+Production construction stays private and uses the real transport/default clocks.
 
 The only durable selector is a random local UUID under noBackupFilesDir; it selects
 A6's encrypted slot and is not account/workspace identity. A fresh process owner may

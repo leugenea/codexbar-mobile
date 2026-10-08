@@ -1,6 +1,7 @@
 package io.github.leugenea.codexbarmobile
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,27 +36,36 @@ import java.util.UUID
 /** One holder for the entire default application process, not one entry per Activity or slot. */
 internal object NativeConnection {
     private var controller: ConnectionController? = null
-    internal var factory: (Context) -> ConnectionController = ::create
+    private val productionFactory: (Context) -> ConnectionController = ::create
+    @set:VisibleForTesting(otherwise = VisibleForTesting.NONE)
+    internal var factory: (Context) -> ConnectionController = productionFactory
 
     @Synchronized fun get(context: Context): ConnectionController =
         controller ?: factory(context.applicationContext).also { controller = it }
 
-    /** Instrumentation only: drain old durable work before allowing a new owner. */
+    /** Instrumentation only: install a test factory, then drain the previous owner's durable work. */
+    @VisibleForTesting(otherwise = VisibleForTesting.NONE)
     @Synchronized internal fun resetForTests() {
+        check(factory !== productionFactory) { "Test factory required" }
         controller?.let { old -> kotlinx.coroutines.runBlocking {
             kotlinx.coroutines.withTimeout(5_000) { old.shutdown() }
         } }
         controller = null
     }
 
-    fun create(context: Context): ConnectionController = create(context.applicationContext, null, SystemTransportClock) { delay(it) }
+    private fun create(context: Context): ConnectionController =
+        createController(context.applicationContext, null, SystemTransportClock) { delay(it) }
 
-    internal fun create(context: Context, fakeTransport: AuthTransport?, clock: TransportClock,
+    @VisibleForTesting(otherwise = VisibleForTesting.NONE)
+    internal fun create(context: Context, transport: AuthTransport, clock: TransportClock,
+        pause: suspend (Long) -> Unit): ConnectionController = createController(context, transport, clock, pause)
+
+    private fun createController(context: Context, suppliedTransport: AuthTransport?, clock: TransportClock,
         pause: suspend (Long) -> Unit): ConnectionController {
         val app = context.applicationContext
         val session = try { session(app) } catch (_: Exception) { null }
         val store = KeystoreCredentialStore(app, session ?: UUID.randomUUID())
-        val transport = fakeTransport ?: productionTransport(app)
+        val transport = suppliedTransport ?: productionTransport(app)
         return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),
             NativeFeasibilityReader(transport, clock, pause),
             CoroutineScope(SupervisorJob() + Dispatchers.IO), storageReady = session != null)
