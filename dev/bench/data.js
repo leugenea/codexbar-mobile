@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791444310928,
+  "lastUpdate": 1791444314309,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1317,6 +1317,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/f868ebf11ea8a30a6d72c2991f7cae947758546d"
         },
         "date": 1791441577249,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "da6db58362edaaac2af176983fae6e37d8484a5c",
+          "message": "feat(m3b): shared absolute and relative reset/expiry time presentation (#57)",
+          "timestamp": "2026-10-08T10:24:35+03:00",
+          "tree_id": "05d98e1bcadf2ace31b9b95bd1d695754238ffe0",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/da6db58362edaaac2af176983fae6e37d8484a5c"
+        },
+        "date": 1791444313696,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
