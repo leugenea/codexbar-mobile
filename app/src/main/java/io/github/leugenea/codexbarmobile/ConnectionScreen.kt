@@ -68,7 +68,7 @@ internal object NativeConnection {
         val transport = suppliedTransport ?: productionTransport(app)
         return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),
             NativeFeasibilityReader(transport, clock, pause),
-            CoroutineScope(SupervisorJob() + Dispatchers.IO), storageReady = session != null)
+            CoroutineScope(SupervisorJob() + Dispatchers.IO), storageReady = session != null, refreshClock = clock)
     }
 
     private fun productionTransport(context: Context): AuthTransport {

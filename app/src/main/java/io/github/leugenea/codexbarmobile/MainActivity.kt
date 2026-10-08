@@ -6,6 +6,10 @@ import android.content.Intent
 import androidx.core.net.toUri
 import android.view.WindowManager
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.awaitCancellation
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -66,6 +70,7 @@ class MainActivity : ComponentActivity() {
                 var savedPreview by rememberSaveable { mutableStateOf(Preview.Disconnected.savedKey) }
                 var connectionTab by rememberSaveable { mutableStateOf(false) }
                 val connectionState by connection.state.collectAsState()
+                if (connectionTab) ObserveUsageLifecycle(connection, lifecycle)
                 Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         OutlinedButton(onClick = { connectionTab = false }, modifier = Modifier.testTag("offline-tab")) {
@@ -99,6 +104,17 @@ class MainActivity : ComponentActivity() {
 
     internal companion object {
         var browserLauncher: (MainActivity, Intent) -> Unit = { activity, intent -> activity.startActivity(intent) }
+    }
+}
+
+@Composable
+private fun ObserveUsageLifecycle(controller: ConnectionController, lifecycle: Lifecycle) {
+    LaunchedEffect(controller, lifecycle) {
+        val observer = Any()
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            controller.usageForeground(observer, true)
+            try { awaitCancellation() } finally { controller.usageForeground(observer, false) }
+        }
     }
 }
 

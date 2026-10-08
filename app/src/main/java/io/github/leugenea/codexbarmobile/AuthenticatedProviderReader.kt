@@ -8,11 +8,12 @@ internal class AuthenticatedProviderReader(
     private val session: SessionCoordinator,
     private val reader: NativeFeasibilityReader,
 ) {
-    suspend fun read(): FeasibilityObservations {
+    suspend fun read(observed: (EndpointObservation) -> Unit = {}): FeasibilityObservations {
         val initial = session.snapshot()
         if (initial is SessionResult.Failed) return failure(initial.problem.readError())
         val before = (initial as SessionResult.Ready).envelope
         val usage = reader.endpoint(ReadOperation.USAGE, before.accessToken, session = session, envelope = before)
+        observed(usage)
         val next = session.snapshot()
         if (next is SessionResult.Failed) return failure(next.problem.readError())
         val after = (next as SessionResult.Ready).envelope
@@ -22,7 +23,7 @@ internal class AuthenticatedProviderReader(
         // Data from an invalidated generation never crosses the repository boundary.
         val final = session.snapshot()
         if (final is SessionResult.Ready && final.envelope.generation === before.generation)
-            return FeasibilityObservations(usage, inventory)
+            return FeasibilityObservations(usage, inventory.also(observed))
         return failure((final as? SessionResult.Failed)?.problem?.readError() ?: ReadError.CANCELLED)
     }
 
