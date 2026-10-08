@@ -54,6 +54,7 @@ internal fun LiveUsageScreen(state: ConnectionState, refresh: () -> Unit) {
         model.windows.forEach { UsageWindowCard(it) }
         Text(stringResource(R.string.live_time_precision), style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.testTag("live-rounding"))
+        BankedResetSection(BankedResetPresentation.present(state, ZoneId.systemDefault(), LocalConfiguration.current.locales[0]))
     }
 }
 
@@ -91,8 +92,7 @@ private fun ResetLabels(time: PresentedTime?, tag: String) {
         return
     }
     time.absolute?.let { absolute ->
-        val text = if (absolute.utcOffset == null) stringResource(absolute.formatResource, absolute.date, absolute.hour)
-            else stringResource(absolute.formatResource, absolute.date, absolute.hour, absolute.utcOffset)
+        val text = absoluteTimeLabel(absolute)
         Text(stringResource(R.string.live_reset_absolute, text), Modifier.testTag("$tag-reset-absolute"))
     }
     val relative = relativeLabel(time)
@@ -105,7 +105,7 @@ private fun ResetLabels(time: PresentedTime?, tag: String) {
 }
 
 @Composable
-private fun relativeLabel(time: PresentedTime): String {
+internal fun relativeLabel(time: PresentedTime): String {
     val remaining = time.remaining ?: return stringResource(time.state.labelResource)
     // Quantities select grammar only; original Long values remain format arguments.
     val days = pluralStringResource(TimePresentation.daysPluralResource, remaining.days.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), remaining.days)

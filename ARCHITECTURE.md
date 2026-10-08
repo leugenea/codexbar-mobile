@@ -149,8 +149,15 @@ repeated-hour offsets. Status transitions use polite accessibility live regions;
 countdowns do not repeatedly announce. One wrapping, vertically scrollable content tree
 keeps actions reachable in landscape. Only the existing harmless tab/preview selection
 is Bundle-restored; usage stays with the process owner across Activity recreation, not
-with a saved credential or a persistent history store. The existing gate's allowlisted
-banked numeric/date facts remain diagnostics; C2 entitlement UI is not implemented.
+with a saved credential or a persistent history store. C2's read-only banked-reset
+section consumes B2's inventory cache through C1
+`EntitlementPresentation`; `BankedResetPresentation` only adapts resource labels and
+independent freshness/error metadata. Provider counts and comparison clocks are kept
+verbatim, including discrepancies and expired-available rows. B1 supplies both expiry
+labels, distinct from periodic reset. Row/count containers each own one accessibility
+announcement; duplicate visible text is hidden from accessibility. No action callback,
+activation/purchase request or new owner is introduced. Retirement discards every
+entitlement fact; the existing A10/B2 generation path rejects late inventory results.
 The gate retains explicit read/session-refresh controls and sign-in-again action.
 
 B2's `UsageRefresh` is a subordinate scheduler in that same owner scope/lane, not
@@ -242,7 +249,8 @@ account/workspace association or service distribution permission.
 The native gate implements selected connect, explicit two-read/session-refresh,
 rotation/re-auth and local-delete boundaries with production usage/inventory decoding.
 Authoritative association is unavailable and is not inferred. B3 renders periodic
-usage windows through B2/B1; banked-entitlement rendering remains separate C2 work.
+usage windows through B2/B1; C2 renders banked-reset counts/status/expiry through C1,
+with unknown facts and purchased-balance separation explicit.
 B2 consumes the session/repository API rather than reimplementing token rotation or login.
 History, graphs, further providers, signing and distribution remain future scope.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).

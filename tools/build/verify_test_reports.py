@@ -75,6 +75,20 @@ LIVE_USAGE_CASES = {
 }
 
 
+BANKED_RESET_CLASS = LIVE_USAGE_CLASS
+BANKED_RESET_CASES = {
+    "bankedAvailableHasSimultaneousExpiryAndSingleViewOnlyAnnouncements",
+    "bankedEmptyUnknownUnsupportedAndMalformedRemainExplicit",
+    "bankedExpiredAndDiscrepantRetainBothCountsAndExpiry",
+    "bankedMissingExpiryAndMalformedRowsKeepKnownSiblings",
+    "bankedInventoryFailureAndUsageFailureKeepIndependentClocks",
+    "bankedStaleAndRefreshCycleAreIndependentFromUsage",
+    "bankedLogoutDropsItemsBeforeLateInventoryCanReturn",
+    "bankedReplacementRejectsLateInventoryWhileNewAccountConnects",
+    "bankedLandscapeLongCopyAndRecreationRemainReadable",
+}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -105,6 +119,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
             ("connection", CONNECTION_CLASS, CONNECTION_CASES),
             ("usage refresh", USAGE_REFRESH_CLASS, USAGE_REFRESH_CASES),
             ("live usage", LIVE_USAGE_CLASS, LIVE_USAGE_CASES),
+            ("banked reset", BANKED_RESET_CLASS, BANKED_RESET_CASES),
         ):
             actual_names = {case["name"] for case in cases if case["class"] == classname}
             missing_names = required - actual_names
