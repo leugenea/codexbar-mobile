@@ -114,6 +114,7 @@ class ConnectionControllerTest {
                 override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> =
                     failure?.let { CredentialResult.Failure(it) } ?: CredentialResult.Success(syntheticEnvelope(generation))
                 override fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation) = delegate.replace(envelope, cancellation)
+                override fun admitDeletion(generation: SessionGeneration) = delegate.admitDeletion(generation)
                 override fun delete(generation: SessionGeneration) = delegate.delete(generation)
                 override fun replaceSession(generation: SessionGeneration) = delegate.replaceSession(generation)
             }

@@ -56,8 +56,11 @@ internal class SessionCoordinator(
         problem = SessionProblem.STALE
         detached?.takeUnless { it.result.isCompleted }?.let {
             it.write.cancel()
-            ownership.defer { it.job.cancel() }
-            store.delete(it.envelope.generation)
+            val admitted = store.admitDeletion(it.envelope.generation)
+            ownership.deferDeletion {
+                if (admitted is CredentialResult.Success) admitted.value.complete()
+                it.job.cancel()
+            }
         }
     }
 
@@ -65,7 +68,12 @@ internal class SessionCoordinator(
         if (current !== rejected) return
         retire()
         problem = SessionProblem.REAUTHORIZE
-        store.delete(rejected.generation)
+        quarantine(rejected.generation)
+    }
+
+    private fun quarantine(generation: SessionGeneration) {
+        val admitted = store.admitDeletion(generation)
+        ownership.deferDeletion { if (admitted is CredentialResult.Success) admitted.value.complete() }
     }
 
     fun deadline(): ReadDeadline = ReadDeadline.after(clock.now())
@@ -121,7 +129,7 @@ internal class SessionCoordinator(
                     binding = null
                     current = null
                     problem = result.problem
-                    store.delete(owner.envelope.generation)
+                    quarantine(owner.envelope.generation)
                 }
             }
             // Retain a settled failure for this exact token: concurrent readers share the

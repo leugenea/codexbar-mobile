@@ -23,6 +23,7 @@ class KeystoreCredentialStore(context: Context, localSessionId: UUID) : Credenti
     override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> = owner.read(generation)
     override fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation): CredentialResult<CredentialEnvelope> =
         owner.kernel.replace(envelope, cancellation)
+    override fun admitDeletion(generation: SessionGeneration): CredentialResult<CredentialDeletion> = owner.admitDeletion(generation)
     override fun delete(generation: SessionGeneration): CredentialResult<Unit> = owner.delete(generation)
     override fun replaceSession(generation: SessionGeneration) = owner.replaceSession(generation)
     override fun beginRotation(generation: SessionGeneration) = owner.beginRotation(generation)
@@ -44,36 +45,27 @@ class KeystoreCredentialStore(context: Context, localSessionId: UUID) : Credenti
     }
 }
 
-/** The outer lock makes capability creation and persistence rebinding one atomic operation. */
+/** The kernel atomically rebinds capabilities; durable deletion never retains its runtime lane. */
 internal class CredentialSlotOwner(private val persistence: ProtectedCredentialPersistence) : CredentialStore {
-    internal val kernel = SerializedCredentialStore(persistence)
+    internal val kernel = SerializedCredentialStore(persistence, persistence::activate)
     override val ownership: SessionOwnership get() = kernel.ownership
 
-    override fun openSession(): SessionGeneration = ownership.serialized {
-        kernel.openSession().also(persistence::activate)
-    }
+    override fun openSession(): SessionGeneration = kernel.openSession()
     override fun isActive(generation: SessionGeneration): Boolean = kernel.isActive(generation)
 
-    override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> = ownership.serialized {
-        kernel.read(generation)
-    }
+    override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> = kernel.read(generation)
     override fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation): CredentialResult<CredentialEnvelope> =
         kernel.replace(envelope, cancellation)
-    override fun delete(generation: SessionGeneration): CredentialResult<Unit> = ownership.serialized {
-        kernel.delete(generation)
-    }
-    override fun replaceSession(generation: SessionGeneration): CredentialResult<SessionGeneration> = ownership.serialized {
-        kernel.replaceSession(generation).also {
-            if (it is CredentialResult.Success) persistence.activate(it.value)
-        }
-    }
-    override fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = ownership.serialized {
+    override fun admitDeletion(generation: SessionGeneration): CredentialResult<CredentialDeletion> = kernel.admitDeletion(generation)
+    override fun delete(generation: SessionGeneration): CredentialResult<Unit> = kernel.delete(generation)
+    override fun replaceSession(generation: SessionGeneration): CredentialResult<SessionGeneration> = kernel.replaceSession(generation)
+    override fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = ownership.settled {
         when (val read = kernel.read(generation)) {
             is CredentialResult.Failure -> read
             is CredentialResult.Success -> persistence.rotation(generation, pending = true)
         }
     }
-    override fun finishRotation(generation: SessionGeneration): CredentialResult<Unit> = ownership.serialized {
+    override fun finishRotation(generation: SessionGeneration): CredentialResult<Unit> = ownership.settled {
         when (val checked = kernel.finishRotation(generation)) {
             is CredentialResult.Failure -> checked
             is CredentialResult.Success -> persistence.rotation(generation, pending = false)
@@ -88,8 +80,9 @@ internal class ProtectedCredentialPersistence(
     private val rotationMarker: File? = null,
 ) : CredentialPersistence {
     private val io = Any()
-    private var generation: SessionGeneration? = null
-    fun activate(generation: SessionGeneration) { synchronized(io) { this.generation = generation } }
+    @Volatile private var generation: SessionGeneration? = null
+    // Capability rebinding is callback-free and must never wait for deletion I/O.
+    fun activate(generation: SessionGeneration?) { this.generation = generation }
 
     override fun read(): CredentialResult<CredentialEnvelope> = synchronized(io) {
         guarded(CredentialFailure.CORRUPT) {
@@ -134,7 +127,8 @@ internal class ProtectedCredentialPersistence(
     }
 
     override fun delete(): CredentialResult<Unit> = synchronized(io) {
-        generation = null
+        // The kernel invalidated/rebound the capability at admission, before entering I/O.
+        // Do not clear it here: a newer owner may already have been admitted.
         // Tombstone first. Both deletion attempts still run if marking fails.
         val tombstone = guarded(CredentialFailure.FAILED_WRITE) { marker(true); CredentialResult.Success(Unit) }
         // Attempt both removals even when one fails. A3 already invalidated the capability.

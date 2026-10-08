@@ -29,8 +29,10 @@ interface CredentialStore {
     fun isActive(generation: SessionGeneration): Boolean
     fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope>
     fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation): CredentialResult<CredentialEnvelope>
+    /** Non-I/O admission. Every decorator must delegate to this slot's actual kernel. */
+    fun admitDeletion(generation: SessionGeneration): CredentialResult<CredentialDeletion>
     fun delete(generation: SessionGeneration): CredentialResult<Unit>
-    /** Delete and allocate replacement atomically; delayed auth cannot reopen a displaced slot. */
+    /** Reserve replacement at deletion admission; return it only after durable removal and revalidation. */
     fun replaceSession(generation: SessionGeneration): CredentialResult<SessionGeneration>
     /** Protected adapters persist an uncertainty marker before sending a refresh. */
     fun beginRotation(generation: SessionGeneration): CredentialResult<Unit> = CredentialResult.Success(Unit)
@@ -38,10 +40,17 @@ interface CredentialStore {
     fun finishRotation(generation: SessionGeneration): CredentialResult<Unit> = CredentialResult.Success(Unit)
 }
 
+/** An exactly-once durable removal reserved before runtime retirement; complete outside the lane. */
+interface CredentialDeletion {
+    fun complete(): CredentialResult<Unit>
+}
+
 /**
  * A6 implements protected I/O, not A3. All methods return categorical outcomes.
  * prepare must not change the committed envelope and may run concurrently with deletion.
- * commit and delete run on the store's serialized lane, never from a staging worker.
+ * commit is generation-guarded on the store's serialized lane. Deletion reserves a
+ * slot-wide barrier and invalidates its capability there, then removes key/file outside
+ * the runtime lane. Durable operations wait outside that lane and recheck admission.
  * Staging/admission failures preserve the previous envelope. An irreversible rename
  * followed by a durability-barrier failure may leave either complete envelope, never
  * a partial token pair; a refresh owner must quarantine that uncertain outcome.
