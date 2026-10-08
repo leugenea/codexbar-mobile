@@ -193,6 +193,86 @@ process-kill/relaunch are separate evidence boundaries, not established by parse
 tests. A10 live refresh/rotation/logout still needs an exact-candidate owner check;
 A8 sign-in alone does not close parent #4.
 
+## Pure usage-history contract (M4a-1)
+
+`history/WindowHistory` consumes A1's normalized `UsageObservation` and field knowledge;
+there is no new parser, slot interpretation, account inference, B1 formatting or B2
+refresh integration. `HistoryPartition` is an opaque durable **local credential-lifetime**
+UUID, not verified provider-account identity. `HistoryGeneration` is a separate,
+identity-compared runtime capability, never persisted. M4a-4 owns allocating/adopting
+and revoking those values: rotation and clean restoration retain the lifetime; logout,
+replacement, terminal re-auth/quarantine/key loss delete it; later sign-in never joins it.
+
+Each admitted event has a contiguous partition-scoped `ObservationId` (durable ordinal),
+including background/error/status events. A store serializes admission and commits the
+immutable entry, constant-sized reducer cursor and high-water ordinal together. Retry
+uses the **same ID**, is a no-op even after retention eviction, and cannot change a
+measurement. A new admission uses the next ordinal; gaps in ordinal order are rejected,
+failed admissions consume nothing, and `nextId() == null` means `Long.MAX_VALUE` capacity
+is exhausted, never wrapped. This is append order, not wall-clock order. No refresh,
+countdown or analytical calculation is itself an observed measurement.
+
+Candidate window identity is exactly partition + A1 duration-classified kind + supported
+SI-second duration + exact known non-discrepant **absolute** reset. Primary/secondary
+is only source provenance. Relative-derived resets remain explicitly relative-derived,
+not absolute identity; unknown/malformed/unsupported/discrepant reset facts stay typed.
+A malformed relative sibling does not erase an independently known non-discrepant
+absolute reset or a known percentage. Missing/ambiguous/unsupported-duration selections
+produce status, never a guessed periodic point. An unambiguous known percentage with
+unusable reset produces an **unkeyed isolated** real point; unknown observation time
+preserves numeric knowledge but produces no timestamped point. Plan text, account hints
+and banked-reset identities are not retained. Permission and limit flags stay independent.
+
+Segments are distinct from candidate windows. Reset changes split with unknown cause;
+a decrease for the same candidate splits as a correction, not a proven rollover/manual
+or banked reset. The exact provider `BigDecimal` and actual `observedAt` never change.
+Background/error/field/ambiguity/unkeyed/unknown-time gaps split the next keyed segment.
+The cursor keeps only the last keyed point and the latest explicit pending gap reason,
+so a gap cannot erase correction confidence or conceal a later same-window decrease.
+All intervening statuses remain separate entries. Interval **>120 seconds**, wall time
+that is non-increasing, same-epoch non-increasing/unavailable monotonic time, or absolute
+wall/monotonic delta disagreement **>5 seconds** split continuity. Durations are compared
+without conversion to overflowing nanosecond/millisecond scalars. A fresh `ClockEpoch`
+splits by default; monotonic values are **never subtracted across epochs**. Multiple
+applicable break reasons are retained on immutable segment-start metadata. Graphs must
+not join different segment IDs, including after pagination or retention removes the
+segment's first real point. No artificial start/reset/endpoints or forward-filled points
+are admitted.
+
+Baseline availability is orthogonal to measured history. `NominalStartConfidence` says
+**nominal full quota**, not an observed quota start. A correction makes that same
+candidate's nominal start uncertain even after gaps; a different candidate starts a new
+nominal assumption. `BaselineEligibility` distinguishes no window/ambiguous/unknown
+percent or observation time, unkeyed reset, unverified/discontinuous clock, before nominal
+start, after reset, uncertain correction and time-range overflow. The supported nominal
+interval includes both endpoints; no clamping or baseline points are implemented here.
+M4a-3 alone implements the approved analytical reference: with elapsed SI duration D,
+reset R and nominal start S = R - D, B(t) = 100 * (t - S) / D within [S, R], and observed
+used percent minus B(t) in percentage points. Division uses DECIMAL128; exact percentages
+are stored without rounding. Five-hour and weekly references stay independent. This is
+not prediction, a ratio, a derivative, projected exhaustion or an alarm.
+
+`HistoryStore` is a blocking port only. M4a-2 implements framework SQLite under
+`noBackupFilesDir`, bounded by 30 days / 100,000 admitted observations / 32 MiB, with no
+new dependency. Reads are explicitly limited, partition-filtered and ordinal-ordered;
+detached snapshots expose immutable points, segments, page content, pagination and typed
+age/count/byte truncation. Empty/status-only/measured **page content** is not a baseline
+availability claim. Corruption/unavailability never masquerades as empty history;
+delete success means durable removal of the named partition's records/cursor/high-water.
+Retention does not reset high-water. M4a-4 revokes runtime sampling before deleting and
+reports deletion failure honestly. M4a-5 admits only real current-generation foreground
+observations, supplies clock provenance/gaps and publishes this read contract without
+allowing history failures to replace or block live quota. Persistence, credential
+lifecycle, numerical formulas, refresh admission and graph rendering remain downstream.
+
+`WindowHistoryTest` and `HistoryContractTest` use original synthetic normalized inputs,
+literal boundary expectations and a clearly labeled in-memory port illustration. They
+cover identity/slot moves, immutable decimals, ambiguity, isolated invalid-reset facts,
+correction/gap/clock rules, ordinal overflow/idempotency and detached bounded read models.
+They do not establish native persistence or integration. All new handwritten production
+classes remain in the unchanged >=90% compatible JVM/native INSTRUCTION denominator;
+actual JVM execution and whole-app coverage are hosted gates, not compilation claims.
+
 ## Verification boundaries
 
 - `app/src/test`: JVM state transitions, restore behavior and percentage validation.
@@ -252,5 +332,6 @@ Authoritative association is unavailable and is not inferred. B3 renders periodi
 usage windows through B2/B1; C2 renders banked-reset counts/status/expiry through C1,
 with unknown facts and purchased-balance separation explicit.
 B2 consumes the session/repository API rather than reimplementing token rotation or login.
-History, graphs, further providers, signing and distribution remain future scope.
+Persistent history integration, numerical baselines, graphs, further providers, signing
+and distribution remain future scope. The M4a-1 pure contract above is not a live store.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
