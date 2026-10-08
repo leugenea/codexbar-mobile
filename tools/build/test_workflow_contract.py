@@ -657,7 +657,67 @@ class SyntheticReportTests(unittest.TestCase):
         return ('<manifest xmlns:android="http://schemas.android.com/apk/res/android" '
                 'xmlns:tools="http://schemas.android.com/tools">'
                 + ''.join(f'<uses-permission android:name="{name}"/>' for name in sorted(permissions))
-                + declarations + '<application android:usesCleartextTraffic="false"/></manifest>')
+                + declarations + '<application android:usesCleartextTraffic="false">'
+                '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
+                '</application></manifest>')
+
+    def synthetic_apk_activity(self, name=PACKAGE + ".MainActivity"):
+        return ('    E: activity (line=5)\n'
+                f'      A: android:name(0x01010003)="{name}"\n'
+                '      A: android:launchMode(0x0101001d)=(type 0x10)0x2\n')
+
+    def test_manifest_launcher_and_process_policy_rejects_synthetic_regressions(self):
+        manifest = self.directory / "SYNTHETIC-AndroidManifest.xml"
+        for permissions in (SOURCE_PERMISSIONS, APP_PERMISSIONS):
+            valid = self.synthetic_manifest(permissions)
+            activity = '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
+            for name in ('.MainActivity', 'MainActivity', PACKAGE + '.MainActivity'):
+                manifest.write_text(valid.replace('.MainActivity', name))
+                self.assertEqual(check_manifest(manifest, permissions)['mainActivityLaunchMode'], 'singleTask')
+            mutations = [
+                (valid.replace(' android:launchMode="singleTask"', ''), 'singleTask'),
+                (valid.replace(activity, ''), 'singleTask'),
+                (valid.replace(activity, activity + activity), 'singleTask'),
+                (valid.replace('.MainActivity', '.OtherActivity'), 'singleTask'),
+            ]
+            for mode in ('standard', 'singleTop', 'singleInstance', 'singleInstancePerTask'):
+                mutations.append((valid.replace('singleTask', mode), 'singleTask'))
+            for element in ('application', 'activity'):
+                mutations.append((valid.replace('<' + element + ' ',
+                                                '<' + element + ' android:process=":other" '), 'single process'))
+            mutations.append((valid.replace('</application>',
+                              '<service android:name=".Other" android:process=":other"/></application>'), 'single process'))
+            for text, error in mutations:
+                with self.subTest(permissions=permissions, mutation=text):
+                    manifest.write_text(text)
+                    with self.assertRaisesRegex(ValueError, error):
+                        check_manifest(manifest, permissions)
+
+    def test_apk_launcher_and_process_policy_rejects_synthetic_regressions(self):
+        permissions = f'package: {PACKAGE}\n' + ''.join(
+            f"uses-permission: name='{name}'\n" for name in sorted(APP_PERMISSIONS))
+        prefix = (f'  E: permission (line=3)\n'
+                  f'    A: android:name(0x01010003)="{RECEIVER_PERMISSION}"\n'
+                  '    A: android:protectionLevel(0x01010009)=(type 0x11)0x2\n'
+                  '  E: application (line=4)\n'
+                  '    A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0x0\n')
+        activity = self.synthetic_apk_activity()
+        for name in ('.MainActivity', 'MainActivity', PACKAGE + '.MainActivity'):
+            self.assertEqual(check_apk_dump(permissions, prefix + self.synthetic_apk_activity(name)), sorted(APP_PERMISSIONS))
+        for tree, error in (
+            (prefix, 'singleTask'),
+            (prefix + activity + activity, 'singleTask'),
+            (prefix + activity.replace('MainActivity', 'OtherActivity'), 'singleTask'),
+            (prefix + activity.replace('      A: android:launchMode(0x0101001d)=(type 0x10)0x2\n', ''), 'singleTask'),
+            (prefix + activity.replace('0x10)0x2', '0x10)0x0'), 'singleTask'),
+            (prefix + activity.replace('0x10)0x2', '0x10)0x1'), 'singleTask'),
+            (prefix + activity.replace('0x10)0x2', '0x10)0x3'), 'singleTask'),
+            (prefix + '    A: android:process(0x01010011)=":other"\n' + activity, 'single process'),
+            (prefix + activity + '      A: android:process(0x01010011)=":other"\n', 'single process'),
+            (prefix + activity + '    E: service (line=6)\n      A: android:process(0x01010011)=":other"\n', 'single process'),
+        ):
+            with self.subTest(tree=tree), self.assertRaisesRegex(ValueError, error):
+                check_apk_dump(permissions, tree)
 
     def write_synthetic_manifest_tree(self):
         files = {
@@ -688,6 +748,8 @@ class SyntheticReportTests(unittest.TestCase):
             (valid.replace('usesCleartextTraffic="false"', 'usesCleartextTraffic="true"'), 'Cleartext'),
             (valid.replace('usesCleartextTraffic="false"', 'usesCleartextTraffic="false" android:networkSecurityConfig="@xml/unsafe"'), 'Cleartext'),
             (valid.replace('protectionLevel="signature"', 'protectionLevel="normal"'), 'signature-only'),
+            (valid.replace('launchMode="singleTask"', 'launchMode="standard"'), 'singleTask'),
+            (valid.replace('launchMode="singleTask"', 'launchMode="singleTask" android:process=":other"'), 'single process'),
         ):
             with self.subTest(release_mutation=error):
                 release.write_text(text)
@@ -729,6 +791,10 @@ class SyntheticReportTests(unittest.TestCase):
             ('application', 'tools:replace="android:usesCleartextTraffic"'),
             ('application', 'tools:remove="android:networkSecurityConfig"'),
             ('application', 'android:networkSecurityConfig="@xml/unsafe"'),
+            ('activity', 'tools:remove="android:launchMode"'),
+            ('activity', 'tools:replace="android:launchMode"'),
+            ('application', 'tools:remove="android:process"'),
+            ('activity', 'tools:replace="android:process"'),
         ):
             with self.subTest(element=element, directive=directive):
                 main.write_text(valid.replace('<' + element + ' ', '<' + element + ' ' + directive + ' ', 1))
@@ -753,7 +819,8 @@ class SyntheticReportTests(unittest.TestCase):
         tree = ('  E: permission (line=1)\n'
                 f'    A: android:name(0x01010003)="{RECEIVER_PERMISSION}"\n'
                 '    A: android:protectionLevel(0x01010009)=(type 0x11)0x2\n'
-                '  E: application (line=2)\n    A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0x0\n')
+                '  E: application (line=2)\n    A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0x0\n'
+                + self.synthetic_apk_activity())
         dump = f'  Package [{PACKAGE}] (synthetic):\n    requested permissions:\n' + ''.join(
             f'      {name}\n' for name in sorted(APP_PERMISSIONS)) + '    install permissions:\n'
         if mutation == 'extra-installed-permission':
@@ -870,7 +937,9 @@ else:
     def test_source_and_merged_manifest_parser_fails_closed(self):
         manifest = self.directory / "SYNTHETIC-AndroidManifest.xml"
         prefix = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
-        application = '<application android:usesCleartextTraffic="false"/>'
+        application = ('<application android:usesCleartextTraffic="false">'
+                       '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
+                       '</application>')
         for expected in (SOURCE_PERMISSIONS, APP_PERMISSIONS):
             for tag in ("uses-permission", "uses-permission-sdk-23"):
                 permissions = ''.join(f'<{tag} android:name="{name}"/>' for name in sorted(expected))
@@ -910,7 +979,9 @@ else:
         declaration = (f'  E: permission (line=3)\n'
                        f'    A: android:name(0x01010003)="{RECEIVER_PERMISSION}" (Raw: "{RECEIVER_PERMISSION}")\n'
                        '    A: android:protectionLevel(0x01010009)=(type 0x11)0x2\n')
-        xmltree = declaration + '  E: application (line=4)\n    A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0x0\n'
+        xmltree = (declaration + '  E: application (line=4)\n'
+                   '    A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0x0\n'
+                   + self.synthetic_apk_activity())
         self.assertEqual(check_apk_dump(permissions, xmltree), sorted(APP_PERMISSIONS))
         for bad_permissions, bad_tree, error in (
                 (permissions + "uses-permission: name='android.permission.CAMERA'\n", xmltree, "allowlist"),

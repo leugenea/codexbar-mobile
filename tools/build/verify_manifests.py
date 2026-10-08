@@ -1,4 +1,4 @@
-"""Fail closed on the exact app permission allowlist and cleartext-off policy."""
+"""Fail closed on permissions, cleartext-off and single-process launcher policy."""
 import argparse
 import json
 from pathlib import Path
@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ANDROID = "{http://schemas.android.com/apk/res/android}"
 TOOLS = "{http://schemas.android.com/tools}"
 PACKAGE = "io.github.leugenea.codexbarmobile"
+MAIN_ACTIVITY = PACKAGE + ".MainActivity"
 RECEIVER_PERMISSION = PACKAGE + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
 SOURCE_PERMISSIONS = frozenset({"android.permission.INTERNET"})
 # androidx.core 1.18.0 already contributes this signature-only receiver permission.
@@ -33,7 +34,7 @@ def check_merge_policy(manifest, path: Path) -> None:
                 continue
             names = {name.strip().split(":")[-1] for name in attributes.split(",")}
             if (node.tag in {"permission", "uses-permission", "uses-permission-sdk-23"}
-                    or names & {"usesCleartextTraffic", "networkSecurityConfig"}):
+                    or names & {"usesCleartextTraffic", "networkSecurityConfig", "launchMode", "process"}):
                 raise ValueError(f"Protected manifest policy merge directive: {path}")
         if node.get(ANDROID + "networkSecurityConfig") is not None:
             raise ValueError(f"Cleartext policy override is forbidden: {path}")
@@ -46,6 +47,21 @@ def check_source_manifests(root: Path) -> dict:
     if overlays:
         raise ValueError(f"App manifest source-set overlays are forbidden: {overlays}")
     return check_manifest(root / "app/src/main/AndroidManifest.xml", SOURCE_PERMISSIONS)
+
+
+def activity_name(name: str) -> str:
+    if name.startswith("."):
+        return PACKAGE + name
+    return name if "." in name else PACKAGE + "." + name
+
+
+def check_process_owner(application, path: Path) -> None:
+    if any(node.get(ANDROID + "process") is not None for node in application.iter()):
+        raise ValueError(f"App components must use the default single process: {path}")
+    activities = [node for node in application.findall("activity")
+                  if activity_name(node.get(ANDROID + "name", "")) == MAIN_ACTIVITY]
+    if len(activities) != 1 or activities[0].get(ANDROID + "launchMode") != "singleTask":
+        raise ValueError(f"MainActivity must declare singleTask launch mode: {path}")
 
 
 def check_manifest(path: Path, expected=APP_PERMISSIONS) -> dict:
@@ -66,7 +82,41 @@ def check_manifest(path: Path, expected=APP_PERMISSIONS) -> dict:
     if (len(applications) != 1 or applications[0].get(ANDROID + "usesCleartextTraffic") != "false"
             or applications[0].get(ANDROID + "networkSecurityConfig") is not None):
         raise ValueError(f"Cleartext must be explicitly disabled without a policy override: {path}")
-    return {"manifest": str(path), "requestedPermissions": permissions, "cleartextPermitted": False}
+    check_process_owner(applications[0], path)
+    return {"manifest": str(path), "requestedPermissions": permissions, "cleartextPermitted": False,
+            "mainActivityLaunchMode": "singleTask", "defaultProcessOnly": True}
+
+
+def xmltree_elements(xmltree: str, element: str) -> list[str]:
+    lines = xmltree.splitlines()
+    blocks = []
+    for index, line in enumerate(lines):
+        match = re.fullmatch(r"([ \t]*)E: " + re.escape(element) + r" \(line=\d+\)", line)
+        if not match:
+            continue
+        indent = len(match[1])
+        attributes = []
+        for following in lines[index + 1:]:
+            if following.strip() and len(following) - len(following.lstrip()) <= indent:
+                break
+            if following.lstrip().startswith("E:"):
+                break
+            attributes.append(following)
+        blocks.append("\n".join(attributes))
+    return blocks
+
+
+def check_apk_process_owner(xmltree: str) -> None:
+    if re.search(r"(?m)^\s*A: android:process\(", xmltree):
+        raise ValueError("APK app components must use the default single process")
+    activities = []
+    for block in xmltree_elements(xmltree, "activity"):
+        names = re.findall(r'android:name\([^\n]*?\)="([^"]+)"', block)
+        if names and activity_name(names[0]) == MAIN_ACTIVITY:
+            activities.append(block)
+    mode = r"(?m)^\s*A: android:launchMode\([^\n]*?\)=\(type 0x10\)0x2[ \t]*$"
+    if len(activities) != 1 or len(re.findall(mode, activities[0])) != 1:
+        raise ValueError("APK MainActivity must declare singleTask launch mode")
 
 
 def check_apk_dump(permissions: str, xmltree: str) -> list[str]:
@@ -105,6 +155,7 @@ def check_apk_dump(permissions: str, xmltree: str) -> list[str]:
     if (len(cleartext) != 1 or not re.search(r"=\(type 0x12\)0x0\s*$", cleartext[0])
             or "android:networkSecurityConfig(" in xmltree):
         raise ValueError("APK cleartext policy must be explicitly false without an override")
+    check_apk_process_owner(xmltree)
     return result
 
 
@@ -167,7 +218,8 @@ def main() -> None:
     destination = ROOT / "evidence/verified-manifests.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(receipt, indent=2) + "\n")
-    print("Source and merged debug/release app manifests: exact permission allowlist; cleartext disabled")
+    print("Source and merged debug/release manifests: exact permissions; cleartext disabled; "
+          "singleTask launcher in the default process")
 
 
 if __name__ == "__main__":

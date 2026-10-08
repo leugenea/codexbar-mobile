@@ -225,8 +225,16 @@ class PublicReadinessTests(unittest.TestCase):
         self.assertIn("still makes no provider traffic", security)
         self.assertIn("Explicit connect", security)
         self.assertIn("Process death drops a pending login", security)
-        self.assertIn("binding UNRESOLVED and NOT_GO", security)
+        self.assertIn("binding UNRESOLVED and identity UNVERIFIED", security)
         self.assertIn("without automatic requests", security)
+        self.assertIn("recorded A8 GO on 2026-10-07", security)
+        self.assertIn("does not revoke remote sessions", security)
+        self.assertIn("Refresh is serialized per session", security)
+        self.assertIn("durably saved before publication", security)
+        self.assertIn("uncertainty marker", security)
+        self.assertIn("requires sign-in", security)
+        self.assertIn("no invented token TTL", security)
+        self.assertIn("own exact-candidate hosted and safe owner live checks", security)
 
     def test_link_checker_rejects_missing_target_and_escape(self):
         for link in ("missing-readiness-document.md", "../outside.md"):

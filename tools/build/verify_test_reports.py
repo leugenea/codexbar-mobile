@@ -46,6 +46,12 @@ CONNECTION_CASES = {
     "fakeExchangeUsesRealKeystoreTwoReadsSeparateClocksAndLocalSignOut",
     "freshOwnerRestoresOnlyUnresolvedCredentialsWithoutRequestsAndBrowserFailureIsSafe",
     "failedReadRetainsUnresolvedSessionAndSignOutCancelsInFlightTransport",
+    "restoredSessionRotationReauthAndLogoutUseRealKeystore",
+    "nativeLogoutDuringRefreshAndReplacementRejectLateRotatedCredentials",
+    "nativeKeyLossCorruptionAndInterruptedRotationRestoreFailClosedToReauth",
+    "nativeFailedRotationWriteQuarantinesRealStoreBeforeReauth",
+    "nativeTwoLiveOwnersLogoutWhileUsageIsHeldRejectsOldGeneration",
+    "nativeTwoLiveOwnersReplacementWhileUsageIsHeldRejectsOldGeneration",
 }
 
 

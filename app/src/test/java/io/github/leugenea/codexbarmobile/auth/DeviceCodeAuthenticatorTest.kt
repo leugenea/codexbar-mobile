@@ -317,7 +317,7 @@ class DeviceCodeAuthenticatorTest {
         assertSame(AuthState.Exchanging, f.auth.state.value)
         f.store.openSession()
         f.fake.calls.last().reply(SyntheticAuth.response(SyntheticAuth.TOKENS))
-        f.failed(AuthStage.STORE, AuthFailure.STALE_OWNER)
+        f.failed(AuthStage.EXCHANGE, AuthFailure.STALE_OWNER)
         assertNull(f.persistence.saved)
         assertEquals(0, f.persistence.commits)
     }
@@ -468,7 +468,7 @@ class DeviceCodeAuthenticatorTest {
         val fake = AuthFake()
         val persistence = AuthPersistence()
         val store = SerializedCredentialStore(persistence)
-        val auth = DeviceCodeAuthenticator(fake, store, clock, clock::pause)
+        val auth = DeviceCodeAuthenticator(fake, store, clock, clock::pause, Dispatchers.Unconfined)
         fun start() = auth.start(scope)
         fun failed(stage: AuthStage, category: AuthFailure) {
             assertEquals(AuthState.Failed(stage, category), auth.state.value)

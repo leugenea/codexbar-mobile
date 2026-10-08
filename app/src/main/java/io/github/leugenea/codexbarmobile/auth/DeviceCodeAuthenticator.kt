@@ -6,6 +6,7 @@ import io.github.leugenea.codexbarmobile.credentials.CredentialFailure
 import io.github.leugenea.codexbarmobile.credentials.CredentialResult
 import io.github.leugenea.codexbarmobile.credentials.CredentialStore
 import io.github.leugenea.codexbarmobile.credentials.SessionGeneration
+import io.github.leugenea.codexbarmobile.credentials.replaceAsync
 import io.github.leugenea.codexbarmobile.transport.ProviderHttpRequest
 import io.github.leugenea.codexbarmobile.transport.ReadDeadline
 import io.github.leugenea.codexbarmobile.transport.RetryAfter
@@ -22,16 +23,15 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
 
 /**
  * One connected local session. start replaces/cancels the preceding auth owner; cancel
  * retires only an in-flight attempt, not stored credentials (A10 owns local logout).
- * A8 supplies a lifecycle-owned worker scope and manual system-browser UI. No traffic
+ * The process session owner supplies a serialized worker scope and manual system-browser UI. No traffic
  * starts at construction. Scope cancellation also clears the in-memory display code.
  */
 class DeviceCodeAuthenticator(
@@ -39,35 +39,30 @@ class DeviceCodeAuthenticator(
     private val store: CredentialStore,
     private val clock: TransportClock = SystemTransportClock,
     private val pause: suspend (Long) -> Unit = { delay(it) },
+    private val storageDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val mutableState = MutableStateFlow<AuthState>(AuthState.Idle)
-    val state: StateFlow<AuthState> = mutableState.asStateFlow()
+    val state: StateFlow<AuthState> = mutableState
     private var active: Attempt? = null
 
-    fun start(scope: CoroutineScope): Job {
-        val (previous, attempt) = synchronized(this) {
-            val previous = active
-            val owner = Attempt(store.openSession())
-            owner.job = scope.launch(start = CoroutineStart.LAZY) { run(owner) }
-            active = owner
-            mutableState.value = AuthState.RequestingCode
-            previous to owner
-        }
-        // Job completion handlers can synchronously start/cancel another owner. No
-        // ownership or state writes follow cancellation of the detached predecessor.
+    fun start(scope: CoroutineScope, generation: SessionGeneration? = null): Job {
+        if (generation != null && !store.isActive(generation))
+            return scope.launch(start = CoroutineStart.LAZY) {}.also { it.cancel() }
+        val previous = active
+        val owner = Attempt(generation ?: store.openSession(), scope)
+        owner.job = scope.launch(start = CoroutineStart.LAZY) { run(owner) }
+        active = owner
+        mutableState.value = AuthState.RequestingCode
         stop(previous)
-        attempt.job.invokeOnCompletion { finish(attempt, AuthState.Cancelled) }
-        attempt.job.start()
-        return attempt.job
+        owner.job.invokeOnCompletion { finish(owner, AuthState.Cancelled) }
+        owner.job.start()
+        return owner.job
     }
 
     fun cancel() {
-        val previous = synchronized(this) {
-            val owner = active ?: return
-            active = null
-            mutableState.value = AuthState.Cancelled
-            owner
-        }
+        val previous = active ?: return
+        active = null
+        mutableState.value = AuthState.Cancelled
         stop(previous)
     }
 
@@ -79,13 +74,13 @@ class DeviceCodeAuthenticator(
 
     private suspend fun run(owner: Attempt) {
         try {
-            val device = usercode()
+            val device = usercode(owner)
             publish(owner, AuthState.AwaitingUser(device.code))
             owner.stage = AuthStage.POLL
-            val authorization = poll(device)
+            val authorization = poll(owner, device)
             owner.stage = AuthStage.EXCHANGE
             publish(owner, AuthState.Exchanging)
-            val tokens = AuthProtocol.tokens(success(request(AuthProtocol.exchangeRequest(authorization))).body)
+            val tokens = AuthProtocol.tokens(success(request(owner, AuthProtocol.exchangeRequest(authorization))).body)
             owner.stage = AuthStage.STORE
             persist(owner, tokens)
             finish(owner, AuthState.Connected(owner.generation))
@@ -100,10 +95,10 @@ class DeviceCodeAuthenticator(
         }
     }
 
-    private suspend fun usercode(): DeviceCode {
+    private suspend fun usercode(owner: Attempt): DeviceCode {
         var retries = 0
         while (true) {
-            val result = response(request(AuthProtocol.usercodeRequest()))
+            val result = response(request(owner, AuthProtocol.usercodeRequest()))
             if (result.status != 429) return AuthProtocol.device(success(result).body)
             if (retries == 3) throw AuthAbort(AuthFailure.RATE_LIMITED)
             retries++
@@ -119,13 +114,13 @@ class DeviceCodeAuthenticator(
         return delay.coerceIn(1_000L, 60_000L)
     }
 
-    private suspend fun poll(device: DeviceCode): AuthorizationCode {
+    private suspend fun poll(owner: Attempt, device: DeviceCode): AuthorizationCode {
         val end = saturatedAdd(clock.now().monotonicMillis, AuthProtocol.POLL_BUDGET_MILLIS)
         var consecutiveErrors = 0
         while (true) {
             pause(minOf(device.intervalMillis, remaining(end)))
             remaining(end)
-            val result = request(AuthProtocol.pollRequest(device), end)
+            val result = request(owner, AuthProtocol.pollRequest(device), end)
             if (transient(result)) {
                 consecutiveErrors++
                 if (consecutiveErrors >= 6) throw AuthAbort(AuthFailure.NETWORK)
@@ -150,15 +145,21 @@ class DeviceCodeAuthenticator(
         return remaining
     }
 
-    private suspend fun request(request: ProviderHttpRequest, end: Long? = null): TransportResult {
+    private suspend fun request(owner: Attempt, request: ProviderHttpRequest, end: Long? = null): TransportResult {
         currentCoroutineContext().ensureActive()
+        ensureOwner(owner)
         val duration = end?.let { minOf(remaining(it), ReadDeadline.MAX_DURATION_MILLIS) }
             ?: ReadDeadline.MAX_DURATION_MILLIS
         val deadline = ReadDeadline.after(clock.now(), duration)
         val result = transport.await(request, deadline)
         currentCoroutineContext().ensureActive()
+        ensureOwner(owner)
         if (end != null) remaining(end)
         return if (deadline.isExpired(clock.now())) TransportResult.Failure(TransportFailure.DEADLINE_EXCEEDED) else result
+    }
+
+    private fun ensureOwner(owner: Attempt) {
+        if (!store.isActive(owner.generation)) throw AuthAbort(AuthFailure.STALE_OWNER)
     }
 
     private fun response(result: TransportResult): TransportResult.Response = when (result) {
@@ -180,13 +181,11 @@ class DeviceCodeAuthenticator(
         }
     }
 
-    private suspend fun persist(owner: Attempt, tokens: AuthTokens): Unit = suspendCancellableCoroutine { continuation ->
-        // Cancellation registration precedes potentially blocking staging, not just its completion.
-        continuation.invokeOnCancellation { owner.cancellation.cancel() }
+    private suspend fun persist(owner: Attempt, tokens: AuthTokens) {
         val envelope = CredentialEnvelope(owner.generation, tokens.access, tokens.refresh)
-        when (val result = store.replace(envelope, owner.cancellation)) {
-            is CredentialResult.Success -> continuation.resume(Unit)
-            is CredentialResult.Failure -> continuation.resumeWith(Result.failure(storageFailure(result.category)))
+        when (val result = store.replaceAsync(owner.scope, storageDispatcher, envelope, owner.cancellation)) {
+            is CredentialResult.Success -> Unit
+            is CredentialResult.Failure -> throw storageFailure(result.category)
         }
     }
 
@@ -198,20 +197,19 @@ class DeviceCodeAuthenticator(
 
     private suspend fun publish(owner: Attempt, state: AuthState) {
         currentCoroutineContext().ensureActive()
-        synchronized(this) { if (active === owner) mutableState.value = state }
-        // An undispatched observer may synchronously cancel or replace this attempt.
+        ensureOwner(owner)
+        if (active === owner) mutableState.value = state
         currentCoroutineContext().ensureActive()
     }
 
     private fun finish(owner: Attempt, state: AuthState) {
-        synchronized(this) {
-            if (active !== owner) return
-            active = null
-            mutableState.value = state
-        }
+        if (active !== owner) return
+        active = null
+        mutableState.value = if (state is AuthState.Connected && !store.isActive(owner.generation))
+            AuthState.Failed(AuthStage.STORE, AuthFailure.STALE_OWNER) else state
     }
 
-    private class Attempt(val generation: SessionGeneration) {
+    private class Attempt(val generation: SessionGeneration, val scope: CoroutineScope) {
         val cancellation = CredentialCancellation()
         var stage = AuthStage.USERCODE
         lateinit var job: Job

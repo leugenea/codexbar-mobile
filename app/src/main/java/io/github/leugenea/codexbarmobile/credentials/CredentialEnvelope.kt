@@ -10,7 +10,7 @@ class SessionGeneration internal constructor(val namespace: LocalCredentialNames
     override fun toString(): String = "SessionGeneration(local-only)"
 }
 
-/** A8 must establish authoritative selected-flow account/workspace evidence before A10. */
+/** Q1 accepts one identity-unverified session; no provider account/workspace is inferred. */
 sealed interface AccountWorkspaceBinding {
     data object Unresolved : AccountWorkspaceBinding
 }

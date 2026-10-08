@@ -5,6 +5,7 @@ import io.github.leugenea.codexbarmobile.credentials.*
 import io.github.leugenea.codexbarmobile.transport.*
 import io.github.leugenea.codexbarmobile.usage.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.*
 import org.junit.Test
 import java.math.BigDecimal
@@ -89,7 +90,7 @@ class ConnectionControllerTest {
             h.persistence.deleteFailure = CredentialFailure.FAILED_WRITE
             h.controller.signOut()
             assertEquals(ConnectionProblem.STORAGE, h.controller.state.value.problem)
-            assertTrue(h.controller.state.value.toString().contains("NOT_GO"))
+            assertTrue(h.controller.state.value.toString().contains("UNVERIFIED"))
             h.controller.close()
             h.controller.close()
             h.controller.connect()
@@ -108,15 +109,19 @@ class ConnectionControllerTest {
             val store = object : CredentialStore {
                 private val delegate = SerializedCredentialStore(persistence)
                 override fun openSession() = delegate.openSession()
+                override fun isActive(generation: SessionGeneration) = delegate.isActive(generation)
                 override fun read(generation: SessionGeneration): CredentialResult<CredentialEnvelope> =
                     failure?.let { CredentialResult.Failure(it) } ?: CredentialResult.Success(syntheticEnvelope(generation))
                 override fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation) = delegate.replace(envelope, cancellation)
+                override fun admitDeletion(generation: SessionGeneration) = delegate.admitDeletion(generation)
                 override fun delete(generation: SessionGeneration) = delegate.delete(generation)
+                override fun replaceSession(generation: SessionGeneration) = delegate.replaceSession(generation)
             }
-            val controller = ConnectionController(store, DeviceCodeAuthenticator(fake, store), NativeFeasibilityReader(fake),
-                CoroutineScope(SupervisorJob() + Dispatchers.Unconfined))
+            val controller = ConnectionController(store, DeviceCodeAuthenticator(fake, store, storageDispatcher = Dispatchers.Unconfined), NativeFeasibilityReader(fake),
+                CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+                mutationDispatcher = Dispatchers.Unconfined, storageDispatcher = Dispatchers.Unconfined)
             assertEquals(when (failure) { null -> ConnectionPhase.RESTORED; CredentialFailure.MISSING -> ConnectionPhase.IDLE
-                else -> ConnectionPhase.FAILED }, controller.state.value.phase)
+                else -> ConnectionPhase.REAUTH_REQUIRED }, controller.state.value.phase)
             assertTrue(fake.calls.isEmpty())
             controller.close()
         }
@@ -140,7 +145,7 @@ class ConnectionControllerTest {
     }
 
     @Test
-    fun rateLimitBackoffIsBoundedCancellableAndDoesNotRefresh401OrExpire403() = runBlocking {
+    fun rateLimitBackoffIsBoundedCancellableAnd401RefreshIsBoundedWithoutExpiring403() = runBlocking {
         Harness().use { h ->
             var attempts = 0
             h.fake.respond = { call ->
@@ -159,10 +164,18 @@ class ConnectionControllerTest {
                         RetryAfter.NotBefore(h.clock.millis + 40_000))) else h.respond(call)
                 }
                 h.connect()
-                assertEquals(error, h.controller.state.value.observations!!.usage.error)
-                assertEquals(ConnectionProblem.READ, h.controller.state.value.problem)
-                assertNotNull(h.persistence.durable) // generic 403 does not delete or expire credentials.
-                assertEquals(5, h.fake.calls.size)
+                if (status == 401) {
+                    assertEquals(ConnectionPhase.REAUTH_REQUIRED, h.controller.state.value.phase)
+                    assertEquals(ConnectionProblem.AUTH, h.controller.state.value.problem)
+                    assertNull(h.controller.state.value.observations)
+                    assertNull(h.persistence.durable)
+                    assertEquals(6, h.fake.calls.size) // auth + usage + one refresh + one retry.
+                } else {
+                    assertEquals(error, h.controller.state.value.observations!!.usage.error)
+                    assertEquals(ConnectionProblem.READ, h.controller.state.value.problem)
+                    assertNotNull(h.persistence.durable) // generic 403 never expires credentials.
+                    assertEquals(5, h.fake.calls.size)
+                }
             }
         }
         Harness().use { h ->
@@ -238,66 +251,20 @@ class ConnectionControllerTest {
     }
 
     @Test
-    fun queuedRestorationCannotReopenRetiredOwnerAndAdmittedLogoutSurvivesFinish() {
-        val queue = java.util.ArrayDeque<Runnable>()
-        val dispatcher = object : CoroutineDispatcher() {
-            override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) { queue.add(block) }
-        }
-        val persistence = FakeCredentialPersistence()
-        val store = SerializedCredentialStore(persistence)
-        val generation = store.openSession()
-        val envelope = syntheticEnvelope(generation)
-        store.replace(envelope, CredentialCancellation())
-        val fake = AuthFake()
-        val controller = ConnectionController(store, DeviceCodeAuthenticator(fake, store), NativeFeasibilityReader(fake),
-            CoroutineScope(SupervisorJob() + dispatcher))
-        assertEquals(ConnectionPhase.RESTORING, controller.state.value.phase)
-        controller.signOut()
-        controller.signOut()
-        controller.cancel()
-        controller.browserFailed()
-        controller.connect()
-        controller.close()
-        while (queue.isNotEmpty()) queue.removeFirst().run()
-        assertNull(persistence.durable)
-        assertEquals(1, persistence.deleteCount)
-        assertTrue(fake.calls.isEmpty())
-        assertEquals(ConnectionPhase.CANCELLED, controller.state.value.phase)
-    }
-
-    @Test
-    fun replacementOwnerWaitsForAdmittedLogoutBeforeRestoringOrConnecting() = runBlocking {
-        val queue = java.util.ArrayDeque<Runnable>()
-        val dispatcher = object : CoroutineDispatcher() {
-            override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) { queue.add(block) }
-        }
+    fun explicitRefreshTransientFailureIsVisibleAndDoesNotStartReadsOrExpireSession() = runBlocking {
         Harness().use { h ->
             h.connect()
-            val deletions = ConnectionDeletionBarrier()
-            val old = ConnectionController(h.store, DeviceCodeAuthenticator(h.fake, h.store, h.clock, h.clock::pause),
-                NativeFeasibilityReader(h.fake, h.clock, h.clock::pause), CoroutineScope(SupervisorJob() + dispatcher),
-                deletions = deletions)
-            old.signOut()
-            old.close()
-            val newer = ConnectionController(h.store, DeviceCodeAuthenticator(h.fake, h.store, h.clock, h.clock::pause),
-                NativeFeasibilityReader(h.fake, h.clock, h.clock::pause), CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
-                deletions = deletions)
-            try {
-                assertEquals(ConnectionPhase.RESTORING, newer.state.value.phase)
-                val before = h.fake.calls.size
-                newer.cancel()
-                newer.browserFailed()
-                newer.connect()
-                assertEquals(ConnectionPhase.RESTORING, newer.state.value.phase)
-                assertEquals(before, h.fake.calls.size)
-                while (queue.isNotEmpty()) queue.removeFirst().run()
-                assertEquals(ConnectionPhase.IDLE, newer.state.value.phase)
-                assertNull(h.persistence.durable)
-                assertEquals(1, h.persistence.deleteCount)
-                newer.connect()
-                assertEquals(ConnectionPhase.OBSERVED, newer.state.value.phase)
-                assertNotNull(h.persistence.durable)
-            } finally { newer.close() }
+            val before = h.fake.calls.size
+            h.fake.respond = { call -> call.reply(SyntheticAuth.response("{}", 429)) }
+            h.controller.readUsage(refreshSession = true)
+            val state = h.controller.state.value
+            assertEquals(ConnectionPhase.OBSERVED, state.phase)
+            assertEquals(ConnectionProblem.READ, state.problem)
+            assertEquals(ReadError.RATE_LIMITED, state.observations!!.usage.error)
+            assertNotNull(h.persistence.durable)
+            assertEquals(before + 1, h.fake.calls.size)
+            h.controller.readUsage()
+            assertNotNull(h.persistence.durable)
         }
     }
 
@@ -307,8 +274,8 @@ class ConnectionControllerTest {
         val persistence = FakeCredentialPersistence()
         val store = SerializedCredentialStore(persistence)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-        val controller = ConnectionController(store, DeviceCodeAuthenticator(fake, store, clock, clock::pause),
-            NativeFeasibilityReader(fake, clock, clock::pause), scope, ready)
+        val controller = ConnectionController(store, DeviceCodeAuthenticator(fake, store, clock, clock::pause, Dispatchers.Unconfined),
+            NativeFeasibilityReader(fake, clock, clock::pause), scope, ready, mutationDispatcher = Dispatchers.Unconfined, storageDispatcher = Dispatchers.Unconfined)
         init { respondNormally() }
         fun respondNormally() { fake.respond = ::respond }
         fun respond(call: AuthFake.Call) {

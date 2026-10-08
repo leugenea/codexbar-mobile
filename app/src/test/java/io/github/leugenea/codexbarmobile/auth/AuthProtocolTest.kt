@@ -101,6 +101,27 @@ class AuthProtocolTest {
         assertTrue(error.stackTrace.isEmpty())
     }
 
+    @Test fun refreshOptionalRotationAndErrorCodesFollowPinnedSourceWithoutDescriptions() {
+        val previous = SensitiveValue.copyOf("synthetic-original-refresh".toByteArray())
+        for (value in listOf(null, "null", "true", "0", "{}", "[]", "\"\"", "\"  \"")) {
+            val optional = value?.let { ",\"refresh_token\":$it" } ?: ""
+            val tokens = AuthProtocol.refreshedTokens(SyntheticAuth.body("{\"access_token\":\" synthetic-new-access \"$optional}"), previous)
+            assertSame(previous, tokens.refresh)
+            assertEquals("synthetic-new-access", text(tokens.access))
+        }
+        val rotated = AuthProtocol.refreshedTokens(SyntheticAuth.body("""{"access_token":"synthetic-new-access","refresh_token":" synthetic-new-refresh "}"""), previous)
+        assertEquals("synthetic-new-refresh", text(rotated.refresh))
+        listOf("{}", "not-json", """{"access_token":" "}""", """{"access_token":true}""",
+            """{"access_token":"synthetic-new","access_token":"synthetic-duplicate"}""").forEach {
+            malformed { AuthProtocol.refreshedTokens(SyntheticAuth.body(it), previous) }
+        }
+        for (body in listOf("not-json", "{}", """{"error":true}""", """{"error":{"code":true}}""",
+            """{"error":"synthetic-unknown","error_description":"invalid_grant"}""")) {
+            val response = SyntheticAuth.response(body, 400) as io.github.leugenea.codexbarmobile.transport.TransportResult.Response
+            assertFalse(AuthProtocol.terminalRefresh(response))
+        }
+    }
+
     private fun withInterval(value: String) = SyntheticAuth.DEVICE.dropLast(1) + ",\"interval\":$value}"
     private fun text(value: SensitiveValue) = value.copyBytes().toString(Charsets.UTF_8)
     private fun malformed(parse: () -> Any) {

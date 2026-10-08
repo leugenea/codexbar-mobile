@@ -51,6 +51,7 @@ internal class AtomicCredentialFile(
             return try {
                 beforeRename()
                 if (!temporary.renameTo(target)) throw IOException()
+                syncDirectory(target.parentFile!!)
                 CredentialResult.Success(Unit)
             } catch (_: Exception) {
                 CredentialResult.Failure(CredentialFailure.FAILED_WRITE)
@@ -61,5 +62,11 @@ internal class AtomicCredentialFile(
 
     override fun delete() {
         if (target.exists() && !target.delete()) throw IOException()
+        if (target.parentFile!!.isDirectory) syncDirectory(target.parentFile!!)
     }
+}
+
+/** Linux/Android directory barrier: rename/unlink must settle before publication. */
+internal fun syncDirectory(directory: File) {
+    java.nio.channels.FileChannel.open(directory.toPath(), java.nio.file.StandardOpenOption.READ).use { it.force(true) }
 }

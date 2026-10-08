@@ -1,6 +1,7 @@
 package io.github.leugenea.codexbarmobile
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
 import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
@@ -33,24 +33,42 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 
-/** Retained across recreation, not process death; no SavedStateHandle or Activity reference. */
-internal class ConnectionOwner(val controller: ConnectionController) : ViewModel() {
-    override fun onCleared() { controller.close() }
-}
-
+/** One holder for the entire default application process, not one entry per Activity or slot. */
 internal object NativeConnection {
-    private val deletions = ConnectionDeletionBarrier()
-    /** Persist only the random LOCAL slot selector, never a provider account or pending login. */
-    fun create(context: Context): ConnectionController = create(context, null, SystemTransportClock) { delay(it) }
+    private var controller: ConnectionController? = null
+    private val productionFactory: (Context) -> ConnectionController = ::create
+    @set:VisibleForTesting(otherwise = VisibleForTesting.NONE)
+    internal var factory: (Context) -> ConnectionController = productionFactory
 
-    internal fun create(context: Context, fakeTransport: AuthTransport?, clock: TransportClock,
+    @Synchronized fun get(context: Context): ConnectionController =
+        controller ?: factory(context.applicationContext).also { controller = it }
+
+    /** Instrumentation only: install a test factory, then drain the previous owner's durable work. */
+    @VisibleForTesting(otherwise = VisibleForTesting.NONE)
+    @Synchronized internal fun resetForTests() {
+        check(factory !== productionFactory) { "Test factory required" }
+        controller?.let { old -> kotlinx.coroutines.runBlocking {
+            kotlinx.coroutines.withTimeout(5_000) { old.shutdown() }
+        } }
+        controller = null
+    }
+
+    private fun create(context: Context): ConnectionController =
+        createController(context.applicationContext, null, SystemTransportClock) { delay(it) }
+
+    @VisibleForTesting(otherwise = VisibleForTesting.NONE)
+    internal fun create(context: Context, transport: AuthTransport, clock: TransportClock,
+        pause: suspend (Long) -> Unit): ConnectionController = createController(context, transport, clock, pause)
+
+    private fun createController(context: Context, suppliedTransport: AuthTransport?, clock: TransportClock,
         pause: suspend (Long) -> Unit): ConnectionController {
-        val session = try { session(context) } catch (_: Exception) { null }
-        val store = KeystoreCredentialStore(context, session ?: UUID.randomUUID())
-        val transport = fakeTransport ?: productionTransport(context)
+        val app = context.applicationContext
+        val session = try { session(app) } catch (_: Exception) { null }
+        val store = KeystoreCredentialStore(app, session ?: UUID.randomUUID())
+        val transport = suppliedTransport ?: productionTransport(app)
         return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),
             NativeFeasibilityReader(transport, clock, pause),
-            CoroutineScope(SupervisorJob() + Dispatchers.IO), storageReady = session != null, deletions = deletions)
+            CoroutineScope(SupervisorJob() + Dispatchers.IO), storageReady = session != null)
     }
 
     private fun productionTransport(context: Context): AuthTransport {
@@ -103,8 +121,13 @@ internal fun ConnectionScreen(state: ConnectionState, controller: ConnectionCont
             }
         }
         Button(onClick = controller::connect, enabled = !state.busy, modifier = Modifier.testTag("connect")) {
-            Text(stringResource(R.string.gate_connect))
+            Text(stringResource(if (state.phase == ConnectionPhase.REAUTH_REQUIRED) R.string.gate_reauth else R.string.gate_connect))
         }
+        OutlinedButton(onClick = { controller.readUsage() }, enabled = !state.busy && controller.session.snapshot() is SessionResult.Ready,
+            modifier = Modifier.testTag("read-usage")) { Text(stringResource(R.string.gate_read)) }
+        OutlinedButton(onClick = { controller.readUsage(refreshSession = true) },
+            enabled = !state.busy && controller.session.snapshot() is SessionResult.Ready,
+            modifier = Modifier.testTag("refresh-session")) { Text(stringResource(R.string.gate_refresh)) }
         OutlinedButton(onClick = controller::cancel,
             enabled = state.phase !in setOf(ConnectionPhase.RESTORING, ConnectionPhase.SIGNING_OUT),
             modifier = Modifier.testTag("cancel-connect")) {
