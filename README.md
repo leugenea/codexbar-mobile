@@ -46,7 +46,9 @@ unsupported availability, status or expiry remain visible limitations, never zer
 infinite lifetime. Summary counts/clocks are the C1 facts captured for the inventory
 comparison, not a recomputed current total; retained inventory may be older than usage.
 Refresh progress describes B2's shared read cycle, not an invented per-endpoint worker.
-There is no account history, graph calculation, background refresh service, widget
+A dependency-free local usage-history model/reducer/store contract is defined for future
+persistence and graphs; it is not connected to live refresh and does not store samples yet.
+There is no persisted account history, graph calculation, background refresh service, widget
 or signed production release. CI debug APKs are test outputs, not signed release
 deliverables. Minimum Android version is Android 8.0 (API 26).
 
