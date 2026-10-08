@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
@@ -67,7 +68,8 @@ private fun UsageWindowCard(window: PresentedUsageWindow) {
             if (window.percent != null && window.progress != null) {
                 val percent = stringResource(R.string.live_percent, window.percent)
                 val description = stringResource(R.string.live_progress_description, label, percent)
-                Text(percent, Modifier.testTag("${window.tag}-percent"))
+                Text(percent, Modifier.testTag("${window.tag}-percent")
+                    .semantics { hideFromAccessibility() })
                 LinearProgressIndicator(progress = { window.progress }, modifier = Modifier.fillMaxWidth()
                     .testTag("${window.tag}-progress").clearAndSetSemantics {
                         contentDescription = description

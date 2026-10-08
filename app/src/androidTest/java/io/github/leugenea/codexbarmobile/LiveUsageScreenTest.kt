@@ -2,7 +2,6 @@ package io.github.leugenea.codexbarmobile
 
 import android.app.LocaleManager
 import android.os.LocaleList
-import androidx.annotation.RequiresApi
 import androidx.test.filters.SdkSuppress
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
@@ -13,6 +12,11 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
@@ -43,7 +47,6 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /** Real production Activity, process owner, A9/B2 state and protected store; synthetic data only. */
 @RunWith(AndroidJUnit4::class)
-@RequiresApi(33)
 @SdkSuppress(minSdkVersion = 33)
 class LiveUsageScreenTest {
     @get:Rule val compose = createEmptyComposeRule()
@@ -90,7 +93,7 @@ class LiveUsageScreenTest {
         launchLive().use {
             read()
             text("live-weekly-percent", "12.345678901234567890% used")
-            progress("live-weekly", 0.12345679f, "Weekly window · 12.345678901234567890% used", "Provider-reported usage")
+            progress("live-weekly", 0.12345679f, "Weekly window · 12.345678901234567890% used", "Provider-reported usage", "12.345678901234567890% used")
             text("live-five-hour-status", "Window or usage percentage unavailable · not zero")
             compose.onNodeWithTag("live-five-hour-progress").assertDoesNotExist()
             text("live-weekly-reset-relative", "Reset: Time unavailable")
@@ -144,12 +147,12 @@ class LiveUsageScreenTest {
         fake.usage = response(fiveHour("100.00"))
         launchLive().use {
             read()
-            progress("live-five-hour", 1f, "Five-hour window · 100.00% used", "Usage bar exhausted · permission is reported separately")
+            progress("live-five-hour", 1f, "Five-hour window · 100.00% used", "Usage bar exhausted · permission is reported separately", "100.00% used")
             text("live-allowed", "Provider permission: allowed")
             text("live-limit", "Provider limit status: limit not reached")
             fake.usage = response(fiveHour("0", allowed = false, reached = true))
             read()
-            progress("live-five-hour", 0f, "Five-hour window · 0% used", "Provider-reported usage")
+            progress("live-five-hour", 0f, "Five-hour window · 0% used", "Provider-reported usage", "0% used")
             text("live-allowed", "Provider permission: not allowed")
             text("live-limit", "Provider limit status: limit reached")
             fake.usage = response(fiveHour("7.25", reset = ",\"reset_at\":false"))
@@ -301,11 +304,19 @@ class LiveUsageScreenTest {
         node.assertTextEquals(expected)
     }
 
-    private fun progress(tag: String, fraction: Float, description: String, status: String) {
+    private fun progress(tag: String, fraction: Float, description: String, status: String, percent: String) {
         compose.onNodeWithTag("$tag-progress").performScrollTo()
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(fraction, 0f..1f)))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf(description)))
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, status))
+        // Visible text remains testable, but only the precise bar description is announced.
+        compose.onNodeWithTag("$tag-percent", useUnmergedTree = true)
+            .assertTextEquals(percent)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.HideFromAccessibility, Unit))
+        val percentage = hasText(percent, substring = true) or hasContentDescription(percent, substring = true)
+        val accessible = !SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility)
+        compose.onAllNodes(percentage and accessible and hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true)
+            .assertCountEquals(1)
     }
 
     private fun noOverflow(tag: String) {
