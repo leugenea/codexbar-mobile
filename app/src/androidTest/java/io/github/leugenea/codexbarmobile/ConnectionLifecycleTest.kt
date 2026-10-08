@@ -485,7 +485,18 @@ class ConnectionLifecycleTest {
             val phase = if (replace) ConnectionPhase.OBSERVED else ConnectionPhase.SIGNED_OUT
             await(scenario, "shared-owner $phase") { it.phase == phase }
             assertEquals("Retired usage transport cancelled", 1, fake.cancelledReads)
+            // Local B2 ticks legitimately replace ConnectionState while the gate is visible.
+            // Pause only that scheduler before the strict retired-generation identity oracle.
+            click("offline-tab")
+            compose.waitForIdle()
+            settleOwnerCommands()
+            await(scenario, "shared-owner paused $phase") { it.phase == phase }
+            val previousAttempt = shared.state.value.refresh.usage.attempt
             assertRetiredReadCannotAffectSharedOwner(scenario, shared, held, replace)
+            click("connection-tab")
+            if (replace) await(scenario, "shared-owner foreground refresh settled") {
+                it.phase == ConnectionPhase.OBSERVED && it.refresh.usage.attempt !== previousAttempt
+            }
             assertSavedStateHasNoSecrets(scenario)
         }
     }
@@ -500,7 +511,7 @@ class ConnectionLifecycleTest {
         val requests = fake.calls.size
         val current = shared.state.value
         held(response(USAGE))
-        await(scenario, "late old-generation response discarded") { it.phase == current.phase }
+        settleOwnerCommands()
         assertSame("No stale observations after replacement/logout", current, shared.state.value)
         assertEquals("Old generation must not admit inventory", requests, fake.calls.size)
         if (bytes == null) {
@@ -552,7 +563,12 @@ class ConnectionLifecycleTest {
         var last = "no Activity"
         bounded(step, { last }) {
             var matches = false
-            scenario.onActivity { last = it.connection.state.value.toString(); matches = test(it.connection.state.value) }
+            scenario.onActivity {
+                val state = it.connection.state.value
+                last = "$state, refreshing=${state.refresh.refreshing}"
+                // Endpoint facts can be OBSERVED before the current B2 flight has settled.
+                matches = test(state) && (state.phase != ConnectionPhase.OBSERVED || !state.refresh.refreshing)
+            }
             matches
         }
     }

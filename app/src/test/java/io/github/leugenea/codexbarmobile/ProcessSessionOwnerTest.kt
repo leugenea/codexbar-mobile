@@ -373,7 +373,15 @@ class ProcessSessionOwnerTest {
         fun commander(second: Boolean) = if (second) this.second else first
         suspend fun restored() = phase(ConnectionPhase.RESTORED)
         suspend fun phase(phase: ConnectionPhase) {
-            withTimeout(5_000) { owner.state.first { it.phase == phase } }
+            // OBSERVED publishes endpoint facts before B2's completion clears refreshing.
+            // Identity/no-request oracles must start after that current-generation work.
+            try {
+                withTimeout(5_000) { owner.state.first {
+                    it.phase == phase && (phase != ConnectionPhase.OBSERVED || !it.refresh.refreshing)
+                } }
+            } catch (error: TimeoutCancellationException) {
+                throw AssertionError("settled $phase: ${owner.state.value}, refreshing=${owner.state.value.refresh.refreshing}", error)
+            }
         }
         suspend fun awaitRemoved() { withTimeout(5_000) { while (persistence.durable != null) delay(1) } }
         fun assertShared() { assertSame(first.owner, second.owner); assertSame(first.owner.state, second.owner.state) }
