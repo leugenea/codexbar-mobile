@@ -97,9 +97,13 @@ class EntitlementPresentationTest {
     }
 
     @Test fun unavailableInventoryShapeDoesNotBecomeEmptyEvenWithKnownZero() {
-        for (rows in listOf(Input.Missing, Input.Null, Input.Invalid)) {
+        for ((rows, expected) in listOf(
+            Input.Missing to EntitlementState.UNKNOWN,
+            Input.Null to EntitlementState.UNKNOWN,
+            Input.Invalid to EntitlementState.MALFORMED,
+        )) {
             val result = present(observation(Input.Value(0), rows, Input.Value(0)))
-            assertEquals(EntitlementState.UNKNOWN, result.state)
+            assertEquals(expected, result.state)
             assertEquals(0L, result.reportedAvailableCount?.value)
             assertEquals(Completeness.UNKNOWN, result.completeness)
             assertNull(result.inventoryRowCount)
@@ -295,6 +299,7 @@ class EntitlementPresentationTest {
             assertNull(result.summaryObservedAt)
             assertNull(result.inventoryObservedAt)
             assertNull(result.inventoryRowCount)
+            assertNull(result.inventoryRowContainer)
             assertNull(result.summaryError)
             assertNull(result.inventoryError)
             assertTrue(result.items.isEmpty())

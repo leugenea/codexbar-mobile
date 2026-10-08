@@ -219,8 +219,13 @@ class BankedResetNormalizerTest {
     }
 
     @Test fun absentInvalidInventoryAndRowsPreserveSummaryAndIndependentClocks() {
-        for (input in listOf(Input.Missing, Input.Null, Input.Invalid)) {
+        for ((input, expected) in listOf(
+            Input.Missing to Field<Int>(Knowledge.UNAVAILABLE, reason = Reason.MISSING),
+            Input.Null to Field<Int>(Knowledge.UNAVAILABLE, reason = Reason.PROVIDER_NULL),
+            Input.Invalid to Field<Int>(Knowledge.MALFORMED, reason = Reason.WRONG_TYPE),
+        )) {
             val result = normalize(input, 2)
+            assertEquals(expected, result.inventoryRowContainer)
             assertEquals(2L, result.summaryAvailableCount.value)
             assertNull(result.reportedAvailableCount.value)
             assertNull(result.inventoryRowCount)

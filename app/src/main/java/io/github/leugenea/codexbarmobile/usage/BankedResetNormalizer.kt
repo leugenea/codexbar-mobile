@@ -22,6 +22,7 @@ object BankedResetNormalizer {
             PrimitiveNormalizer.positiveEpoch(usage?.observedAt), PrimitiveNormalizer.positiveEpoch(observedAt),
             summary, count, rows.value?.size, items, completeness,
             issues(summary, count, items, completeness),
+            Field(rows.knowledge, rows.value?.size, rows.reason),
         )
     }
 

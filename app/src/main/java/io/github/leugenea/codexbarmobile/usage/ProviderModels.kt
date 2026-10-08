@@ -113,4 +113,6 @@ data class BankedResetObservation(
     val items: List<Field<BankedResetItem>>,
     val completeness: Completeness,
     val issues: Set<InventoryIssue>,
+    /** Array size and A1 container knowledge/reason; independent of provider available counts and row validity. */
+    val inventoryRowContainer: Field<Int>,
 )
