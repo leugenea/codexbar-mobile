@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791507091611,
+  "lastUpdate": 1791507093872,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1861,6 +1861,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/375b84d2d91385b7048521859581f1f84770d536"
         },
         "date": 1791504023457,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3ced49e777b56040a25961a63fedea218e660ccc",
+          "message": "feat(m4a): define deterministic even-distribution comparisons (#77)",
+          "timestamp": "2026-10-09T03:51:04+03:00",
+          "tree_id": "e365689ba9bbf8c951dec8129d708e8320b0d4cb",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/3ced49e777b56040a25961a63fedea218e660ccc"
+        },
+        "date": 1791507093561,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
