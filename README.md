@@ -70,8 +70,15 @@ gaps remain explicit, with no retrospective backfill. Bounded durable work repor
 unconfirmed samples and categorical storage failures without replacing live quota.
 An immutable bounded history/query contract supplies measured segments and separate
 nominal even-distribution descriptors. Reusable per-window chart/text components render
-these supplied facts without chart dependencies; production graph navigation/wiring remains
-separate work. Native chart fixtures are synthetic, not live-provider evidence. The native
+these supplied facts without chart dependencies. The real Connection screen exposes local
+five-hour/weekly history and bounded admission-order pages without activating dormant
+credentials or adding provider reads. Charts distinguish measured markers/within-run edges
+from dashed analytical references; exact observed-only percentage-point deltas and reset
+context remain in reachable textual details. Gaps, unknown facts, corrections, reset changes
+and page boundaries are not invented trends. Assembled phone acceptance is conditional on
+exact-candidate hosted layout/pixel/semantics checks, independent actual-PNG review and
+exact-merge checks; see the original-parent map in [Architecture](ARCHITECTURE.md).
+Native chart fixtures and integrated captures are synthetic, not live-provider evidence. The native
 contract exercises actual Keystore/SQLite with synthetic transport and fresh-runtime
 restoration, not literal process death or verified provider identity. There is no
 verified-account history, background refresh service, widget
