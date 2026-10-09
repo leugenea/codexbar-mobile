@@ -93,6 +93,31 @@ class HistoryNavigationContracts(unittest.TestCase):
         self.assertEqual(resources["history_page_cursor"], "Exclusive admission cursor: %1$d · Page limit: %2$d")
         self.assertNotRegex(resources["history_page_cursor"], r"%\d+\$d\s+[A-Za-z]")
 
+    def test_integrated_canvas_rejects_partial_visibility_even_with_contained_clipped_bounds(self):
+        mutations = (("canvasTop", -1), ("canvasClippedTop", 0.5),
+                     ("canvasClippedLeft", None), ("canvasClippedRight", float("nan")),
+                     ("canvasClippedBottom", True))
+        for key, value in mutations:
+            self.fixture.captures()
+            path = self.directory / "history-integrated-chart-portrait-light.json"
+            data = json.loads(path.read_text())
+            data[key] = value
+            path.write_text(json.dumps(data))
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                verify_captures(self.directory)
+
+    def test_full_unclipped_canvas_passes_without_changing_inherited_component_receipts(self):
+        self.fixture.captures()
+        captures = verify_captures(self.directory)
+        self.assertEqual(len(captures), 12)
+        inherited = [item for item in captures if item["name"] not in INTEGRATED_CAPTURES]
+        self.assertEqual(len(inherited), 10)
+        self.assertTrue(all("canvasClippedLeft" not in item for item in inherited))
+        collector = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryNavigationCapture.kt").read_text()
+        self.assertIn("Rect(node.positionInRoot, node.size.toSize())", collector)
+        self.assertIn("val clipped = node.boundsInRoot", collector)
+        self.assertIn('assertEquals("The full Canvas must not be clipped by a scroll viewport", bounds, clipped)', collector)
+
 
 if __name__ == "__main__":
     unittest.main()

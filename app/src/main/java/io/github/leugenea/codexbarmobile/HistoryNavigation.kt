@@ -34,7 +34,7 @@ internal fun historyForDisplay(
 private fun unavailableHistory(source: HistoryGraphSnapshot, query: HistoryGraphQuery): HistoryGraphSnapshot {
     if (source.generation == null && source.readiness == HistoryReadiness.ERROR) {
         return HistoryGraphSnapshot(HistoryReadiness.ERROR, query = query,
-            problem = source.problem, storageReason = source.storageReason)
+            problem = source.problem, storageReason = source.storageReason, lostSamples = source.lostSamples)
     }
     return HistoryGraphSnapshot(HistoryReadiness.UNAVAILABLE, query = query)
 }

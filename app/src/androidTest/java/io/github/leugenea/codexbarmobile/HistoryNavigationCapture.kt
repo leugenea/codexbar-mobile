@@ -2,11 +2,13 @@ package io.github.leugenea.codexbarmobile
 
 import android.graphics.Bitmap
 import android.os.Build
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.toSize
 import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONArray
 import org.json.JSONObject
@@ -70,9 +72,17 @@ internal class HistoryNavigationCapture(private val compose: ComposeTestRule) {
     }
 
     private fun addCanvas(metadata: JSONObject, tag: String, bitmap: Bitmap) {
-        val bounds = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue(bounds.left >= 0 && bounds.top >= 0 && bounds.right <= bitmap.width && bounds.bottom <= bitmap.height)
+        val node = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode()
+        // This production Canvas has no scale/rotation. Size and position are
+        // unclipped physical pixels in the same Compose root as captureToImage.
+        val bounds = Rect(node.positionInRoot, node.size.toSize())
+        val clipped = node.boundsInRoot
         metadata.put("canvasLeft", bounds.left).put("canvasTop", bounds.top)
             .put("canvasRight", bounds.right).put("canvasBottom", bounds.bottom)
+            .put("canvasClippedLeft", clipped.left).put("canvasClippedTop", clipped.top)
+            .put("canvasClippedRight", clipped.right).put("canvasClippedBottom", clipped.bottom)
+        assertTrue(bounds.left >= 0 && bounds.top >= 0 && bounds.right <= bitmap.width && bounds.bottom <= bitmap.height)
+        assertTrue(bounds.width > 0 && bounds.height > 0)
+        assertEquals("The full Canvas must not be clipped by a scroll viewport", bounds, clipped)
     }
 }

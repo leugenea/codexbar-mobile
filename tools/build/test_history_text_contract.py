@@ -66,7 +66,9 @@ class HistoryTextContracts(unittest.TestCase):
                                 phase="RESTORED", queryKind="FIVE_HOUR", queryLimit=32, queryAfter=0,
                                 firstOrdinal=1, lastOrdinal=32, pageEntries=32, hasMore=True, requests=5, gets=2,
                                 visibleControls=INTEGRATED_CONTROLS[name], canvasLeft=0.1, canvasTop=0.1,
-                                canvasRight=1.9, canvasBottom=1.9)
+                                canvasRight=1.9, canvasBottom=1.9,
+                                canvasClippedLeft=0.1, canvasClippedTop=0.1,
+                                canvasClippedRight=1.9, canvasClippedBottom=1.9)
             (self.directory / (name + ".json")).write_text(json.dumps(metadata))
             (self.directory / (name + ".png")).write_bytes(self.png(*size))
 

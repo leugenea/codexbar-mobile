@@ -193,13 +193,23 @@ def verify_chart_metadata(metadata: dict, name: str, size: tuple[int, int]) -> N
     verify_canvas_bounds(metadata, size)
 
 
-def verify_canvas_bounds(metadata: dict, size: tuple[int, int]) -> None:
-    bounds = [metadata.get("canvas" + side) for side in ("Left", "Top", "Right", "Bottom")]
+def verify_canvas_bounds(metadata: dict, size: tuple[int, int], prefix: str = "canvas") -> None:
+    bounds = [metadata.get(prefix + side) for side in ("Left", "Top", "Right", "Bottom")]
     if any(type(value) not in (int, float) or not math.isfinite(value) for value in bounds):
         raise ValueError("Chart capture lacks finite observed Canvas bounds")
     left, top, right, bottom = bounds
     if not (0 <= left < right <= size[0] and 0 <= top < bottom <= size[1]):
         raise ValueError("Chart Canvas is not entirely within captured pixels")
+
+
+def verify_integrated_canvas(metadata: dict, size: tuple[int, int]) -> None:
+    # Only integrated captures add independent full/unclipped and clipped bounds.
+    # Keep inherited component receipts and their native pixel oracles unchanged.
+    verify_canvas_bounds(metadata, size)
+    verify_canvas_bounds(metadata, size, "canvasClipped")
+    if any(metadata["canvas" + side] != metadata["canvasClipped" + side]
+           for side in ("Left", "Top", "Right", "Bottom")):
+        raise ValueError("Integrated Canvas is partially clipped in its captured root")
 
 
 def verify_integrated_metadata(metadata: dict, name: str, size: tuple[int, int]) -> None:
@@ -208,12 +218,11 @@ def verify_integrated_metadata(metadata: dict, name: str, size: tuple[int, int])
         raise ValueError("Integrated capture lacks bounded dormant page/request identities")
     if metadata.get("productionEntry") is not True or metadata.get("hasMore") is not True:
         raise ValueError("Integrated capture is not a production entry with more retained data")
-    if (metadata.get("activity") != "io.github.leugenea.codexbarmobile.MainActivity"
-            or metadata.get("phase") != "RESTORED" or metadata.get("queryKind") != "FIVE_HOUR"
-            or metadata.get("visibleControls") != INTEGRATED_CONTROLS[name]):
+    identity = (metadata.get("activity"), metadata.get("phase"), metadata.get("queryKind"), metadata.get("visibleControls"))
+    if identity != ("io.github.leugenea.codexbarmobile.MainActivity", "RESTORED", "FIVE_HOUR", INTEGRATED_CONTROLS[name]):
         raise ValueError("Integrated navigation/owner identity changed")
     if name == "history-integrated-chart-portrait-light":
-        verify_canvas_bounds(metadata, size)
+        verify_integrated_canvas(metadata, size)
 
 
 def capture_receipt(path: Path) -> dict:
