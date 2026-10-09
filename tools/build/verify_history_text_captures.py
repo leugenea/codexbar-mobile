@@ -5,6 +5,7 @@ establishes the labels/layout/actions; independent actual-image inspection is st
 """
 import hashlib
 import json
+import math
 from pathlib import Path
 import struct
 import zlib
@@ -18,6 +19,27 @@ CAPTURES = {
     "history-gap-landscape-dark": (2, True, 1.0),
     "history-unknown-large-font": (1, False, 2.0),
 }
+
+
+CHART_CAPTURES = {
+    "history-chart-reference-portrait-light": (1, False, 1.0),
+    "history-chart-measured-portrait-dark": (1, True, 1.0),
+    "history-chart-gap-landscape-dark": (2, True, 1.0),
+    "history-chart-unknown-large-font": (1, False, 2.0),
+    "history-chart-measured-landscape-light": (2, False, 1.0),
+    "history-chart-invalid-portrait-light": (1, False, 1.0),
+}
+CHART_COUNTS = {
+    "history-chart-reference-portrait-light": (1, 0, 1),
+    "history-chart-measured-portrait-dark": (4, 3, 0),
+    "history-chart-gap-landscape-dark": (4, 2, 0),
+    "history-chart-unknown-large-font": (1, 0, 0),
+    "history-chart-measured-landscape-light": (4, 3, 0),
+    "history-chart-invalid-portrait-light": (0, 0, 0),
+}
+# Keep all four textual captures and their exact configuration assertions. The
+# same collector/workflow now also requires the bounded actual chart gallery.
+CAPTURES.update(CHART_CAPTURES)
 
 
 # Bitmap.compress uses Skia's non-interlaced direct-color PNG encoder. Support
@@ -151,6 +173,20 @@ def valid_configuration(metadata: dict, expected: dict, size: tuple[int, int]) -
     return matches and booleans and geometry and metadata.get("density", 0) > 0 and bool(metadata.get("renderedLocale"))
 
 
+def verify_chart_metadata(metadata: dict, name: str, size: tuple[int, int]) -> None:
+    expected = dict(zip(("markerCount", "connectionCount", "referenceCount"), CHART_COUNTS[name]))
+    if any(type(metadata.get(key)) is not int or metadata[key] != value for key, value in expected.items()):
+        raise ValueError("Chart capture drawing identities/counts changed")
+    if metadata.get("pixelOraclePassed") is not True:
+        raise ValueError("Chart capture lacks native pixel oracle")
+    bounds = [metadata.get("canvas" + side) for side in ("Left", "Top", "Right", "Bottom")]
+    if any(type(value) not in (int, float) or not math.isfinite(value) for value in bounds):
+        raise ValueError("Chart capture lacks finite observed Canvas bounds")
+    left, top, right, bottom = bounds
+    if not (0 <= left < right <= size[0] and 0 <= top < bottom <= size[1]):
+        raise ValueError("Chart Canvas is not entirely within captured pixels")
+
+
 def capture_receipt(path: Path) -> dict:
     metadata = json.loads(path.with_suffix(".json").read_text())
     orientation, dark, font = CAPTURES[path.stem]
@@ -161,6 +197,8 @@ def capture_receipt(path: Path) -> dict:
         raise ValueError(f"Invalid observed capture configuration: {path.name}")
     if (orientation == 1 and size[0] >= size[1]) or (orientation == 2 and size[0] <= size[1]):
         raise ValueError(f"PNG aspect does not match observed orientation: {path.name}")
+    if path.stem in CHART_CAPTURES:
+        verify_chart_metadata(metadata, path.stem, size)
     return dict(metadata, path=str(path), pngSha256=hashlib.sha256(image).hexdigest(),
                 metadataSha256=hashlib.sha256(path.with_suffix(".json").read_bytes()).hexdigest())
 

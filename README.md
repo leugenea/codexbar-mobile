@@ -69,7 +69,9 @@ This is sparse foreground history, not a continuous record: background/error/fie
 gaps remain explicit, with no retrospective backfill. Bounded durable work reports lost or
 unconfirmed samples and categorical storage failures without replacing live quota.
 An immutable bounded history/query contract supplies measured segments and separate
-nominal even-distribution descriptors; graph rendering is still separate work. The native
+nominal even-distribution descriptors. Reusable per-window chart/text components render
+these supplied facts without chart dependencies; production graph navigation/wiring remains
+separate work. Native chart fixtures are synthetic, not live-provider evidence. The native
 contract exercises actual Keystore/SQLite with synthetic transport and fresh-runtime
 restoration, not literal process death or verified provider identity. There is no
 verified-account history, background refresh service, widget
