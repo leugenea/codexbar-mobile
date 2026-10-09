@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791583478598,
+  "lastUpdate": 1791589033006,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1213,6 +1213,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/c4b094a8639a559b314b1bcbc39cf24e8d80cfde"
         },
         "date": 1791583475416,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "84933c8eee7df6a9111e525f38f591ea5479df8f",
+          "message": "refactor(connection): remove native feasibility diagnostics panel (#99)\n\nRemove the raw A8 diagnostics dump and its unused gate strings from the\nconnection screen, drop diagnostic-only EndpointObservation getters, and\nmigrate the affected JVM/native assertions to normalized owner fields and\nlive/banked UI with a scoped no-dump native oracle.\n\nRefs #69",
+          "timestamp": "2026-10-10T02:36:49+03:00",
+          "tree_id": "07f163a3ddc615b6a5661dc6383098acdfaf5540",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/84933c8eee7df6a9111e525f38f591ea5479df8f"
+        },
+        "date": 1791589032137,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
