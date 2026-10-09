@@ -132,6 +132,16 @@ HISTORY_LIFETIME_CASES = {
 }
 
 
+HISTORY_SAMPLING_CLASS = "io.github.leugenea.codexbarmobile.history.UsageHistoryIntegrationTest"
+HISTORY_SAMPLING_CASES = {
+    "admittedEndpointPersistsThroughFreshRuntimeDormancyAndLogoutRejectsLateLoginData",
+    "partialEndpointsPreserveActualUsageAndIndependentInventoryClocksWithoutReplay",
+    "actualHeldWriteAdmissionAndCommittedWriteAreRevokedBeforeCombinedLogoutCompletion",
+    "nativeHistoryReadFailureIsCategoricalAndNeverReplacesLiveUsage",
+    "composeForegroundLossRecreationAndFinishRetireCurrentlyUsableHistoryPorts",
+}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -165,6 +175,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
             ("banked reset", BANKED_RESET_CLASS, BANKED_RESET_CASES),
             ("history", HISTORY_CLASS, HISTORY_CASES),
             ("history lifetime", HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES),
+            ("history sampling", HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES),
         ):
             actual_names = {case["name"] for case in cases if case["class"] == classname}
             missing_names = required - actual_names

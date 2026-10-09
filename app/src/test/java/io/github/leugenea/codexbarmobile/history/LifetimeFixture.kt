@@ -23,6 +23,10 @@ internal class LifetimeJournal {
     var restoreGate: ControlledGate? = null
     var active: Access? = null
     var deletions = 0
+    var appendFailure: HistoryAppendOutcome? = null
+    var readFailure: HistoryReadOutcome? = null
+    var throwRead = false
+    val admissions = mutableListOf<HistoryAdmission>()
 
     fun storage(): HistoryLifetimeStorage = object : HistoryLifetimeStorage {
         override fun stage(): HistoryPartitionOutcome {
@@ -70,6 +74,8 @@ internal class LifetimeJournal {
         override fun revoke() { revoked = true }
         override fun append(admission: HistoryAdmission): HistoryAppendOutcome {
             if (revoked) return HistoryAppendOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
+            admissions += admission
+            appendFailure?.let { return it }
             return when (val reduced = WindowHistory.append(cursor, admission)) {
                 is HistoryReduction.Applied -> {
                     cursor = reduced.cursor; entries += reduced.entry; HistoryAppendOutcome.Stored(reduced.entry)
@@ -78,9 +84,14 @@ internal class LifetimeJournal {
                 is HistoryReduction.Rejected -> HistoryAppendOutcome.Rejected(reduced.reason)
             }
         }
-        override fun read(query: HistoryReadQuery): HistoryReadOutcome = if (revoked)
-            HistoryReadOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
-        else HistoryReadOutcome.Ready(HistoryReadSnapshot(query, entries.toList(), cursor.lastOrdinal.takeIf { it > 0 }?.let(::ObservationId), false))
+        override fun read(query: HistoryReadQuery): HistoryReadOutcome {
+            if (revoked) return HistoryReadOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
+            if (throwRead) throw IllegalStateException("synthetic read category")
+            readFailure?.let { return it }
+            val remaining = entries.filter { it.id.ordinal > (query.after?.ordinal ?: 0) }
+            return HistoryReadOutcome.Ready(HistoryReadSnapshot(query, remaining.take(query.limit),
+                cursor.lastOrdinal.takeIf { it > 0 }?.let(::ObservationId), remaining.size > query.limit))
+        }
         override fun delete(partition: HistoryPartition): HistoryDeleteOutcome = HistoryDeleteOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
     }
 }

@@ -61,6 +61,7 @@ internal class UsageRefresh(
     private val visible get() = observers.isNotEmpty()
     private val eligible get() = !lifecycleManaged || visible
     internal val foregroundEligible get() = eligible
+    internal val hasForegroundObservers get() = visible
 
     fun foreground(observer: Any, foreground: Boolean) {
         val wasVisible = visible
