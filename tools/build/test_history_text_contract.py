@@ -10,9 +10,9 @@ import xml.etree.ElementTree as ET
 import zlib
 
 import test_workflow_contract
-from verify_test_reports import HISTORY_CHART_CASES, HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, verify_reports
+from verify_test_reports import HISTORY_AUTHORITY_CASES, HISTORY_NAVIGATION_CASES, HISTORY_CHART_CASES, HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, verify_reports
 from unittest.mock import patch
-from verify_history_text_captures import CAPTURES, CHART_COUNTS, PNG_CHANNELS, png_size, read_png, verify_captures
+from verify_history_text_captures import CAPTURES, CHART_COUNTS, INTEGRATED_CAPTURES, INTEGRATED_CONTROLS, PNG_CHANNELS, png_size, read_png, verify_captures
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRATCH = Path(os.environ.get("BUILD_CONTRACT_SCRATCH", tempfile.gettempdir()))
@@ -34,7 +34,7 @@ class HistoryTextContracts(unittest.TestCase):
         source = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryTextComponentTest.kt"
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), HISTORY_TEXT_CASES)
         self.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 77 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 77 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES))
         for name in HISTORY_TEXT_CASES:
             self.report(name)
             with self.assertRaisesRegex(ValueError, "Missing real native history text"):
@@ -61,6 +61,14 @@ class HistoryTextContracts(unittest.TestCase):
             if name in CHART_COUNTS:
                 metadata.update(zip(("markerCount", "connectionCount", "referenceCount"), CHART_COUNTS[name]))
                 metadata.update(pixelOraclePassed=True, canvasLeft=0.1, canvasTop=0.1, canvasRight=1.9, canvasBottom=1.9)
+            if name in INTEGRATED_CAPTURES:
+                metadata.update(productionEntry=True, activity="io.github.leugenea.codexbarmobile.MainActivity",
+                                phase="RESTORED", queryKind="FIVE_HOUR", queryLimit=32, queryAfter=0,
+                                firstOrdinal=1, lastOrdinal=32, pageEntries=32, hasMore=True, requests=5, gets=2,
+                                visibleControls=INTEGRATED_CONTROLS[name], canvasLeft=0.1, canvasTop=0.1,
+                                canvasRight=1.9, canvasBottom=1.9,
+                                canvasClippedLeft=0.1, canvasClippedTop=0.1,
+                                canvasClippedRight=1.9, canvasClippedBottom=1.9)
             (self.directory / (name + ".json")).write_text(json.dumps(metadata))
             (self.directory / (name + ".png")).write_bytes(self.png(*size))
 

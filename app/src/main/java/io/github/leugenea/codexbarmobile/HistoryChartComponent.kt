@@ -19,21 +19,23 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.usage.Field
+import io.github.leugenea.codexbarmobile.usage.WindowKind
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
 
-/** Reusable bounded page component. The host supplies scrolling; no production wiring yet.
+/** Reusable bounded page component. The host supplies scrolling and optional kind selection.
  * Exact facts, reset context and observed-only delta have ONE accessible owner: existing text.
  */
 @Composable
 internal fun HistoryChartComponent(
     plot: HistoryPlotSnapshot, now: Instant?, zone: ZoneId, locale: Locale, modifier: Modifier = Modifier,
+    kind: WindowKind? = null,
 ) {
     Column(modifier.fillMaxWidth().testTag("history-charts"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        HistoryWindowChart(plot.fiveHour, zone, locale, "history-chart-five-hour")
-        HistoryWindowChart(plot.weekly, zone, locale, "history-chart-weekly")
-        HistoryTextComponent(plot, now, zone, locale)
+        if (kind == null || kind == WindowKind.FIVE_HOUR) HistoryWindowChart(plot.fiveHour, zone, locale, "history-chart-five-hour")
+        if (kind == null || kind == WindowKind.WEEKLY) HistoryWindowChart(plot.weekly, zone, locale, "history-chart-weekly")
+        HistoryTextComponent(plot, now, zone, locale, kind = kind)
     }
 }
 

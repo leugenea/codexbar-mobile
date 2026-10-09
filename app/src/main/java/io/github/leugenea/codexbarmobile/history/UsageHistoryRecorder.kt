@@ -28,9 +28,18 @@ internal class UsageHistoryRecorder(
     private val storageDispatcher: CoroutineDispatcher,
     private val capacity: Int = 16,
 ) {
-    private class Binding(val session: SessionGeneration, val access: HistoryRuntimeAccess) {
-        val generation = HistoryGeneration()
-        @Volatile var revoked = false
+    /** Only this recorder writes the slot on its existing owner lane. Readers never wait. */
+    private class DisplayAuthority : HistoryDisplayAuthority {
+        @Volatile private var context: HistoryDisplayContext? = null
+        override fun current(): HistoryDisplayContext? = context
+        fun install(generation: HistoryGeneration?) { context = HistoryDisplayContext(generation) }
+        fun clear() { context = null }
+        fun permission(): HistoryDisplayPermission? = context?.let { HistoryDisplayPermission(it, this) }
+    }
+    private class Binding(val session: SessionGeneration, val access: HistoryRuntimeAccess,
+        val permission: HistoryDisplayPermission) {
+        val generation = requireNotNull(permission.context.generation)
+        val revoked get() = permission.current() !== permission.context
     }
     private data class Work(val binding: Binding, val clock: HistoryClock, val event: HistoryEvent, val gap: HistoryGap?)
     private data class Waiting(val session: SessionGeneration, val partition: HistoryPartition, val clock: HistoryClock,
@@ -38,6 +47,7 @@ internal class UsageHistoryRecorder(
     private data class Result(val page: HistoryReadOutcome, val problem: HistoryRecorderProblem? = null,
         val reason: HistoryUnavailable? = null)
     private val mutableState = MutableStateFlow(HistoryGraphSnapshot())
+    private val displayAuthority = DisplayAuthority()
     val state: StateFlow<HistoryGraphSnapshot> = mutableState
     private val clockEpoch = ClockEpoch(UUID.randomUUID())
     private val queue = ArrayDeque<Work>()
@@ -71,14 +81,18 @@ internal class UsageHistoryRecorder(
         bindingPending = pending
         if (!foreground) return
         if (access == null) {
+            // Preserve an existing Binding. With no Binding, even null-generation diagnostics
+            // need a distinct current context so retirement cannot replay their loss accounting.
+            if (displayAuthority.current() == null) displayAuthority.install(null)
             if (!pending) discardWaiting()
             problem = problem ?: if (pending) null else HistoryRecorderProblem.STORAGE_UNAVAILABLE
             publish(if (pending && problem == null) HistoryReadiness.LOADING else HistoryReadiness.ERROR)
             return
         }
         if (binding?.access === access) return
-        binding?.revoked = true
-        val current = Binding(session, access)
+        // The single replacement revokes predecessor workers before successor publication.
+        displayAuthority.install(HistoryGeneration())
+        val current = Binding(session, access, requireNotNull(displayAuthority.permission()))
         binding = current
         lifetime = session to access.partition
         adoptWaiting(current)
@@ -169,7 +183,7 @@ internal class UsageHistoryRecorder(
 
     private fun invalidate(gap: HistoryGap?) {
         epoch++
-        binding?.revoked = true
+        displayAuthority.clear()
         binding = null
         queue.clear()
         waiting.clear()
@@ -281,7 +295,7 @@ internal class UsageHistoryRecorder(
     private fun publish(readiness: HistoryReadiness) {
         val current = binding
         mutableState.value = HistoryGraphSnapshot(readiness, current?.generation, current?.access?.partition,
-            query, page, problem, reason, lost, live)
+            query, page, problem, reason, lost, live, displayAuthority.permission())
     }
 
     /** Process shutdown joins blocking work off the owner lane before the storage adapter closes. */
