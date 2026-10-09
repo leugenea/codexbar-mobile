@@ -51,10 +51,26 @@ internal class HistoryGraphEntry(val source: HistoryEntry, windows: Collection<H
     val windows: List<HistoryGraphWindow> = immutableList(windows)
 }
 
+/** Opaque diagnostic context or bound runtime context; never persisted or reused after revocation. */
+internal class HistoryDisplayContext(val generation: HistoryGeneration?)
+
+/** Read-only view of the recorder's actual worker/display revocation slot, not collected state. */
+internal fun interface HistoryDisplayAuthority {
+    fun current(): HistoryDisplayContext?
+}
+
+/** Retains only an empty context descriptor and its slot, never the recorder/controller/storage. */
+internal class HistoryDisplayPermission(
+    val context: HistoryDisplayContext,
+    private val authority: HistoryDisplayAuthority,
+) {
+    fun current(): HistoryDisplayContext? = authority.current()
+}
+
 /**
- * Detached immutable bounded view. The nonpersistable generation must be compared by identity.
- * A saved snapshot is not permission to read a retired login. M4b consumes this protocol; it must
- * keep analytical descriptors apart from actual points and never join different segment IDs.
+ * Detached bounded facts with nonpersistable, independently revocable display permission.
+ * The facts are immutable; permission is not. A saved snapshot cannot authorize a retired login.
+ * Keep analytical descriptors apart from actual points and never join different segment IDs.
  */
 internal class HistoryGraphSnapshot(
     val readiness: HistoryReadiness = HistoryReadiness.UNAVAILABLE,
@@ -66,6 +82,7 @@ internal class HistoryGraphSnapshot(
     val storageReason: HistoryUnavailable? = null,
     val lostSamples: Long = 0,
     val live: HistoryLiveMetadata = HistoryLiveMetadata(),
+    val displayPermission: HistoryDisplayPermission? = null,
 ) {
     val usedUnit = HistoryUnit.PERCENT
     val baselineUnit = HistoryUnit.PERCENT

@@ -168,6 +168,13 @@ HISTORY_CHART_CASES = {
 }
 
 
+HISTORY_AUTHORITY_CLASS = "io.github.leugenea.codexbarmobile.HistoryDisplayAuthorityTest"
+HISTORY_AUTHORITY_CASES = {
+    "heldBoundCollectionCannotReplayRetiredFactsOnActualHostReexecution",
+    "heldBoundCollectionRejectsReplacementThenShowsOnlySuccessorFacts",
+    "heldNullDiagnosticsKeepCurrentLossButNeverReplayAfterRetireSuccessorRetire",
+}
+
 HISTORY_NAVIGATION_CLASS = "io.github.leugenea.codexbarmobile.HistoryNavigationTest"
 HISTORY_NAVIGATION_CASES = {
     "productionEntrySelectsWindowsAndNavigatesBoundedOrdinalPagesWithNativeCaptures",
@@ -215,6 +222,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
             ("history text", HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES),
             ("history chart", HISTORY_CHART_CLASS, HISTORY_CHART_CASES),
             ("history navigation", HISTORY_NAVIGATION_CLASS, HISTORY_NAVIGATION_CASES),
+            ("history display authority", HISTORY_AUTHORITY_CLASS, HISTORY_AUTHORITY_CASES),
         ):
             actual_names = {case["name"] for case in cases if case["class"] == classname}
             missing_names = required - actual_names

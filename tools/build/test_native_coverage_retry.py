@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 
 import coverage_gate
 import native_coverage_retry as retry
-from verify_test_reports import (HISTORY_NAVIGATION_CASES, HISTORY_NAVIGATION_CLASS, HISTORY_CHART_CASES, HISTORY_CHART_CLASS, HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, HISTORY_SAMPLING_CASES, HISTORY_SAMPLING_CLASS, HISTORY_LIFETIME_CASES, HISTORY_LIFETIME_CLASS, HISTORY_CASES, HISTORY_CLASS, BANKED_RESET_CASES, BANKED_RESET_CLASS, CLASS, CONNECTION_CASES, CONNECTION_CLASS, CREDENTIAL_CASES, CREDENTIAL_CLASS,
+from verify_test_reports import (HISTORY_AUTHORITY_CASES, HISTORY_AUTHORITY_CLASS, HISTORY_NAVIGATION_CASES, HISTORY_NAVIGATION_CLASS, HISTORY_CHART_CASES, HISTORY_CHART_CLASS, HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, HISTORY_SAMPLING_CASES, HISTORY_SAMPLING_CLASS, HISTORY_LIFETIME_CASES, HISTORY_LIFETIME_CLASS, HISTORY_CASES, HISTORY_CLASS, BANKED_RESET_CASES, BANKED_RESET_CLASS, CLASS, CONNECTION_CASES, CONNECTION_CLASS, CREDENTIAL_CASES, CREDENTIAL_CLASS,
                                  EXPECTED, LIVE_USAGE_CASES, LIVE_USAGE_CLASS, USAGE_REFRESH_CASES, USAGE_REFRESH_CLASS)
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,7 +35,7 @@ def synthetic_reports(build, failed=False):
             for name in sorted(CREDENTIAL_CASES):
                 ET.SubElement(suite, "testcase", classname=CREDENTIAL_CLASS, name=name)
             for classname, required in ((CONNECTION_CLASS, CONNECTION_CASES), (USAGE_REFRESH_CLASS, USAGE_REFRESH_CASES),
-                                        (LIVE_USAGE_CLASS, LIVE_USAGE_CASES), (BANKED_RESET_CLASS, BANKED_RESET_CASES), (HISTORY_CLASS, HISTORY_CASES), (HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES), (HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES), (HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES), (HISTORY_CHART_CLASS, HISTORY_CHART_CASES), (HISTORY_NAVIGATION_CLASS, HISTORY_NAVIGATION_CASES)):
+                                        (LIVE_USAGE_CLASS, LIVE_USAGE_CASES), (BANKED_RESET_CLASS, BANKED_RESET_CASES), (HISTORY_CLASS, HISTORY_CASES), (HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES), (HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES), (HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES), (HISTORY_CHART_CLASS, HISTORY_CHART_CASES), (HISTORY_NAVIGATION_CLASS, HISTORY_NAVIGATION_CASES), (HISTORY_AUTHORITY_CLASS, HISTORY_AUTHORITY_CASES)):
                 for name in sorted(required):
                     ET.SubElement(suite, "testcase", classname=classname, name=name)
         suite.set("tests", str(len(list(suite))))
@@ -121,6 +121,18 @@ class RetryContracts(unittest.TestCase):
         shutil.rmtree(self.build / "outputs/androidTest-results/connected")
         with self.assertRaisesRegex(ValueError, "No native JUnit XML"):
             self.require()
+
+    def test_missing_held_authority_case_prevents_coverage_transport_retry(self):
+        for name in HISTORY_AUTHORITY_CASES:
+            synthetic_reports(self.build)
+            path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
+            tree = ET.parse(path)
+            root = tree.getroot()
+            case = next(case for case in root if case.get("classname") == HISTORY_AUTHORITY_CLASS and case.get("name") == name)
+            root.remove(case)
+            tree.write(path)
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history display authority"):
+                self.require()
 
     def test_snapshot_preserves_failed_inputs_and_tests_before_prepare_deletes_them(self):
         coverage = self.build / "coverage-gate"

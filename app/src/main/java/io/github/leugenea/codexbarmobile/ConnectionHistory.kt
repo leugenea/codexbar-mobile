@@ -17,18 +17,22 @@ import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.usage.WindowKind
 import java.time.Instant
 import java.time.ZoneId
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 /** Uses the connection screen's existing foreground registration, never activates a provider read. */
 @Composable
-internal fun ConnectionHistory(controller: ConnectionController, now: Instant?) {
-    val source by controller.historySnapshots.collectAsState()
+internal fun ConnectionHistory(controller: ConnectionController, now: Instant?, observer: HistoryUiObserver? = null) {
+    val source by if (observer == null) controller.historySnapshots.collectAsState() else
+        remember(controller, observer) { observer.snapshots(controller.historySnapshots) }.collectAsState(HistoryGraphSnapshot())
     val generation = source.generation
     var navigation by remember(controller, generation) { mutableStateOf(HistoryNavigation()) }
     val query = navigation.query
     LaunchedEffect(controller, generation, query) {
         if (generation != null && controller.historySnapshots.value.generation === generation) controller.queryHistory(query)
     }
-    val display = historyForDisplay(source, controller.historySnapshots.value.generation, query)
+    val display = historyForDisplay(source, query)
+    SideEffect { observer?.projected(source, display, now) }
     val plot = remember(display) { HistoryPlotInputs.project(display) }
     val locale = LocalConfiguration.current.locales[0]
     Column(Modifier.fillMaxWidth().testTag("connection-history"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -54,6 +58,12 @@ internal fun ConnectionHistory(controller: ConnectionController, now: Instant?) 
         }
         HistoryChartComponent(plot, now, ZoneId.systemDefault(), locale, kind = navigation.kind)
     }
+}
+
+/** UI-observation-only seam: tests may hold delivery, not the owner or its revocation slot. */
+internal interface HistoryUiObserver {
+    fun snapshots(source: StateFlow<HistoryGraphSnapshot>): Flow<HistoryGraphSnapshot>
+    fun projected(source: HistoryGraphSnapshot, display: HistoryGraphSnapshot, now: Instant?)
 }
 
 @Composable

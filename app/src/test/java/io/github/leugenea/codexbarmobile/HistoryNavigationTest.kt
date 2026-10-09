@@ -70,19 +70,23 @@ class HistoryNavigationTest {
 
     @Test fun onlyMatchingCurrentRuntimeGenerationAndSelectionExposeDetachedFacts() {
         val navigation = HistoryNavigation()
-        val source = source(navigation.query, more = true)
-        assertSame(source, historyForDisplay(source, source.generation, navigation.query))
-        val oldGeneration = historyForDisplay(source, HistoryGeneration(), navigation.query)
+        val issuer = DisplayIssuer()
+        val source = source(navigation.query, more = true, issuer = issuer)
+        assertSame(source, historyForDisplay(source, navigation.query))
+        val changedQuery = historyForDisplay(source, navigation.copy(kind = WindowKind.WEEKLY).query)
+        issuer.context = HistoryDisplayContext(HistoryGeneration())
+        val oldGeneration = historyForDisplay(source, navigation.query)
         assertHidden(oldGeneration, HistoryReadiness.LOADING)
-        val changedQuery = historyForDisplay(source, source.generation, navigation.copy(kind = WindowKind.WEEKLY).query)
         assertHidden(changedQuery, HistoryReadiness.LOADING)
         assertEquals(WindowKind.WEEKLY, changedQuery.query.kind)
     }
 
     @Test fun retirementRemovesEveryMeasurementAndIndependentEndpointClock() {
         val navigation = HistoryNavigation()
-        val old = source(navigation.query, more = true, readiness = HistoryReadiness.ERROR, lostSamples = 3)
-        val hidden = historyForDisplay(old, null, navigation.query)
+        val issuer = DisplayIssuer()
+        val old = source(navigation.query, more = true, readiness = HistoryReadiness.ERROR, lostSamples = 3, issuer = issuer)
+        issuer.context = null
+        val hidden = historyForDisplay(old, navigation.query)
         assertHidden(hidden, HistoryReadiness.UNAVAILABLE)
         assertEquals(HistoryLiveMetadata(), hidden.live)
         assertNull(hidden.partition)
@@ -108,7 +112,7 @@ class HistoryNavigationTest {
         assertEquals(2L, error.lostSamples)
         assertNotEquals(HistoryLiveMetadata(), error.live)
         val query = HistoryNavigation(kind = WindowKind.WEEKLY).query
-        val shown = historyForDisplay(error, null, query)
+        val shown = historyForDisplay(error, query)
         assertHidden(shown, HistoryReadiness.ERROR)
         assertEquals(query, shown.query)
         assertEquals(HistoryRecorderProblem.STORAGE_UNAVAILABLE, shown.problem)
@@ -116,33 +120,52 @@ class HistoryNavigationTest {
         assertNull(shown.partition)
         assertEquals(HistoryLiveMetadata(), shown.live)
         recorder.retire()
-        val retired = historyForDisplay(recorder.state.value, null, query)
+        val retired = historyForDisplay(error, query)
         assertHidden(retired, HistoryReadiness.UNAVAILABLE)
         assertEquals(0L, retired.lostSamples)
     }
 
     @Test fun unavailableStorageErrorsStayCategoricalRatherThanEmptyOrZero() {
         val navigation = HistoryNavigation()
+        val issuer = DisplayIssuer(null)
         val error = HistoryGraphSnapshot(HistoryReadiness.ERROR, problem = HistoryRecorderProblem.STORAGE_UNAVAILABLE,
-            storageReason = HistoryUnavailable.IO_FAILURE)
-        val shown = historyForDisplay(error, null, navigation.query)
+            storageReason = HistoryUnavailable.IO_FAILURE, displayPermission = issuer.permission())
+        val shown = historyForDisplay(error, navigation.query)
         assertHidden(shown, HistoryReadiness.ERROR)
         assertEquals(error.problem, shown.problem)
         assertEquals(error.storageReason, shown.storageReason)
         val current = source(navigation.query, more = false, readiness = HistoryReadiness.ERROR)
-        assertSame(current, historyForDisplay(current, current.generation, navigation.query))
+        assertSame(current, historyForDisplay(current, navigation.query))
+    }
+
+    @Test fun detachedFactsWithoutIssuerPermissionNeverAuthorizeThemselves() {
+        val navigation = HistoryNavigation()
+        val unauthorized = HistoryGraphSnapshot(HistoryReadiness.ERROR, HistoryGeneration(),
+            lostSamples = 7, problem = HistoryRecorderProblem.WRITE_FAILURE)
+        val hidden = historyForDisplay(unauthorized, navigation.query)
+        assertHidden(hidden, HistoryReadiness.UNAVAILABLE)
+        assertEquals(0L, hidden.lostSamples)
+        assertNull(hidden.problem)
     }
 
     private fun source(query: HistoryGraphQuery, more: Boolean, readiness: HistoryReadiness = HistoryReadiness.READY,
-        lostSamples: Long = 0): HistoryGraphSnapshot {
+        lostSamples: Long = 0, issuer: DisplayIssuer = DisplayIssuer()): HistoryGraphSnapshot {
         var cursor = HistoryCursor(SyntheticHistory.partition, lastOrdinal = query.after?.ordinal ?: 0)
         // A real store fills the limit before its pagination lookahead reports more.
         val retained = List(if (more) query.limit + 1 else 1) {
             SyntheticHistory.append(cursor).also { cursor = it.cursor }.entry
         }
         val storage = HistoryReadSnapshot(query.storage(cursor.partition), retained.take(query.limit), retained.last().id, more)
-        return HistoryGraphSnapshot(readiness, HistoryGeneration(), cursor.partition, query, storage, lostSamples = lostSamples,
-            live = HistoryLiveMetadata(HistoryEndpointMetadata(SyntheticHistory.at), HistoryEndpointMetadata(SyntheticHistory.at.plusSeconds(1))))
+        return HistoryGraphSnapshot(readiness, issuer.context!!.generation, cursor.partition, query, storage, lostSamples = lostSamples,
+            live = HistoryLiveMetadata(HistoryEndpointMetadata(SyntheticHistory.at), HistoryEndpointMetadata(SyntheticHistory.at.plusSeconds(1))),
+            displayPermission = issuer.permission())
+    }
+
+    /** Explicit synthetic issuer for pure projection cases, not recorder runtime evidence. */
+    private class DisplayIssuer(generation: HistoryGeneration? = HistoryGeneration()) : HistoryDisplayAuthority {
+        var context: HistoryDisplayContext? = HistoryDisplayContext(generation)
+        override fun current() = context
+        fun permission() = HistoryDisplayPermission(requireNotNull(context), this)
     }
 
     private fun assertHidden(source: HistoryGraphSnapshot, readiness: HistoryReadiness) {

@@ -22,14 +22,22 @@ internal data class HistoryNavigation(
     }
 }
 
-/** Compare runtime identity AND requested selection before any detached data reaches the renderer. */
+/** One fresh descriptor read at the host boundary, independent of delayed snapshot collection. */
 internal fun historyForDisplay(
-    source: HistoryGraphSnapshot, current: HistoryGeneration?, query: HistoryGraphQuery,
+    source: HistoryGraphSnapshot, query: HistoryGraphQuery,
 ): HistoryGraphSnapshot {
-    if (current != null && source.generation === current && source.query == query) return source
-    if (current == null) return unavailableHistory(source, query)
-    return HistoryGraphSnapshot(HistoryReadiness.LOADING, query = query)
+    val permission = source.displayPermission
+    val current = permission?.current()
+    if (current == null || current !== permission.context) return hiddenHistory(current, query)
+    if (current.generation != null) {
+        if (source.generation === current.generation && source.query == query) return source
+        return hiddenHistory(current, query)
+    }
+    return unavailableHistory(source, query)
 }
+
+private fun hiddenHistory(current: HistoryDisplayContext?, query: HistoryGraphQuery) =
+    HistoryGraphSnapshot(if (current?.generation != null) HistoryReadiness.LOADING else HistoryReadiness.UNAVAILABLE, query = query)
 
 private fun unavailableHistory(source: HistoryGraphSnapshot, query: HistoryGraphQuery): HistoryGraphSnapshot {
     if (source.generation == null && source.readiness == HistoryReadiness.ERROR) {

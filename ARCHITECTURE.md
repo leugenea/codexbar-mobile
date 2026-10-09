@@ -686,12 +686,38 @@ not redefine pagination. Explicit cursor/limit/retained-ordinal labels complemen
 the unchanged content, error, loss, retention and independent endpoint metadata.
 
 Selection and detail state are in-memory `remember`, not Bundle/saved snapshots.
-Runtime-generation identity and requested-query equality gate rendering; a
-superseded selection has no page while awaiting its own query. Retirement hides
-measurements and endpoint clocks, and new adoption resets navigation. Metadata-only
+The recorder's one volatile display-context slot replaces its private Binding
+revocation flag: workers and the host use the same authority, not a mirrored flow.
+Each snapshot carries only a read-only nonpersistable permission retaining an opaque
+context (with nullable bound generation) and the slot, never controller/storage or
+credentials. Replacement revokes the predecessor before publication; invalidation
+clears the slot before publishing unavailable. A foreground bind without storage
+has a distinct diagnostic context, still with null generation. Its current ERROR
+loss survives selection changes, but its retired context cannot replay even across
+null → successor → null. Existing null-access binds preserve any current Binding;
+background/resume loss retention and retirement loss reset are unchanged.
+
+On each actual `ConnectionHistory` execution, one independent descriptor read
+immediately before projection authorizes context/generation identity and requested
+query equality. Ordinary StateFlow collection still schedules UI updates; it is not
+render permission. Missing/revoked permission scrubs all facts and loss, showing
+loading only for a current bound successor, otherwise unavailable. This is a host
+composition-time check, not a frame/child/hardware atomic-erasure promise. No
+mutable authority is marked Stable/Immutable or cached by remember. A superseded
+selection has no page while awaiting its own query. Retirement hides measurements
+and endpoint clocks, and new adoption resets navigation. Metadata-only
 ticks do not collapse exact details: details reset on generation, query or storage
 page identity instead of every detached metadata snapshot. No measured point,
 comparison, baseline or provider fact is recalculated by navigation.
+
+Three additional mandatory `HistoryDisplayAuthorityTest` cases run that actual
+host with recorder-produced facts, a held UI-only delivery collector and changed
+evaluation input. They require the exact retained source on the challenged host
+pass after an owner receipt, reject retired bound/null contexts, then prove only
+successor data/loss and unchanged dormant request counts. The observer seam cannot
+mutate owner/storage authority or hold the entire Compose scheduler. These extend
+the 98 native identities without changing the twelve captures. Hosted execution
+and fresh lint/coverage/image review remain acceptance, not source-level proof.
 
 Five mandatory `HistoryNavigationTest` instrumentation cases exercise the actual
 MainActivity entry, window/page controls, dormant restore and offline request

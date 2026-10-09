@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 import test_history_text_contract as text_contract
 from verify_history_text_captures import CAPTURES, INTEGRATED_CAPTURES, verify_captures
-from verify_test_reports import HISTORY_NAVIGATION_CASES, HISTORY_NAVIGATION_CLASS, verify_reports
+from verify_test_reports import HISTORY_AUTHORITY_CASES, HISTORY_AUTHORITY_CLASS, HISTORY_NAVIGATION_CASES, HISTORY_NAVIGATION_CLASS, verify_reports
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -23,7 +23,7 @@ class HistoryNavigationContracts(unittest.TestCase):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryNavigationTest.kt").read_text()
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_NAVIGATION_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 93 + len(HISTORY_NAVIGATION_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 93 + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES))
         for name in HISTORY_NAVIGATION_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history navigation"):
@@ -37,6 +37,30 @@ class HistoryNavigationContracts(unittest.TestCase):
                 case = next(case for case in tree.getroot().iter("testcase") if case.get("name") == name)
                 if mutation == "wrong-class":
                     case.set("classname", HISTORY_NAVIGATION_CLASS + ".wrong")
+                else:
+                    ET.SubElement(case, mutation)
+                tree.write(path)
+                with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
+                    verify_reports(self.directory, "native")
+
+    def test_held_collection_authority_regressions_extend_the_98_inherited(self):
+        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryDisplayAuthorityTest.kt").read_text()
+        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_AUTHORITY_CASES)
+        self.fixture.report()
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 98 + len(HISTORY_AUTHORITY_CASES))
+        for name in HISTORY_AUTHORITY_CASES:
+            self.fixture.report(name)
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history display authority"):
+                verify_reports(self.directory, "native")
+
+    def test_held_authority_regressions_fail_closed_on_skip_error_failure_and_spoof(self):
+        for name in HISTORY_AUTHORITY_CASES:
+            for mutation in ("skipped", "error", "failure", "wrong-class"):
+                path = self.fixture.report()
+                tree = ET.parse(path)
+                case = next(case for case in tree.getroot().iter("testcase") if case.get("name") == name)
+                if mutation == "wrong-class":
+                    case.set("classname", HISTORY_AUTHORITY_CLASS + ".wrong")
                 else:
                     ET.SubElement(case, mutation)
                 tree.write(path)
