@@ -8,8 +8,9 @@ import java.util.UUID
 
 /**
  * One durable LOCAL session slot. The caller must retain its random session identifier for
- * pending restoration and allocate a new identifier for a different session after logout.
- * It is not provider identity. openSession replaces the runtime capability, not that durable
+ * pending restoration; the process owner keeps that slot selector across logout.
+ * It is neither provider identity nor the separate history credential-lifetime partition.
+ * openSession replaces the runtime capability, not that durable
  * session; restored credentials remain Unresolved and must not be advertised as an account.
  * The process session owner constructs this store once. No Activity or Context is retained.
  */

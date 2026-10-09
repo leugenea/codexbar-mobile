@@ -20,6 +20,9 @@ import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
 import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
 import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
+import io.github.leugenea.codexbarmobile.history.HistoryLifetimeCoordinator
+import io.github.leugenea.codexbarmobile.history.SQLiteHistoryLifetimeStorage
+import io.github.leugenea.codexbarmobile.history.SQLiteHistoryStore
 import io.github.leugenea.codexbarmobile.transport.HttpTransportAdapter
 import io.github.leugenea.codexbarmobile.transport.SystemTransportClock
 import io.github.leugenea.codexbarmobile.transport.TransportClock
@@ -68,7 +71,8 @@ internal object NativeConnection {
         val transport = suppliedTransport ?: productionTransport(app)
         return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),
             NativeFeasibilityReader(transport, clock, pause),
-            CoroutineScope(SupervisorJob() + Dispatchers.IO), storageReady = session != null, refreshClock = clock)
+            CoroutineScope(SupervisorJob() + Dispatchers.IO), storageReady = session != null, refreshClock = clock,
+            history = HistoryLifetimeCoordinator(SQLiteHistoryLifetimeStorage(SQLiteHistoryStore.open(app))))
     }
 
     private fun productionTransport(context: Context): AuthTransport {

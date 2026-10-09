@@ -1,6 +1,7 @@
 package io.github.leugenea.codexbarmobile.history
 
 import android.content.Context
+import android.content.ContextWrapper
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import android.database.sqlite.SQLiteFullException
@@ -26,6 +27,7 @@ import org.junit.runner.RunWith
 /** Hosted framework SQLite/disk tests, original synthetic numeric/time facts only. No process-death claim. */
 @RunWith(AndroidJUnit4::class)
 class HistoryPersistenceTest {
+    private lateinit var fixtureRoot: File
     private lateinit var directory: File
     private val stores = mutableListOf<SQLiteHistoryStore>()
     private val at = Instant.ofEpochSecond(1_800_000_000, 7)
@@ -33,7 +35,8 @@ class HistoryPersistenceTest {
 
     @Before fun prepare() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        directory = File(context.noBackupFilesDir, "synthetic-history-${UUID.randomUUID()}").canonicalFile
+        fixtureRoot = File(context.noBackupFilesDir, "synthetic-history-${UUID.randomUUID()}").canonicalFile
+        directory = fixtureRoot
     }
     @After fun cleanup() {
         var failure: Throwable? = null
@@ -43,7 +46,7 @@ class HistoryPersistenceTest {
                     if (failure == null) failure = problem else failure.addSuppressed(problem)
                 }
             }
-        } finally { directory.deleteRecursively() }
+        } finally { fixtureRoot.deleteRecursively() }
         failure?.let { throw it }
     }
     private fun store(limits: HistoryStorageLimits = HistoryStorageLimits(), hooks: HistoryStorageHooks = object : HistoryStorageHooks {}): SQLiteHistoryStore =
@@ -529,7 +532,14 @@ class HistoryPersistenceTest {
 
     @Test fun historyArtifactsUseNoBackupDirectoryWithMemoryTemporariesAndUnchangedBackupRules() {
         verifyNativeSchemaPragmaSetters()
-        val context = ApplicationProvider.getApplicationContext<Context>()
+        val application = ApplicationProvider.getApplicationContext<Context>()
+        // Exercise the production default child, not the process owner's retained shared history.
+        val context = object : ContextWrapper(application) {
+            override fun getApplicationContext(): Context = this
+            override fun getNoBackupFilesDir(): File = fixtureRoot
+        }
+        assertSame("default open must retain the fixture's application context", context, context.applicationContext)
+        assertTrue(fixtureRoot.path.startsWith(application.noBackupFilesDir.canonicalPath + File.separator))
         val defaultDirectory = File(context.noBackupFilesDir, "usage-history").canonicalFile
         assertFalse("default history directory must be a fresh synthetic fixture", defaultDirectory.exists())
         directory = defaultDirectory

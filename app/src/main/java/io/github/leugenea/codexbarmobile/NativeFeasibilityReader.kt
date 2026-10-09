@@ -44,8 +44,8 @@ internal class NativeFeasibilityReader(
 
     fun session(store: io.github.leugenea.codexbarmobile.credentials.CredentialStore, scope: kotlinx.coroutines.CoroutineScope,
         storageDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO,
-        invalidated: () -> Unit = {}) =
-        SessionCoordinator(store, transport, scope, clock, storageDispatcher, invalidated)
+        invalidated: () -> Unit = {}, removing: () -> Unit = {}) =
+        SessionCoordinator(store, transport, scope, clock, storageDispatcher, invalidated, removing)
 
     suspend fun read(bearer: SensitiveValue): FeasibilityObservations {
         val usage = endpoint(ReadOperation.USAGE, bearer)
