@@ -24,11 +24,6 @@ internal class EndpointObservation(
     val notBeforeMillis: Long? = null,
     val receivedAtMillis: Long? = null,
 ) {
-    // Keep the A8 screen's allowlisted facts without maintaining a second JSON parser.
-    val availableCount: Field<Long>? get() = inventory?.reportedAvailableCount
-    val expiries: List<Field<Instant>> get() = inventory?.items.orEmpty().map {
-        it.value?.expiresAt ?: Field(it.knowledge, reason = it.reason)
-    }
     override fun toString(): String = "EndpointObservation(operation=$operation, status=$status, observedAt=$observedAt, error=$error, payload=redacted)"
 }
 internal data class FeasibilityObservations(val usage: EndpointObservation, val inventory: EndpointObservation) {

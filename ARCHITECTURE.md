@@ -31,9 +31,9 @@ need that opt-in. This replaces the historical no-INTERNET invariant, not the
 offline demo boundary: preview actions still initiate no requests. Backup/extraction rules
 exclude app data. The default offline preview initiates no provider requests.
 
-## Initial native connection gate
+## Native connection screen
 
-A separate Connection gate screen is opt-in and never uses the offline fixtures:
+A separate Connection screen is opt-in and never uses the offline fixtures:
 
 ```text
 MainActivity / thin StateFlow observer
@@ -122,11 +122,12 @@ result clears that marker. Explicit cancel or owner shutdown during an unfinishe
 refresh deletes its uncertain credentials; Activity finish does not shut down the owner.
 Generation checks reject late writes/results after logout or
 replacement; diagnostics expose categories, never token values or error descriptions.
-The narrow projection
-shows validated duration-identified five-hour/weekly percentages, resets, provider
-flags, banked counts and UTC expiry facts, with independent endpoint observation
-times. Both endpoints now use the production A9 decoders; no independent A8 JSON
-fact extractor remains. Decoders retain missing/null/wrong-type knowledge and all
+The live usage and banked sections show duration-identified five-hour/weekly
+percentages, reset/expiry labels, provider flags and banked counts, with independent
+endpoint observation times. The former raw feasibility diagnostics dump is not
+rendered; connection status, identity/lifecycle boundaries and connect/cancel/read/
+session-refresh/sign-out controls remain. Both endpoints use the production A9
+decoders; no independent A8 JSON fact extractor remains. Decoders retain missing/null/wrong-type knowledge and all
 window/item siblings through A1, without treating M0 fixtures as provider guarantees.
 Banked inventory also retains the `credits` row-container knowledge/reason and array
 size independently of provider counts and individual row validity. The pure C1
@@ -670,7 +671,7 @@ and the conditional assembled acceptance contract are described below.
 ## Production bounded history navigation (M4b-3a)
 
 The existing Connection screen exposes **View local history** and a return control
-for the unchanged live usage/authentication/diagnostics surface. `ConnectionHistory`
+for the live usage and authentication controls. `ConnectionHistory`
 collects the same process owner's `historySnapshots` and sends only
 `queryHistory(HistoryGraphQuery)`. It adds no observer registration, controller,
 storage port, network action or sampling timer. The existing Connection-tab

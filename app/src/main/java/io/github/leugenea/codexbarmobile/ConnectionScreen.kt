@@ -31,8 +31,6 @@ import io.github.leugenea.codexbarmobile.transport.HttpTransportAdapter
 import io.github.leugenea.codexbarmobile.transport.SystemTransportClock
 import io.github.leugenea.codexbarmobile.transport.TransportClock
 import kotlinx.coroutines.delay
-import io.github.leugenea.codexbarmobile.usage.Field
-import io.github.leugenea.codexbarmobile.usage.WindowSelection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -157,36 +155,4 @@ private fun ConnectionContent(state: ConnectionState, controller: ConnectionCont
         modifier = Modifier.testTag("sign-out")) {
         Text(stringResource(R.string.gate_sign_out))
     }
-    state.observations?.let { ConnectionDiagnostics(it) }
 }
-
-@Composable
-private fun ConnectionDiagnostics(observations: FeasibilityObservations) {
-    EndpointFacts(observations.usage)
-    observations.usage.usage?.let { usage ->
-        WindowFacts(stringResource(R.string.gate_five_hour), usage.fiveHour)
-        WindowFacts(stringResource(R.string.gate_weekly), usage.weekly)
-        Text(stringResource(R.string.gate_flags, fact(usage.allowed), fact(usage.limitReached)))
-        Text(stringResource(R.string.gate_summary_count, fact(usage.bankedAvailableCount)))
-    }
-    EndpointFacts(observations.inventory)
-    Text(stringResource(R.string.gate_inventory_count, observations.inventory.availableCount?.let(::fact) ?: "—"))
-    observations.inventory.expiries.forEach { Text(stringResource(R.string.gate_expiry, fact(it))) }
-}
-
-@Composable
-private fun EndpointFacts(observation: EndpointObservation) {
-    Text(stringResource(R.string.gate_endpoint, observation.operation.name, observation.status?.toString() ?: "—",
-        observation.observedAt?.toString() ?: "—", observation.error?.name ?: "—"))
-}
-
-@Composable
-private fun WindowFacts(label: String, selection: WindowSelection) {
-    Text(stringResource(R.string.gate_window_state, label, selection.state.name))
-    selection.candidates.forEach { window ->
-        Text(stringResource(R.string.gate_window, fact(window.durationSeconds), fact(window.usedPercent),
-            fact(window.reset.absolute), fact(window.reset.relativeSeconds), window.reset.discrepant.toString()))
-    }
-}
-
-private fun fact(field: Field<*>): String = field.value?.toString() ?: "${field.knowledge.name}/${field.reason?.name ?: "—"}"

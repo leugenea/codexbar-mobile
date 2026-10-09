@@ -33,8 +33,8 @@ class ConnectionControllerTest {
             assertTrue(facts.usage.observedAt!! < facts.inventory.observedAt!!)
             assertEquals(SelectionState.UNAVAILABLE, facts.usage.usage!!.fiveHour.state)
             assertEquals(BigDecimal(5), facts.usage.usage.weekly.candidates.single().usedPercent.value)
-            assertEquals(2L, facts.inventory.availableCount!!.value)
-            assertEquals(Knowledge.UNAVAILABLE, facts.inventory.expiries[1].knowledge)
+            assertEquals(2L, facts.inventory.inventory!!.reportedAvailableCount.value)
+            assertEquals(Knowledge.UNAVAILABLE, facts.inventory.inventory.items[1].value!!.expiresAt.knowledge)
             assertFalse(state.toString().contains("synthetic"))
             assertFalse(facts.toString().contains("synthetic-private-label"))
             h.controller.signOut()
@@ -217,10 +217,10 @@ class ConnectionControllerTest {
                 call.reply(SyntheticAuth.response("""{"available_count":true,"credits":[1,{},null,{"expires_at":false},{"expires_at":"unknown"}]}"""))
                 else h.respond(call) }
             h.connect()
-            val inventory = h.controller.state.value.observations!!.inventory
-            assertEquals(Knowledge.MALFORMED, inventory.availableCount!!.knowledge)
-            assertEquals(5, inventory.expiries.size)
-            assertEquals(Knowledge.UNSUPPORTED, inventory.expiries.last().knowledge)
+            val inventory = h.controller.state.value.observations!!.inventory.inventory!!
+            assertEquals(Knowledge.MALFORMED, inventory.reportedAvailableCount.knowledge)
+            assertEquals(5, inventory.items.size)
+            assertEquals(Knowledge.UNSUPPORTED, inventory.items.last().value!!.expiresAt.knowledge)
         }
     }
 

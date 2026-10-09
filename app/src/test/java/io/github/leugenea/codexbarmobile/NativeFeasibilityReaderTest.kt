@@ -51,8 +51,8 @@ class NativeFeasibilityReaderTest {
         assertEquals(2L, normalizedInventory.reportedAvailableCount.value)
         assertEquals(2, normalizedInventory.inventoryRowCount)
         assertEquals(Completeness.COMPLETE, normalizedInventory.completeness)
-        assertEquals(Instant.ofEpochSecond(1792701116, 833553000), result.inventory.expiries[0].value)
-        assertEquals(Instant.ofEpochSecond(1793300317, 564252000), result.inventory.expiries[1].value)
+        assertEquals(Instant.ofEpochSecond(1792701116, 833553000), normalizedInventory.items[0].value!!.expiresAt.value)
+        assertEquals(Instant.ofEpochSecond(1793300317, 564252000), normalizedInventory.items[1].value!!.expiresAt.value)
         assertFalse(result.toString().contains("synthetic-private"))
         assertFalse(result.inventory.toString().contains("codex_rate_limits"))
         assertFalse(result.usage.toString().contains("synthetic-private-plan"))
@@ -69,8 +69,8 @@ class NativeFeasibilityReaderTest {
             assertEquals(error, result.inventory.error)
             assertNull(result.inventory.observedAt)
             assertNull(result.inventory.inventory)
-            assertNull(result.inventory.availableCount)
-            assertTrue(result.inventory.expiries.isEmpty())
+            assertNull(result.inventory.inventory?.reportedAvailableCount)
+            assertNull(result.inventory.inventory?.items)
         }
     }
 
@@ -97,8 +97,8 @@ class NativeFeasibilityReaderTest {
     @Test fun summaryAndInventoryMismatchSurvivesReaderWithoutOverwritingEitherCount() {
         val result = read(SyntheticAuth.response(usage), SyntheticAuth.response(inventory.replace("available_count\":2", "available_count\":3")))
         assertEquals(2L, result.usage.usage!!.bankedAvailableCount.value)
-        assertEquals(3L, result.inventory.availableCount!!.value)
-        assertEquals(setOf(InventoryIssue.SUMMARY_COUNT_MISMATCH, InventoryIssue.AVAILABLE_ROW_COUNT_MISMATCH), result.inventory.inventory!!.issues)
+        assertEquals(3L, result.inventory.inventory!!.reportedAvailableCount.value)
+        assertEquals(setOf(InventoryIssue.SUMMARY_COUNT_MISMATCH, InventoryIssue.AVAILABLE_ROW_COUNT_MISMATCH), result.inventory.inventory.issues)
     }
 
     private fun failures(): List<Pair<TransportResult, ReadError>> = listOf(

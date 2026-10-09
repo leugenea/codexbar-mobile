@@ -8,11 +8,11 @@ import android.os.Bundle
 import android.os.Parcel
 import android.view.WindowManager
 import androidx.compose.ui.test.ComposeTimeoutException
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.Lifecycle
@@ -23,6 +23,7 @@ import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
 import io.github.leugenea.codexbarmobile.credentials.*
 import io.github.leugenea.codexbarmobile.transport.*
+import io.github.leugenea.codexbarmobile.usage.SelectionState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -199,9 +200,7 @@ class ConnectionLifecycleTest {
             assertTrue(KeystoreCredentialStore.file(context, session).isFile)
             assertTrue(keyExists(session))
             assertSavedStateHasNoSecrets(scenario)
-            compose.onNodeWithText("Weekly (604800 s): KNOWN").performScrollTo().assertExists()
-            compose.onNodeWithText("Inventory banked available_count: 2").performScrollTo().assertExists()
-            compose.onNodeWithText("Banked expiry: 2026-10-22T20:31:56.833553Z").performScrollTo().assertExists()
+            assertPresentedObservations(facts)
             val beforeRecreation = fake.calls.size
             scenario.recreate()
             bounded("recreated live gate admits one resumed cycle") { fake.calls.size == beforeRecreation + 2 }
@@ -534,10 +533,23 @@ class ConnectionLifecycleTest {
 
     private fun launch(): ActivityScenario<MainActivity> = ActivityScenario.launch(MainActivity::class.java)
 
+    private fun assertPresentedObservations(facts: FeasibilityObservations) {
+        assertEquals(SelectionState.KNOWN, facts.usage.usage!!.weekly.state)
+        compose.onNodeWithTag("live-weekly-status").performScrollTo().assertTextEquals("Provider-reported usage")
+        compose.onNodeWithTag("live-weekly-percent").performScrollTo().assertTextEquals("5% used")
+        compose.onNodeWithTag("banked-inventory-text", useUnmergedTree = true).performScrollTo()
+            .assertTextEquals("Inventory reports: 2 available banked resets")
+        assertEquals(Instant.parse("2026-10-22T20:31:56.833553Z"), facts.inventory.inventory!!.items.first().value!!.expiresAt.value)
+        // The exact source instant stays an owner oracle; the UI intentionally shows B1 hour precision.
+        compose.onNodeWithTag("banked-item-0-absolute", useUnmergedTree = true).performScrollTo().assertExists()
+        assertConnectionHasNoDiagnosticDump(compose)
+    }
+
     private fun openGate(scenario: ActivityScenario<MainActivity>, phase: ConnectionPhase = ConnectionPhase.IDLE) {
         compose.waitForIdle()
         await(scenario, "initial $phase") { it.phase == phase }
         click("connection-tab")
+        assertConnectionHasNoDiagnosticDump(compose)
     }
     private fun click(tag: String, expectTransition: Boolean = true) {
         val changesState = tag in setOf("connect", "read-usage", "refresh-session", "sign-out", "cancel-connect")
@@ -570,6 +582,10 @@ class ConnectionLifecycleTest {
                 matches = test(state) && (state.phase != ConnectionPhase.OBSERVED || !state.refresh.refreshing)
             }
             matches
+        }
+        // Some owner waits run on the offline tab; require the real live root before this UI oracle.
+        if (compose.onAllNodes(hasTestTag("live-usage")).fetchSemanticsNodes().isNotEmpty()) {
+            assertConnectionHasNoDiagnosticDump(compose)
         }
     }
     private fun bounded(step: String, last: () -> String = { "no diagnostic" }, test: () -> Boolean) {

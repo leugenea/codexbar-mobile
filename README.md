@@ -2,14 +2,14 @@
 
 An independent, unofficial Android phone project. It is not affiliated with or
 endorsed by OpenAI or CodexBar. **The app retains an offline preview and includes
-an owner-operated native connection feasibility gate, not supported provider access.**
+an opt-in native connection screen, not supported provider access.**
 
 ## What works today
 
 - Disconnected, frozen loading, simulated error and demo-usage previews.
 - Hand-authored sample percentages, clearly labeled as samples.
 - Preview selection restored across Activity recreation; preview actions never request provider data.
-- A separate connection gate: connect/cancel, fixed system-browser device login,
+- A separate connection screen: connect/cancel, fixed system-browser device login,
   Keystore-backed local storage and sign-out, and only the two selected read-only routes.
 - Serialized session refresh/rotation with durable save before publication, bounded
   401 recovery, re-auth on terminal/write failures, and generation-isolated local logout.
@@ -28,10 +28,11 @@ an owner-operated native connection feasibility gate, not supported provider acc
   Empty, unknown with reasons, unsupported, inaccessible, malformed and conflicting
   inventory remain distinct; stale/error inventory retains its own successful clock.
   Counts are never recomputed from rows. No activation or purchase action exists.
-- Safe numeric/date/status observations with independent endpoint clocks.
+- Live usage and banked sections present numeric/date/status facts with independent
+  endpoint clocks, without the former raw feasibility diagnostics dump.
 - Android launcher, Compose UI, JVM state tests and hosted synthetic native tests.
 
-The connection gate reports **binding UNRESOLVED / identity UNVERIFIED**. Receiving
+The connection remains **binding UNRESOLVED / identity UNVERIFIED**. Receiving
 tokens or HTTP 200 does not establish account/workspace association. The owner accepted
 this single identity-unverified session and recorded A8 GO on 2026-10-07 in issue #48.
 Refresh/rotation/local-logout verification on the exact candidate remains a separate

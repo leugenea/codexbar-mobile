@@ -284,7 +284,7 @@ class LiveUsageScreenTest {
             assertBankedOwner("banked-inventory", "1 available banked reset")
             assertViewOnlyBanked()
             assertEquals(0, fake.posts.get())
-            // The pre-existing A8 diagnostic dump legitimately retains raw expiry facts outside C2.
+            // Keep C2's purchased-balance/raw-subsecond oracle scoped to its own presentation.
             compose.onNodeWithTag("banked-section", useUnmergedTree = true).assertExists()
             val banked = hasTestTag("banked-section") or hasAnyAncestor(hasTestTag("banked-section"))
             val rawInstantOrBalance = hasText("999999", substring = true) or
@@ -568,6 +568,7 @@ class LiveUsageScreenTest {
         val node = compose.onNodeWithTag(tag)
         if (scroll) node.performScrollTo()
         node.assertTextEquals(expected)
+        if (tag != "demo-identity") assertConnectionHasNoDiagnosticDump(compose)
     }
 
     private fun progress(tag: String, fraction: Float, description: String, status: String, percent: String) {
@@ -624,6 +625,10 @@ class LiveUsageScreenTest {
             throw AssertionError("$step: phase=${owner.state.value.phase}, refresh=${owner.state.value.refresh}", error)
         }
         compose.waitForIdle()
+        // Check successful, refreshing, error, stale, unknown, malformed and retired live states.
+        if (compose.onAllNodes(hasTestTag("live-usage")).fetchSemanticsNodes().isNotEmpty()) {
+            assertConnectionHasNoDiagnosticDump(compose)
+        }
     }
     private fun settleOwnerCommands() {
         try {
