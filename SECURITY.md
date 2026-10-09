@@ -70,8 +70,11 @@ facts and opaque local credential-lifetime/clock UUIDs. It stores no credentials
 provider/account identity, plan text or raw response. History is framework SQLite under
 `noBackupFilesDir/usage-history`, excluded by the existing cloud/D2D rules; the owner
 accepted sandbox-private history without Keystore encryption. Its subordinate lifetime
-coordinator is wired to the one process session owner, but no refresh sampling or graph
-presentation is implemented. The ceilings are 30-day trusted
+coordinator and bounded foreground recorder are wired to the one process session owner;
+no graph presentation is implemented. Only accepted USAGE deliveries may supply samples;
+cache/tick/inventory/baseline publications do not. Queue loss and read/write failures are
+categorical, not raw exceptions; late durable work cannot publish a retired generation.
+The ceilings are 30-day trusted
 observation aging, 100,000 observations and 32 MiB for the entire owned directory,
 including rollback journal/control replacements. Reads/fields are also bounded; unknown
 or anomalous clocks suspend aging without disabling count/byte bounds.

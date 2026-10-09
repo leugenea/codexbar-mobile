@@ -481,13 +481,20 @@ class HistoryLifetimeTest {
         @Volatile private var heldRefresh: (() -> Unit)? = null
         val refreshReached = CountDownLatch(1)
         fun releaseRefresh() { heldRefresh?.invoke(); heldRefresh = null }
+        private fun responseStatus(request: ProviderHttpRequest, path: String): Int = when {
+            path == "/oauth/token" && terminalRefresh -> 401
+            request is ProviderHttpRequest.Get && path == ReadOperation.USAGE.path -> 403
+            else -> 200
+        }
         val clock = TransportClock { TransportTime(Instant.ofEpochSecond(1_800_000_000).plusMillis(millis.get()), millis.get()) }
         suspend fun pause(duration: Long) { millis.addAndGet(duration) }
         override fun execute(request: ProviderHttpRequest, deadline: ReadDeadline, terminal: (TransportResult) -> Unit): CancellationHandle {
             requests.incrementAndGet()
             val path = request.url.encodedPath
             if (path == "/oauth/token") exchanges.incrementAndGet()
-            val status = if (path == "/oauth/token" && terminalRefresh) 401 else 200
+            // This lifetime suite admits explicit synthetic store events; the integrated sampling
+            // suite separately owns successful USAGE delivery. A failed usage read adds no point.
+            val status = responseStatus(request, path)
             val body = when (path) {
                 "/api/accounts/deviceauth/usercode" -> """{"device_auth_id":"synthetic-lifetime-device","user_code":"SYNTHETIC-LIFETIME"}"""
                 "/api/accounts/deviceauth/token" -> """{"authorization_code":"synthetic-lifetime-authorization","code_verifier":"synthetic-lifetime-verifier"}"""

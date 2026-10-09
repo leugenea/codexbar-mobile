@@ -22,6 +22,7 @@ internal class EndpointObservation(
     val usage: UsageObservation? = null,
     val inventory: BankedResetObservation? = null,
     val notBeforeMillis: Long? = null,
+    val receivedAtMillis: Long? = null,
 ) {
     // Keep the A8 screen's allowlisted facts without maintaining a second JSON parser.
     val availableCount: Field<Long>? get() = inventory?.reportedAvailableCount
@@ -74,7 +75,7 @@ internal class NativeFeasibilityReader(
                 currentCoroutineContext().ensureActive()
                 val result = request(ProviderHttpRequest.Get(url(operation), token), request.deadline, session, credentials)
                 currentCoroutineContext().ensureActive()
-                val receivedAt = clock.now().wall
+                val receivedAt = clock.now()
                 val decision = policy.evaluate(request, attempt, result)
                 // Preserve A2's boundary on the owner lane before a cancellable retry wait.
                 decision.notBeforeMillis?.let(admissionDeferred)
@@ -130,15 +131,15 @@ internal class NativeFeasibilityReader(
     }
 
     private fun project(
-        operation: ReadOperation, response: TransportResult.Response, observed: Instant, usage: UsageObservation?,
+        operation: ReadOperation, response: TransportResult.Response, observed: TransportTime, usage: UsageObservation?,
     ): EndpointObservation = when (operation) {
         ReadOperation.USAGE -> decoded(operation, response.status,
-            UsageResponseParser.parse(response.body, observed, observed)) { observation ->
-            EndpointObservation(operation, response.status, observation.observedAt, usage = observation)
+            UsageResponseParser.parse(response.body, observed.wall, observed.wall)) { observation ->
+            EndpointObservation(operation, response.status, observation.observedAt, usage = observation, receivedAtMillis = observed.monotonicMillis)
         }
         ReadOperation.RESET_INVENTORY -> decoded(operation, response.status,
-            BankedResetResponseParser.parse(response.body, usage, observed, observed)) { observation ->
-            EndpointObservation(operation, response.status, observation.observedAt, inventory = observation)
+            BankedResetResponseParser.parse(response.body, usage, observed.wall, observed.wall)) { observation ->
+            EndpointObservation(operation, response.status, observation.observedAt, inventory = observation, receivedAtMillis = observed.monotonicMillis)
         }
     }
 

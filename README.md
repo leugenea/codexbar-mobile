@@ -47,7 +47,7 @@ infinite lifetime. Summary counts/clocks are the C1 facts captured for the inven
 comparison, not a recomputed current total; retained inventory may be older than usage.
 Refresh progress describes B2's shared read cycle, not an invented per-endpoint worker.
 A dependency-free framework SQLite history adapter implements the local usage-history
-contract, separately from live refresh. It uses a no-backup directory with 30-day
+contract, fed by accepted foreground usage delivery under the existing process owner. It uses a no-backup directory with 30-day
 trusted-observation aging, 100,000-observation and 32 MiB complete-directory ceilings,
 bounded reads and visible eviction metadata. It retains exact numeric/time facts, not
 credentials, plan text or provider identity; history is sandbox-private, not Keystore-encrypted.
@@ -62,9 +62,17 @@ explicit storage failure, with no successor admission over unsettled cleanup. Ca
 shutdown retain a clean lifetime; the last foreground observer leaving revokes its runtime
 history capability without deleting it. A returning observer gets a fresh capability for the
 same continuing partition. Identity remains UNVERIFIED: there is no provider-account join.
-No live samples are recorded yet; refresh sampling and history presentation are separate
-work. The pure even-distribution reference is not a graph UI. There is no verified-account
-history, background refresh service, widget
+Real accepted USAGE observations are now recorded only while a live observer is visible.
+Different successful reads at equal percent remain distinct; cache replay, inventory-only
+success, errors, local ticks and analytical baseline queries add no measured points.
+This is sparse foreground history, not a continuous record: background/error/field/clock
+gaps remain explicit, with no retrospective backfill. Bounded durable work reports lost or
+unconfirmed samples and categorical storage failures without replacing live quota.
+An immutable bounded history/query contract supplies measured segments and separate
+nominal even-distribution descriptors; graph rendering is still separate work. The native
+contract exercises actual Keystore/SQLite with synthetic transport and fresh-runtime
+restoration, not literal process death or verified provider identity. There is no
+verified-account history, background refresh service, widget
 or signed production release. CI debug APKs are test outputs, not signed release
 deliverables. Minimum Android version is Android 8.0 (API 26).
 

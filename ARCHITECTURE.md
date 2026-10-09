@@ -461,6 +461,105 @@ remains in the unchanged >=90% compatible JVM/native INSTRUCTION denominator. So
 compilation is not JVM execution, pinned Android build or exact-run coverage acceptance;
 those gates remain hosted.
 
+## Admitted foreground recording and M4b contract (M4a-5)
+
+`ConnectionController` admits sampling in the actual successful accepted USAGE delivery
+callback, after B2's cycle cancellation/epoch check and the captured controller revision /
+`SessionGeneration` check. `HistoryObservationAdmission` is an identity-bearing one-cycle
+in-memory ticket with an exactly-once delivery gate, not a StateFlow emission identity,
+percentage comparison or persisted account ID. The worker allocates the contiguous durable
+`ObservationId` from the store's high-water. One real endpoint observation supplies both
+independently classified window facts; missing/unknown windows stay status, not invented
+points. Equal-percent independent reads still get distinct ordinals. Usage success is
+recorded before inventory completes and remains valid when inventory fails. Inventory-only
+success, retained cache, failure, preview, local tick and analytical evaluation add no points.
+Endpoint wall `observedAt` and its paired `receivedAtMillis` are captured before decoding;
+storage completion and graph query time never replace them.
+
+`UsageHistoryRecorder` is subordinate to the same owner lane/scope, with no independent
+network, timer or lifecycle owner. One storage worker performs blocking read/append/read
+on the separate storage dispatcher; at most 16 observations wait behind it. The waiting
+bound includes observations delivered while a continuing lifetime's runtime capability is
+being re-adopted. Such work captures the prior opaque lifetime partition and exact session /
+lifecycle admission; it can attach only to the matching fresh capability. Failed adoption
+discards it explicitly. Already-failed durable observations are never replayed or retried.
+A worker rechecks revocation before read and append, and the native store remains the
+irreversible-write authority. Publication rechecks the identity-bound runtime token and
+query revision. Last-observer loss, cancel, logout/replacement and shutdown immediately
+clear queued facts/views and retire publication authority; no held read/write can expose
+another login. An already irreversible-admitted commit may finish, but existing combined
+removal deletes it before terminal success. Fresh runtime reads are local and dormant:
+restoration or opening a history view never activates B2 provider requests.
+
+Background and accepted usage errors mark the next actual observation with existing typed
+BACKGROUND/READ_ERROR gap entries. Overflow and ordinary storage failure report fixed
+`HistoryRecorderProblem` categories, plus a lost/unconfirmed-observation counter, and mark
+a READ_ERROR discontinuity before the next successfully admitted measurement. This counter
+is an acknowledgement/loss diagnostic, not a claim that uncertain I/O physically lost a
+committed row. There is no invented retry measurement, interpolation or off-screen backfill.
+Read errors do not masquerade as empty; successful durable rows remain available in a bounded
+page alongside a sticky runtime error until fresh capability adoption. Queue work cannot
+block the owner lane or require another provider request. Existing B2 manual/connect/resume,
+>=60-second cadence, Retry-After, coalescing, independent endpoint clocks and dormant restore
+semantics are unchanged. Storage ceilings/no-backup/corruption/deletion remain M4a-2/-4's
+contract, not new recorder policy.
+
+M4b consumes `historySnapshots: StateFlow<HistoryGraphSnapshot>` and submits domain-only
+`queryHistory(HistoryGraphQuery)`; it must not redefine sampling, identity, segmentation or
+math. The snapshot is detached and immutable, with:
+
+- UNAVAILABLE / LOADING / EMPTY / READY / ERROR readiness; EMPTY means an actually empty
+  storage page, while status-only or a window-filtered page may have zero measured points.
+  Failure categories, storage reason and lost/unconfirmed count are separate from page data.
+- Identity-compared nonpersistable `HistoryGeneration` plus the opaque durable partition.
+  A retained snapshot is not authority for a retired login; new UI work uses the current
+  generation. Logout clears the view, query and endpoint metadata before any successor.
+- `HistoryGraphQuery(limit=1..256, after=exclusive ordinal, kind?, window?)`. Storage pagination
+  stays ordinal-ordered and single-partition; selection filters window facts on that page,
+  not the storage cursor. A query is not a provider read or new observation. Latest query
+  revision rejects held earlier-query publication. No invented tail/time-range API exists.
+- The original `HistoryReadSnapshot`: entries, high-water, next-after/has-more, EMPTY /
+  STATUS_ONLY / MEASUREMENTS content, retention truncation and ordinal eviction cutoffs.
+  All page gap entries survive window selection. Actual points retain admission order even
+  for backwards wall time; consumers never sort away a discontinuity or join segment IDs.
+- Each selected `HistoryGraphWindow` retains its immutable source facts, segment/window
+  identity, break reasons, UNKNOWN reset cause, typed baseline eligibility and nominal-start
+  confidence; `EvenDistribution.reference` / `compare` supply separate analytical reference
+  and observed-only comparison, never synthesized measured endpoints.
+- Explicit PERCENT units for measured/reference values, PERCENTAGE_POINTS for delta and
+  ELAPSED_SI_SECONDS for duration. Nominal full-quota start is an assumption, not proof.
+  Unknown/conflicting/corrected/out-of-interval facts keep typed absence. The established
+  DECIMAL128 math above remains authoritative; no prediction, derivative or alarm is added.
+- Safe independent usage/inventory source-observed clocks, latest-attempt observed clocks
+  (null if the failed endpoint supplied none), HTTP status/error, stale flags and cycle
+  refreshing metadata. Ticks may update this metadata but cannot move points or deltas.
+  No provider text, raw payload or credential/account hint is exposed by the graph contract.
+
+Synthetic handoff examples: a five-hour success at epoch second 1,800,000,000 with 12.375
+percent and reset 1,800,003,600 stores ordinal 1 and delta -67.625 percentage points. A new
+successful read at equal percent stores another actual point, not a replay. A subsequent
+usage error plus inventory success retains those points and the old usage source clock;
+its next usage success carries a READ_ERROR gap. A clean fresh runtime restores the same
+partition without a GET, and its next real observation starts a NEW_CLOCK_EPOCH segment.
+A later sign-in after complete logout starts at ordinal 1 in a different partition.
+
+`UsageHistoryRecorderTest` executes the actual controller/B2/reader/parser/reducer/math
+with original synthetic transport, virtual time and held storage dispatch. It counts
+actual provider requests and append IDs, covering partial endpoints, equal percentages,
+coalescing/ticks, cadence/Retry-After, observer/cancel/logout retirement, queue overflow,
+categorical failures, corrections/reset/unknown/clock facts and bounded queries.
+`HistoryProjectionTest` supplements immutable selection/baseline/truncation/units,
+exactly-once ticket replay and capacity/failure contracts. `UsageHistoryIntegrationTest`
+uses the production-default owner factory, real Keystore and framework SQLite in a test-owned
+application/no-backup context. It covers observation -> persistence -> fresh-runtime dormant
+restore -> isolated read, relogin/late callbacks, partial endpoints, held pre/post-admission
+writes, categorical native read failure, and Compose-v2 lifecycle/recreation/finish retirement.
+Fresh-runtime restoration is not literal process death. The mandatory native validator adds
+these cases without removing the preceding 72. Native execution, exact-head independent
+review and >=90% compatible JVM/native INSTRUCTION coverage remain hosted gates; source or
+cached-toolchain compilation alone cannot establish those outcomes. #8 owns graph/UI/
+accessibility; #9 owns assembled release/live acceptance, with #69 separate.
+
 ## Verification boundaries
 
 - `app/src/test`: JVM state transitions, restore behavior and percentage validation.
@@ -520,7 +619,7 @@ Authoritative association is unavailable and is not inferred. B3 renders periodi
 usage windows through B2/B1; C2 renders banked-reset counts/status/expiry through C1,
 with unknown facts and purchased-balance separation explicit.
 B2 consumes the session/repository API rather than reimplementing token rotation or login.
-Foreground history sampling, graphs, further providers, signing and distribution remain
-future scope. The history adapter/lifetime binding and pure numerical reference above are
-not wired to live sampling.
+Admitted foreground history sampling now feeds the adapter/lifetime binding and numerical
+reference above. Graphs, further providers, signing and distribution remain separate future
+scope; sparse sampling is not verified-account or continuous background history.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).

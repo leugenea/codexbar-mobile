@@ -40,6 +40,7 @@ internal class ConnectionController(
     private val storageDispatcher: CoroutineDispatcher = Dispatchers.IO,
     refreshClock: io.github.leugenea.codexbarmobile.transport.TransportClock = reader.clock,
     private val history: HistoryLifetimeCoordinator? = null,
+    historyQueueCapacity: Int = 16,
 ) {
     private val ownerScope = CoroutineScope(scope.coroutineContext + mutationDispatcher)
     private val mutableState = MutableStateFlow(ConnectionState(ConnectionPhase.RESTORING))
@@ -51,8 +52,11 @@ internal class ConnectionController(
     private var generation: SessionGeneration? = null
     private var deletion: Deferred<CredentialResult<Unit>>? = null
     private var historyDeletion: Deferred<HistoryDeleteOutcome>? = null
+    private var historyRestore: Job? = null
     private var closed = false
     private val stopped = CompletableDeferred<Unit>()
+    private val historyRecorder = UsageHistoryRecorder(ownerScope, storageDispatcher, historyQueueCapacity)
+    internal val historySnapshots = historyRecorder.state
     private val usageRefresh = UsageRefresh(ownerScope, refreshClock, ::refreshUsage, ::refreshChanged)
 
     init { work = ownerScope.launch { restore() } }
@@ -94,6 +98,7 @@ internal class ConnectionController(
         history?.open(active)
         ownerScope.async(storageDispatcher) { history?.restore(active) }.await()
         if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
+        bindHistory(active)
     }
 
     private suspend fun missingCredentials(): ConnectionPhase {
@@ -112,6 +117,7 @@ internal class ConnectionController(
     private fun removeHistory() {
         val coordinator = history ?: return
         if (historyDeletion != null) return
+        historyRecorder.retire()
         val reserved = coordinator.beginDeletion()
         historyDeletion = ownerScope.async(storageDispatcher) { reserved.complete() }
     }
@@ -162,6 +168,7 @@ internal class ConnectionController(
                 if (!current(owner)) return
                 session.adopt(credentials.value)
                 if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
+                bindHistory(terminal.generation)
                 publish(owner, ConnectionState(ConnectionPhase.RESTORED, terminal))
                 usageRefresh.request()
             }
@@ -176,18 +183,32 @@ internal class ConnectionController(
     /** Observer identities keep one Activity from cancelling another visible Activity. */
     fun usageForeground(observer: Any, foreground: Boolean) = command {
         usageRefresh.foreground(observer, foreground)
+        historyRecorder.foreground(usageRefresh.hasForegroundObservers)
         if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
         else resumeHistory()
+        (session.snapshot() as? SessionResult.Ready)?.envelope?.generation?.let(::bindHistory)
     }
 
     private fun resumeHistory() {
         val active = (session.snapshot() as? SessionResult.Ready)?.envelope ?: return
-        if (cleanupPending() || historyAvailability != HistoryAvailability.UNAVAILABLE) return
+        if (cleanupPending() || historyAvailability != HistoryAvailability.UNAVAILABLE || historyRestore?.isActive == true) return
         history?.resumeRuntime()
-        ownerScope.launch { ownerScope.async(storageDispatcher) { history?.restore(active.generation) }.await() }
+        historyRestore = ownerScope.launch(start = CoroutineStart.LAZY) {
+            ownerScope.async(storageDispatcher) { history?.restore(active.generation) }.await()
+            historyRestore = null
+            bindHistory(active.generation)
+        }.also { it.start() }
     }
 
+    private fun bindHistory(active: SessionGeneration) {
+        if (usageRefresh.hasForegroundObservers && store.isActive(active))
+            historyRecorder.bind(active, historyCapability(active), historyRestore?.isActive == true)
+    }
+
+    internal fun queryHistory(query: HistoryGraphQuery) = command { historyRecorder.query(query) }
+
     private fun refreshChanged(refresh: UsageRefreshState) {
+        historyRecorder.metadata(refresh)
         val previous = mutableState.value
         val phase = if (previous.phase == ConnectionPhase.READING && !refresh.refreshing) ConnectionPhase.OBSERVED else previous.phase
         mutableState.value = ConnectionState(phase, previous.auth, refresh.observations, previous.problem, refresh)
@@ -203,7 +224,12 @@ internal class ConnectionController(
         publish(owner, ConnectionState(ConnectionPhase.READING, auth, usageRefresh.state.observations,
             refresh = usageRefresh.state))
         val result = if (refreshSession) session.refresh(active.envelope, session.deadline()) else null
-        observe(owner, auth, observed, admissionDeferred, result as? SessionResult.Failed)
+        bindHistory(active.envelope.generation)
+        val admission = historyRecorder.capture(active.envelope.generation)
+        observe(owner, auth, { observation ->
+            observed(observation) // B2 cancellation/epoch check precedes subordinate sampling.
+            if (current(owner) && store.isActive(active.envelope.generation)) historyRecorder.accept(admission, observation)
+        }, admissionDeferred, result as? SessionResult.Failed)
     }
 
     private suspend fun observe(owner: Long, auth: AuthState, observed: (EndpointObservation) -> Unit,
@@ -304,6 +330,7 @@ internal class ConnectionController(
         usageRefresh.reset()
         work?.cancel()
         authenticator.cancel()
+        historyRecorder.retire()
         history?.retire()
         session.retire()
         return revision
@@ -324,6 +351,7 @@ internal class ConnectionController(
             deletion?.join()
             session.awaitShutdown()
             historyDeletion?.join()
+            historyRecorder.settled()
             // A cancelled stage/activation waiter can leave its process-owned child running.
             history?.let { coordinator -> withContext(storageDispatcher) { coordinator.close() } }
             stopped.complete(Unit)
