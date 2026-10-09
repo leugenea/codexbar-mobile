@@ -7,7 +7,9 @@ import xml.etree.ElementTree as ET
 
 import test_history_text_contract as text_contract
 from verify_history_text_captures import CAPTURES, INTEGRATED_CAPTURES, verify_captures
+from verify_history_text_captures import ASSEMBLED_CAPTURES
 from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
+from verify_test_reports import HISTORY_ASSEMBLED_CASES, HISTORY_ASSEMBLED_CLASS
 from verify_test_reports import HISTORY_AUTHORITY_CASES, HISTORY_AUTHORITY_CLASS, HISTORY_NAVIGATION_CASES, HISTORY_NAVIGATION_CLASS, verify_reports
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,7 +26,7 @@ class HistoryNavigationContracts(unittest.TestCase):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryNavigationTest.kt").read_text()
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_NAVIGATION_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 93 + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 93 + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES))
         for name in HISTORY_NAVIGATION_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history navigation"):
@@ -48,7 +50,7 @@ class HistoryNavigationContracts(unittest.TestCase):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryDisplayAuthorityTest.kt").read_text()
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_AUTHORITY_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 98 + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 98 + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES))
         for name in HISTORY_AUTHORITY_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history display authority"):
@@ -71,10 +73,10 @@ class HistoryNavigationContracts(unittest.TestCase):
     def test_two_production_entry_images_extend_not_replace_the_ten_component_images(self):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryNavigationTest.kt").read_text()
         self.assertEqual(set(re.findall(r'capture\.capture\("(history-integrated-[^"]+)"', source)), set(INTEGRATED_CAPTURES))
-        self.assertEqual(len(CAPTURES), 10 + len(INTEGRATED_CAPTURES))
+        self.assertEqual(len(CAPTURES), 10 + len(INTEGRATED_CAPTURES) + len(ASSEMBLED_CAPTURES))
         for name in INTEGRATED_CAPTURES:
             self.fixture.captures()
-            self.assertEqual(len(verify_captures(self.directory)), 12)
+            self.assertEqual(len(verify_captures(self.directory)), 12 + len(ASSEMBLED_CAPTURES))
             (self.directory / (name + ".png")).unlink()
             with self.subTest(name=name), self.assertRaises(ValueError):
                 verify_captures(self.directory)
@@ -134,8 +136,8 @@ class HistoryNavigationContracts(unittest.TestCase):
     def test_full_unclipped_canvas_passes_without_changing_inherited_component_receipts(self):
         self.fixture.captures()
         captures = verify_captures(self.directory)
-        self.assertEqual(len(captures), 12)
-        inherited = [item for item in captures if item["name"] not in INTEGRATED_CAPTURES]
+        self.assertEqual(len(captures), 12 + len(ASSEMBLED_CAPTURES))
+        inherited = [item for item in captures if item["name"] not in INTEGRATED_CAPTURES and item["name"] not in ASSEMBLED_CAPTURES]
         self.assertEqual(len(inherited), 10)
         self.assertTrue(all("canvasClippedLeft" not in item for item in inherited))
         collector = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryNavigationCapture.kt").read_text()

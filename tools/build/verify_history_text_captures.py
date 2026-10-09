@@ -52,6 +52,36 @@ INTEGRATED_CONTROLS = {
 }
 CAPTURES.update(INTEGRATED_CAPTURES)
 
+# Representative assembled acceptance classes, not a theme/orientation Cartesian
+# product. Earlier twelve captures and their exact invariants remain mandatory.
+ASSEMBLED_CAPTURES = {
+    "history-assembled-fresh-portrait-light": (1, False, 1.0),
+    "history-assembled-single-portrait-dark": (1, True, 1.0),
+    "history-assembled-breaks-landscape-dark": (2, True, 1.0),
+    "history-assembled-unknown-large-font": (1, False, 2.0),
+    "history-assembled-page-landscape-light": (2, False, 1.0),
+}
+ASSEMBLED_PAGES = {
+    "history-assembled-fresh-portrait-light": ("IDLE", "UNAVAILABLE", "NONE", 256, 0, 0, 0, 0, 0, 0),
+    "history-assembled-single-portrait-dark": ("RESTORED", "READY", "FIVE_HOUR", 32, 0, 1, 1, 1, 5, 2),
+    "history-assembled-breaks-landscape-dark": ("RESTORED", "READY", "FIVE_HOUR", 32, 0, 1, 7, 7, 5, 2),
+    "history-assembled-unknown-large-font": ("RESTORED", "READY", "FIVE_HOUR", 32, 0, 1, 1, 1, 5, 2),
+    "history-assembled-page-landscape-light": ("RESTORED", "READY", "FIVE_HOUR", 32, 32, 33, 35, 3, 5, 2),
+}
+ASSEMBLED_CONTROLS = {
+    "history-assembled-fresh-portrait-light": ["connection-tab", "history-select-FIVE_HOUR", "history-select-WEEKLY"],
+    "history-assembled-single-portrait-dark": ["connection-tab"],
+    "history-assembled-breaks-landscape-dark": ["connection-tab"],
+    "history-assembled-unknown-large-font": ["connection-tab"],
+    "history-assembled-page-landscape-light": ["connection-tab", "history-first-page", "history-next-page"],
+}
+ASSEMBLED_COUNTS = {
+    "history-assembled-single-portrait-dark": (1, 0, 1, 0),
+    "history-assembled-breaks-landscape-dark": (6, 2, 0, 3),
+    "history-assembled-unknown-large-font": (1, 0, 0, 0),
+}
+CAPTURES.update(ASSEMBLED_CAPTURES)
+
 
 # Bitmap.compress uses Skia's non-interlaced direct-color PNG encoder. Support
 # its grayscale/RGB/gray-alpha/RGBA 8/16-bit output, not palette or Adam7 files.
@@ -225,6 +255,123 @@ def verify_integrated_metadata(metadata: dict, name: str, size: tuple[int, int])
         verify_integrated_canvas(metadata, size)
 
 
+def paeth(left: int, above: int, corner: int) -> int:
+    prediction = left + above - corner
+    distances = (abs(prediction - left), abs(prediction - above), abs(prediction - corner))
+    return (left, above, corner)[distances.index(min(distances))]
+
+
+def reconstruct_row(filtered: bytes, previous: bytes, channels: int, kind: int) -> bytes:
+    if kind == 0:
+        return filtered
+    if kind == 2:
+        return bytes((value + previous[index]) & 255 for index, value in enumerate(filtered))
+    row = bytearray(filtered)
+    for index, value in enumerate(filtered):
+        left = row[index - channels] if index >= channels else 0
+        if kind == 1:
+            predictor = left
+        else:
+            above = previous[index]
+            corner = previous[index - channels] if index >= channels else 0
+            predictor = (left + above) // 2 if kind == 3 else paeth(left, above, corner)
+        row[index] = (value + predictor) & 255
+    return bytes(row)
+
+
+def decoded_samples(image: bytes, samples: list[dict]) -> list[int]:
+    chunks = png_chunks(image)
+    width, height, stride, color = png_header(chunks[0])
+    # New native Bitmap sample receipts use opaque 8-bit RGB/RGBA. Preserve the
+    # inherited decoder's wider 8/16-bit direct-color integrity contract.
+    if chunks[0][1][8] != 8 or color not in (2, 6):
+        raise ValueError("Unsupported assembled pixel sample format")
+    coordinates = []
+    for item in samples:
+        x, y = item.get("x"), item.get("y")
+        if type(x) is not int or type(y) is not int or not (0 <= x < width and 0 <= y < height):
+            raise ValueError("Invalid assembled pixel registration")
+        coordinates.append((int(x), int(y)))
+    compressed = png_image_data(chunks, color)
+    validate_png_pixels(compressed, stride, height)
+    pixels = zlib.decompressobj().decompress(compressed, stride * height + 1)
+    channels = PNG_CHANNELS[color]
+    previous = bytes(stride - 1)
+    wanted = {}
+    for x, y in set(coordinates):
+        wanted.setdefault(y, []).append(x)
+    observed = {}
+    for y in range(max(item[1] for item in coordinates) + 1):
+        start = y * stride
+        row = reconstruct_row(pixels[start + 1:start + stride], previous, channels, pixels[start])
+        for x in wanted.get(y, []):
+            offset = x * channels
+            red, green, blue = row[offset:offset + 3]
+            alpha = row[offset + 3] if channels == 4 else 255
+            value = (alpha << 24) | (red << 16) | (green << 8) | blue
+            observed[x, y] = value if value < 2 ** 31 else value - 2 ** 32
+        previous = row
+    return [observed[coordinate] for coordinate in coordinates]
+
+
+def verify_sample(item: dict, actual: int) -> None:
+    target = item.get("targetArgb")
+    if type(target) is not int or not (-2 ** 31 <= target < 2 ** 31):
+        raise ValueError("Invalid assembled target color")
+    matched = all(abs(((actual >> shift) & 255) - ((target >> shift) & 255)) <= 12 for shift in (0, 8, 16))
+    if type(item.get("actualArgb")) is not int or item["actualArgb"] != actual or item.get("matched") is not matched:
+        raise ValueError("Assembled sample receipt disagrees with decoded PNG pixels")
+    required = {"marker": True, "edge": True, "break": False, "dash": matched}
+    if item.get("kind") not in required or matched != required[item["kind"]]:
+        raise ValueError("Assembled native paint oracle failed")
+
+
+def verify_assembled_pixels(metadata: dict, name: str, image: bytes) -> None:
+    counts = ASSEMBLED_COUNTS[name]
+    keys = ("markerCount", "connectionCount", "referenceCount", "boundaryCount")
+    if any(type(metadata.get(key)) is not int or metadata[key] != value for key, value in zip(keys, counts)):
+        raise ValueError("Assembled drawing identities/counts changed")
+    samples = metadata.get("pixelSamples")
+    expected = dict(zip(("marker", "edge", "dash", "break"), (counts[0], counts[1], counts[2] * 56, counts[3])))
+    if not isinstance(samples, list) or not samples or len(samples) > 512 or any(not isinstance(item, dict) for item in samples):
+        raise ValueError("Missing/bounded assembled PNG sample evidence")
+    observed = {kind: sum(item.get("kind") == kind for item in samples) for kind in expected}
+    if observed != expected or sum(observed.values()) != len(samples) or metadata.get("pixelOraclePassed") is not True:
+        raise ValueError("Missing assembled native pixel oracle/sample identities")
+    for item in samples:
+        x, y = item.get("x"), item.get("y")
+        if type(x) is not int or type(y) is not int or not (metadata["canvasLeft"] <= x < metadata["canvasRight"] and
+                                                                         metadata["canvasTop"] <= y < metadata["canvasBottom"]):
+            raise ValueError("Assembled pixel sample is outside its full Canvas")
+    for item, actual in zip(samples, decoded_samples(image, samples)):
+        verify_sample(item, actual)
+    dashes = [item["matched"] for item in samples if item["kind"] == "dash"]
+    if dashes and (dashes.count(True) < 10 or dashes.count(False) < 10):
+        raise ValueError("Analytical reference lacks actual painted pixels or dash gaps")
+
+
+def verify_assembled_metadata(metadata: dict, name: str, size: tuple[int, int], image: bytes) -> None:
+    keys = ("phase", "readiness", "queryKind", "queryLimit", "queryAfter", "firstOrdinal", "lastOrdinal", "pageEntries", "requests", "gets")
+    expected = dict(zip(keys, ASSEMBLED_PAGES[name]))
+    if any(type(metadata.get(key)) is not type(value) or metadata[key] != value for key, value in expected.items()):
+        raise ValueError("Assembled owner/page/request identities changed")
+    if metadata.get("productionEntry") is not True or metadata.get("hasMore") is not False:
+        raise ValueError("Assembled capture is not an honest bounded production entry")
+    if metadata.get("activity") != "io.github.leugenea.codexbarmobile.MainActivity" or metadata.get("visibleControls") != ASSEMBLED_CONTROLS[name]:
+        raise ValueError("Assembled Activity/visible control identities changed")
+    numbers = ("fontScale", "density", "layoutFontScale", "layoutDensity")
+    if any(type(metadata.get(key)) not in (int, float) or not math.isfinite(metadata[key]) or metadata[key] <= 0 for key in numbers):
+        raise ValueError("Invalid effective native configuration")
+    if type(metadata.get("orientation")) is not int or metadata.get("layoutFontScale") != metadata["fontScale"] or metadata.get("layoutDensity") != metadata["density"]:
+        raise ValueError("Effective native layout configuration disagrees with resource configuration")
+    after = expected["queryAfter"]
+    if metadata.get("uiCursor") != f"Exclusive admission cursor: {after} · Page limit: 32":
+        raise ValueError("Assembled visible UI cursor changed")
+    if name in ASSEMBLED_COUNTS:
+        verify_integrated_canvas(metadata, size)
+        verify_assembled_pixels(metadata, name, image)
+
+
 def capture_receipt(path: Path) -> dict:
     metadata = json.loads(path.with_suffix(".json").read_text())
     orientation, dark, font = CAPTURES[path.stem]
@@ -239,6 +386,8 @@ def capture_receipt(path: Path) -> dict:
         verify_chart_metadata(metadata, path.stem, size)
     if path.stem in INTEGRATED_CAPTURES:
         verify_integrated_metadata(metadata, path.stem, size)
+    if path.stem in ASSEMBLED_CAPTURES:
+        verify_assembled_metadata(metadata, path.stem, size, image)
     return dict(metadata, path=str(path), pngSha256=hashlib.sha256(image).hexdigest(),
                 metadataSha256=hashlib.sha256(path.with_suffix(".json").read_bytes()).hexdigest())
 

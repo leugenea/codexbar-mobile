@@ -15,6 +15,7 @@ import xml.etree.ElementTree as ET
 import coverage_gate
 import native_coverage_retry as retry
 from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
+from verify_test_reports import HISTORY_ASSEMBLED_CASES, HISTORY_ASSEMBLED_CLASS
 from verify_test_reports import (HISTORY_AUTHORITY_CASES, HISTORY_AUTHORITY_CLASS, HISTORY_NAVIGATION_CASES, HISTORY_NAVIGATION_CLASS, HISTORY_CHART_CASES, HISTORY_CHART_CLASS, HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, HISTORY_SAMPLING_CASES, HISTORY_SAMPLING_CLASS, HISTORY_LIFETIME_CASES, HISTORY_LIFETIME_CLASS, HISTORY_CASES, HISTORY_CLASS, BANKED_RESET_CASES, BANKED_RESET_CLASS, CLASS, CONNECTION_CASES, CONNECTION_CLASS, CREDENTIAL_CASES, CREDENTIAL_CLASS,
                                  EXPECTED, LIVE_USAGE_CASES, LIVE_USAGE_CLASS, USAGE_REFRESH_CASES, USAGE_REFRESH_CLASS)
 
@@ -36,7 +37,7 @@ def synthetic_reports(build, failed=False):
             for name in sorted(CREDENTIAL_CASES):
                 ET.SubElement(suite, "testcase", classname=CREDENTIAL_CLASS, name=name)
             for classname, required in ((CONNECTION_CLASS, CONNECTION_CASES), (USAGE_REFRESH_CLASS, USAGE_REFRESH_CASES),
-                                        (LIVE_USAGE_CLASS, LIVE_USAGE_CASES), (BANKED_RESET_CLASS, BANKED_RESET_CASES), (HISTORY_CLASS, HISTORY_CASES), (HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES), (HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES), (HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES), (HISTORY_CHART_CLASS, HISTORY_CHART_CASES), (HISTORY_NAVIGATION_CLASS, HISTORY_NAVIGATION_CASES), (HISTORY_AUTHORITY_CLASS, HISTORY_AUTHORITY_CASES), (HISTORY_ISOLATION_CLASS, HISTORY_ISOLATION_CASES)):
+                                        (LIVE_USAGE_CLASS, LIVE_USAGE_CASES), (BANKED_RESET_CLASS, BANKED_RESET_CASES), (HISTORY_CLASS, HISTORY_CASES), (HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES), (HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES), (HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES), (HISTORY_CHART_CLASS, HISTORY_CHART_CASES), (HISTORY_NAVIGATION_CLASS, HISTORY_NAVIGATION_CASES), (HISTORY_AUTHORITY_CLASS, HISTORY_AUTHORITY_CASES), (HISTORY_ISOLATION_CLASS, HISTORY_ISOLATION_CASES), (HISTORY_ASSEMBLED_CLASS, HISTORY_ASSEMBLED_CASES)):
                 for name in sorted(required):
                     ET.SubElement(suite, "testcase", classname=classname, name=name)
         suite.set("tests", str(len(list(suite))))
@@ -163,6 +164,23 @@ class RetryContracts(unittest.TestCase):
             tree.write(path)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history isolation"):
                 self.require()
+
+
+    def test_each_assembled_case_missing_failed_errored_or_skipped_prevents_retry(self):
+        for name in HISTORY_ASSEMBLED_CASES:
+            for mutation in ("missing", "failure", "error", "skipped"):
+                synthetic_reports(self.build)
+                path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
+                tree = ET.parse(path)
+                root = tree.getroot()
+                case = next(case for case in root if case.get("classname") == HISTORY_ASSEMBLED_CLASS and case.get("name") == name)
+                if mutation == "missing":
+                    root.remove(case)
+                else:
+                    ET.SubElement(case, mutation)
+                tree.write(path)
+                with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
+                    self.require()
 
 
 # The runner block below is exercised with labelled synthetic command doubles,

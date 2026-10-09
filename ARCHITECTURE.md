@@ -597,7 +597,8 @@ observations, nonzero decimal underflow is marked, and out-of-range or >1,024-di
 values have typed unavailable geometry, never silent clamping or zero facts.
 Original BigDecimal/Instant objects and exact exponent-notation numeric/ISO instant
 text remain available even when geometry cannot be drawn. Renderer pixel layout,
-localized B1 time labels and accessibility semantics remain M4b-2/-3 work.
+localized B1 time labels and accessibility semantics belong to the component and
+navigation layers described below, not this pure adapter.
 
 `HistoryPlotInputsTest` and `HistoryPlotCoordinatesTest` add original deterministic
 synthetic JVM oracles for both kinds, metadata/content, identity/gaps/corrections,
@@ -623,7 +624,7 @@ and next controls expose one entry at a time. Exact exponent notation is preserv
 Values longer than 120 characters are split into ordered, individually accessible
 text parts without omission. Plain text has one semantics owner, no giant merged
 content description and no live countdown announcements. Canvas rendering and
-production navigation remain separate work.
+production navigation are separate layers described below.
 
 `HistoryTextPresentationTest` covers exact/typed presentation; eight mandatory
 `HistoryTextComponentTest` cases add native labels, semantics, controls and text
@@ -663,8 +664,8 @@ collector without removing its four textual PNGs or 85 inherited native identiti
 The collector validates decoded pixels/configuration and observed root-contained
 Canvas metadata, not visual approval. Hosted execution, compatible whole-app >=90%
 INSTRUCTION coverage and independent exact-candidate actual-image inspection remain
-acceptance gates; compilation alone proves none of them. The remainder of parent
-integration (#82/#90) and assembled history acceptance (#83) remain separate work.
+acceptance gates; compilation alone proves none of them. Owner/navigation integration
+and the conditional assembled acceptance contract are described below.
 
 ## Production bounded history navigation (M4b-3a)
 
@@ -732,7 +733,7 @@ identity, observed configuration, bounded page/request metadata and native Canva
 bounds; it does not establish visual approval. JVM navigation projections and
 fail-closed report/capture parser controls supplement the native cases. Exact-head
 hosted runtime/coverage and independent actual-image review remain required;
-#90 completes the parent adversarial integration matrix, and #83 retains assembled
+the following integration matrix completes #90, and #83 retains assembled
 accessibility acceptance. There is no signed release or live-device claim.
 
 ## Integrated query and lifecycle isolation (M4b-3b)
@@ -779,6 +780,50 @@ and static parser controls are not native runtime proof. Independent exact-head
 review, hosted runtime/lint/compatible whole-handwritten >=90% INSTRUCTION coverage
 and actual-image inspection remain required; #83 and diagnostics removal #69 stay
 separate.
+
+## Assembled history acceptance and original-parent map (M4b-4)
+
+This is an evidence-only roll-up, not a second implementation of the pure projection,
+chart, text or owner/navigation contracts. `HistoryAssembledAcceptanceTest` enters the
+unmodified production `MainActivity`, uses the same default process owner with actual
+isolated no-backup SQLite/Keystore and synthetic transport, and arranges additional
+explicitly synthetic admitted rows when necessary. It never replaces the composition
+root, creates another lifecycle owner or changes sampling/math/storage/network policy.
+
+The original three #8 criteria map as follows; this describes required oracles, not
+an assertion that a newly authored test or screenshot has already passed:
+
+| Original criterion | Inherited source and evidence contract | Missing assembled evidence supplied by #83 |
+| --- | --- | --- |
+| Actual measurements versus even-distribution baseline, with units/reset context | `EvenDistribution` and `HistoryPlotInputs` preserve exact observed-only comparisons and separate analytical endpoints; `HistoryChartDrawing` and chart/text components label percent versus percentage points and reuse B1 reset formatting. `EvenDistributionTest`, `HistoryPlotInputsTest`, `HistoryChartDrawingTest`, `HistoryTextPresentationTest` and component native cases retain their deterministic, layout, semantics and actual-pixel oracles. | `freshInstallAndSingleObservationExposeNoInventedTrendAndObservedOnlySignedDeltas` requires a real-entry single marker, painted dashed reference plus unpainted dash gaps, exact negative/zero/positive observed-only deltas, UTC observation/reset facts and both window selections. |
+| Fresh installs and sparse/unknown history remain truthful; no fake trend | Pure plot tests and native component cases distinguish no/empty/status-only/single/multiple pages, unknown baseline/geometry, and breaks. Navigation/isolation tests retain bounded pagination, storage loss/retention and independent endpoint errors. | Fresh entry has unavailable facts, no Canvas, no detail/zero and no requests. `sparseGapCorrectionAndChangedResetRemainSeparatedInActualLandscapeDarkPixelsAndDetails` requires six markers, two within-run edges and three unpainted boundaries plus reachable gap/correction/reset details. `unknownResetAndUnknownPercentAtActualLargeFontKeepCompleteAccessibleFactsAndReachableControls` preserves a real known point but unavailable baseline and a separate unknown-percent window with no Canvas/zero. `truncatedPageLandscapeLightKeepsHonestLocalCursorAndEveryBoundedDetailReachable` requires explicit more-page copy, exclusive cursor 32, only ordinals 33..35, all three reachable entries, disabled terminal controls and unchanged admission high-water. |
+| Hosted phone layout/theme/readability/accessibility | Ten inherited synthetic reusable-component captures establish their component scopes, not integrated reachability; two inherited production-entry captures establish basic navigation. All owner/query/lifecycle/privacy adversaries remain required, not duplicated here. | Four new mandatory native methods add five representative real-entry viewports: fresh portrait/light, single portrait/dark, gap/correction/reset landscape/dark, unknown portrait/light at effective font scale 2, and bounded-page landscape/light. Native text-layout complete-line/ellipsis/extent checks, full versus independently clipped bounds, root containment, hidden decorative Canvas, exact-fact ownership and click/reachable-control assertions accompany them. Actual effective resource configuration is checked against native text-layout density/font scale, not inferred from filenames/requested settings. |
+
+The phone fixture changes hosted night/font settings and restores them on failure;
+orientation changes use the real Activity. The unchanged production theme reads the
+effective system configuration. Each viewport is intentionally scrollable: the native
+driver checks complete labels/details after reaching them rather than claiming an entire
+history page fits in one image. The campaign is not a full configuration Cartesian product,
+a blanket contrast certification or a physical-device accessibility audit.
+
+The fail-closed JUnit/retry contracts require all 107 inherited identities plus four
+assembled identities. The collector requires all twelve inherited captures plus the five
+new declared captures, observed API/configuration, exact owner/page/request identities,
+per-file hashes and checkout/source-head/run/attempt provenance. The three new Canvas
+captures retain independent unclipped/clipped bounds; registered Bitmap pixel samples
+are compared again with bounded decoded RGB/RGBA PNG pixels on the host, so metadata or
+filenames alone cannot establish painted markers/edges, absent bridges or dash gaps.
+Explicitly synthetic parser controls reject omitted/failed/errored/skipped methods,
+missing images, configuration drift, clipping, false paint receipts and changed PNG pixels.
+
+Final original-parent acceptance remains conditional on independent full-diff review,
+exact-head hosted compilation/lint/JVM/native execution, compatible whole-handwritten
+>=90% INSTRUCTION union, independent inspection of every actual required PNG, and the
+applicable exact-merge main reports/artifacts. Compilation and source/parser checks are
+not runtime or visual approval. Activity recreation and fresh-owner storage restoration
+remain precisely those scopes, not process-death, reboot, live-provider, signed release
+or instantaneous physical-pixel erasure proof. Diagnostics removal #69 and M5 remain
+separate; this roll-up does not waive either.
 
 ## Verification boundaries
 
@@ -840,6 +885,8 @@ usage windows through B2/B1; C2 renders banked-reset counts/status/expiry throug
 with unknown facts and purchased-balance separation explicit.
 B2 consumes the session/repository API rather than reimplementing token rotation or login.
 Admitted foreground history sampling now feeds the adapter/lifetime binding and numerical
-reference above. Graphs, further providers, signing and distribution remain separate future
-scope; sparse sampling is not verified-account or continuous background history.
+reference above. The local bounded graph/navigation implementation consumes that contract;
+assembled acceptance retains the conditional gates above. Further providers, signing and
+distribution remain separate future scope; sparse sampling is not verified-account or
+continuous background history.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).

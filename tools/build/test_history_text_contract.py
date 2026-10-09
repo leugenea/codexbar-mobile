@@ -11,9 +11,11 @@ import zlib
 
 import test_workflow_contract
 from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
+from verify_test_reports import HISTORY_ASSEMBLED_CASES, HISTORY_ASSEMBLED_CLASS
 from verify_test_reports import HISTORY_AUTHORITY_CASES, HISTORY_NAVIGATION_CASES, HISTORY_CHART_CASES, HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, verify_reports
 from unittest.mock import patch
 from verify_history_text_captures import CAPTURES, CHART_COUNTS, INTEGRATED_CAPTURES, INTEGRATED_CONTROLS, PNG_CHANNELS, png_size, read_png, verify_captures
+from verify_history_text_captures import ASSEMBLED_CAPTURES, ASSEMBLED_PAGES, ASSEMBLED_CONTROLS, ASSEMBLED_COUNTS
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRATCH = Path(os.environ.get("BUILD_CONTRACT_SCRATCH", tempfile.gettempdir()))
@@ -35,7 +37,7 @@ class HistoryTextContracts(unittest.TestCase):
         source = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryTextComponentTest.kt"
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), HISTORY_TEXT_CASES)
         self.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 77 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 77 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES))
         for name in HISTORY_TEXT_CASES:
             self.report(name)
             with self.assertRaisesRegex(ValueError, "Missing real native history text"):
@@ -70,8 +72,29 @@ class HistoryTextContracts(unittest.TestCase):
                                 canvasRight=1.9, canvasBottom=1.9,
                                 canvasClippedLeft=0.1, canvasClippedTop=0.1,
                                 canvasClippedRight=1.9, canvasClippedBottom=1.9)
+            if name in ASSEMBLED_CAPTURES:
+                keys = ("phase", "readiness", "queryKind", "queryLimit", "queryAfter", "firstOrdinal", "lastOrdinal", "pageEntries", "requests", "gets")
+                metadata.update(zip(keys, ASSEMBLED_PAGES[name]))
+                metadata.update(productionEntry=True, activity="io.github.leugenea.codexbarmobile.MainActivity", hasMore=False,
+                                visibleControls=ASSEMBLED_CONTROLS[name], layoutFontScale=font, layoutDensity=1,
+                                uiCursor=f"Exclusive admission cursor: {metadata['queryAfter']} · Page limit: 32")
+                if name in ASSEMBLED_COUNTS:
+                    metadata.update(zip(("markerCount", "connectionCount", "referenceCount", "boundaryCount"), ASSEMBLED_COUNTS[name]))
+                    metadata.update(pixelOraclePassed=True, canvasLeft=0.1, canvasTop=0.1, canvasRight=1.9, canvasBottom=1.9,
+                                    canvasClippedLeft=0.1, canvasClippedTop=0.1, canvasClippedRight=1.9, canvasClippedBottom=1.9)
+                    metadata["pixelSamples"] = self.assembled_samples(ASSEMBLED_COUNTS[name])
             (self.directory / (name + ".json")).write_text(json.dumps(metadata))
             (self.directory / (name + ".png")).write_bytes(self.png(*size))
+
+    @staticmethod
+    def assembled_samples(counts):
+        samples = []
+        for kind, count in zip(("marker", "edge", "dash", "break"), (counts[0], counts[1], counts[2] * 56, counts[3])):
+            for index in range(count):
+                matched = kind != "break" and (kind != "dash" or index < 28)
+                samples.append(dict(kind=kind, x=1, y=1, targetArgb=-16777216 if matched else -1,
+                                    actualArgb=-16777216, matched=matched))
+        return samples
 
     @staticmethod
     def chunk(kind, body):

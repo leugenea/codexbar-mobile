@@ -186,6 +186,15 @@ HISTORY_NAVIGATION_CASES = {
 }
 
 
+HISTORY_ASSEMBLED_CLASS = "io.github.leugenea.codexbarmobile.HistoryAssembledAcceptanceTest"
+HISTORY_ASSEMBLED_CASES = {
+    "freshInstallAndSingleObservationExposeNoInventedTrendAndObservedOnlySignedDeltas",
+    "sparseGapCorrectionAndChangedResetRemainSeparatedInActualLandscapeDarkPixelsAndDetails",
+    "unknownResetAndUnknownPercentAtActualLargeFontKeepCompleteAccessibleFactsAndReachableControls",
+    "truncatedPageLandscapeLightKeepsHonestLocalCursorAndEveryBoundedDetailReachable",
+}
+
+
 HISTORY_ISOLATION_CLASS = "io.github.leugenea.codexbarmobile.HistoryIsolationTest"
 HISTORY_ISOLATION_CASES = {
     "heldWindowQueriesRejectSupersessionBeforeAndAfterAuthoritativePublication",
@@ -235,6 +244,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
             ("history navigation", HISTORY_NAVIGATION_CLASS, HISTORY_NAVIGATION_CASES),
             ("history display authority", HISTORY_AUTHORITY_CLASS, HISTORY_AUTHORITY_CASES),
             ("history isolation", HISTORY_ISOLATION_CLASS, HISTORY_ISOLATION_CASES),
+            ("history assembled acceptance", HISTORY_ASSEMBLED_CLASS, HISTORY_ASSEMBLED_CASES),
         ):
             actual_names = {case["name"] for case in cases if case["class"] == classname}
             missing_names = required - actual_names
