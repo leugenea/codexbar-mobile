@@ -220,7 +220,9 @@ jobs:
           timeout --signal=TERM --kill-after=30s 32m bash tools/build/run-hosted-native-smoke.sh
       - name: Record native task outcomes (all outcomes)
         if: always()
-        run: python3 tools/build/coverage_gate.py phases
+        run: |
+          python3 tools/build/coverage_gate.py phases
+          python3 tools/build/verify_history_text_captures.py
       - name: Upload instrumented logs and outputs (all outcomes)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -235,6 +237,7 @@ jobs:
             app/build/outputs/code_coverage/
             app/build/coverage-gate/
             app/build/outputs/androidTest-results/
+            app/build/outputs/connected_android_test_additional_output/
             app/build/outputs/apk/
             app/build/intermediates/merged_manifests/
           if-no-files-found: error

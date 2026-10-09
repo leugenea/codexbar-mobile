@@ -142,6 +142,19 @@ HISTORY_SAMPLING_CASES = {
 }
 
 
+HISTORY_TEXT_CLASS = "io.github.leugenea.codexbarmobile.HistoryTextComponentTest"
+HISTORY_TEXT_CASES = {
+    "independentKindsExposeExactMeasuredAndObservedOnlyDelta",
+    "readinessContentErrorsLossAndTruncationRemainIndependent",
+    "collapsedDetailsReachEveryGapAndResetBreakWithoutOmission",
+    "unknownBaselineKeepsMeasuredValueAndB1ResetContext",
+    "longExactDecimalIsChunkedWithOneAccessibleOwnerPerPart",
+    "portraitLightMeasuredScreenshotHasReachableUnclippedLabels",
+    "landscapeDarkGappedScreenshotHasReachableControls",
+    "largeFontUnknownScreenshotKeepsCompleteNativeTextAndControls",
+}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -176,6 +189,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
             ("history", HISTORY_CLASS, HISTORY_CASES),
             ("history lifetime", HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES),
             ("history sampling", HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES),
+            ("history text", HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES),
         ):
             actual_names = {case["name"] for case in cases if case["class"] == classname}
             missing_names = required - actual_names

@@ -606,6 +606,33 @@ and immutability. No native case, dependency, exclusion or coverage threshold ch
 JVM execution, all 77 mandatory native regressions and unchanged >=90% compatible
 JVM/native INSTRUCTION coverage remain hosted acceptance gates.
 
+## Reusable textual history equivalent
+
+`HistoryTextComponent` consumes `HistoryPlotSnapshot` without production screen or
+controller wiring. It shows independent five-hour/weekly content and readiness,
+exact measured percent, observed-only percentage-point delta, typed baseline
+absence, recorder/storage/loss/retention/page metadata, and independent endpoint
+clocks. Nominal full-quota reference copy explicitly says assumption, not measured
+usage or exhaustion prediction. Reset labels reuse B1 with caller-supplied time,
+zone and locale; this component owns no timer, query, quota math or network call.
+
+The host supplies scrolling. A collapsed entry selector retains the complete
+admitted page, including filtered-entry slot status and timestamp-less gaps; previous
+and next controls expose one entry at a time. Exact exponent notation is preserved.
+Values longer than 120 characters are split into ordered, individually accessible
+text parts without omission. Plain text has one semantics owner, no giant merged
+content description and no live countdown announcements. Canvas rendering and
+production navigation remain separate work.
+
+`HistoryTextPresentationTest` covers exact/typed presentation; eight mandatory
+`HistoryTextComponentTest` cases add native labels, semantics, controls and text
+layout plus synthetic portrait/light, landscape/dark and large-font captures.
+The native artifact upload includes AGP additional-test-output PNGs and observed
+configuration metadata; its fail-closed collector requires all declared captures.
+Capture collection is not visual approval: independent actual-image inspection and
+exact-head hosted native/coverage evidence remain required. All preceding 77 native
+cases, dependencies, permissions and the coverage denominator/threshold are retained.
+
 ## Verification boundaries
 
 - `app/src/test`: JVM state transitions, restore behavior and percentage validation.
