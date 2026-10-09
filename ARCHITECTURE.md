@@ -735,6 +735,51 @@ hosted runtime/coverage and independent actual-image review remain required;
 #90 completes the parent adversarial integration matrix, and #83 retains assembled
 accessibility acceptance. There is no signed release or live-device claim.
 
+## Integrated query and lifecycle isolation (M4b-3b)
+
+`HistoryIsolationTest` extends the production-entry contract with five mandatory
+hosted cases, plus one new actual-host held-collection case in
+`HistoryDisplayAuthorityTest`, without changing application code or adding another owner. Window
+and ordinal-page tests exercise both an older SQLite result held before publication
+and an older page already published when the successor query is held. Actual query
+command receipts, captured partition/cursor/limit and observed successor publication
+bound each rejection; navigation never admits a provider request or observation.
+Exact retained SQLite-result identity makes rejection discriminating even when
+window queries share a physical storage cursor. Separately, the held UI collector
+retains the exact previously published source across window/page changes; a reached
+host re-execution must scrub it after authoritative successor query publication
+while the same display context remains current. This is not a retirement-only oracle.
+
+A fixture delegates to actual framework SQLite and holds only its detached read
+result after the read completes. It retains the production constructor's single
+process-owner lane, dispatchers, recorder and B2 scheduler, injecting synthetic
+transport/clock and test-owned Keystore/no-backup storage. It does not add a controller
+or storage API. Late usage and inventory replies deliberately ignore cancellation:
+logout removes both stores before relogin, and only the new partition's ordinal-one
+measurement, independent metadata and reported inventory survive. STOP/RESUME and
+Activity recreation positively establish a usable fresh capability while the old
+read is held, then require rejection of the predecessor and successor-only pages.
+Fresh-holder restoration here remains restoration from app storage, not process-death
+or live-provider evidence.
+
+The inherited default-factory dormant restore and offline cases count every transport
+call; the new local query/lifecycle cases additionally compare all five route counters
+(user-code, auth poll, token exchange, usage and inventory) and unchanged high-water.
+A synthetic tighter count ceiling plus an actual SQLite read fault exercises retained
+rows, loss acknowledgement, retention cutoff, usage error/staleness and independently
+fresh inventory through the real history entry. These diagnostics do not become empty
+or current measurements. Current/retired null-context loss remains covered by the
+unchanged held-collection host-reexecution cases from M4b-3a.
+
+The fail-closed JUnit registry and coverage-transport retry fixtures retain all 101
+inherited identities and require six additional identities. The twelve existing
+captures (ten reusable component, two injected production-entry) remain unchanged;
+no new visual acceptance class or mandatory screenshot is introduced. Compilation
+and static parser controls are not native runtime proof. Independent exact-head
+review, hosted runtime/lint/compatible whole-handwritten >=90% INSTRUCTION coverage
+and actual-image inspection remain required; #83 and diagnostics removal #69 stay
+separate.
+
 ## Verification boundaries
 
 - `app/src/test`: JVM state transitions, restore behavior and percentage validation.

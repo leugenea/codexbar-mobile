@@ -163,6 +163,39 @@ class HistoryDisplayAuthorityTest {
         assertEquals(8L, fixture.transport.gets.get())
     }
 
+    @Test fun heldPublishedWindowAndPageCollectionHidesSupersededFactsOnActualHostReexecution() {
+        boundPage()
+        mount()
+        retainedBoundPage()
+        val selections = listOf(
+            "history-select-WEEKLY" to HistoryNavigation(kind = WindowKind.WEEKLY),
+            "history-next-page" to HistoryNavigation(kind = WindowKind.WEEKLY, after = ObservationId(32)),
+            "history-first-page" to HistoryNavigation(kind = WindowKind.WEEKLY),
+            "history-select-FIVE_HOUR" to HistoryNavigation())
+        for ((tag, selection) in selections) {
+            val old = observer.last!!.source
+            assertTrue("a real previously published page must reach the host", old.points.isNotEmpty())
+            observer.hold()
+            try {
+                click(tag)
+                await("authoritative successor query published while old collection stays held") {
+                    val source = owner.historySnapshots.value
+                    source.query == selection.query && source.storage != null && source.readiness == HistoryReadiness.READY
+                }
+                assertSame("query supersession must not masquerade as lifecycle retirement",
+                    old.displayPermission!!.context, old.displayPermission.current())
+                assertEquals(selection.query, observer.last!!.display.query)
+                challenge(old, HistoryReadiness.LOADING)
+            } finally { observer.release() }
+            await("only selected successor page reaches host after collection release") {
+                val display = observer.last?.display
+                display?.query == selection.query && display.entries.size == if (selection.after == null) 32 else 3
+            }
+        }
+        assertEquals(7L, fixture.transport.requests.get())
+        assertEquals(4L, fixture.transport.gets.get())
+    }
+
     private fun login() {
         phase(ConnectionPhase.IDLE)
         owner.usageForeground(fixture.observer, true)

@@ -12,6 +12,8 @@ import java.io.File
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /** Synthetic transport, isolated production-default owner, actual no-backup SQLite and Keystore. */
 internal class HistoryNavigationFixture {
@@ -33,6 +35,7 @@ internal class HistoryNavigationFixture {
     }
 
     fun cleanup() {
+        transport.releaseHeld()
         try { NativeConnection.resetForTests() }
         finally {
             NativeConnection.factory = originalFactory
@@ -64,25 +67,41 @@ internal class HistoryNavigationFixture {
 }
 
 internal class NavigationTransport : AuthTransport {
+    class HeldCall(val path: String, private val result: TransportResult, private val terminal: (TransportResult) -> Unit) {
+        @Volatile var cancelled = false
+        private val delivered = java.util.concurrent.atomic.AtomicBoolean()
+        fun reply() { if (delivered.compareAndSet(false, true)) terminal(result) }
+    }
     val requests = AtomicLong()
     val gets = AtomicLong()
+    private val routes = ConcurrentHashMap<String, AtomicLong>()
+    private val held = CopyOnWriteArrayList<HeldCall>()
+    @Volatile var heldPath: String? = null
+    @Volatile var usageBody = USAGE
+    @Volatile var inventoryBody = """{"available_count":0,"credits":[]}"""
     private val millis = AtomicLong()
     val clock = TransportClock { TransportTime(Instant.ofEpochSecond(1_800_000_000).plusMillis(millis.get()), millis.get()) }
     @Volatile var usageStatus = 200
     @Volatile var inventoryStatus = 200
     fun advance(value: Long) { millis.addAndGet(value) }
     suspend fun pause(value: Long) { require(value >= 0) }
+    fun counts(): Map<String, Long> = routes.mapValues { it.value.get() }
+    fun heldCall(path: String): HeldCall? = held.lastOrNull { it.path == path }
+    fun releaseHeld() { heldPath = null; held.forEach { it.reply() } }
 
     override fun execute(request: ProviderHttpRequest, deadline: ReadDeadline, terminal: (TransportResult) -> Unit): CancellationHandle {
         requests.incrementAndGet()
         if (request is ProviderHttpRequest.Get) gets.incrementAndGet()
-        terminal(response(request.url.encodedPath))
-        return CancellationHandle { }
+        val path = request.url.encodedPath
+        routes.computeIfAbsent(path) { AtomicLong() }.incrementAndGet()
+        val call = HeldCall(path, response(path), terminal)
+        if (path == heldPath) held += call else call.reply()
+        return CancellationHandle { call.cancelled = true }
     }
 
     private fun response(path: String): TransportResult = when (path) {
-        ReadOperation.USAGE.path -> body(USAGE, usageStatus)
-        ReadOperation.RESET_INVENTORY.path -> body("""{"available_count":0,"credits":[]}""", inventoryStatus)
+        ReadOperation.USAGE.path -> body(usageBody, usageStatus)
+        ReadOperation.RESET_INVENTORY.path -> body(inventoryBody, inventoryStatus)
         "/api/accounts/deviceauth/usercode" -> body("""{"device_auth_id":"synthetic-navigation","user_code":"SYNTHETIC-NAVIGATION"}""")
         "/api/accounts/deviceauth/token" -> body("""{"authorization_code":"synthetic-navigation-code","code_verifier":"synthetic-navigation-verifier"}""")
         "/oauth/token" -> body("""{"access_token":"synthetic-navigation-access","refresh_token":"synthetic-navigation-refresh"}""")

@@ -173,6 +173,7 @@ HISTORY_AUTHORITY_CASES = {
     "heldBoundCollectionCannotReplayRetiredFactsOnActualHostReexecution",
     "heldBoundCollectionRejectsReplacementThenShowsOnlySuccessorFacts",
     "heldNullDiagnosticsKeepCurrentLossButNeverReplayAfterRetireSuccessorRetire",
+    "heldPublishedWindowAndPageCollectionHidesSupersededFactsOnActualHostReexecution",
 }
 
 HISTORY_NAVIGATION_CLASS = "io.github.leugenea.codexbarmobile.HistoryNavigationTest"
@@ -182,6 +183,16 @@ HISTORY_NAVIGATION_CASES = {
     "logoutClearsVisibleHistoryAndReloginNeverDisplaysPreviousPartition",
     "recreationAndForegroundLossUseTheSameDormantOwnerButFreshHistoryAuthority",
     "integratedHistoryRetainsIndependentEndpointFailuresAndNoNewSamplesFromLocalNavigation",
+}
+
+
+HISTORY_ISOLATION_CLASS = "io.github.leugenea.codexbarmobile.HistoryIsolationTest"
+HISTORY_ISOLATION_CASES = {
+    "heldWindowQueriesRejectSupersessionBeforeAndAfterAuthoritativePublication",
+    "heldPageQueriesRejectSupersessionBeforeAndAfterAuthoritativePublication",
+    "heldUsageAndInventoryResponsesCannotResurrectHistoryAcrossLogoutAndRelogin",
+    "heldLocalPagesLoseLastObserverAuthorityBeforeFreshResumeAndRecreationAdoption",
+    "integratedStaleUsageIndependentInventoryLossAndRetentionNeverBecomeEmptyOrCurrent",
 }
 
 
@@ -223,6 +234,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
             ("history chart", HISTORY_CHART_CLASS, HISTORY_CHART_CASES),
             ("history navigation", HISTORY_NAVIGATION_CLASS, HISTORY_NAVIGATION_CASES),
             ("history display authority", HISTORY_AUTHORITY_CLASS, HISTORY_AUTHORITY_CASES),
+            ("history isolation", HISTORY_ISOLATION_CLASS, HISTORY_ISOLATION_CASES),
         ):
             actual_names = {case["name"] for case in cases if case["class"] == classname}
             missing_names = required - actual_names
