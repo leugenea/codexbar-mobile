@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791571361516,
+  "lastUpdate": 1791571364485,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2269,6 +2269,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/ca67db492842f7e9e1a32bf81d3ba94f1a8c61d8"
         },
         "date": 1791560312783,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f6b65a69891403a3d2b4221bec9ce490b152f90e",
+          "message": "M4b-3a: Integrate bounded local history navigation (#91)\n\n* feat(m4b): integrate bounded local history navigation\n\n* fix(m4b): preserve loss diagnostics and validate full canvas bounds\n\n* fix(m4b): share revocable history display authority with owner",
+          "timestamp": "2026-10-09T21:42:13+03:00",
+          "tree_id": "59f098c04398814529c7068337c3bd6c2a493a58",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/f6b65a69891403a3d2b4221bec9ce490b152f90e"
+        },
+        "date": 1791571364115,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
