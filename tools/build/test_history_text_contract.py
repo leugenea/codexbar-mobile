@@ -10,9 +10,9 @@ import xml.etree.ElementTree as ET
 import zlib
 
 import test_workflow_contract
-from verify_test_reports import HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, verify_reports
+from verify_test_reports import HISTORY_CHART_CASES, HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, verify_reports
 from unittest.mock import patch
-from verify_history_text_captures import CAPTURES, PNG_CHANNELS, png_size, read_png, verify_captures
+from verify_history_text_captures import CAPTURES, CHART_COUNTS, PNG_CHANNELS, png_size, read_png, verify_captures
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRATCH = Path(os.environ.get("BUILD_CONTRACT_SCRATCH", tempfile.gettempdir()))
@@ -34,7 +34,7 @@ class HistoryTextContracts(unittest.TestCase):
         source = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryTextComponentTest.kt"
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), HISTORY_TEXT_CASES)
         self.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 77 + len(HISTORY_TEXT_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 77 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES))
         for name in HISTORY_TEXT_CASES:
             self.report(name)
             with self.assertRaisesRegex(ValueError, "Missing real native history text"):
@@ -58,6 +58,9 @@ class HistoryTextContracts(unittest.TestCase):
             size = (2, 3) if orientation == 1 else (3, 2)
             metadata = dict(name=name, synthetic=True, api=36, orientation=orientation, dark=dark,
                             fontScale=font, density=1, renderedLocale="en-US", width=size[0], height=size[1])
+            if name in CHART_COUNTS:
+                metadata.update(zip(("markerCount", "connectionCount", "referenceCount"), CHART_COUNTS[name]))
+                metadata.update(pixelOraclePassed=True, canvasLeft=0.1, canvasTop=0.1, canvasRight=1.9, canvasBottom=1.9)
             (self.directory / (name + ".json")).write_text(json.dumps(metadata))
             (self.directory / (name + ".png")).write_bytes(self.png(*size))
 

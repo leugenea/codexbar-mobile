@@ -633,6 +633,37 @@ Capture collection is not visual approval: independent actual-image inspection a
 exact-head hosted native/coverage evidence remain required. All preceding 77 native
 cases, dependencies, permissions and the coverage denominator/threshold are retained.
 
+## Reusable per-window chart component
+
+`HistoryChartComponent` renders the M4b-1 five-hour/weekly percent geometry beside
+that unchanged textual equivalent; the caller supplies a detached page, B1 locale/
+zone/evaluation context and scrolling. It is not wired into production navigation.
+`HistoryChartDrawing` maps only supplied page-local runs into measured circles and
+straight within-run edges. A single measurement remains a circle. Separate nominal
+analytical endpoints produce dashed lines, never measured markers or forecasts.
+Shape/line-style labels do not rely on color alone. No smoothing, clamping, fake
+measured start/reset point, sorting, quota calculation or cross-page cache is added.
+
+The fixed percent axis and B1 hour-precision time-domain labels wrap outside the
+Canvas; exact UTC timestamps, reset context, original measurements and observed-only
+percentage-point delta remain in reachable existing details. Typed decimal-capacity/
+out-of-domain geometry and nonzero approximate underflow have explicit resource copy.
+Missing time geometry shows no invented axes or zero. The decorative Canvas is hidden
+from accessibility; plain labels and existing bounded text retain their own semantics,
+with no duplicated exact-value announcement or countdown live region.
+
+Seven deterministic `HistoryChartDrawingTest` cases cover drawing roles and boundary
+preservation. Eight mandatory `HistoryChartComponentTest` cases exercise production
+Canvas pixels, dashed gaps, marker/straight-edge visibility, absent run bridges,
+labels/semantics/layout and reachable details across phone portrait/landscape,
+light/dark and doubled font scale. Six synthetic chart PNGs extend the existing
+collector without removing its four textual PNGs or 85 inherited native identities.
+The collector validates decoded pixels/configuration and observed root-contained
+Canvas metadata, not visual approval. Hosted execution, compatible whole-app >=90%
+INSTRUCTION coverage and independent exact-candidate actual-image inspection remain
+acceptance gates; compilation alone proves none of them. Production wiring (#82)
+and assembled history acceptance (#83) remain separate work.
+
 ## Verification boundaries
 
 - `app/src/test`: JVM state transitions, restore behavior and percentage validation.

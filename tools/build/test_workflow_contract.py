@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 from verify_manifests import (APP_PERMISSIONS, PACKAGE, RECEIVER_PERMISSION, SOURCE_PERMISSIONS, check_apk_dump,
                               check_installed_dump, check_installed_path, check_manifest, check_permissions,
                               check_source_manifests)
-from verify_test_reports import (HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, HISTORY_SAMPLING_CASES, HISTORY_SAMPLING_CLASS, HISTORY_LIFETIME_CASES, HISTORY_LIFETIME_CLASS, HISTORY_CASES, HISTORY_CLASS, BANKED_RESET_CASES, BANKED_RESET_CLASS, CLASS, CONNECTION_CASES, CONNECTION_CLASS, CREDENTIAL_CASES,
+from verify_test_reports import (HISTORY_CHART_CASES, HISTORY_CHART_CLASS, HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, HISTORY_SAMPLING_CASES, HISTORY_SAMPLING_CLASS, HISTORY_LIFETIME_CASES, HISTORY_LIFETIME_CLASS, HISTORY_CASES, HISTORY_CLASS, BANKED_RESET_CASES, BANKED_RESET_CLASS, CLASS, CONNECTION_CASES, CONNECTION_CLASS, CREDENTIAL_CASES,
                                  CREDENTIAL_CLASS, EXPECTED, LIVE_USAGE_CASES, LIVE_USAGE_CLASS,
                                  USAGE_REFRESH_CASES, USAGE_REFRESH_CLASS, verify_reports)
 
@@ -561,7 +561,7 @@ class SyntheticReportTests(unittest.TestCase):
             for name in sorted(CREDENTIAL_CASES - ({missing} if missing else set())):
                 ET.SubElement(suite, "testcase", classname=CREDENTIAL_CLASS, name=name)
             for classname, names in ((CONNECTION_CLASS, CONNECTION_CASES), (USAGE_REFRESH_CLASS, USAGE_REFRESH_CASES),
-                                     (LIVE_USAGE_CLASS, LIVE_USAGE_CASES), (BANKED_RESET_CLASS, BANKED_RESET_CASES), (HISTORY_CLASS, HISTORY_CASES), (HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES), (HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES), (HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES)):
+                                     (LIVE_USAGE_CLASS, LIVE_USAGE_CASES), (BANKED_RESET_CLASS, BANKED_RESET_CASES), (HISTORY_CLASS, HISTORY_CASES), (HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES), (HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES), (HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES), (HISTORY_CHART_CLASS, HISTORY_CHART_CASES)):
                 for name in sorted(names - ({missing} if missing else set())):
                     ET.SubElement(suite, "testcase", classname=classname, name=name)
         root = suite
@@ -582,7 +582,7 @@ class SyntheticReportTests(unittest.TestCase):
                     self.write_report(kind, container_depth=depth)
                     result = verify_reports(self.directory, kind)
                     self.assertEqual(result["testCount"], len(EXPECTED[kind]) +
-                                     (len(CREDENTIAL_CASES) + len(CONNECTION_CASES) + len(USAGE_REFRESH_CASES) + len(LIVE_USAGE_CASES) + len(BANKED_RESET_CASES) + len(HISTORY_CASES) + len(HISTORY_LIFETIME_CASES) + len(HISTORY_SAMPLING_CASES) + len(HISTORY_TEXT_CASES) if kind == "native" else 0))
+                                     (len(CREDENTIAL_CASES) + len(CONNECTION_CASES) + len(USAGE_REFRESH_CASES) + len(LIVE_USAGE_CASES) + len(BANKED_RESET_CASES) + len(HISTORY_CASES) + len(HISTORY_LIFETIME_CASES) + len(HISTORY_SAMPLING_CASES) + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) if kind == "native" else 0))
 
     def test_rejects_missing_tests(self):
         for kind in EXPECTED:

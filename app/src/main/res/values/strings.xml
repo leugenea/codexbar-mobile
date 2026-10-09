@@ -334,4 +334,15 @@
     <string name="history_state_invalidfact_decimal_capacity">decimal capacity</string>
     <string name="history_assumption">The nominal baseline assumes evenly distributed full quota from reset minus window duration to reset. It is analytical, not measured usage or a prediction of exhaustion.</string>
     <string name="history_sparse">Observations are sparse; gaps, reset changes and corrections are not joined.</string>
+    <string name="history_chart_title">%1$s · observed usage chart</string>
+    <string name="history_chart_legend">● Measured observations · solid straight connections within each run only\nDashed line: nominal analytical full-quota reference, not a forecast</string>
+    <string name="history_chart_counts">Drawn markers: %1$d · Within-run connections: %2$d · Nominal reference lines: %3$d</string>
+    <string name="history_chart_percent">%1$d%%</string>
+    <string name="history_chart_time_first">Time axis start: %1$s</string>
+    <string name="history_chart_time_last">Time axis end: %1$s</string>
+    <string name="history_chart_no_geometry">No timestamped geometry available; see the exact textual facts below. No zero or trend is inferred.</string>
+    <string name="history_chart_no_baseline">Nominal reference unavailable for this series; exact reasons are in the observation details below.</string>
+    <string name="history_chart_decimal_capacity">Measured geometry unavailable: decimal rendering capacity exceeded. Exact measurements remain in the text below.</string>
+    <string name="history_chart_outside_domain">Measured geometry unavailable: outside the 0–100 percent axis. Exact measurements remain in the text below; values are not clamped.</string>
+    <string name="history_chart_underflow">A nonzero measurement is too small for approximate drawing precision. Its exact nonzero value remains in the text below.</string>
 </resources>
