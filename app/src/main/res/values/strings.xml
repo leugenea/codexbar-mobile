@@ -345,4 +345,12 @@
     <string name="history_chart_decimal_capacity">Measured geometry unavailable: decimal rendering capacity exceeded. Exact measurements remain in the text below.</string>
     <string name="history_chart_outside_domain">Measured geometry unavailable: outside the 0–100 percent axis. Exact measurements remain in the text below; values are not clamped.</string>
     <string name="history_chart_underflow">A nonzero measurement is too small for approximate drawing precision. Its exact nonzero value remains in the text below.</string>
+    <string name="history_open">View local history</string>
+    <string name="history_return_connection">Return to live connection controls</string>
+    <string name="history_navigation_title">Local usage history</string>
+    <string name="history_navigation_policy">Bounded pages in storage admission order, starting with the earliest retained entries. Window selection filters this page, not the storage cursor. This is not newest-first or a time-range view.</string>
+    <string name="history_page_cursor">Exclusive admission cursor: %1$d · Page limit: %2$d</string>
+    <string name="history_page_ordinals">Retained page ordinals: %1$s to %2$s</string>
+    <string name="history_first_page">First retained page</string>
+    <string name="history_next_page">Next admitted page</string>
 </resources>

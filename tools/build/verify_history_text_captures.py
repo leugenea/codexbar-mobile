@@ -41,6 +41,17 @@ CHART_COUNTS = {
 # same collector/workflow now also requires the bounded actual chart gallery.
 CAPTURES.update(CHART_CAPTURES)
 
+INTEGRATED_CAPTURES = {
+    "history-integrated-navigation-portrait-light": (1, False, 1.0),
+    "history-integrated-chart-portrait-light": (1, False, 1.0),
+}
+INTEGRATED_CONTROLS = {
+    "history-integrated-navigation-portrait-light": ["connection-tab", "history-select-FIVE_HOUR",
+                                                    "history-select-WEEKLY", "history-first-page", "history-next-page"],
+    "history-integrated-chart-portrait-light": ["connection-tab"],
+}
+CAPTURES.update(INTEGRATED_CAPTURES)
+
 
 # Bitmap.compress uses Skia's non-interlaced direct-color PNG encoder. Support
 # its grayscale/RGB/gray-alpha/RGBA 8/16-bit output, not palette or Adam7 files.
@@ -179,12 +190,30 @@ def verify_chart_metadata(metadata: dict, name: str, size: tuple[int, int]) -> N
         raise ValueError("Chart capture drawing identities/counts changed")
     if metadata.get("pixelOraclePassed") is not True:
         raise ValueError("Chart capture lacks native pixel oracle")
+    verify_canvas_bounds(metadata, size)
+
+
+def verify_canvas_bounds(metadata: dict, size: tuple[int, int]) -> None:
     bounds = [metadata.get("canvas" + side) for side in ("Left", "Top", "Right", "Bottom")]
     if any(type(value) not in (int, float) or not math.isfinite(value) for value in bounds):
         raise ValueError("Chart capture lacks finite observed Canvas bounds")
     left, top, right, bottom = bounds
     if not (0 <= left < right <= size[0] and 0 <= top < bottom <= size[1]):
         raise ValueError("Chart Canvas is not entirely within captured pixels")
+
+
+def verify_integrated_metadata(metadata: dict, name: str, size: tuple[int, int]) -> None:
+    expected = dict(queryLimit=32, queryAfter=0, firstOrdinal=1, lastOrdinal=32, pageEntries=32, requests=5, gets=2)
+    if any(type(metadata.get(key)) is not int or metadata[key] != value for key, value in expected.items()):
+        raise ValueError("Integrated capture lacks bounded dormant page/request identities")
+    if metadata.get("productionEntry") is not True or metadata.get("hasMore") is not True:
+        raise ValueError("Integrated capture is not a production entry with more retained data")
+    if (metadata.get("activity") != "io.github.leugenea.codexbarmobile.MainActivity"
+            or metadata.get("phase") != "RESTORED" or metadata.get("queryKind") != "FIVE_HOUR"
+            or metadata.get("visibleControls") != INTEGRATED_CONTROLS[name]):
+        raise ValueError("Integrated navigation/owner identity changed")
+    if name == "history-integrated-chart-portrait-light":
+        verify_canvas_bounds(metadata, size)
 
 
 def capture_receipt(path: Path) -> dict:
@@ -199,6 +228,8 @@ def capture_receipt(path: Path) -> dict:
         raise ValueError(f"PNG aspect does not match observed orientation: {path.name}")
     if path.stem in CHART_CAPTURES:
         verify_chart_metadata(metadata, path.stem, size)
+    if path.stem in INTEGRATED_CAPTURES:
+        verify_integrated_metadata(metadata, path.stem, size)
     return dict(metadata, path=str(path), pngSha256=hashlib.sha256(image).hexdigest(),
                 metadataSha256=hashlib.sha256(path.with_suffix(".json").read_bytes()).hexdigest())
 
@@ -219,7 +250,7 @@ def main() -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(dict(current_identity(), captures=captures,
                                            visualInspection="pending independent actual-image review"), indent=2) + "\n")
-    print(f"Collected {len(captures)} native component screenshots; image review is not automated")
+    print(f"Collected {len(captures)} native history screenshots; image review is not automated")
 
 
 if __name__ == "__main__":

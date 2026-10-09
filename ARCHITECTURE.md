@@ -608,8 +608,9 @@ JVM/native INSTRUCTION coverage remain hosted acceptance gates.
 
 ## Reusable textual history equivalent
 
-`HistoryTextComponent` consumes `HistoryPlotSnapshot` without production screen or
-controller wiring. It shows independent five-hour/weekly content and readiness,
+`HistoryTextComponent` consumes `HistoryPlotSnapshot` without controller ownership.
+The production connection view supplies its current-generation bounded page. It
+shows independent five-hour/weekly content and readiness,
 exact measured percent, observed-only percentage-point delta, typed baseline
 absence, recorder/storage/loss/retention/page metadata, and independent endpoint
 clocks. Nominal full-quota reference copy explicitly says assumption, not measured
@@ -637,7 +638,8 @@ cases, dependencies, permissions and the coverage denominator/threshold are reta
 
 `HistoryChartComponent` renders the M4b-1 five-hour/weekly percent geometry beside
 that unchanged textual equivalent; the caller supplies a detached page, B1 locale/
-zone/evaluation context and scrolling. It is not wired into production navigation.
+zone/evaluation context and scrolling. Its optional kind selector keeps reusable
+both-kind rendering available while the production connection view shows one kind.
 `HistoryChartDrawing` maps only supplied page-local runs into measured circles and
 straight within-run edges. A single measurement remains a circle. Separate nominal
 analytical endpoints produce dashed lines, never measured markers or forecasts.
@@ -661,8 +663,51 @@ collector without removing its four textual PNGs or 85 inherited native identiti
 The collector validates decoded pixels/configuration and observed root-contained
 Canvas metadata, not visual approval. Hosted execution, compatible whole-app >=90%
 INSTRUCTION coverage and independent exact-candidate actual-image inspection remain
-acceptance gates; compilation alone proves none of them. Production wiring (#82)
-and assembled history acceptance (#83) remain separate work.
+acceptance gates; compilation alone proves none of them. The remainder of parent
+integration (#82/#90) and assembled history acceptance (#83) remain separate work.
+
+## Production bounded history navigation (M4b-3a)
+
+The existing Connection screen exposes **View local history** and a return control
+for the unchanged live usage/authentication/diagnostics surface. `ConnectionHistory`
+collects the same process owner's `historySnapshots` and sends only
+`queryHistory(HistoryGraphQuery)`. It adds no observer registration, controller,
+storage port, network action or sampling timer. The existing Connection-tab
+STARTED lifecycle remains the only UI registration; opening dormant restored
+history does not activate B2. Offline previews remain separate.
+
+A five-hour/weekly selection renders the selected chart and its textual equivalent.
+`HistoryNavigation` holds only the kind and one exclusive ordinal cursor, with a
+fixed limit of 32 admitted entries. **First retained page** resets that cursor;
+**Next admitted page** uses the storage page's `nextAfter` only when `hasMore` is
+true. There is no page stack, accumulation, newest-first or time-range query.
+Window selection preserves the storage cursor, and status/gap/filtered pages do
+not redefine pagination. Explicit cursor/limit/retained-ordinal labels complement
+the unchanged content, error, loss, retention and independent endpoint metadata.
+
+Selection and detail state are in-memory `remember`, not Bundle/saved snapshots.
+Runtime-generation identity and requested-query equality gate rendering; a
+superseded selection has no page while awaiting its own query. Retirement hides
+measurements and endpoint clocks, and new adoption resets navigation. Metadata-only
+ticks do not collapse exact details: details reset on generation, query or storage
+page identity instead of every detached metadata snapshot. No measured point,
+comparison, baseline or provider fact is recalculated by navigation.
+
+Five mandatory `HistoryNavigationTest` instrumentation cases exercise the actual
+MainActivity entry, window/page controls, dormant restore and offline request
+counts, logout/relogin deletion, recreation/foreground retirement and independent
+endpoint errors. They use a route-dispatched synthetic transport and the production
+owner factory with actual Keystore/SQLite under a test-owned application/no-backup
+root. Page arrangement adds explicitly synthetic local admissions; it is not
+provider-sampling evidence. Compose-v2 waits advance composition rather than
+blocking its scheduler. Two production-entry PNGs extend, not replace, the ten
+component PNGs and all 93 preceding native identities. Collection binds source/run
+identity, observed configuration, bounded page/request metadata and native Canvas
+bounds; it does not establish visual approval. JVM navigation projections and
+fail-closed report/capture parser controls supplement the native cases. Exact-head
+hosted runtime/coverage and independent actual-image review remain required;
+#90 completes the parent adversarial integration matrix, and #83 retains assembled
+accessibility acceptance. There is no signed release or live-device claim.
 
 ## Verification boundaries
 

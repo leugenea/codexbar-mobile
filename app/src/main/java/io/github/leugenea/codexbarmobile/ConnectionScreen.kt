@@ -12,6 +12,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -107,54 +111,67 @@ internal object NativeConnection {
 
 @Composable
 internal fun ConnectionScreen(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+    var historyOpen by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxSize().testTag("connection-screen").verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        LiveUsageScreen(state) { controller.readUsage() }
-        Text(stringResource(R.string.gate_identity))
-        Text(stringResource(R.string.gate_boundary))
-        Text(stringResource(R.string.gate_lifecycle))
-        Text(stringResource(R.string.gate_state, state.phase.name, state.problem?.name ?: "—"),
-            Modifier.testTag("gate-state"))
-        if (state.auth is AuthState.Connected) Text(stringResource(R.string.gate_exchange_completed))
-        val awaiting = state.auth as? AuthState.AwaitingUser
-        if (awaiting != null) {
-            Text(awaiting.verificationUrl, Modifier.testTag("verification-url"))
-            // Plain Text only: no text field/saver, selection container, clipboard or diagnostics.
-            Text(awaiting.userCode.copyBytes().toString(Charsets.UTF_8), Modifier.testTag("device-code"))
-            Button(onClick = openBrowser, modifier = Modifier.testTag("open-browser")) {
-                Text(stringResource(R.string.gate_browser))
-            }
+        OutlinedButton(onClick = { historyOpen = !historyOpen }, modifier = Modifier.testTag("history-toggle")) {
+            Text(stringResource(if (historyOpen) R.string.history_return_connection else R.string.history_open))
         }
-        Button(onClick = controller::connect, enabled = !state.busy, modifier = Modifier.testTag("connect")) {
-            Text(stringResource(if (state.phase == ConnectionPhase.REAUTH_REQUIRED) R.string.gate_reauth else R.string.gate_connect))
-        }
-        OutlinedButton(onClick = { controller.readUsage() }, enabled = !state.busy && controller.session.snapshot() is SessionResult.Ready,
-            modifier = Modifier.testTag("read-usage")) { Text(stringResource(R.string.gate_read)) }
-        OutlinedButton(onClick = { controller.readUsage(refreshSession = true) },
-            enabled = !state.busy && controller.session.snapshot() is SessionResult.Ready,
-            modifier = Modifier.testTag("refresh-session")) { Text(stringResource(R.string.gate_refresh)) }
-        OutlinedButton(onClick = controller::cancel,
-            enabled = state.phase !in setOf(ConnectionPhase.RESTORING, ConnectionPhase.SIGNING_OUT),
-            modifier = Modifier.testTag("cancel-connect")) {
-            Text(stringResource(R.string.gate_cancel))
-        }
-        OutlinedButton(onClick = controller::signOut, enabled = state.phase != ConnectionPhase.SIGNING_OUT,
-            modifier = Modifier.testTag("sign-out")) {
-            Text(stringResource(R.string.gate_sign_out))
-        }
-        state.observations?.let { observations ->
-            EndpointFacts(observations.usage)
-            observations.usage.usage?.let { usage ->
-                WindowFacts(stringResource(R.string.gate_five_hour), usage.fiveHour)
-                WindowFacts(stringResource(R.string.gate_weekly), usage.weekly)
-                Text(stringResource(R.string.gate_flags, fact(usage.allowed), fact(usage.limitReached)))
-                Text(stringResource(R.string.gate_summary_count, fact(usage.bankedAvailableCount)))
-            }
-            EndpointFacts(observations.inventory)
-            Text(stringResource(R.string.gate_inventory_count, observations.inventory.availableCount?.let(::fact) ?: "—"))
-            observations.inventory.expiries.forEach { Text(stringResource(R.string.gate_expiry, fact(it))) }
+        if (historyOpen) ConnectionHistory(controller, state.refresh.evaluatedAt)
+        else ConnectionContent(state, controller, openBrowser)
+    }
+}
+
+@Composable
+private fun ConnectionContent(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit) {
+    LiveUsageScreen(state) { controller.readUsage() }
+    Text(stringResource(R.string.gate_identity))
+    Text(stringResource(R.string.gate_boundary))
+    Text(stringResource(R.string.gate_lifecycle))
+    Text(stringResource(R.string.gate_state, state.phase.name, state.problem?.name ?: "—"),
+        Modifier.testTag("gate-state"))
+    if (state.auth is AuthState.Connected) Text(stringResource(R.string.gate_exchange_completed))
+    val awaiting = state.auth as? AuthState.AwaitingUser
+    if (awaiting != null) {
+        Text(awaiting.verificationUrl, Modifier.testTag("verification-url"))
+        // Plain Text only: no text field/saver, selection container, clipboard or diagnostics.
+        Text(awaiting.userCode.copyBytes().toString(Charsets.UTF_8), Modifier.testTag("device-code"))
+        Button(onClick = openBrowser, modifier = Modifier.testTag("open-browser")) {
+            Text(stringResource(R.string.gate_browser))
         }
     }
+    Button(onClick = controller::connect, enabled = !state.busy, modifier = Modifier.testTag("connect")) {
+        Text(stringResource(if (state.phase == ConnectionPhase.REAUTH_REQUIRED) R.string.gate_reauth else R.string.gate_connect))
+    }
+    OutlinedButton(onClick = { controller.readUsage() }, enabled = !state.busy && controller.session.snapshot() is SessionResult.Ready,
+        modifier = Modifier.testTag("read-usage")) { Text(stringResource(R.string.gate_read)) }
+    OutlinedButton(onClick = { controller.readUsage(refreshSession = true) },
+        enabled = !state.busy && controller.session.snapshot() is SessionResult.Ready,
+        modifier = Modifier.testTag("refresh-session")) { Text(stringResource(R.string.gate_refresh)) }
+    OutlinedButton(onClick = controller::cancel,
+        enabled = state.phase !in setOf(ConnectionPhase.RESTORING, ConnectionPhase.SIGNING_OUT),
+        modifier = Modifier.testTag("cancel-connect")) {
+        Text(stringResource(R.string.gate_cancel))
+    }
+    OutlinedButton(onClick = controller::signOut, enabled = state.phase != ConnectionPhase.SIGNING_OUT,
+        modifier = Modifier.testTag("sign-out")) {
+        Text(stringResource(R.string.gate_sign_out))
+    }
+    state.observations?.let { ConnectionDiagnostics(it) }
+}
+
+@Composable
+private fun ConnectionDiagnostics(observations: FeasibilityObservations) {
+    EndpointFacts(observations.usage)
+    observations.usage.usage?.let { usage ->
+        WindowFacts(stringResource(R.string.gate_five_hour), usage.fiveHour)
+        WindowFacts(stringResource(R.string.gate_weekly), usage.weekly)
+        Text(stringResource(R.string.gate_flags, fact(usage.allowed), fact(usage.limitReached)))
+        Text(stringResource(R.string.gate_summary_count, fact(usage.bankedAvailableCount)))
+    }
+    EndpointFacts(observations.inventory)
+    Text(stringResource(R.string.gate_inventory_count, observations.inventory.availableCount?.let(::fact) ?: "—"))
+    observations.inventory.expiries.forEach { Text(stringResource(R.string.gate_expiry, fact(it))) }
 }
 
 @Composable

@@ -21,6 +21,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.leugenea.codexbarmobile.history.*
+import io.github.leugenea.codexbarmobile.usage.WindowKind
 import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
@@ -28,11 +29,12 @@ import java.util.Locale
 /** Textual graph equivalent only. Host supplies scrolling and an explicit evaluation clock.
  * One detail entry is visible at a time; controls expose every admitted page entry, including
  * filtered entries and timestamp-less gaps. No merged giant announcement or live countdown.
- * This is deliberately not wired into a production screen until the separate integration issue.
+ * Production navigation supplies the current-generation page; this component owns no authority.
  */
 @Composable
 internal fun HistoryTextComponent(
     plot: HistoryPlotSnapshot, now: Instant?, zone: ZoneId, locale: Locale, modifier: Modifier = Modifier,
+    kind: WindowKind? = null,
 ) {
     Column(modifier.fillMaxWidth().testTag("history-text"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         HistoryHeading(R.string.history_title, "history-title")
@@ -40,8 +42,8 @@ internal fun HistoryTextComponent(
         Text(stringResource(R.string.history_legend), Modifier.testTag("history-legend"))
         Text(stringResource(R.string.history_assumption), Modifier.testTag("history-assumption"))
         Text(stringResource(R.string.history_sparse), Modifier.testTag("history-sparse"))
-        HistorySeriesSummary(plot.fiveHour, "history-five-hour")
-        HistorySeriesSummary(plot.weekly, "history-weekly")
+        if (kind == null || kind == WindowKind.FIVE_HOUR) HistorySeriesSummary(plot.fiveHour, "history-five-hour")
+        if (kind == null || kind == WindowKind.WEEKLY) HistorySeriesSummary(plot.weekly, "history-weekly")
         HistoryPageStatus(plot)
         HistoryDetails(plot, now, zone, locale)
     }
@@ -90,9 +92,9 @@ private fun HistoryEndpoint(source: HistoryEndpointMetadata, label: Int) {
 private fun HistoryDetails(plot: HistoryPlotSnapshot, now: Instant?, zone: ZoneId, locale: Locale) {
     val entries = plot.source.entries
     if (entries.isEmpty()) return
-    // A new detached snapshot resets selection; never carry an ordinal into another generation/page.
-    var expanded by remember(plot) { mutableStateOf(false) }
-    var index by remember(plot) { mutableIntStateOf(0) }
+    // Metadata ticks keep details usable; generation/query/page changes reset bounded selection.
+    var expanded by remember(plot.source.generation, plot.source.query, plot.source.storage) { mutableStateOf(false) }
+    var index by remember(plot.source.generation, plot.source.query, plot.source.storage) { mutableIntStateOf(0) }
     Button(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth().testTag("history-details-toggle")) {
         Text(stringResource(if (expanded) R.string.history_hide_details else R.string.history_show_details, entries.size))
     }

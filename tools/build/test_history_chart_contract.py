@@ -6,8 +6,8 @@ import unittest
 import xml.etree.ElementTree as ET
 
 import test_history_text_contract as text_contract
-from verify_history_text_captures import CAPTURES, CHART_CAPTURES, CHART_COUNTS, verify_captures
-from verify_test_reports import HISTORY_CHART_CASES, HISTORY_CHART_CLASS, verify_reports
+from verify_history_text_captures import CAPTURES, INTEGRATED_CAPTURES, CHART_CAPTURES, CHART_COUNTS, verify_captures
+from verify_test_reports import HISTORY_NAVIGATION_CASES, HISTORY_CHART_CASES, HISTORY_CHART_CLASS, verify_reports
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -23,7 +23,7 @@ class HistoryChartContracts(unittest.TestCase):
         source = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryChartComponentTest.kt"
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), HISTORY_CHART_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 85 + len(HISTORY_CHART_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 85 + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES))
         for name in HISTORY_CHART_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history chart"):
@@ -44,7 +44,7 @@ class HistoryChartContracts(unittest.TestCase):
                     verify_reports(self.directory, "native")
 
     def test_collector_preserves_four_text_images_and_requires_six_actual_chart_images(self):
-        self.assertEqual(set(CAPTURES) - set(CHART_CAPTURES), {
+        self.assertEqual(set(CAPTURES) - set(CHART_CAPTURES) - set(INTEGRATED_CAPTURES), {
             "history-measured-portrait-light", "history-exact-measurement-portrait-light",
             "history-gap-landscape-dark", "history-unknown-large-font"})
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryChartComponentTest.kt").read_text()
@@ -52,7 +52,7 @@ class HistoryChartContracts(unittest.TestCase):
         self.assertEqual(set(CHART_COUNTS), set(CHART_CAPTURES))
         for name in CHART_CAPTURES:
             self.fixture.captures()
-            self.assertEqual(len(verify_captures(self.directory)), 10)
+            self.assertEqual(len(verify_captures(self.directory)), 10 + len(INTEGRATED_CAPTURES))
             (self.directory / (name + ".png")).unlink()
             with self.subTest(name=name), self.assertRaises(ValueError):
                 verify_captures(self.directory)
