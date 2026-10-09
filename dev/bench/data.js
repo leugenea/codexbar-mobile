@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791517433003,
+  "lastUpdate": 1791523875631,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -975,6 +975,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/fc47d0692d4c36cb727f3879afc4606d647e9f48"
         },
         "date": 1791517429184,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "32ad4f22fd8921a407287711e6d0d2590d51e1c7",
+          "message": "feat(m4a): record admitted foreground usage and expose history snapshots (#79)",
+          "timestamp": "2026-10-09T08:30:48+03:00",
+          "tree_id": "25f58cca7e5f0d8eba58b078eb0ab4aac97f1419",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/32ad4f22fd8921a407287711e6d0d2590d51e1c7"
+        },
+        "date": 1791523874789,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
