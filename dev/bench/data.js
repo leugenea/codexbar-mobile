@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791507093872,
+  "lastUpdate": 1791517429963,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -941,6 +941,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/3ced49e777b56040a25961a63fedea218e660ccc"
         },
         "date": 1791507091179,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fc47d0692d4c36cb727f3879afc4606d647e9f48",
+          "message": "feat(m4a): credential-lifetime history binding and combined cleanup (#78)\n\n* feat(m4a): bind history to durable credential lifetimes\n\n* test(history): isolate SQLite fixture and advance lifecycle scheduler",
+          "timestamp": "2026-10-09T06:43:22+03:00",
+          "tree_id": "a9e71e4b484d6557ec554d45423d06158ce338ad",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/fc47d0692d4c36cb727f3879afc4606d647e9f48"
+        },
+        "date": 1791517429184,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
