@@ -21,6 +21,7 @@ internal class SessionCoordinator(
     private val clock: TransportClock = SystemTransportClock,
     private val storageDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val invalidated: () -> Unit = {},
+    private val removing: () -> Unit = {},
 ) {
     @Volatile private var current: CredentialEnvelope? = null
     @Volatile private var problem = SessionProblem.STALE
@@ -74,6 +75,7 @@ internal class SessionCoordinator(
     }
 
     private fun quarantine(generation: SessionGeneration) {
+        removing()
         when (val admitted = store.admitDeletion(generation)) {
             is CredentialResult.Failure -> Unit // A newer lifecycle command already revoked this capability.
             is CredentialResult.Success -> {

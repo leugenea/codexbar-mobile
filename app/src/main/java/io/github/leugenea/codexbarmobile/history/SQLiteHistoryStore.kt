@@ -16,18 +16,24 @@ sealed interface HistoryAccessOutcome {
 /** Partition-scoped port: there is no unguarded UUID-only SQLite writer. */
 class HistoryAccess internal constructor(
     private val owner: SQLiteHistoryStore,
-    val partition: HistoryPartition,
+    override val partition: HistoryPartition,
     internal val generation: HistoryGeneration,
-) : HistoryStore {
+) : HistoryRuntimeAccess {
     private var deletion: HistoryDeletion? = null
-    override fun append(admission: HistoryAdmission): HistoryAppendOutcome = owner.append(this, admission)
-    override fun read(query: HistoryReadQuery): HistoryReadOutcome = owner.read(this, query)
+    override fun append(admission: HistoryAdmission): HistoryAppendOutcome {
+        owner.rejection(this, admission.partition)?.let { return HistoryAppendOutcome.Unavailable(it) }
+        return owner.append(this, admission)
+    }
+    override fun read(query: HistoryReadQuery): HistoryReadOutcome {
+        owner.rejection(this, query.partition)?.let { return HistoryReadOutcome.Unavailable(it) }
+        return owner.read(this, query)
+    }
     override fun delete(partition: HistoryPartition): HistoryDeleteOutcome {
         if (partition != this.partition) return HistoryDeleteOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
         return beginDelete().complete()
     }
     /** Runtime retirement only: clean restoration may adopt the continuing durable lifetime. */
-    fun revoke() = owner.revoke(this)
+    override fun revoke() = owner.revoke(this)
     /** Immediate runtime fence; caller schedules blocking, idempotent complete() on its storage lane. */
     @Synchronized fun beginDelete(): HistoryDeletion = deletion ?: owner.beginDelete(this).also { deletion = it }
 }
@@ -92,6 +98,55 @@ class SQLiteHistoryStore internal constructor(
         maintainCount(partition)
         bind(partition)
     }
+
+    /** Fresh-login staging never grants a runtime capability before protected adoption. */
+    internal fun stagePartition(): HistoryPartitionOutcome = operation(HistoryUnavailable.WRITE_FAILURE, ::partitionFailure) {
+        initialize()
+        if (binding!!.phase != HistoryBindingPhase.EMPTY || hasRemoval()) {
+            return@operation partitionFailure(HistoryUnavailable.PARTITION_REVOKED)
+        }
+        val partition = HistoryPartition(UUID.randomUUID())
+        changeBinding(HistoryBinding(HistoryBindingPhase.STAGED, partition))
+        schema.open(partition, create = true)
+        files.checkBudget()
+        HistoryPartitionOutcome.Staged(partition)
+    }
+
+    internal fun activatePartition(partition: HistoryPartition): HistoryAccessOutcome = operation(HistoryUnavailable.WRITE_FAILURE, ::accessFailure) {
+        initialize()
+        if (binding != HistoryBinding(HistoryBindingPhase.STAGED, partition) || hasRemoval()) {
+            return@operation accessFailure(HistoryUnavailable.PARTITION_REVOKED)
+        }
+        schema.open(partition, create = false)
+        changeBinding(HistoryBinding(HistoryBindingPhase.ACTIVE, partition))
+        bind(partition)
+    }
+
+    /** Continuing protected credentials are the prerequisite, never the fixed slot selector. */
+    internal fun restorePartition(): HistoryLifetimeOutcome = operation(HistoryUnavailable.READ_FAILURE, { HistoryLifetimeOutcome.Unavailable }) {
+        // Do not erase an interrupted-removal receipt before the credential owner sees it.
+        if (binding == null) {
+            files.acquire()
+            val disk = files.readBinding()
+            if (disk.phase == HistoryBindingPhase.DELETING) {
+                binding = disk
+                return@operation HistoryLifetimeOutcome.RemovalRequired
+            }
+        }
+        initialize()
+        val current = binding!!
+        if (current.phase == HistoryBindingPhase.DELETING) return@operation HistoryLifetimeOutcome.RemovalRequired
+        if (current.phase == HistoryBindingPhase.STAGED) {
+            changeBinding(current.copy(phase = HistoryBindingPhase.DELETING))
+            finishRemoval(current.partition)
+            return@operation HistoryLifetimeOutcome.Unavailable
+        }
+        if (current.phase != HistoryBindingPhase.ACTIVE) return@operation HistoryLifetimeOutcome.Unavailable
+        adopt(current.partition).lifetimeOutcome()
+    }
+
+    private fun partitionFailure(reason: HistoryUnavailable?): HistoryPartitionOutcome =
+        if (reason == null) HistoryPartitionOutcome.Corrupt else HistoryPartitionOutcome.Unavailable(reason)
 
     private fun bind(partition: HistoryPartition): HistoryAccessOutcome = synchronized(admission) {
         if (removal != null) return@synchronized HistoryAccessOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
@@ -208,6 +263,15 @@ class SQLiteHistoryStore internal constructor(
             HistoryReadOutcome.Ready(HistoryReadSnapshot(query, page, last, more, state.cutoffs.keys, state.cutoffs))
         }
 
+    /** A retired caller must not wait behind a held irreversible write/removal. */
+    internal fun rejection(access: HistoryAccess, partition: HistoryPartition): HistoryUnavailable? = synchronized(admission) {
+        when {
+            closed -> HistoryUnavailable.CLOSED
+            !authorized(access, partition) -> HistoryUnavailable.PARTITION_REVOKED
+            else -> null
+        }
+    }
+
     private fun authorized(access: HistoryAccess, partition: HistoryPartition): Boolean = synchronized(admission) {
         !closed && removal == null && active === access.generation && activePartition == partition && access.partition == partition
     }
@@ -242,15 +306,15 @@ class SQLiteHistoryStore internal constructor(
         if (files.readBinding() != binding) throw IOException()
     }
 
-    /** Explicit destructive recovery ONLY; no automatic migration or fabricated replacement samples. */
-    fun quarantineAndDelete(): HistoryDeleteOutcome {
-        val ticket = synchronized(admission) {
+    /** Non-I/O administrative reservation; process owner schedules settlement independently. */
+    internal fun reserveDeletion(): HistoryDeletion = synchronized(admission) {
             active = null
             val pending = removal
             if (pending != null && !pending.failed()) pending else HistoryDeletion { quarantineStorage() }.also { removal = it }
-        }
-        return ticket.complete()
     }
+
+    /** Explicit destructive recovery ONLY; no automatic migration or fabricated replacement samples. */
+    fun quarantineAndDelete(): HistoryDeleteOutcome = reserveDeletion().complete()
 
     private fun quarantineStorage(): HistoryDeleteOutcome = operation(HistoryUnavailable.WRITE_FAILURE, ::deleteFailure) {
             files.acquire()

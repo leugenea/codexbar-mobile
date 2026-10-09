@@ -53,8 +53,18 @@ bounded reads and visible eviction metadata. It retains exact numeric/time facts
 credentials, plan text or provider identity; history is sandbox-private, not Keystore-encrypted.
 Local deletion is logical removal, not forensic erasure. The hosted test contract requires
 close/fresh-adapter persistence proof, not process-death or backup-extraction proof.
-No live samples are recorded yet: credential-lifetime wiring and refresh admission remain
-separate work. There is no verified-account history, graph calculation, background refresh service, widget
+The existing process owner now binds history to a separate opaque local credential-lifetime
+partition. Fresh sign-in gets new isolation; clean protected restoration and token rotation
+retain it. Logout, replacement, terminal re-auth, key loss and corrupt restoration revoke
+history immediately and attempt both protected credential and history cleanup. Full local
+deletion succeeds only when both durable outcomes succeed; failure/timeout remains an
+explicit storage failure, with no successor admission over unsettled cleanup. Cancel/holder
+shutdown retain a clean lifetime; the last foreground observer leaving revokes its runtime
+history capability without deleting it. A returning observer gets a fresh capability for the
+same continuing partition. Identity remains UNVERIFIED: there is no provider-account join.
+No live samples are recorded yet; refresh sampling and history presentation are separate
+work. The pure even-distribution reference is not a graph UI. There is no verified-account
+history, background refresh service, widget
 or signed production release. CI debug APKs are test outputs, not signed release
 deliverables. Minimum Android version is Android 8.0 (API 26).
 

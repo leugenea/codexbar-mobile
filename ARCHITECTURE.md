@@ -77,10 +77,11 @@ I/O runs on the separate storage dispatcher and re-enters the owner lane for che
 publication. Commands are asynchronous; observers may enqueue commands but cannot
 reenter the current mutation. The owner retires/cancels superseded work; there is no cross-controller ownership
 registry, displaced Activity owner or shared Activity deletion barrier. Local sign-out
-invalidates auth, reads and refresh and deletes the A6 key and ciphertext without a
-remote revocation request. Account replacement deletes the preceding durable pair
-before new authentication. Durable removal precedes successful SIGNED_OUT or
-REAUTH_REQUIRED publication; removal failures are storage failures, not success.
+invalidates auth, reads, refresh and history capabilities and attempts both the A6 key/
+ciphertext and history removal without a remote revocation request. Account replacement
+settles the preceding combined durable removal before new authentication. Combined removal
+precedes successful SIGNED_OUT or REAUTH_REQUIRED publication; partial failure and timeout
+are storage failures, not deletion success.
 The process scope, rather than an Activity lifecycle, owns this work. Generation and
 cancellation checks reject late results and writes after logout or replacement. The
 uncertainty marker keeps interrupted rotation fail-closed across a fresh runtime.
@@ -278,7 +279,7 @@ actual JVM execution and whole-app coverage are hosted gates, not compilation cl
 
 `SQLiteHistoryStore.open(applicationContext)` owns one blocking serialized I/O lane,
 with a file lock rejecting a second adapter for the same directory. It is not a
-session/controller, and is not constructed by the live gate yet. The single durable
+session/controller; the live gate constructs it under the existing process owner. The single durable
 binding matches the existing single local credential slot: `createPartition()` generates
 a fresh opaque UUID, while `adopt(partition)` only accepts the continuing ACTIVE binding
 and revokes the preceding runtime capability. Only the returned `HistoryAccess` implements
@@ -321,13 +322,13 @@ barrier; explicit `quarantineAndDelete()` may retry. Missing/damaged/interrupted
 data fails closed. Database corruption and unsupported versions are typed, not empty;
 only explicit quarantine discards corrupt/unsupported data, preserving the privacy fence.
 
-M4a-4 must schedule and settle deletion before closing the adapter, keep successor
-credential-lifetime admission blocked on failure, and gate adoption by its protected
+M4a-4 schedules and settles deletion before closing the adapter, keeps successor
+credential-lifetime admission blocked on failure, and gates adoption by its protected
 credential lifetime. Runtime reservation alone is not a durable deletion receipt. If
 the filesystem refuses every fence write and removal, restart durability cannot be
 promised; failure is reported, never successful deletion. The adapter does not block or
-replace live auth/quota. No dependency, encryption, identity inference, sample timer,
-session wiring, baseline math or graph UI is introduced.
+replace live auth/quota. The adapter itself adds no dependency, encryption, identity
+inference, sample timer, controller, baseline math or graph UI.
 
 `HistoryStoreContractTest` covers the pure bounded codec, trustworthy-clock policy and
 explicitly synthetic journal failure contracts. `HistoryPersistenceTest` covers actual
@@ -337,6 +338,54 @@ SQLite-full errors, corruption/version handling and explicit recovery. Its manda
 cases are checked by the unchanged fail-closed native report gate. Native execution and
 whole-app >=90% compatible JVM/native INSTRUCTION coverage remain hosted acceptance,
 not a source-compilation claim; neither is exempted or excluded.
+
+## Durable credential-lifetime binding (M4a-4)
+
+`HistoryLifetimeCoordinator` is subordinate to `ConnectionController`, not another owner,
+scope, credential slot, account selector or sampler. `SQLiteHistoryLifetimeStorage` is its
+thin blocking adapter. Runtime `SessionGeneration` identity maps to a separate opaque
+history partition, never to the stable connection-session selector or token contents.
+The A6 credential slot/encrypted envelope and history SQLite schema stay unchanged. The
+existing 32-byte history binding adds a STAGED phase after the existing phase ordinals.
+
+Fresh authentication starts only after captured credential and history deletion tickets
+actually settle. History is staged before device authentication can save credentials;
+checked protected read/adoption activates it before a capability is published. Rotation
+retains the partition. A fresh holder restores ACTIVE only after clean protected credential
+restoration. STAGED is discarded/unavailable, EMPTY is unavailable, and missing/corrupt/
+pending control never guesses a partition. A DELETING receipt asks the process owner to
+remove both stores even when protected credentials otherwise look clean. Missing protected
+credentials purge orphan history. Key loss, corruption and A10 terminal/quarantine paths
+reserve the same process-owned cleanup. No provider identity is inferred: UNVERIFIED and
+UNRESOLVED remain unchanged.
+
+Runtime retirement revokes captured reads/appends immediately without waiting on SQLite
+I/O. The last existing B2 foreground observer leaving revokes history ports but retains the
+lifetime and credentials; return re-adopts ACTIVE through storage with fresh runtime
+capability. Cancel and holder shutdown also revoke without turning a clean lifetime into a
+new login. Activities still only observe/command the process owner and do not delete it.
+An already irreversible-admitted append can finish, but removal fences and deletes it
+before terminal success. Already-captured reads recheck authority before returning.
+
+Credential and history deletion run independently off the owner lane, so held/failed
+history I/O cannot skip key/file removal or block command/timeout notification. The owner
+awaits both real outcomes within its bounded waiter; timeout leaves both tickets owned and
+admission closed. A settled failed removal can be retried explicitly. History tombstones/
+quarantine persist through reopen; no successor is admitted over unsettled cleanup. Old
+exactly-once tickets cannot delete a later partition. A filesystem refusing every fence and
+removal remains an honestly reported failure, not an unconditional privacy guarantee.
+
+`historyCapability(generation)` and categorical `historyAvailability` are the downstream
+M4a-5/#8 seams. They expose no token/slot-derived UUID and perform no sampling or UI work.
+Original synthetic `HistoryLifetimeCoordinatorTest` uses the actual owner/A3/auth/A10
+coroutine topology with held storage. `HistoryLifetimeTest` uses actual Keystore + SQLite,
+Activity recreation/finish, last-observer retirement, clean fresh-holder restore, rotation,
+relogin, key loss/corruption/uncertain rotation, actual failed credential-file removal,
+held/failed combined deletion and explicit binding crash cuts. Fresh-holder/close/reopen fixtures are not literal process-death proof.
+The native report validator requires every new case, with omission/class-spoof/failure/
+skip contracts; all existing A10 and history-store mandatory cases stay required. All new
+handwritten code remains in the unchanged >=90% compatible JVM/native INSTRUCTION union;
+compilation alone does not establish runtime or coverage acceptance.
 
 ## Even-distribution reference and observed comparison (M4a-3)
 
@@ -471,7 +520,7 @@ Authoritative association is unavailable and is not inferred. B3 renders periodi
 usage windows through B2/B1; C2 renders banked-reset counts/status/expiry through C1,
 with unknown facts and purchased-balance separation explicit.
 B2 consumes the session/repository API rather than reimplementing token rotation or login.
-Persistent history integration, graphs, further providers, signing and distribution
-remain future scope. The history adapter and pure numerical reference above are not
-wired to live sampling.
+Foreground history sampling, graphs, further providers, signing and distribution remain
+future scope. The history adapter/lifetime binding and pure numerical reference above are
+not wired to live sampling.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).

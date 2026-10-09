@@ -11,7 +11,7 @@ import java.nio.channels.FileChannel
 import java.nio.channels.FileLock
 import java.util.UUID
 
-internal enum class HistoryBindingPhase { EMPTY, ACTIVE, DELETING }
+internal enum class HistoryBindingPhase { EMPTY, ACTIVE, DELETING, STAGED }
 internal data class HistoryBinding(val phase: HistoryBindingPhase, val partition: HistoryPartition)
 internal class HistoryStorageException(val reason: HistoryUnavailable) : IOException()
 internal class HistoryCorruption : IOException()

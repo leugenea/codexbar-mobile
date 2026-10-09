@@ -3,6 +3,7 @@ package io.github.leugenea.codexbarmobile
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
 import io.github.leugenea.codexbarmobile.credentials.*
+import io.github.leugenea.codexbarmobile.history.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,16 +39,18 @@ internal class ConnectionController(
     private val storageWaitMillis: Long = 5_000L,
     private val storageDispatcher: CoroutineDispatcher = Dispatchers.IO,
     refreshClock: io.github.leugenea.codexbarmobile.transport.TransportClock = reader.clock,
+    private val history: HistoryLifetimeCoordinator? = null,
 ) {
     private val ownerScope = CoroutineScope(scope.coroutineContext + mutationDispatcher)
     private val mutableState = MutableStateFlow(ConnectionState(ConnectionPhase.RESTORING))
     val state: StateFlow<ConnectionState> = mutableState
-    internal val session = reader.session(store, ownerScope, storageDispatcher, ::sessionInvalidated)
+    internal val session = reader.session(store, ownerScope, storageDispatcher, ::sessionInvalidated, ::removeHistory)
     private val authenticatedReader = AuthenticatedProviderReader(session, reader)
     private var work: Job? = null
     private var revision = 0L
     private var generation: SessionGeneration? = null
     private var deletion: Deferred<CredentialResult<Unit>>? = null
+    private var historyDeletion: Deferred<HistoryDeleteOutcome>? = null
     private var closed = false
     private val stopped = CompletableDeferred<Unit>()
     private val usageRefresh = UsageRefresh(ownerScope, refreshClock, ::refreshUsage, ::refreshChanged)
@@ -61,8 +64,15 @@ internal class ConnectionController(
         if (revision != 0L || closed) return
         when (restored) {
             is CredentialResult.Success -> {
-                session.adopt(restored.value)
-                publish(0, ConnectionState(ConnectionPhase.RESTORED))
+                restoreHistory(restoredGeneration)
+                if (revision != 0L || closed) return
+                if (history?.requiresRemoval == true) {
+                    removeCredentials()
+                    publish(0, if (awaitDeletion()) ConnectionState(ConnectionPhase.REAUTH_REQUIRED) else storageFailure())
+                } else {
+                    session.adopt(restored.value)
+                    publish(0, ConnectionState(ConnectionPhase.RESTORED))
+                }
             }
             is CredentialResult.Failure -> restoreFailure(restored)
         }
@@ -70,7 +80,7 @@ internal class ConnectionController(
 
     private suspend fun restoreFailure(result: CredentialResult.Failure) {
         val phase = when (result.category) {
-            CredentialFailure.MISSING -> ConnectionPhase.IDLE
+            CredentialFailure.MISSING -> missingCredentials()
             CredentialFailure.KEY_LOST, CredentialFailure.CORRUPT -> {
                 removeCredentials()
                 if (awaitDeletion()) ConnectionPhase.REAUTH_REQUIRED else ConnectionPhase.FAILED
@@ -78,6 +88,32 @@ internal class ConnectionController(
             else -> ConnectionPhase.FAILED
         }
         publish(0, ConnectionState(phase, problem = if (phase == ConnectionPhase.IDLE) null else ConnectionProblem.STORAGE))
+    }
+
+    private suspend fun restoreHistory(active: SessionGeneration) {
+        history?.open(active)
+        ownerScope.async(storageDispatcher) { history?.restore(active) }.await()
+        if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
+    }
+
+    private suspend fun missingCredentials(): ConnectionPhase {
+        if (history == null) return ConnectionPhase.IDLE
+        removeCredentials()
+        return if (awaitDeletion()) ConnectionPhase.IDLE else ConnectionPhase.FAILED
+    }
+
+    /** M4a-5/#8 seam: capture with the exact adopted runtime generation, never a slot UUID. */
+    internal fun historyCapability(active: SessionGeneration): HistoryRuntimeAccess? =
+        if (store.isActive(active)) history?.capability(active) else null
+
+    internal val historyAvailability: HistoryAvailability
+        get() = history?.availability ?: HistoryAvailability.UNAVAILABLE
+
+    private fun removeHistory() {
+        val coordinator = history ?: return
+        if (historyDeletion != null) return
+        val reserved = coordinator.beginDeletion()
+        historyDeletion = ownerScope.async(storageDispatcher) { reserved.complete() }
     }
 
     private fun command(action: suspend () -> Unit) {
@@ -96,7 +132,10 @@ internal class ConnectionController(
     private suspend fun login(owner: Long) {
         if (!awaitDeletion()) { publish(owner, storageFailure()); return }
         if (!current(owner)) return
-        val next = store.openSession().also { generation = it }
+        historyDeletion = null // The preceding combined barrier has actually settled.
+        val next = store.openSession().also { generation = it; history?.open(it) }
+        ownerScope.async(storageDispatcher) { history?.stage(next) }.await()
+        if (!current(owner)) return
         authenticator.start(ownerScope, next)
         val terminal = authenticator.state.first { auth ->
             publish(owner, ConnectionState(ConnectionPhase.AUTHENTICATING, auth))
@@ -119,7 +158,10 @@ internal class ConnectionController(
                 publish(owner, storageFailure())
             }
             is CredentialResult.Success -> {
+                ownerScope.async(storageDispatcher) { history?.activate(terminal.generation) }.await()
+                if (!current(owner)) return
                 session.adopt(credentials.value)
+                if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
                 publish(owner, ConnectionState(ConnectionPhase.RESTORED, terminal))
                 usageRefresh.request()
             }
@@ -134,6 +176,15 @@ internal class ConnectionController(
     /** Observer identities keep one Activity from cancelling another visible Activity. */
     fun usageForeground(observer: Any, foreground: Boolean) = command {
         usageRefresh.foreground(observer, foreground)
+        if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
+        else resumeHistory()
+    }
+
+    private fun resumeHistory() {
+        val active = (session.snapshot() as? SessionResult.Ready)?.envelope ?: return
+        if (cleanupPending() || historyAvailability != HistoryAvailability.UNAVAILABLE) return
+        history?.resumeRuntime()
+        ownerScope.launch { ownerScope.async(storageDispatcher) { history?.restore(active.generation) }.await() }
     }
 
     private fun refreshChanged(refresh: UsageRefreshState) {
@@ -172,7 +223,7 @@ internal class ConnectionController(
         usageRefresh.reset()
         publish(owner, ConnectionState(ConnectionPhase.READING))
         ownerScope.launch {
-            val removed = session.awaitRemoval()
+            val removed = awaitDeletion()
             publish(owner, if (removed) ConnectionState(ConnectionPhase.REAUTH_REQUIRED, problem = ConnectionProblem.AUTH)
                 else storageFailure())
         }
@@ -213,14 +264,19 @@ internal class ConnectionController(
         val state = mutableState.value
         if (state.phase != ConnectionPhase.FAILED || state.problem != ConnectionProblem.STORAGE) return
         // A timeout is not a durable failure. A successful ticket stays exactly once.
-        if (deletion?.await() !is CredentialResult.Failure && !session.removalFailed()) return
+        val credentialFailed = deletion?.await() is CredentialResult.Failure || session.removalFailed()
+        val historyFailed = historyDeletion?.await()?.successful() == false
+        if (!credentialFailed && !historyFailed) return
         session.retryRemoval()
         deletion = null
+        historyDeletion = null
+        history?.retryDeletion()
         generation = store.openSession()
     }
 
     /** Reserve synchronously on the owner lane; the independent owner child performs I/O once. */
     private fun removeCredentials() {
+        removeHistory()
         val active = generation ?: return
         val admitted = store.admitDeletion(active)
         generation = null
@@ -233,17 +289,22 @@ internal class ConnectionController(
     }
 
     private suspend fun awaitDeletion(): Boolean {
-        if (!session.awaitRemoval()) return false
-        return withTimeoutOrNull(storageWaitMillis) { deletion?.await() !is CredentialResult.Failure } ?: false
+        return withTimeoutOrNull(storageWaitMillis) {
+            val sessionRemoved = session.awaitRemoval()
+            val credentialsRemoved = deletion?.await() !is CredentialResult.Failure
+            val historyRemoved = historyDeletion?.await()?.successful() != false
+            sessionRemoved && credentialsRemoved && historyRemoved
+        } ?: false
     }
 
-    private fun cleanupPending() = deletion?.isCompleted == false || session.removalPending()
+    private fun cleanupPending() = deletion?.isCompleted == false || historyDeletion?.isCompleted == false || session.removalPending()
 
     private fun retire(): Long {
         revision++
         usageRefresh.reset()
         work?.cancel()
         authenticator.cancel()
+        history?.retire()
         session.retire()
         return revision
     }
@@ -262,6 +323,9 @@ internal class ConnectionController(
             // Do not clear a holder while an old deletion can still erase its successor.
             deletion?.join()
             session.awaitShutdown()
+            historyDeletion?.join()
+            // A cancelled stage/activation waiter can leave its process-owned child running.
+            history?.let { coordinator -> withContext(storageDispatcher) { coordinator.close() } }
             stopped.complete(Unit)
             scope.cancel()
         }

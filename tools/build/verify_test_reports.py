@@ -114,6 +114,24 @@ HISTORY_CASES = {
 }
 
 
+HISTORY_LIFETIME_CLASS = "io.github.leugenea.codexbarmobile.history.HistoryLifetimeTest"
+HISTORY_LIFETIME_CASES = {
+    "nativeActivityFinishAndRecreationKeepProcessHistoryOwner",
+    "nativeCancelAndHolderShutdownRetireButRestoreContinuingLifetime",
+    "nativeCrashCutsStageCredentialSaveAndActivationNeverReusePreviousLogin",
+    "nativeCredentialFileRemovalFailureStillDeletesKeyAndHistoryWithoutFalseSuccess",
+    "nativeFailedHistoryDeletionStillRemovesKeystoreAndQuarantinesFreshHolder",
+    "nativeForegroundLossRetainsLifetimeWithoutPretendingLogout",
+    "nativeFreshLoginRotationReopenAndReloginNeverJoin",
+    "nativeHeldAppendAndReadLoseAuthorityImmediatelyOnOwnerRetirement",
+    "nativeHeldCredentialSaveCannotActivateHistoryOrResurrectAfterLogout",
+    "nativeHeldHistoryDeletionTimeoutBlocksSuccessorAndOldTicketCannotEraseNewPartition",
+    "nativeInterruptedOldTombstonePurgesEvenCleanLookingCredentials",
+    "nativeKeyLossCorruptionAndInterruptedRotationPurgeLifetimeHistory",
+    "nativeTerminalRefreshWaitsForBothCleanupAfterForegroundLoss",
+}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -146,6 +164,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
             ("live usage", LIVE_USAGE_CLASS, LIVE_USAGE_CASES),
             ("banked reset", BANKED_RESET_CLASS, BANKED_RESET_CASES),
             ("history", HISTORY_CLASS, HISTORY_CASES),
+            ("history lifetime", HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES),
         ):
             actual_names = {case["name"] for case in cases if case["class"] == classname}
             missing_names = required - actual_names

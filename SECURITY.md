@@ -32,11 +32,12 @@ logs or exception diagnostics. The Activity sets FLAG_SECURE. Process death drop
 pending login; encrypted credentials may restore only as unresolved, without automatic
 requests. Credentials use A6 AndroidKeyStore AES-GCM and an atomic no-backup ciphertext
 slot; its random local selector is also under noBackupFilesDir, not provider identity.
-Sign-out cancels owned auth/read/refresh work and deletes the slot key and ciphertext
-locally; it does not revoke remote sessions. Account replacement invalidates the old
-generation and deletes its credentials before new authentication. Late results cannot
-publish old account data or persist into a newer generation. Durable deletion
-completes before SIGNED_OUT/REAUTH_REQUIRED; cancellable wait timeouts report
+Sign-out cancels owned auth/read/refresh work, immediately revokes history access, and
+attempts both slot key/ciphertext removal and local history deletion in process-owned
+storage children. It does not revoke remote sessions. Account replacement invalidates the
+old generation and settles both durable removals before new authentication. Late results cannot
+publish old account data or persist into a newer generation. Combined durable deletion
+completes before SIGNED_OUT/REAUTH_REQUIRED; partial failures and cancellable wait timeouts report
 STORAGE failure without permitting new traffic or writes over pending removal. Backup/extraction rules exclude app data.
 Native fake tests and the owner's physical-phone session are separate evidence boundaries.
 
@@ -68,8 +69,9 @@ The standalone history adapter stores only bounded normalized numeric/time/categ
 facts and opaque local credential-lifetime/clock UUIDs. It stores no credentials,
 provider/account identity, plan text or raw response. History is framework SQLite under
 `noBackupFilesDir/usage-history`, excluded by the existing cloud/D2D rules; the owner
-accepted sandbox-private history without Keystore encryption. It is not integrated into
-the live credential lifetime or refresh sampler yet. The ceilings are 30-day trusted
+accepted sandbox-private history without Keystore encryption. Its subordinate lifetime
+coordinator is wired to the one process session owner, but no refresh sampling or graph
+presentation is implemented. The ceilings are 30-day trusted
 observation aging, 100,000 observations and 32 MiB for the entire owned directory,
 including rollback journal/control replacements. Reads/fields are also bounded; unknown
 or anomalous clocks suspend aging without disabling count/byte bounds.
@@ -81,8 +83,20 @@ Corrupt, missing or interrupted control data does not silently create a new hist
 explicit quarantine/recovery discards database artifacts but never re-adopts a deleted
 partition. Unknown schema versions are reported, not silently migrated. Deletion is
 logical app-visible removal, not forensic erasure, encrypted-at-rest storage or remote
-revocation. Runtime reservation is not durable completion: the downstream lifetime
-owner must settle the ticket and report any storage failure. If all filesystem writes
+revocation. Runtime reservation is not durable completion: the process lifetime
+owner settles the captured ticket alongside credential cleanup and reports storage failure.
+History's fixed binding file stages a new opaque partition before a fresh credential save;
+activation requires checked durable adoption. Only ACTIVE bindings restore with clean
+protected credentials. STAGED/orphan/interrupted control never guesses linkage; it is
+unavailable or discarded. A DELETING receipt on fresh-owner restoration requires combined
+cleanup even if the credential slot still looks clean. The stable connection-session UUID
+and credential envelope/format are unchanged and never used to infer history identity.
+Token equality, JWT claims and account hints are not inspected or persisted. Ordinary
+cancel/shutdown retain a clean lifetime but revoke runtime authority; foreground retirement
+also revokes held ports without deleting history. Returning observers re-adopt with fresh
+runtime authority. An already irreversible-admitted append may settle, but combined deletion
+removes it before successful terminal publication. Late reads and stale appends are rejected;
+an exactly-once old deletion ticket cannot delete a successor. If all filesystem writes
 and removals fail, no unconditional restart/privacy guarantee is possible. Numeric/time
 history may still reveal usage patterns to someone with app-sandbox access. Native
 close/reopen fixtures do not establish literal process death, OS backup extraction or
