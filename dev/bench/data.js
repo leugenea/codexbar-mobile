@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791556632051,
+  "lastUpdate": 1791556635305,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2133,6 +2133,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/b8f8e9a39c8fc9244909e588fc4e487858c95bd6"
         },
         "date": 1791551281155,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "448a1c7c96306c1e16870e23d4e505ddd67787d2",
+          "message": "M4b-2a: Accessible truthful history text component (#87)\n\n* feat(m4b): add accessible truthful history text component\n\n* fix(m4b): validate PNG pixel streams and neutralize count labels",
+          "timestamp": "2026-10-09T17:36:42+03:00",
+          "tree_id": "995ecd20391172044ce4874fe66ea5ca2aa5d9c1",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/448a1c7c96306c1e16870e23d4e505ddd67787d2"
+        },
+        "date": 1791556634829,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
