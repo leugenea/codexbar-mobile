@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791494037899,
+  "lastUpdate": 1791504020788,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -873,6 +873,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/b2dd4c04aa35e8643e5950724219ee9aa94144a8"
         },
         "date": 1791494033595,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "375b84d2d91385b7048521859581f1f84770d536",
+          "message": "feat(m4a): bounded native SQLite history persistence (#76)\n\n* feat(m4a): persist bounded history in framework SQLite\n\n* fix(history): consume row-returning SQLite pragmas on Android",
+          "timestamp": "2026-10-09T02:59:55+03:00",
+          "tree_id": "48a7f7f43a557b8ad0ea18ab41be8f2f6aa2ba31",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/375b84d2d91385b7048521859581f1f84770d536"
+        },
+        "date": 1791504020009,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
