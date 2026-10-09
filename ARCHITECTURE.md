@@ -263,7 +263,8 @@ Retention does not reset high-water. M4a-4 revokes runtime sampling before delet
 reports deletion failure honestly. M4a-5 admits only real current-generation foreground
 observations, supplies clock provenance/gaps and publishes this read contract without
 allowing history failures to replace or block live quota. Credential lifecycle,
-numerical formulas, refresh admission and graph rendering remain downstream.
+refresh admission and graph rendering remain downstream; M4a-3 now supplies the pure
+numerical reference described below.
 
 `WindowHistoryTest` and `HistoryContractTest` use original synthetic normalized inputs,
 literal boundary expectations and a clearly labeled in-memory port illustration. They
@@ -337,6 +338,80 @@ cases are checked by the unchanged fail-closed native report gate. Native execut
 whole-app >=90% compatible JVM/native INSTRUCTION coverage remain hosted acceptance,
 not a source-compilation claim; neither is exempted or excluded.
 
+## Even-distribution reference and observed comparison (M4a-3)
+
+`history/EvenDistribution` is a pure consumer of M4a-1 `HistoryWindow`, not another
+normalizer/reducer or a sampling owner. `reference(source)` returns an independent
+`EvenDistributionReference` descriptor tagged with the exact canonical window and
+segment identities, or typed unavailability. `compare(source)` returns the original
+immutable real point, its descriptor, baseline percent and signed delta in **percentage
+points**, or the unchanged source plus a typed reason. Existing `BaselineEligibility`
+is authoritative and survives verbatim as `DistributionUnavailable.Ineligible`.
+The source retains reset provenance, duration/percent knowledge, nominal-start
+confidence and clock/correction metadata; these are not replaced by arithmetic.
+Inconsistent handcrafted identity/reset/duration/percent facts are separately rejected
+as `InvalidFact`, not promoted to known quota.
+
+For supported elapsed SI-second duration D (18,000 five-hour; 604,800 weekly),
+non-discrepant absolute reset R and nominal full-quota assumption:
+
+```text
+S = R - D                         nominal analytical start, not an observed quota start
+B(t) = 100 * elapsedSeconds(S,t) / D       percent, only for S <= t <= R
+Delta = original usedPercent - B(observedAt)    signed percentage points
+B(S) = 0; B(R) = 100               analytical endpoints, never invented measurements
+```
+
+`Duration` seconds plus its nanosecond fraction are converted exactly to `BigDecimal`.
+The numerator is multiplied by 100 exactly, then divided **once** with `DECIMAL128`
+(34 significant digits, HALF_EVEN); endpoint values are exact 0/100. Delta subtraction
+is exact against that computed decimal. Neither provider percent nor storage is rounded.
+Exact subtraction is bounded to 1,024 coefficient digits and absolute scale <=1,024
+for nonzero measured values. Larger operands return explicit `DECIMAL_CAPACITY`, not
+rounded usage, zero or an estimate. Extreme-scale zero is a safe zero arithmetic operand
+only; its original measurement object/scale remains untouched. No plain-string expansion,
+Double arithmetic or unbounded decimal-scale alignment is needed.
+
+Descriptor evaluation requires an explicit `Instant` (null means unknown time) or
+injected `Clock`; there is no system-clock default. These are analytical evaluation
+requests, not new measurements or an independent clock-trust inference. M4a-1's
+observation eligibility is required first: unavailable/ambiguous window, unknown percent
+or observation time, unknown/malformed/unsupported/relative-only/discrepant reset or
+duration, unverified/discontinuous observation clock, uncertain correction start and
+time-range overflow remain unavailable. Queries before S or after R are separately
+unavailable, never clamped. B1 remains the sole shared reset/expiry/time formatter;
+locale, timezone and daylight-saving changes cannot change elapsed SI-second math.
+
+Fixed synthetic examples (same values in the literal JVM oracles):
+
+| Window / explicit time | Baseline percent | Exact measured percent | Delta, percentage points |
+| --- | --- | --- | --- |
+| Five-hour R = epoch second 1,800,003,600; S = 1,799,985,600; t = 1,800,000,000 | 80 | 12.375 | -67.625 |
+| Same window, t = S + 9,000 seconds | 50 | 100 | +50 |
+| Same window, t = S + 9,000 seconds | 50 | 12.37500000000000000001 | -37.62499999999999999999 |
+| Same window, t = S + 45.125 seconds | 0.2506944444444444444444444444444444 | not supplied | not a measurement |
+| Weekly R = 1,800,604,800; S = 1,800,000,000; t = S + 302,400.25 seconds | 50.00004133597883597883597883597884 | not supplied | not a measurement |
+
+A late first measurement stays at its actual `observedAt`. Evaluating analytical
+endpoints or later Clock ticks never adds/moves measured points or advances an earlier
+delta: `compare` has **no now/tick argument**. Empty history stays empty. Graph consumers
+must keep the descriptor separate from measured points and must not join distinct
+segment IDs, even for the same canonical window or a retained/paginated segment whose
+origin is absent. Five-hour/weekly and same-kind reset changes stay independent; a
+correction's uncertain start is never replaced with its first visible point. Reset
+cause stays UNKNOWN. Banked summary, inventory and expiry are not inputs to this API;
+they cannot reset a reference or establish rollover/manual activation.
+
+`EvenDistributionTest` adds only original synthetic JVM cases for literal values,
+subseconds/nanoseconds, endpoints, out-of-range/unknown facts, corrected starts, clock
+provenance, extreme scale/capacity/Instant bounds, SI-time/DST invariance, independent
+window/segment identities and immutable late/empty/paginated history. There is no new
+native case, dependency, persistence/session/refresh integration, rendering, ratio,
+derivative, prediction, exhaustion projection or alarm. All new handwritten bytecode
+remains in the unchanged >=90% compatible JVM/native INSTRUCTION denominator. Source
+compilation is not JVM execution, pinned Android build or exact-run coverage acceptance;
+those gates remain hosted.
+
 ## Verification boundaries
 
 - `app/src/test`: JVM state transitions, restore behavior and percentage validation.
@@ -396,6 +471,7 @@ Authoritative association is unavailable and is not inferred. B3 renders periodi
 usage windows through B2/B1; C2 renders banked-reset counts/status/expiry through C1,
 with unknown facts and purchased-balance separation explicit.
 B2 consumes the session/repository API rather than reimplementing token rotation or login.
-Persistent history integration, numerical baselines, graphs, further providers, signing
-and distribution remain future scope. The history adapter above is not wired to live sampling.
+Persistent history integration, graphs, further providers, signing and distribution
+remain future scope. The history adapter and pure numerical reference above are not
+wired to live sampling.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
