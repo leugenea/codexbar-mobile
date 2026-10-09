@@ -55,6 +55,10 @@ class HistoryTextComponentTest {
         launch(HistoryTextFixture.plot()).use {
             text("Five-hour window", 1)
             text("Weekly window", 1)
+            compose.onNodeWithTag("history-five-hour-counts").assertTextEquals(
+                "Timestamped measurements: 1 · Nominal analytical reference segments: 1")
+            compose.onNodeWithTag("history-weekly-counts").assertTextEquals(
+                "Timestamped measurements: 1 · Nominal analytical reference segments: 1")
             text("The nominal baseline assumes evenly distributed full quota from reset minus window duration to reset. It is analytical, not measured usage or a prediction of exhaustion.")
             openDetails()
             text("Measured used percent (exact %): 12.345678901234567890")
@@ -74,7 +78,7 @@ class HistoryTextComponentTest {
                     problem = HistoryRecorderProblem.WRITE_FAILURE, reason = HistoryUnavailable.IO_FAILURE,
                     truncation = setOf(HistoryTruncation.BYTE_CAP)))
                 compose.onNodeWithTag("history-readiness").assertTextEquals(context.getString(historyStateResource(state)))
-                text("7 samples lost or unconfirmed; history is incomplete.")
+                text("Samples lost or unconfirmed: 7; history is incomplete.")
                 text("History recorder problem: write failure")
                 text("Retention truncated history: byte cap")
                 compose.onNodeWithTag("history-more").assertExists()
@@ -83,6 +87,8 @@ class HistoryTextComponentTest {
             compose.onNodeWithTag("history-five-hour-content").assertTextEquals("No history page available; usage is not zero")
             render(scenario, HistoryTextFixture.plot(emptyList()))
             compose.onNodeWithTag("history-five-hour-content").assertTextEquals("No entries in this admitted page")
+            compose.onNodeWithTag("history-five-hour-counts").assertTextEquals(
+                "Timestamped measurements: 0 · Nominal analytical reference segments: 0")
             render(scenario, HistoryTextFixture.plot(query = HistoryGraphQuery(kind = WindowKind.WEEKLY)))
             compose.onNodeWithTag("history-five-hour-content").assertTextEquals("No entries match this window selection")
             render(scenario, HistoryTextFixture.plot(listOf(HistoryTextFixture.measured(weekly = false))))
@@ -97,7 +103,9 @@ class HistoryTextComponentTest {
         val gap = HistoryTextFixture.second(HistoryTextFixture.gap())
         launch(HistoryTextFixture.plot(listOf(first, gap))).use {
             compose.onNodeWithTag("history-detail").assertDoesNotExist()
+            compose.onNodeWithTag("history-details-toggle").assertTextEquals("Show exact details · Page entries: 2")
             openDetails()
+            compose.onNodeWithTag("history-details-toggle").assertTextEquals("Hide exact details · Page entries: 2")
             text("Segment break: first retained segment observation", 2)
             text("Reset cause: unknown", 2)
             click("history-next")
@@ -123,6 +131,8 @@ class HistoryTextComponentTest {
 
     @Test fun unknownBaselineKeepsMeasuredValueAndB1ResetContext() {
         launch(HistoryTextFixture.plot(listOf(HistoryTextFixture.measured(reset = false)))).use {
+            compose.onNodeWithTag("history-five-hour-counts").assertTextEquals(
+                "Timestamped measurements: 1 · Nominal analytical reference segments: 0")
             openDetails()
             text("Measured used percent (exact %): 12.345678901234567890")
             text("Baseline and delta unavailable: unkeyed reset", 2)
@@ -143,6 +153,7 @@ class HistoryTextComponentTest {
         launch(HistoryTextFixture.plot(listOf(HistoryTextFixture.measured(decimal, weekly = false, reset = false)))).use {
             openDetails()
             val exactChunks = HistoryTextPresentation.chunks(decimal)
+            text("Exact value continues in ordered text parts (count: 4); concatenate in order. No digits omitted.")
             val nodes = compose.onAllNodes(hasAnyAncestor(hasTestTag("history-detail")) and
                 SemanticsMatcher.keyIsDefined(SemanticsProperties.Text), useUnmergedTree = true).fetchSemanticsNodes()
             val values = nodes.flatMap { it.config[SemanticsProperties.Text].map { value -> value.text } }
