@@ -1,6 +1,7 @@
 package io.github.leugenea.codexbarmobile.history
 
 import android.content.Context
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -164,22 +165,57 @@ class HistoryLifetimeTest {
     @Test fun nativeActivityFinishAndRecreationKeepProcessHistoryOwner() {
         val first = login(); val access = capability(first); append(access)
         val scenario = ActivityScenario.launch(MainActivity::class.java)
+        lateinit var beforeFinish: HistoryRuntimeAccess
         try {
             compose.waitForIdle()
             scenario.onActivity { assertSame(first, it.connection) }
             compose.onNodeWithTag("connection-tab").performClick()
             compose.waitForIdle()
-            scenario.recreate(); compose.waitForIdle()
+
+            // Positive attachment/retirement proof: availability before launch alone cannot
+            // establish that the Activity's LaunchedEffect actually registered its observer.
+            scenario.moveToState(Lifecycle.State.CREATED)
+            lifecycleHistory(first, HistoryAvailability.UNAVAILABLE, "Activity stop retires attached history observer")
+            revoked(access)
+            scenario.moveToState(Lifecycle.State.RESUMED)
+            compose.waitForIdle()
+            lifecycleHistory(first, HistoryAvailability.AVAILABLE, "Activity resume re-adopts continuing history", replacing = access)
+            val beforeRecreation = capability(first)
+            assertNotSame(access, beforeRecreation)
+            assertEquals(access.partition, beforeRecreation.partition)
+            assertEquals(1, page(beforeRecreation).entries.size)
+
+            scenario.recreate(); compose.waitForIdle(); settled(first)
             scenario.onActivity { assertSame(first, it.connection) }
+            lifecycleHistory(first, HistoryAvailability.AVAILABLE, "Recreated Activity exposes continuing history")
+            // Observer handoff may retain or replace the port; finish must revoke the
+            // actually usable post-recreation port, not an already-retired predecessor.
+            beforeFinish = capability(first)
+            assertEquals(access.partition, beforeFinish.partition)
+            assertEquals(1, page(beforeFinish).entries.size)
         } finally { scenario.close() }
+        assertEquals(Lifecycle.State.DESTROYED, scenario.state)
         assertSame(first, owner())
-        runBlocking { await("Activity finish retires history port", { first.historyAvailability.name }) {
-            first.historyAvailability == HistoryAvailability.UNAVAILABLE
-        } }
-        revoked(access)
+        lifecycleHistory(first, HistoryAvailability.UNAVAILABLE, "Activity finish retires history port")
+        revoked(beforeFinish)
+        assertTrue(KeystoreCredentialStore.file(context, slot).exists())
+        assertNotEquals(ConnectionPhase.SIGNED_OUT, first.state.value.phase)
         val restored = freshOwner(); phase(restored, ConnectionPhase.RESTORED)
         assertEquals(access.partition, capability(restored).partition)
         assertEquals(1, page(capability(restored)).entries.size)
+    }
+
+    /** Advance Compose v2's queued effect cancellation, including after its root is destroyed. */
+    private fun lifecycleHistory(owner: ConnectionController, expected: HistoryAvailability, step: String,
+        replacing: HistoryRuntimeAccess? = null) {
+        try { compose.waitUntil(timeoutMillis = 5_000) {
+            val generation = (owner.session.snapshot() as? SessionResult.Ready)?.envelope?.generation
+            val current = generation?.let(owner::historyCapability)
+            owner.historyAvailability == expected && (replacing == null || current != null && current !== replacing)
+        } }
+        catch (_: ComposeTimeoutException) {
+            throw AssertionError("$step: expected=$expected, last state=${owner.historyAvailability}")
+        }
     }
 
     @Test fun nativeForegroundLossRetainsLifetimeWithoutPretendingLogout() {
