@@ -560,6 +560,52 @@ review and >=90% compatible JVM/native INSTRUCTION coverage remain hosted gates;
 cached-toolchain compilation alone cannot establish those outcomes. #8 owns graph/UI/
 accessibility; #9 owns assembled release/live acceptance, with #69 separate.
 
+## Bounded truthful plot inputs (M4b-1)
+
+`history/HistoryPlotInputs.project` is a pure page-local consumer of the detached
+`HistoryGraphSnapshot`; it adds no query, sampling, clock, controller, storage or
+Compose behavior. Immutable five-hour and weekly series each retain selected
+window facts/statuses in admission order. The original snapshot remains attached,
+including every page gap, runtime generation/partition, readiness, query, endpoint
+metadata, storage content, pagination, retention cutoffs and lost/unconfirmed count.
+A plot snapshot is not permission to use a retired generation.
+
+Plot content distinguishes no page, actually empty page, filtered-empty,
+status-only, single measurement and multiple measurements independently of
+readiness/error/baseline availability. The adapter rejects oversized handcrafted
+pages or duplicate selected kinds per admission instead of silently losing facts;
+accepted input is bounded to the existing query limit of at most 256 per kind.
+Page-local measured and delta runs preserve original segment/window identities,
+breaks and UNKNOWN reset cause. They never bridge a different segment/window,
+unkeyed point, non-increasing wall time, ordinal hole, intervening gap/status or
+unavailable geometry. No run authorizes joining to a run from a different page,
+retained snapshot or generation; an absent segment origin is not manufactured.
+
+Analytical descriptors/endpoints are separate from measured runs and tagged
+NOMINAL_EVEN_DISTRIBUTION, never measured samples or forecasts. Existing
+`HistoryGraphWindow.reference` / `comparison` from `EvenDistribution` are reused,
+including all typed absence. Delta geometry/text stays at the actual `observedAt`
+and in PERCENTAGE_POINTS; no tick/now argument can advance a comparison.
+
+Each kind's exact time domain includes its real points and available analytical
+endpoints; no visible sample is relocated to a nominal start. Rendering-only
+fractions use fixed 0..100 PERCENT and -100..100 PERCENTAGE_POINTS value domains.
+A single-instant span maps to horizontal center without inventing elapsed time.
+Duration seconds plus nanoseconds avoid scalar overflow across Instant.MIN..MAX.
+Double fractions are explicitly approximate: coincident fractions do not merge
+observations, nonzero decimal underflow is marked, and out-of-range or >1,024-digit
+values have typed unavailable geometry, never silent clamping or zero facts.
+Original BigDecimal/Instant objects and exact exponent-notation numeric/ISO instant
+text remain available even when geometry cannot be drawn. Renderer pixel layout,
+localized B1 time labels and accessibility semantics remain M4b-2/-3 work.
+
+`HistoryPlotInputsTest` and `HistoryPlotCoordinatesTest` add original deterministic
+synthetic JVM oracles for both kinds, metadata/content, identity/gaps/corrections,
+late and paginated/retained points, exact decimals, rendering extremes, boundedness
+and immutability. No native case, dependency, exclusion or coverage threshold changes;
+JVM execution, all 77 mandatory native regressions and unchanged >=90% compatible
+JVM/native INSTRUCTION coverage remain hosted acceptance gates.
+
 ## Verification boundaries
 
 - `app/src/test`: JVM state transitions, restore behavior and percentage validation.
