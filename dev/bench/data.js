@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791556635305,
+  "lastUpdate": 1791560310200,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1077,6 +1077,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/448a1c7c96306c1e16870e23d4e505ddd67787d2"
         },
         "date": 1791556631374,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ca67db492842f7e9e1a32bf81d3ba94f1a8c61d8",
+          "message": "feat(m4b): render segmented usage charts and nominal references (#88)",
+          "timestamp": "2026-10-09T18:38:03+03:00",
+          "tree_id": "729814160873ba77fdbeffb275cd35368ed92333",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/ca67db492842f7e9e1a32bf81d3ba94f1a8c61d8"
+        },
+        "date": 1791560309290,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
