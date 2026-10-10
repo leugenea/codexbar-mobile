@@ -211,6 +211,9 @@ if not green:
     failure = dict(kind='native', reason=reason, path=str(path), bytes=path.stat().st_size,
                    modifiedMillis=path.stat().st_mtime_ns // 1000000, sha256=coverage_gate.digest(path))
     coverage_gate.write_json(coverage_gate.COVERAGE / 'collection-failure.json', failure)
+print("Caching disabled for task ':app:testDebugUnitTest' because:")
+print('  Build cache is disabled')
+print('Loading library manifest /SYNTHETIC/library/AndroidManifest.xml')
 print('Collecting code coverage data.')
 if scenario != 'no-offline' and not green:
     print('adb: device offline')
@@ -240,7 +243,8 @@ class SyntheticRunnerTests(unittest.TestCase):
                 base = Path(temporary)
                 tools = base / "tools/build"
                 tools.mkdir(parents=True)
-                for filename in ("coverage_gate.py", "native_coverage_retry.py", "verify_test_reports.py"):
+                for filename in ("coverage_gate.py", "native_coverage_retry.py", "verify_test_reports.py",
+                                 "filter-gradle-console.sh"):
                     shutil.copyfile(ROOT / "tools/build" / filename, tools / filename)
                 evidence = base / "evidence/native"
                 evidence.mkdir(parents=True)
@@ -265,7 +269,11 @@ class SyntheticRunnerTests(unittest.TestCase):
                     self.assertTrue((attempt_path / "strict-connected.log").is_file())
                     self.assertTrue((attempt_path / "graph-exit-status.txt").is_file())
                     self.assertTrue((attempt_path / "task-phase-outcomes.json").is_file())
+                self.assertNotIn("Caching disabled for task", result.stdout)
+                self.assertNotIn("Loading library manifest", result.stdout)
                 latest = (evidence / "strict-connected.log").read_text()
+                self.assertIn("Caching disabled for task", latest)
+                self.assertIn("Loading library manifest", latest)
                 self.assertEqual(latest.count("COVERAGE_TASK_OUTCOME :app:connectedDebugAndroidTest"), 1)
                 if expected_count == 2:
                     saved = evidence / "attempt-1/app/build/outputs/code_coverage/debugAndroidTest/connected/SYNTHETIC/coverage.ec"

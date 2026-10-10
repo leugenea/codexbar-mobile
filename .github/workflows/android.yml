@@ -23,7 +23,7 @@ jobs:
       GRADLE_USER_HOME: ${{ github.workspace }}/../android-gradle-build
     steps:
       - name: Check out repository
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 2
@@ -85,17 +85,24 @@ jobs:
         if: steps.install.outcome == 'success'
         run: |
           set -o pipefail
+          set +e
           ./gradlew --no-daemon --dependency-verification strict --no-build-cache --no-configuration-cache --rerun-tasks \
             --stacktrace --info --continue \
             -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
             :app:lintDebug :app:assembleDebug :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
             :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
-            2>&1 | tee evidence/strict.log
+            2>&1 | tee evidence/strict.log | bash tools/build/filter-gradle-console.sh
+          # Capture every pipeline status before any command resets PIPESTATUS.
+          graph_status=("${PIPESTATUS[@]}")
+          set -e
+          if (( graph_status[0] != 0 )); then exit "${graph_status[0]}"; fi
+          # A successful Gradle graph cannot hide an evidence/filter failure.
+          (( graph_status[1] == 0 && graph_status[2] == 0 ))
           python3 tools/build/verify_manifests.py
           python3 tools/build/verify_test_reports.py jvm
       - name: Upload build logs and outputs (all outcomes)
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -111,7 +118,7 @@ jobs:
 
   instrumented:
     name: Instrumented tests and coverage (API 36 emulator)
-    needs: build
+    # Independent strict gate; JVM tests stay in both jobs for same-compilation coverage.
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     env:
@@ -119,7 +126,7 @@ jobs:
       GRADLE_USER_HOME: ${{ github.workspace }}/../android-gradle-instrumented
     steps:
       - name: Check out repository
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Initialize native diagnostics
@@ -225,7 +232,7 @@ jobs:
           python3 tools/build/verify_history_text_captures.py
       - name: Upload instrumented logs and outputs (all outcomes)
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: android-instrumented-${{ github.run_id }}-${{ github.run_attempt }}
           path: |

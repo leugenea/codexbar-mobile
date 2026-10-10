@@ -167,10 +167,17 @@ while :; do
     --stacktrace --info --console=plain -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
     :app:processReleaseManifest :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest \
     :app:connectedDebugAndroidTest :app:jacocoDebugCoverageVerification \
-    2>&1 | tee evidence/native/strict-connected.log "$attempt_dir/strict-connected.log"
-  test_status=$?
-  set -e
+    2>&1 | tee evidence/native/strict-connected.log "$attempt_dir/strict-connected.log" | bash tools/build/filter-gradle-console.sh
+  graph_status=("${PIPESTATUS[@]}")
+  test_status=${graph_status[0]}
   printf 'graph_task_exit=%s\n' "$test_status" | tee evidence/native/graph-exit-status.txt "$attempt_dir/graph-exit-status.txt"
+  receipt_status=$?
+  set -e
+  # Logging failures are not coverage-transport retries; keep the graph exit first.
+  if (( graph_status[1] != 0 || graph_status[2] != 0 || receipt_status != 0 )); then
+    if (( test_status != 0 )); then exit "$test_status"; fi
+    exit 1
+  fi
   python3 tools/build/coverage_gate.py phases > "$attempt_dir/phases.log" 2>&1
   cp evidence/native/task-phase-outcomes.json "$attempt_dir/task-phase-outcomes.json"
   if (( test_status == 0 || coverage_attempt == 2 )); then break; fi

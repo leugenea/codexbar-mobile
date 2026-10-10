@@ -256,9 +256,9 @@ class WorkflowContracts(unittest.TestCase):
 
     def test_native_job_is_narrow_strict_read_only_and_observable(self):
         workflow = (ROOT / ".github/workflows/android.yml").read_text()
-        native = workflow.split("  instrumented:\n", 1)[1]
+        native = workflow.split("  instrumented:\n", 1)[1].split("  result:\n", 1)[0]
         self.assertIn("name: Instrumented tests and coverage (API 36 emulator)", native)
-        self.assertIn("needs: build", native)
+        self.assertNotRegex(native, r"(?m)^    needs:")
         self.assertIn("runs-on: ubuntu-24.04", native)
         self.assertIn("timeout-minutes: 50", native)
         self.assertIn("sudo chmod a+rw /dev/kvm", native)
@@ -290,6 +290,87 @@ class WorkflowContracts(unittest.TestCase):
             self.assertIn(status + " == 0", final_gate)
         installation = script.split("--install ", 1)[1].split("2>&1", 1)[0]
         self.assertEqual(installation.strip(), 'platform-tools emulator "$image"')
+
+    def assert_parallel_android_gates(self, workflow):
+        jobs = dict(re.findall(r"(?ms)^  (\w+):\n(.*?)(?=^  \w+:\n|\Z)", workflow.split("jobs:\n", 1)[1]))
+        self.assertEqual(set(jobs), {"build", "instrumented", "result"})
+        for job in ("build", "instrumented"):
+            self.assertNotRegex(jobs[job], r"(?m)^    (?:needs|if):")
+        result = jobs["result"]
+        self.assertIn("    if: always()\n", result)
+        self.assertIn("    needs: [build, instrumented]\n", result)
+        self.assertIn('[[ "$BUILD_RESULT" == success && "$INSTRUMENTED_RESULT" == success ]]', result)
+        self.assertIn("BUILD_RESULT: ${{ needs.build.result }}", result)
+        self.assertIn("INSTRUMENTED_RESULT: ${{ needs.instrumented.result }}", result)
+
+    def test_android_gates_run_in_parallel_but_result_requires_both(self):
+        self.assert_parallel_android_gates((ROOT / ".github/workflows/android.yml").read_text())
+
+    def test_parallel_gate_contract_rejects_serialization_and_weaker_results(self):
+        workflow = (ROOT / ".github/workflows/android.yml").read_text()
+        for old, new in (
+            ("  instrumented:\n", "  instrumented:\n    needs: build\n"),
+            ("  build:\n", "  build:\n    if: false\n"),
+            ("    needs: [build, instrumented]", "    needs: instrumented"),
+            ("\n    if: always()\n", "\n    if: success()\n"),
+            ('"$BUILD_RESULT" == success &&', '"$BUILD_RESULT" == success ||'),
+        ):
+            with self.subTest(mutation=old), self.assertRaises(AssertionError):
+                self.assert_parallel_android_gates(workflow.replace(old, new, 1))
+
+    def assert_full_evidence_filtered_console(self, workflow, script):
+        strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
+        graph = script.split('  set +e\n  timeout --signal=TERM', 1)[1].split('  python3 tools/build/coverage_gate.py phases', 1)[0]
+        for block, evidence in (
+            (strict, 'tee evidence/strict.log'),
+            (graph, 'tee evidence/native/strict-connected.log "$attempt_dir/strict-connected.log"'),
+        ):
+            self.assertIn(evidence + " | bash tools/build/filter-gradle-console.sh", block)
+            self.assertIn('--info', block)
+            self.assertIn('graph_status=("${PIPESTATUS[@]}")', block)
+            self.assertLess(block.index(evidence), block.index('bash tools/build/filter-gradle-console.sh'))
+            self.assertLess(block.index('graph_status=('), block.index('set -e'))
+            self.assertIn('graph_status[1]', block)
+            self.assertIn('graph_status[2]', block)
+        self.assertIn('if (( graph_status[0] != 0 )); then exit "${graph_status[0]}"; fi', strict)
+        self.assertIn('test_status=${graph_status[0]}', graph)
+        self.assertIn('if (( test_status != 0 )); then exit "$test_status"; fi', graph)
+
+    def test_full_info_evidence_precedes_console_filter_and_graph_status_is_preserved(self):
+        self.assert_full_evidence_filtered_console(
+            (ROOT / ".github/workflows/android.yml").read_text(),
+            (ROOT / "tools/build/run-hosted-native-smoke.sh").read_text(),
+        )
+
+    def test_logging_contract_rejects_filtered_evidence_and_pipeline_status_masking(self):
+        original = [(ROOT / path).read_text() for path in (
+            ".github/workflows/android.yml", "tools/build/run-hosted-native-smoke.sh")]
+        for target, old, new in (
+            (0, 'tee evidence/strict.log | bash tools/build/filter-gradle-console.sh',
+             'bash tools/build/filter-gradle-console.sh | tee evidence/strict.log'),
+            (1, ' | bash tools/build/filter-gradle-console.sh', ''),
+            (0, 'graph_status=("${PIPESTATUS[@]}")', 'graph_status=("$?")'),
+            (1, 'test_status=${graph_status[0]}', 'test_status=${graph_status[2]}'),
+        ):
+            texts = original.copy()
+            texts[target] = texts[target].replace(old, new, 1)
+            with self.subTest(target=target, mutation=old), self.assertRaises(AssertionError):
+                self.assert_full_evidence_filtered_console(*texts)
+
+    def test_checkout_and_upload_actions_use_reviewed_node24_releases_everywhere(self):
+        pins = {
+            'actions/checkout': ('3d3c42e5aac5ba805825da76410c181273ba90b1', 'v7.0.1'),
+            'actions/upload-artifact': ('cf430e030ddbb5b0abf93d22962f4752f3646cd9', 'v7.0.2'),
+        }
+        counts = dict.fromkeys(pins, 0)
+        directory = ROOT / '.github/workflows'
+        for path in sorted([*directory.glob('*.yml'), *directory.glob('*.yaml')]):
+            for action, sha, version in re.findall(r'uses: ([\w/-]+)@([^\s]+) # (v[\d.]+)', path.read_text()):
+                if action in pins:
+                    with self.subTest(workflow=path.name, action=action):
+                        self.assertEqual((sha, version), pins[action])
+                    counts[action] += 1
+        self.assertEqual(counts, {'actions/checkout': 8, 'actions/upload-artifact': 4})
 
     def assert_cached_execution(self, workflow, script, verifier):
         strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
