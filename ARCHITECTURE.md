@@ -929,9 +929,32 @@ not a sum of percentages or test counts. Handwritten Activity/Compose/lambda cod
 remains in scope. Commands, cache policy and all-outcome failure artifacts are
 specified in [CONTRIBUTING](CONTRIBUTING.md); metrics in [code quality](docs/code-quality.md).
 The strict build/lint/JVM and instrumented/coverage jobs run in parallel, without
-sharing compiled outputs; `Android CI result` still requires both successes.
-The native graph repeats JVM compilation/tests to bind JVM `.exec` and native
-`.ec` to the same classes. Its hosted API 36 emulator uses 4096 MiB of RAM. After
+exchanging build-job artifacts; `Android CI result` still requires both successes.
+The native graph retains JVM compilation/tests to bind JVM `.exec` and native
+`.ec` to the same actual class bytes. Gradle build-cache reuse is enabled locally
+and explicitly in CI; the pinned basic setup-gradle provider archives the user-home
+`caches/` tree, including `build-cache-1`. Forks cannot write, and PR-scoped cache
+writes cannot poison `main`'s cache scope. No remote cache is configured. Basic
+archives are immutable seeds, not accumulated outputs after an exact hit. The
+basic provider [hashes Gradle build files](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/sources/src/cache-service-basic.ts#L160-L168)
+and intentionally has [no restore keys](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/sources/src/cache-service-basic.ts#L25-L39),
+so the first run after dependency/build-script changes starts with a cold home.
+
+The app-applied `always-execute.gradle` disables up-to-date and cache reuse for
+JVM/native suites, coverage preparation/collection/report/verification, all lint
+analysis/report tasks and toolchain observation, while compile/dex/resource/package
+outputs remain reusable. Local terminal-state checks and hosted full-log evidence
+checks reject reused/skipped/no-source gates; the native check precedes each retry.
+Only AGP-disabled redundant vital lint report/text tasks may be skipped with their
+same-variant enforced full lint partner enabled in the graph, never reused.
+Configuration cache remains off because these listeners and the init observation
+are not configuration-cache compatible. Cached compile/instrumentation outputs
+replay identical bytes, so caching itself cannot change JaCoCo class IDs; actual
+class-ID/probe/freshness/snapshot checks still fail closed on any drift. Preparation
+deletes all coverage/test data and snapshots each attempt, not compiled outputs;
+retry may reuse identical compilation but never failed-attempt execution data.
+
+Its hosted API 36 emulator uses 4096 MiB of RAM. After
 passing JVM/native suites, missing, empty or truncated native coverage permits
 one full-graph retry only with ADB-offline collection evidence and matching
 checkout/run/attempt identity. Missing JVM data cannot retry. Attempt 1 is archived;

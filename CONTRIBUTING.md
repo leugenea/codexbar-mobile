@@ -84,35 +84,72 @@ actual `dumpsys` requested permissions, then uninstalls with a recorded status.
 ## Hosted runtime and coverage
 
 [Android CI](.github/workflows/android.yml) uses hosted Ubuntu 24.04, isolated SDKs
-and separate Gradle user homes. The basic dependency cache is enabled; fork PRs
-have read-only cache access. Strict verification remains mandatory on cache hits.
-Build/configuration caches are disabled and acceptance tasks rerun.
+and separate Gradle user homes. The pinned setup-gradle basic provider persists
+`caches/` and `wrapper/`, including the default local task-output cache at
+`$GRADLE_USER_HOME/caches/build-cache-1`. No remote cache service is configured.
+Fork PRs remain read-only. Same-repository PR writes are scoped to their PR merge
+ref; GitHub does not let them overwrite or restore into the base branch's cache.
+Strict dependency verification remains mandatory on hits. The basic provider keys
+on a [hash of Gradle build files](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/sources/src/cache-service-basic.ts#L160-L168)
+with intentionally [no restore keys](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/sources/src/cache-service-basic.ts#L25-L39):
+the first run after dependency/build-script changes is cold. Exact hits remain
+immutable seeds, not accumulating archives; inspect saves and actual task hits
+before claiming a warm-run gain.
+
+`org.gradle.caching=true` enables local output reuse too, including clean builds,
+branches and worktrees sharing the same Gradle user home. CI explicitly passes
+`--build-cache`. Compile, dex, resources and packaging retain normal cacheability.
+The app applies [always-execute.gradle](tools/build/always-execute.gradle) to force
+fresh JVM/native tests, coverage preparation/collection/report/verification, resolved
+toolchain observation and **all lint tasks**: both up-to-date reuse and build-cache
+reuse are disabled for these tasks. Their terminal-state listener rejects skipped,
+no-source or reused gates locally as well as in CI. Only AGP-disabled
+`lintVital[Report]<Variant>` may be skipped when its matching, enforced full lint
+partner is enabled in the same graph; vital lint still cannot reuse outputs.
+Global `--rerun-tasks` is forbidden in the hosted graphs because it would defeat
+output reuse. Configuration
+cache remains disabled (`--no-configuration-cache`) for the outcome listeners and
+init-script observation.
 
 `build` and `instrumented` run independently in parallel; `Android CI result`
 still requires both to succeed, including the native union-coverage gate. The
-build job retains its strict lint/JVM gate. The native job must compile and run
-JVM + native tests in one Gradle graph so `.exec` and `.ec` share the same class
-IDs; it consumes no build-job outputs. This intentional cross-job compilation
-and JVM-test duplication remains, but the build job is off the native critical path.
+build job retains its strict lint/JVM gate. The native job must resolve class outputs
+and run JVM + native tests in one Gradle graph so `.exec` and `.ec` share the same
+class IDs; it consumes no build-job artifacts. Both graphs retain their compilation
+tasks, now eligible for cache reuse; JVM-test duplication remains, but the build
+job is off the native critical path.
 
 Both graphs keep full `--info` output in `evidence/strict.log` and
 `evidence/native/strict-connected.log` (plus each native attempt's copy), before
-filtering known cache-disabled and library-manifest informational lines from the
-console. Warnings, errors, task/test output and coverage outcomes remain visible.
+filtering known cache-disabled and library-manifest informational lines, plus exact
+artifact-transform `Caching not enabled.` two-line blocks, from the console.
+Warnings, errors, task/test output and coverage outcomes remain visible.
+[verify_gradle_execution.py](tools/build/verify_gradle_execution.py) requires every
+expected verification/observation receipt to be `SUCCESS` and rejects reuse/skip
+headers, including lint analysis/report tasks. Missing, duplicate or malformed
+receipts fail closed. It checks each native attempt **before** retry eligibility;
+only a `FAILED` collection receipt in a failed graph may explain absent downstream
+report/verification receipts; an unrelated graph failure is not an exemption.
+No gate may reuse outputs. Existing retry/JUnit checks still forbid failed suites.
 Evidence parsers and the bounded coverage retry read the unfiltered logs. Gradle/
 timeout exit codes take precedence over pipeline helpers; evidence/filter failures
 also fail the job. Checkout v7.0.1 and upload-artifact v7.0.2 use Node 24 with full
 SHA pins; credential persistence remains disabled and existing artifact inputs
 (including hidden-file exclusion, retention and unique Android names) are unchanged.
 
-Build job command (the init script defines the observation task):
+Build job command (the workflow additionally preserves individual pipeline exit codes;
+the init script defines the observation task):
 
 ```sh
-./gradlew --no-daemon --dependency-verification strict --no-build-cache \
-  --no-configuration-cache --rerun-tasks --stacktrace --info --continue \
+set -euo pipefail
+mkdir -p evidence
+./gradlew --no-daemon --dependency-verification strict --build-cache \
+  --no-configuration-cache --stacktrace --info --console=plain --continue \
   -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
   :app:lintDebug :app:assembleDebug :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
-  :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest
+  :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
+  2>&1 | tee evidence/strict.log | bash tools/build/filter-gradle-console.sh
+python3 tools/build/verify_gradle_execution.py build evidence/strict.log
 python3 tools/build/verify_manifests.py
 python3 tools/build/verify_test_reports.py jvm
 ```
@@ -130,14 +167,24 @@ from the same checkout/run/attempt. It preserves the failed graph's data and
 logs, waits for device readiness, then reruns the complete JVM/native/coverage
 graph within the original 15-minute graph budget. It never combines coverage
 across attempts or retries failing tests, timeouts, other invalid datasets or a
-coverage-threshold failure. See [the retry guard](tools/build/native_coverage_retry.py).
+coverage-threshold failure. `coverage_gate.py prepare()` deletes execution data,
+class snapshots and test/coverage reports before both suites on **each** attempt;
+it leaves compilation/instrumentation outputs intact. Those outputs may legitimately
+be up-to-date or restored byte-for-byte, but suites and every coverage gate execute
+again. Attempt 2 never loads attempt 1's `.exec`/`.ec` or report. See
+[the retry guard](tools/build/native_coverage_retry.py).
 
 Coverage minimum: **90%** JaCoCo **INSTRUCTION** over the compatible JVM +
 instrumented execution-data union. JaCoCo 0.8.15 analyzes the complete debug
 project-class snapshot, including handwritten Activity/Compose/lambda/companion
 code. Only Android-generated R/BuildConfig/Manifest identities are excluded;
 there are no handwritten-code exclusions. Class IDs, probe counts, freshness,
-nonzero denominator and XML/inventory consistency are validated. Never lower the
+nonzero denominator and XML/inventory consistency are validated. Cache hits replay
+the exact compiled/instrumented bytes for their declared inputs/toolchain; they do
+not regenerate class IDs. Both fresh suites consume those same graph outputs, and
+`DebugCoverageInputs` analyzes the actual report-class snapshot. Any bytecode drift
+still fails closed on class IDs/probe counts, freshness or snapshot hashes before
+the report/90% check. Never lower the
 threshold or broaden exclusions. Historical 95% statements in M0 remain historical
 and are superseded for current acceptance by the 0.90 rule in [app/build.gradle](app/build.gradle).
 

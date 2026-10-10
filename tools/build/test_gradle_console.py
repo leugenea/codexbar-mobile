@@ -1,6 +1,7 @@
 """Console filtering and shipped pipeline checks using synthetic output, never Gradle."""
 import os
 from pathlib import Path
+import select
 import shutil
 import subprocess
 import sys
@@ -17,6 +18,8 @@ NOISE = (
     "  Caching has not been enabled for the task\n"
     "Loading library manifest /SYNTHETIC/library/AndroidManifest.xml\n"
     "Merging library manifest /SYNTHETIC/library/AndroidManifest.xml\n"
+    "Caching disabled for AarTransform: /SYNTHETIC/transforms/library because:\n"
+    "  Caching not enabled.\n"
 )
 DIAGNOSTICS = (
     "> Task :app:testDebugUnitTest FAILED\n"
@@ -50,12 +53,93 @@ class GradleConsoleTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, DIAGNOSTICS.replace("\n", "\r\n").encode())
 
+    def test_manifest_near_matches_preserve_the_literal_dot_boundary(self):
+        for action in ('Loading', 'Merging'):
+            for name in ('AndroidManifestXxml', 'AndroidManifest-xml', 'AndroidManifest.xml.bak'):
+                with self.subTest(action=action, name=name):
+                    text = f'{action} library manifest /SYNTHETIC/library/{name}\n'
+                    result = self.filter(text)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, text)
+
+    def test_kept_bytes_and_unterminated_headers_are_preserved_exactly(self):
+        header = b'Caching disabled for AarTransform: /SYNTHETIC/\xff because:'
+        for text in (b'WARNING: invalid UTF-8 \xff\xfe\r\n', b'last diagnostic \xff',
+                     header, header + b'\r\n', header + b'\r\n  Other reason \xfe\r\n'):
+            with self.subTest(text=text):
+                result = subprocess.run(['bash', str(FILTER)], input=text,
+                                        capture_output=True, timeout=5)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, text)
+
+    def test_kept_line_is_readable_before_producer_closes_stdin(self):
+        line = b'GATE_TASK_OUTCOME :app:lintDebug SUCCESS\r\n'
+        with subprocess.Popen(['bash', str(FILTER)], stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0) as process:
+            assert process.stdin is not None
+            assert process.stdout is not None
+            assert process.stderr is not None
+            try:
+                process.stdin.write(line)
+                process.stdin.flush()
+                readable, _, _ = select.select([process.stdout], [], [], 2)
+                self.assertTrue(readable, 'Kept console line buffered until EOF')
+                self.assertEqual(os.read(process.stdout.fileno(), len(line)), line)
+                process.stdin.close()
+                self.assertEqual(process.wait(timeout=5), 0)
+                self.assertEqual(process.stderr.read(), b'')
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=5)
+
     def test_empty_or_all_noise_is_success_not_grep_exit_one(self):
         for text in ("", NOISE):
             with self.subTest(text=text):
                 result = self.filter(text)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, "")
+
+    def test_transform_blocks_filter_only_exact_no_caching_reason(self):
+        for name in ('AarTransform', 'MergeInstrumentationAnalysisTransform',
+                     'ExternalDependencyInstrumentingArtifactTransform', 'IdentityTransform',
+                     'NewPluginTransform'):
+            block = f'Caching disabled for {name}: /SYNTHETIC/transforms/library because:\n  Caching not enabled.\n'
+            for ending in ('\n', '\r\n'):
+                with self.subTest(name=name, ending=ending):
+                    result = subprocess.run(["bash", str(FILTER)],
+                                            input=(block + DIAGNOSTICS).replace('\n', ending).encode(),
+                                            capture_output=True, timeout=5)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, DIAGNOSTICS.replace('\n', ending).encode())
+
+    def test_transform_other_reasons_and_incomplete_blocks_are_preserved(self):
+        header = 'Caching disabled for AarTransform: /SYNTHETIC/transforms/library because:\n'
+        for reason in ('  Different caching reason.\n', '  Build cache is disabled\n',
+                       '  Caching has not been enabled for the task\n', ' Caching not enabled.\n',
+                       '  Caching not enabled. extra\n', '  Caching not enabled. \n', '', '\n'):
+            with self.subTest(reason=reason):
+                text = header + reason
+                result = self.filter(text)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, text)
+        # A lone first header must not conceal a subsequent complete noise block.
+        self.assertEqual(self.filter(header + header + '  Caching not enabled.\n').stdout, header)
+
+    def test_transform_reason_never_filters_task_level_or_near_match_diagnostics(self):
+        lines = ('  Caching not enabled.\n', '> Task :app:lintDebug SKIPPED\n',
+                 'WARNING: Caching disabled for AarTransform: /SYNTHETIC/library because:\n',
+                 'Caching disabled for NotAnArtifact: /SYNTHETIC/library because:\n',
+                 'Caching disabled for AarTransform: /SYNTHETIC/library because: warning\n')
+        for line in lines:
+            text = line + '  Caching not enabled.\n'
+            with self.subTest(line=line):
+                result = self.filter(text)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, text)
+        task = "Caching disabled for task ':app:lintDebug' because:\n  Caching not enabled.\n"
+        # Retain #104 task-header filtering, but not the new transform-only reason.
+        self.assertEqual(self.filter(task).stdout, '  Caching not enabled.\n')
 
     def run_pipeline(self, kind, text, exit_code, helper_failure=""):
         # Execute the actual workflow/native pipeline against a synthetic producer.
@@ -75,8 +159,10 @@ class GradleConsoleTests(unittest.TestCase):
             base = Path(temporary)
             tools = base / "tools/build"
             tools.mkdir(parents=True)
-            shutil.copyfile(FILTER, tools / FILTER.name)
-            for filename in ("verify_manifests.py", "verify_test_reports.py"):
+            for source in (FILTER, ROOT / 'tools/build/filter_gradle_console.py'):
+                shutil.copyfile(source, tools / source.name)
+            # Parser doubles isolate log-pipeline exits; real gate semantics are tested separately.
+            for filename in ("verify_manifests.py", "verify_test_reports.py", "verify_gradle_execution.py"):
                 (tools / filename).write_text("from pathlib import Path\nPath('parsers-ran').touch()\n")
             (base / "evidence/native/attempt-1").mkdir(parents=True)
             (base / "gradlew").write_text(
