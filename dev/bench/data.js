@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791622270682,
+  "lastUpdate": 1791626615953,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1315,6 +1315,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/06c6b819ab5e01f6107871f779d9b8e001dbbfb2"
         },
         "date": 1791622266401,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ced44eae188f0cd3cdef94127eea6fd40bcd8b05",
+          "message": "fix(history): complete interrupted removal when restoration resumes (#105)\n\nCloses #101",
+          "timestamp": "2026-10-10T13:03:10+03:00",
+          "tree_id": "b9e43f5c26deddf35869699074a5ef4e540c3be9",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/ced44eae188f0cd3cdef94127eea6fd40bcd8b05"
+        },
+        "date": 1791626615099,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
