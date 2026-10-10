@@ -223,7 +223,9 @@ or live-provider evidence. Outputs stay in CI artifacts or external scratch.
 [Dependabot](.github/dependabot.yml) scans Actions, Gradle and both Python locations
 weekly; minor/patch groups and separate majors do not imply automerge. SHA-pinned
 Action version scans are not a promise of immediate advisory/security-update PRs.
-PR workflows and tests must not use secrets or live credentials.
+PR workflows and tests must not use secrets or live credentials. CodeQL default
+setup scans Actions, Java/Kotlin and Python; its code-scanning rule is separate
+from required status checks.
 
 See [code-quality policy](docs/code-quality.md) and the
 [metric chart](https://leugenea.github.io/codexbar-mobile/dev/bench/).

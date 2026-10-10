@@ -62,7 +62,10 @@ and redact arbitrary provider error descriptions, token pairs and response bodie
 
 PR workflows run on hosted runners with no live credentials; strict Gradle checksum
 verification, full-SHA Action pins and hash-pinned Python inputs protect build
-acquisition. These are limited safeguards, not a security certification.
+acquisition. CodeQL default setup scans Actions, Java/Kotlin and Python, enforced
+through the [code-scanning rule](docs/repository-protection.md); Java/Kotlin
+autobuild does not extract test sources. These are limited safeguards, not a
+security certification.
 
 The gate reports binding UNRESOLVED and identity UNVERIFIED; token receipt and HTTP
 200 do not establish identity. The owner accepted the single identity-unverified
