@@ -12,5 +12,15 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
+
+// CodeQL must observe compilation, not restore compiled outputs.
+if (providers.environmentVariable('CODEQL_EXTRACTOR_JAVA_TRAP_DIR').isPresent()) {
+    buildCache {
+        local {
+            enabled = false
+        }
+    }
+}
+
 rootProject.name = 'codexbar-mobile'
 include ':app'
