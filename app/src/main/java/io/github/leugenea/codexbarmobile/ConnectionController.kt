@@ -73,15 +73,10 @@ internal class ConnectionController(
         when (restored) {
             is CredentialResult.Success -> {
                 restoreHistory(restoredGeneration)
-                if (revision != 0L || closed) return
-                if (history?.requiresRemoval == true) {
-                    removeCredentials()
-                    publish(0, if (awaitDeletion()) ConnectionState(ConnectionPhase.REAUTH_REQUIRED) else storageFailure())
-                } else {
-                    session.adopt(restored.value)
-                    publishName()
-                    publish(0, ConnectionState(ConnectionPhase.RESTORED))
-                }
+                if (!completeHistoryRestoration(0, restoredGeneration)) return
+                session.adopt(restored.value)
+                publishName()
+                publish(0, ConnectionState(ConnectionPhase.RESTORED))
             }
             is CredentialResult.Failure -> restoreFailure(restored)
         }
@@ -104,6 +99,16 @@ internal class ConnectionController(
         ownerScope.async(storageDispatcher) { history?.restore(active) }.await()
         if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
         bindHistory(active)
+    }
+
+    /** Continue only for the captured lifetime; interrupted removal uses one combined barrier. */
+    private suspend fun completeHistoryRestoration(owner: Long, active: SessionGeneration): Boolean {
+        if (!current(owner) || generation !== active || !store.isActive(active) || cleanupPending()) return false
+        if (history?.requiresRemoval != true) return true
+        usageRefresh.reset()
+        removeCredentials()
+        publish(owner, if (awaitDeletion()) ConnectionState(ConnectionPhase.REAUTH_REQUIRED) else storageFailure())
+        return false
     }
 
     private suspend fun missingCredentials(): ConnectionPhase {
@@ -201,11 +206,13 @@ internal class ConnectionController(
         if (cleanupPending() || historyAvailability !in setOf(HistoryAvailability.UNAVAILABLE, HistoryAvailability.STORAGE_FAILURE)
             || historyRestore?.isActive == true) return
         history?.resumeRuntime()
+        val owner = revision
         historyRestore = ownerScope.launch(start = CoroutineStart.LAZY) {
             ownerScope.async(storageDispatcher) { history?.restore(active.generation) }.await()
             historyRestore = null
+            if (!completeHistoryRestoration(owner, active.generation)) return@launch
             bindHistory(active.generation)
-            if (mutableName.value != null && generation === active.generation) publishName()
+            if (mutableName.value != null) publishName()
         }.also { it.start() }
     }
 

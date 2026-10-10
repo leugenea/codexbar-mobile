@@ -188,6 +188,173 @@ class AccountNameLifetimeTest {
         }
     }
 
+    @Test fun resumedInterruptedRemovalPurgesCredentialsHistoryAndNameExactlyOnceWithoutRequests() = runBlocking {
+        for (initialFailure in listOf(true, false)) {
+            val journal = LifetimeJournal().apply {
+                failRestore = initialFailure
+                name = AccountDisplayName.from("Synthetic interrupted")
+            }
+            LifetimeFixture(journal).use { h ->
+                h.phase(ConnectionPhase.RESTORED)
+                val initial = h.owner.accountName.value!!
+                assertEquals(initialFailure, initial.storageFailed)
+                assertEquals(initialFailure, initial.edit == null)
+                val sample = WindowHistory.append(journal.cursor, SyntheticHistory.admission(journal.cursor)) as HistoryReduction.Applied
+                journal.cursor = sample.cursor; journal.entries += sample.entry
+                journal.failRestore = false
+                journal.phase = LifetimeJournal.Phase.DELETING
+                val observer = Any()
+                if (!initialFailure) {
+                    h.owner.usageForeground(observer, false)
+                    settled(h, "retire clean history before foreground re-adoption")
+                    assertEquals(HistoryAvailability.UNAVAILABLE, h.owner.historyAvailability)
+                } else assertEquals(HistoryAvailability.STORAGE_FAILURE, h.owner.historyAvailability)
+                val restoreGate = ControlledGate(); journal.restoreGate = restoreGate
+                val deleteGate = ControlledGate(); journal.deleteGate = deleteGate
+                try {
+                    h.owner.usageForeground(observer, true)
+                    awaitGate(h, "resume restore entered", restoreGate)
+                    h.owner.usageForeground(observer, true)
+                    settled(h, "coalesce resume while interrupted receipt is held")
+                    assertEquals(2, journal.restoreCalls)
+                    restoreGate.release(); journal.restoreGate = null
+                    awaitGate(h, "combined history removal entered", deleteGate)
+                    await(h, "credential removal settles independently of held history removal") { h.persistence.durable == null }
+                    assertNotEquals(ConnectionPhase.REAUTH_REQUIRED, h.owner.state.value.phase)
+                    assertNull(h.owner.accountName.value)
+                    assertTrue(h.owner.session.snapshot() is SessionResult.Failed)
+                    assertEquals(HistoryAvailability.REMOVAL_PENDING, h.owner.historyAvailability)
+                    h.owner.usageForeground(observer, true); h.owner.readUsage(); h.owner.connect()
+                    settled(h, "reject requests and retries while combined cleanup is pending")
+                    assertTrue(h.fake.calls.isEmpty())
+                    assertEquals(2, journal.restoreCalls)
+                } finally {
+                    restoreGate.release(); deleteGate.release()
+                    journal.restoreGate = null; journal.deleteGate = null
+                }
+                h.phase(ConnectionPhase.REAUTH_REQUIRED)
+                assertNull(h.owner.state.value.problem)
+                assertNull(h.persistence.durable)
+                assertTrue(journal.entries.isEmpty())
+                assertNull(journalName(h)); assertNull(h.owner.accountName.value)
+                assertEquals(LifetimeJournal.Phase.EMPTY, journal.phase)
+                assertEquals(HistoryAvailability.UNAVAILABLE, h.owner.historyAvailability)
+                h.owner.usageForeground(observer, true); h.owner.usageForeground(observer, true)
+                settled(h, "terminal resume cannot repeat interrupted removal")
+                assertEquals(2, journal.restoreCalls)
+                assertEquals(1, h.persistence.deleteCount)
+                assertEquals(1, journal.deletions)
+                assertTrue(h.fake.calls.isEmpty())
+            }
+        }
+    }
+
+    @Test fun resumedRemovalClearsActivatedRefreshAndRejectsItsHeldProviderReply() = runBlocking {
+        val journal = LifetimeJournal().apply { failRestore = true }
+        LifetimeFixture(journal).use { h ->
+            h.phase(ConnectionPhase.RESTORED)
+            val observer = Any()
+            val failed = h.owner.accountName.value
+            h.owner.usageForeground(observer, true)
+            awaitName(h, "foreground local storage failure settled") { it !== failed && it?.storageFailed == true }
+            h.owner.readUsage(); h.phase(ConnectionPhase.OBSERVED)
+            assertNotNull(h.owner.state.value.refresh.usage.success)
+            assertNotNull(h.owner.state.value.refresh.inventory.success)
+            assertEquals(2, h.fake.calls.size)
+            journal.failRestore = false
+            journal.phase = LifetimeJournal.Phase.DELETING
+            val restoreGate = ControlledGate(); journal.restoreGate = restoreGate
+            val deleteGate = ControlledGate(); journal.deleteGate = deleteGate
+            val sent = CompletableDeferred<io.github.leugenea.codexbarmobile.auth.AuthFake.Call>()
+            h.fake.respond = { sent.complete(it) }
+            try {
+                h.owner.usageForeground(observer, true)
+                awaitGate(h, "activated resume restore entered", restoreGate)
+                h.owner.readUsage()
+                val request = bounded(h, "explicit read entered while local restore is held") { sent.await() }
+                restoreGate.release(); journal.restoreGate = null
+                awaitGate(h, "activated combined history removal entered", deleteGate)
+                await(h, "in-flight provider request cancelled by lifetime removal") { request.cancelled }
+                assertNull(h.owner.state.value.observations)
+                assertNull(h.owner.state.value.refresh.observations)
+                assertFalse(h.owner.state.value.refresh.refreshing)
+                deleteGate.release(); journal.deleteGate = null
+                h.phase(ConnectionPhase.REAUTH_REQUIRED)
+                val terminal = h.owner.state.value
+                request.reply(io.github.leugenea.codexbarmobile.auth.SyntheticAuth.response("{}"))
+                h.owner.usageForeground(observer, true)
+                settled(h, "late provider reply and foreground cannot reactivate removed lifetime")
+                assertSame(terminal, h.owner.state.value)
+                assertNull(h.owner.state.value.refresh.observations)
+                assertEquals(3, h.fake.calls.size) // Two accepted reads plus the explicit cancelled read.
+                assertEquals(3, journal.restoreCalls)
+                assertEquals(1, h.persistence.deleteCount)
+                assertEquals(1, journal.deletions)
+            } finally {
+                restoreGate.release(); deleteGate.release()
+                journal.restoreGate = null; journal.deleteGate = null
+            }
+        }
+    }
+
+    @Test fun heldResumeAfterCancelLogoutOrReplacementCannotRemoveTheSuccessorLifetime() = runBlocking {
+        for (action in listOf("cancel", "logout", "replacement")) {
+            val journal = LifetimeJournal().apply {
+                failRestore = true
+                name = AccountDisplayName.from("Synthetic predecessor")
+            }
+            val persistence = FakeCredentialPersistence()
+            LifetimeFixture(journal, persistence).use { h ->
+                h.phase(ConnectionPhase.RESTORED)
+                val old = (h.owner.session.snapshot() as SessionResult.Ready).envelope.generation
+                val predecessor = journal.partition
+                val gate = ControlledGate(); journal.restoreGate = gate
+                try {
+                    h.owner.usageForeground(Any(), true)
+                    awaitGate(h, "$action: resume restore entered", gate)
+                    journal.failRestore = false
+                    journal.phase = LifetimeJournal.Phase.DELETING
+                    when (action) {
+                        "cancel" -> h.owner.cancel()
+                        "logout" -> h.owner.signOut()
+                        else -> h.owner.connect()
+                    }
+                    settled(h, "$action: retire generation while resume storage is held")
+                    assertTrue(h.owner.session.snapshot() is SessionResult.Failed)
+                    assertNull(h.owner.accountName.value)
+                    assertTrue(h.fake.calls.isEmpty())
+                    if (action == "cancel") {
+                        assertEquals(ConnectionPhase.CANCELLED, h.owner.state.value.phase)
+                        assertEquals(0, persistence.deleteCount)
+                        assertEquals(0, journal.deletions)
+                    }
+                } finally { gate.release(); journal.restoreGate = null }
+                if (action != "replacement") {
+                    if (action == "logout") h.phase(ConnectionPhase.SIGNED_OUT)
+                    // Connect reserves the same explicit predecessor cleanup after cancel/logout.
+                    h.owner.connect()
+                }
+                h.phase(ConnectionPhase.OBSERVED)
+                val next = h.owner.accountName.value!!.edit!!
+                assertNotSame(old, next.generation)
+                assertNotEquals(predecessor, next.partition)
+                assertFalse(h.history.requiresRemoval)
+                assertNull(h.owner.historyCapability(old))
+                rename(h, next, "Synthetic successor", "Synthetic successor")
+                assertNotNull(h.persistence.durable)
+                assertEquals(1, persistence.deleteCount)
+                assertEquals(1, journal.deletions)
+                assertEquals(5, h.fake.calls.size) // One explicit login and its two selected reads only.
+            }
+            // Shutdown joins the late restore too: it cannot erase an already named successor.
+            assertNotNull(persistence.durable)
+            assertEquals("Synthetic successor", journal.name!!.text)
+            assertEquals(LifetimeJournal.Phase.ACTIVE, journal.phase)
+            assertEquals(1, persistence.deleteCount)
+            assertEquals(1, journal.deletions)
+        }
+    }
+
     @Test fun failedRemovalDisablesEditsAndRetryCannotReusePredecessorName() = runBlocking {
         LifetimeFixture().use { h ->
             h.phase(ConnectionPhase.RESTORED)
@@ -211,6 +378,10 @@ class AccountNameLifetimeTest {
         awaitName(h, "commit name ${expected ?: "<cleared>"}") {
             it?.edit === edit && !it.storageFailed && it.name?.text == expected
         }
+    }
+    private fun awaitGate(h: LifetimeFixture, step: String, gate: ControlledGate) {
+        try { gate.awaitEntered() }
+        catch (error: IllegalStateException) { throw AssertionError("$step: last=${h.owner.state.value}", error) }
     }
     private suspend fun settled(h: LifetimeFixture, step: String) = bounded(h, step) { h.owner.commandsSettled() }
     private suspend fun awaitName(h: LifetimeFixture, step: String, predicate: (AccountNameState?) -> Boolean) =
