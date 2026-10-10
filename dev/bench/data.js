@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791622267460,
+  "lastUpdate": 1791622270682,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2609,6 +2609,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/41d9d618403ee90791be5924b5a36055d5a37b84"
         },
         "date": 1791617900282,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "06c6b819ab5e01f6107871f779d9b8e001dbbfb2",
+          "message": "test(quarantine): await pending-deletion READING before asserting it (#103)\n\nCloses #102",
+          "timestamp": "2026-10-10T11:50:40+03:00",
+          "tree_id": "1f2b34a73311d05f8f794b4747a318d39632af12",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/06c6b819ab5e01f6107871f779d9b8e001dbbfb2"
+        },
+        "date": 1791622270100,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
