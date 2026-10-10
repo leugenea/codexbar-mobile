@@ -928,6 +928,13 @@ Coverage minimum: **90%** JaCoCo **INSTRUCTION** over the JVM + instrumented uni
 not a sum of percentages or test counts. Handwritten Activity/Compose/lambda code
 remains in scope. Commands, cache policy and all-outcome failure artifacts are
 specified in [CONTRIBUTING](CONTRIBUTING.md); metrics in [code quality](docs/code-quality.md).
+The strict build/lint/JVM and instrumented/coverage jobs run in parallel, without
+sharing compiled outputs; `Android CI result` still requires both successes.
+The native graph repeats JVM compilation/tests to bind JVM `.exec` and native
+`.ec` to the same classes. Full `--info` evidence (including every retry attempt)
+remains unfiltered; only known informational console noise is suppressed. The
+SHA-pinned checkout/upload-artifact actions use Node 24 without changing credential
+or artifact policy.
 
 ## Research versus future implementation
 

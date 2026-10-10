@@ -148,8 +148,8 @@ class ToolchainContract(unittest.TestCase):
 
     def assert_cached_actions_setup(self, workflow):
         pins = {
-            "actions/checkout": ("08eba0b27e820071cde6df949e0beb9ba4906955", "v4.3.0", 2),
-            "actions/upload-artifact": ("ea165f8d65b6e75b540449e92b4886f43607fa02", "v4.6.2", 2),
+            "actions/checkout": ("3d3c42e5aac5ba805825da76410c181273ba90b1", "v7.0.1", 2),
+            "actions/upload-artifact": ("cf430e030ddbb5b0abf93d22962f4752f3646cd9", "v7.0.2", 2),
             "actions/setup-java": ("de7274f081f381c8f8158605e0321c36c376e2e6", "v6.0.1", 2),
             "gradle/actions/setup-gradle": ("3f5f9adaf7d9fecd50b5935e54106014257a94e6", "v6.4.0", 2),
             "android-actions/setup-android": ("be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd", "v4.0.4", 2),

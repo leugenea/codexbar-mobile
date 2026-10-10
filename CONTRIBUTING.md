@@ -88,6 +88,23 @@ and separate Gradle user homes. The basic dependency cache is enabled; fork PRs
 have read-only cache access. Strict verification remains mandatory on cache hits.
 Build/configuration caches are disabled and acceptance tasks rerun.
 
+`build` and `instrumented` run independently in parallel; `Android CI result`
+still requires both to succeed, including the native union-coverage gate. The
+build job retains its strict lint/JVM gate. The native job must compile and run
+JVM + native tests in one Gradle graph so `.exec` and `.ec` share the same class
+IDs; it consumes no build-job outputs. This intentional cross-job compilation
+and JVM-test duplication remains, but the build job is off the native critical path.
+
+Both graphs keep full `--info` output in `evidence/strict.log` and
+`evidence/native/strict-connected.log` (plus each native attempt's copy), before
+filtering known cache-disabled and library-manifest informational lines from the
+console. Warnings, errors, task/test output and coverage outcomes remain visible.
+Evidence parsers and the bounded coverage retry read the unfiltered logs. Gradle/
+timeout exit codes take precedence over pipeline helpers; evidence/filter failures
+also fail the job. Checkout v7.0.1 and upload-artifact v7.0.2 use Node 24 with full
+SHA pins; credential persistence remains disabled and existing artifact inputs
+(including hidden-file exclusion, retention and unique Android names) are unchanged.
+
 Build job command (the init script defines the observation task):
 
 ```sh
