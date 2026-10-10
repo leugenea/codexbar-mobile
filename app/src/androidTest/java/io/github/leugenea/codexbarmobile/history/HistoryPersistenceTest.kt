@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteFullException
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.leugenea.codexbarmobile.usage.*
+import io.github.leugenea.codexbarmobile.account.*
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
@@ -101,6 +102,24 @@ class HistoryPersistenceTest {
         stored(access, 3)
         assertEquals(ObservationId(1), snapshot(access).entries.last().windows.first().point!!.segment.id.first)
         assertEquals(3L, diskCount())
+    }
+
+    private fun clearNameWithoutHeadroom(backend: SQLiteHistoryStore, partition: HistoryPartition, limits: HistoryStorageLimits) {
+        val name = AccountDisplayName.from("Synthetic full directory")!!
+        assertTrue(backend.writeName(partition, name))
+        // Synthetic allowed journal padding fills the directory without modifying the database.
+        val padding = File(directory, "history.db-journal")
+        try {
+            RandomAccessFile(padding, "rw").use { it.setLength(limits.bytes - bytes()) }
+            assertEquals(limits.bytes, bytes())
+            assertFalse(backend.writeName(partition, AccountDisplayName.from("Synthetic rejected")))
+            assertFalse(backend.writeName(HistoryPartition(UUID(0, 99)), null))
+            assertEquals(name.text, (backend.readName(partition) as AccountNameRead.Ready).name!!.text)
+            assertTrue(backend.writeName(partition, null))
+            assertFalse(File(directory, AccountNameFile.FILE_NAME).exists())
+            assertFalse(File(directory, AccountNameFile.PENDING_NAME).exists())
+            assertNull((backend.readName(partition) as AccountNameRead.Ready).name)
+        } finally { assertTrue(padding.delete()) }
     }
 
     @Test fun partitionCapabilitiesRejectCrossPartitionAndRetiredGenerations() {
@@ -289,7 +308,7 @@ class HistoryPersistenceTest {
         assertTrue(bytes() <= HistoryLimits.MAX_BYTES)
         assertEquals(30L, HistoryStorageLimits().retentionDays)
         assertEquals(100_000, HistoryStorageLimits().observations)
-
+        clearNameWithoutHeadroom(defaults, plain.partition, HistoryStorageLimits())
     }
 
     @Test fun fullSQLiteAndInterruptedMaintenanceReturnTypedFailureWithoutConsumingId() {

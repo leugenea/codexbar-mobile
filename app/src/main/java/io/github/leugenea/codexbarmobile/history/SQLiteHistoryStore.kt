@@ -157,7 +157,7 @@ class SQLiteHistoryStore internal constructor(
     internal fun writeName(partition: HistoryPartition, name: AccountDisplayName?): Boolean =
         operation(HistoryUnavailable.WRITE_FAILURE, { false }) {
             if (!nameAuthorized(partition)) return@operation false
-            files.checkBudget(AccountNameFile.MAX_BYTES.toLong())
+            if (name != null) files.checkBudget(AccountNameFile.MAX_BYTES.toLong())
             accountName.write(partition, name)
             files.syncDirectory()
             true

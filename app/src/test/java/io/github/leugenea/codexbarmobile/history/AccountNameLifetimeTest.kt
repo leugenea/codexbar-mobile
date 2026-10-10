@@ -41,7 +41,7 @@ class AccountNameLifetimeTest {
             h.phase(ConnectionPhase.RESTORED)
             assertEquals("Synthetic restored", h.owner.accountName.value!!.name!!.text)
             assertNotSame(old, h.owner.accountName.value!!.edit)
-            h.owner.renameAccount(old, "Synthetic stale"); h.owner.commandsSettled()
+            h.owner.renameAccount(old, "Synthetic stale"); settled(h, "reject stale editor")
             assertEquals("Synthetic restored", journal.name!!.text)
             assertTrue(h.fake.calls.isEmpty())
         }
@@ -51,10 +51,10 @@ class AccountNameLifetimeTest {
         LifetimeFixture().use { h ->
             h.phase(ConnectionPhase.RESTORED)
             val edit = h.owner.accountName.value!!.edit!!
-            h.owner.usageForeground(Any(), false); h.owner.commandsSettled()
+            h.owner.usageForeground(Any(), false); settled(h, "retire foreground history")
             rename(h, edit, "Synthetic background label", "Synthetic background label")
             h.owner.usageForeground(Any(), true)
-            await("history resumed") { h.owner.historyAvailability == HistoryAvailability.AVAILABLE }
+            await(h, "history resumed") { h.owner.historyAvailability == HistoryAvailability.AVAILABLE }
             assertSame(edit, h.owner.accountName.value!!.edit)
             assertEquals("Synthetic background label", h.owner.accountName.value!!.name!!.text)
             assertTrue(h.fake.calls.isEmpty())
@@ -71,7 +71,7 @@ class AccountNameLifetimeTest {
             val next = h.owner.accountName.value!!.edit!!
             assertNotEquals(old.partition, next.partition)
             assertNull(journalName(h))
-            h.owner.renameAccount(old, "Synthetic stale"); h.owner.commandsSettled()
+            h.owner.renameAccount(old, "Synthetic stale"); settled(h, "reject stale editor")
             assertNull(journalName(h))
             rename(h, next, "Synthetic successor", "Synthetic successor")
         }
@@ -85,17 +85,17 @@ class AccountNameLifetimeTest {
             try {
                 h.owner.renameAccount(old, "Synthetic held")
                 gate.awaitEntered()
-                h.owner.signOut(); h.owner.commandsSettled()
+                h.owner.signOut(); settled(h, "reserve removal behind held name write")
                 assertEquals(ConnectionPhase.SIGNING_OUT, h.owner.state.value.phase)
                 assertNull(h.owner.accountName.value)
-                h.owner.connect(); h.owner.commandsSettled()
+                h.owner.connect(); settled(h, "reject connect during held removal")
                 assertTrue(h.fake.calls.isEmpty())
             } finally { gate.release(); h.journal.nameGate = null }
             h.phase(ConnectionPhase.SIGNED_OUT)
             assertNull(journalName(h))
             h.owner.connect(); h.phase(ConnectionPhase.OBSERVED)
             assertNull(h.owner.accountName.value!!.name)
-            h.owner.renameAccount(old, "Synthetic late"); h.owner.commandsSettled()
+            h.owner.renameAccount(old, "Synthetic late"); settled(h, "reject late predecessor editor")
             assertNull(journalName(h))
         }
     }
@@ -110,7 +110,7 @@ class AccountNameLifetimeTest {
             rename(h, edit, "Synthetic retained", "Synthetic retained")
             journal.failNameWrite = true
             h.owner.renameAccount(edit, "Synthetic rejected")
-            withTimeout(5_000) { h.owner.accountName.first { it?.storageFailed == true } }
+            awaitName(h, "name write failure published") { it?.storageFailed == true }
             assertEquals("Synthetic retained", journalName(h))
             assertEquals("Synthetic retained", h.owner.accountName.value!!.name!!.text)
             assertEquals(ConnectionPhase.RESTORED, h.owner.state.value.phase)
@@ -133,10 +133,15 @@ class AccountNameLifetimeTest {
         LifetimeFixture().use { h ->
             h.phase(ConnectionPhase.RESTORED)
             rename(h, h.owner.accountName.value!!.edit!!, "Synthetic terminal", "Synthetic terminal")
-            h.fake.respond = { call -> call.reply(io.github.leugenea.codexbarmobile.auth.SyntheticAuth.response(
-                "{}", if (call.request.url.encodedPath == "/oauth/token") 400 else 401)) }
+            h.fake.respond = { call ->
+                val refresh = call.request.url.encodedPath == "/oauth/token"
+                call.reply(io.github.leugenea.codexbarmobile.auth.SyntheticAuth.response(
+                    if (refresh) "{\"error\":\"invalid_grant\"}" else "{}", if (refresh) 400 else 401))
+            }
             h.owner.readUsage()
             h.phase(ConnectionPhase.REAUTH_REQUIRED)
+            assertEquals(1, h.fake.calls.count { it.request.url.encodedPath == "/oauth/token" })
+            assertNull(h.persistence.durable)
             assertNull(journalName(h)); assertNull(h.owner.accountName.value)
         }
     }
@@ -148,11 +153,36 @@ class AccountNameLifetimeTest {
         }
         LifetimeFixture(journal).use { h ->
             h.phase(ConnectionPhase.RESTORED)
-            assertTrue(h.owner.accountName.value!!.storageFailed)
-            assertNull(h.owner.accountName.value!!.edit)
+            val failed = h.owner.accountName.value!!
+            assertTrue(failed.storageFailed)
+            assertNull(failed.edit)
+            assertEquals(HistoryAvailability.STORAGE_FAILURE, h.owner.historyAvailability)
+            assertEquals(1, journal.restoreCalls)
+            val observer = Any()
+            val gate = ControlledGate(); journal.restoreGate = gate
+            try {
+                h.owner.usageForeground(observer, true)
+                gate.awaitEntered()
+                h.owner.usageForeground(observer, true)
+                settled(h, "coalesce repeated foreground restore while storage is held")
+                assertEquals(2, journal.restoreCalls)
+            } finally { gate.release(); journal.restoreGate = null }
+            awaitName(h, "repeated lifetime failure published without an editor") {
+                it !== failed && it?.storageFailed == true && it.edit == null
+            }
+            settled(h, "failed local restore completed without automatic retry")
+            assertEquals(HistoryAvailability.STORAGE_FAILURE, h.owner.historyAvailability)
+            assertEquals(2, journal.restoreCalls)
+            assertTrue(h.fake.calls.isEmpty())
+            h.owner.usageForeground(Any(), false)
+            settled(h, "unrelated observer removal does not retry lifetime storage")
+            assertEquals(2, journal.restoreCalls)
             journal.failRestore = false
-            h.owner.usageForeground(Any(), true)
-            withTimeout(5_000) { h.owner.accountName.first { it?.name?.text == "Synthetic recovered" } }
+            h.owner.usageForeground(observer, true)
+            awaitName(h, "recovered lifetime republishes name and editor") {
+                it?.name?.text == "Synthetic recovered" && it.edit != null && !it.storageFailed
+            }
+            assertEquals(3, journal.restoreCalls)
             rename(h, h.owner.accountName.value!!.edit!!, "Synthetic available", "Synthetic available")
             assertTrue(h.fake.calls.isEmpty())
         }
@@ -166,7 +196,7 @@ class AccountNameLifetimeTest {
             h.journal.failDelete = true
             h.owner.signOut(); h.phase(ConnectionPhase.FAILED)
             assertNull(h.owner.accountName.value)
-            h.owner.renameAccount(edit, "Synthetic stale"); h.owner.commandsSettled()
+            h.owner.renameAccount(edit, "Synthetic stale"); settled(h, "reject editor after failed removal")
             assertEquals("Synthetic failed removal", journalName(h))
             h.journal.failDelete = false
             h.owner.connect(); h.phase(ConnectionPhase.OBSERVED)
@@ -178,10 +208,19 @@ class AccountNameLifetimeTest {
     private fun journalName(h: LifetimeFixture) = h.journal.name?.text
     private suspend fun rename(h: LifetimeFixture, edit: AccountNameEdit, input: String, expected: String?) {
         h.owner.renameAccount(edit, input)
-        withTimeout(5_000) { h.owner.accountName.first { it?.edit === edit && !it.storageFailed && it.name?.text == expected } }
+        awaitName(h, "commit name ${expected ?: "<cleared>"}") {
+            it?.edit === edit && !it.storageFailed && it.name?.text == expected
+        }
     }
-    private suspend fun await(step: String, predicate: () -> Boolean) {
-        try { withTimeout(5_000) { while (!predicate()) delay(1) } }
-        catch (_: TimeoutCancellationException) { throw AssertionError("$step: last state=false") }
+    private suspend fun settled(h: LifetimeFixture, step: String) = bounded(h, step) { h.owner.commandsSettled() }
+    private suspend fun awaitName(h: LifetimeFixture, step: String, predicate: (AccountNameState?) -> Boolean) =
+        bounded(h, step) { h.owner.accountName.first(predicate) }
+    private suspend fun await(h: LifetimeFixture, step: String, predicate: () -> Boolean) =
+        bounded(h, step) { while (!predicate()) delay(1) }
+    private suspend fun <T> bounded(h: LifetimeFixture, step: String, action: suspend () -> T): T {
+        try { return withTimeout(5_000) { action() } }
+        catch (error: TimeoutCancellationException) {
+            throw AssertionError("$step: last=${h.owner.accountName.value} phase=${h.owner.state.value.phase}", error)
+        }
     }
 }

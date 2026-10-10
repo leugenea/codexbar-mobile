@@ -192,13 +192,14 @@ internal class ConnectionController(
         usageRefresh.foreground(observer, foreground)
         historyRecorder.foreground(usageRefresh.hasForegroundObservers)
         if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
-        else resumeHistory()
+        else if (foreground) resumeHistory()
         (session.snapshot() as? SessionResult.Ready)?.envelope?.generation?.let(::bindHistory)
     }
 
     private fun resumeHistory() {
         val active = (session.snapshot() as? SessionResult.Ready)?.envelope ?: return
-        if (cleanupPending() || historyAvailability != HistoryAvailability.UNAVAILABLE || historyRestore?.isActive == true) return
+        if (cleanupPending() || historyAvailability !in setOf(HistoryAvailability.UNAVAILABLE, HistoryAvailability.STORAGE_FAILURE)
+            || historyRestore?.isActive == true) return
         history?.resumeRuntime()
         historyRestore = ownerScope.launch(start = CoroutineStart.LAZY) {
             ownerScope.async(storageDispatcher) { history?.restore(active.generation) }.await()

@@ -28,7 +28,8 @@ internal class LifetimeJournal {
     var readFailure: HistoryReadOutcome? = null
     var throwRead = false
     var name: AccountDisplayName? = null
-    var failRestore = false
+    @Volatile var failRestore = false
+    @Volatile var restoreCalls = 0
     var failNameRead = false
     var failNameWrite = false
     var nameGate: ControlledGate? = null
@@ -53,6 +54,7 @@ internal class LifetimeJournal {
             return bind()
         }
         override fun restore(): HistoryLifetimeOutcome {
+            restoreCalls++
             restoreGate?.pause()
             if (failRestore) return HistoryLifetimeOutcome.Unavailable
             return when (phase) {
