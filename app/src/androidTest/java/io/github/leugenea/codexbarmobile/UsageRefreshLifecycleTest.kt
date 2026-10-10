@@ -17,9 +17,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
 import io.github.leugenea.codexbarmobile.credentials.*
 import io.github.leugenea.codexbarmobile.transport.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -129,8 +130,7 @@ class UsageRefreshLifecycleTest {
         }
     }
 
-    private fun observed(): Boolean {
-        val state = owner.state.value
+    private fun observed(state: ConnectionState = owner.state.value): Boolean {
         return state.phase == ConnectionPhase.OBSERVED && !state.refresh.refreshing && state.problem == null &&
             state.refresh.usage.success != null && state.refresh.inventory.success != null
     }
@@ -158,9 +158,9 @@ class UsageRefreshLifecycleTest {
                     settleCommands("duplicate foreground read commands coalesce before release")
                     assertEquals("held duplicates issue no GET: ${diagnostics()}", before, fake.gets.get())
                     fake.releaseUsage(current)
-                    // Only the IO-owned response/settlement is awaited here, never Compose.
-                    // Main is fenced so a new lifecycle epoch cannot mask a queued duplicate.
-                    waitFor("released cycle settles on owner lane", pumpCompose = false) { observed() }
+                    // Suspend on an IO-completed state signal while Main fences lifecycle delivery.
+                    // No spinning or Compose synchronization is needed inside this checkpoint.
+                    awaitOwner("released cycle settles on owner lane") { owner.state.first { observed(it) } }
                     settleCommands("released cycle completion commands")
                     assertEquals("coalesced cycle adds exactly its inventory GET: ${diagnostics()}",
                         before + 1, fake.gets.get())
@@ -181,7 +181,7 @@ class UsageRefreshLifecycleTest {
         settleCommands("recovered foreground loss command")
         val fresh = owner.state.value.refresh.usage.success
         assertNotNull(fresh)
-        assertEpochRequests(old, baselineGets)
+        assertEpochRequests(baselineGets)
         val total = fake.gets.get()
         old.reply(response("{}", 401))
         settleCommands("stale unauthorized predecessor reply")
@@ -190,24 +190,29 @@ class UsageRefreshLifecycleTest {
         assertEquals(1, fake.maximum.get())
     }
 
-    private fun assertEpochRequests(old: Held, baselineGets: Int) {
-        val returned = fake.usageCalls.filter { it.id > old.id }
-        val starts = requireNotNull(epochs).starts.get()
-        assertNotEquals("return must observe a START: ${diagnostics()}", 0, starts)
-        assertEquals("all return epochs have stopped: ${diagnostics()}", starts + 1, requireNotNull(epochs).stops.get())
-        // A brief START/STOP can cancel the lazy refresh before it reaches transport.
-        // Admission consumes an independently observed START budget in the fake; these
-        // zero-request epochs must not be mistaken for cancelled held requests.
-        val skipped = starts - returned.size
-        returned.forEach { call ->
-            assertEquals("cancelled epochs cannot reach inventory: ${diagnostics()}",
-                !call.cancelled.get(), call.inventory.get())
-        }
-        // Held cancelled epochs contribute usage only; released completed epochs contribute
-        // both endpoints. This includes extra complete STOP/START pairs after gate release.
-        val cancelled = returned.count { it.cancelled.get() }
-        assertEquals("exact epoch-aware GET total: ${diagnostics()}",
-            baselineGets + 2 * (starts - skipped) - cancelled, fake.gets.get())
+    private fun assertEpochRequests(baselineGets: Int) {
+        val tracker = requireNotNull(epochs)
+        val ledger = tracker.snapshot()
+        val returned = fake.usageCalls.filter { it.epoch != null }
+        val byEpoch = returned.groupBy { requireNotNull(it.epoch) }
+        assertNotEquals("return must observe a START: ${diagnostics()}", 0, ledger.size)
+        assertEquals("all return epochs have stopped: ${diagnostics()}", ledger.size + 1, tracker.stops.get())
+        assertEquals("every return GET belongs to an observed epoch: ${diagnostics()}",
+            returned.size, ledger.sumOf { byEpoch[it.index].orEmpty().size })
+        val returnGets = ledger.sumOf { epochGets(it, byEpoch[it.index].orEmpty()) }
+        assertEquals("exact epoch-aware GET total: ${diagnostics()}", baselineGets + returnGets, fake.gets.get())
+    }
+
+    private fun epochGets(epoch: ForegroundEpoch, calls: List<Held>): Int {
+        val skipped = requireNotNull(epoch.stoppedBeforeAdmission) { "Epoch did not stop: ${diagnostics()}" }
+        assertEquals("epoch ${epoch.index} admits at most one usage GET: ${diagnostics()}",
+            if (skipped) 0 else 1, calls.size)
+        if (skipped) return 0
+        val call = calls.single()
+        assertEquals("cancelled epochs cannot reach inventory: ${diagnostics()}",
+            !call.cancelled.get(), call.inventory.get())
+        // A cancelled admitted epoch contributes usage only; a completed epoch adds inventory.
+        return if (call.cancelled.get()) 1 else 2
     }
 
     private fun launchGate(): ActivityScenario<MainActivity> {
@@ -235,26 +240,24 @@ class UsageRefreshLifecycleTest {
         return state
     }
 
-    private fun waitFor(step: String, pumpCompose: Boolean = true, condition: () -> Boolean) {
-        try {
-            if (pumpCompose) compose.waitUntil(timeoutMillis = 10_000, condition = condition)
-            else runBlocking { withTimeout(5_000) { while (!condition()) yield() } }
-        } catch (error: ComposeTimeoutException) {
-            throw AssertionError("$step: ${diagnostics()}", error)
-        } catch (error: kotlinx.coroutines.TimeoutCancellationException) {
+    private fun waitFor(step: String, condition: () -> Boolean) {
+        try { compose.waitUntil(timeoutMillis = 10_000, condition = condition) }
+        catch (error: ComposeTimeoutException) {
             throw AssertionError("$step: ${diagnostics()}", error)
         }
     }
 
-    private fun settleCommands(step: String) {
-        try { runBlocking { withTimeout(5_000) { owner.commandsSettled() } } }
+    private fun settleCommands(step: String) = awaitOwner(step) { owner.commandsSettled() }
+
+    private fun awaitOwner(step: String, action: suspend () -> Unit) {
+        try { runBlocking(Dispatchers.IO) { withTimeout(5_000) { action() } } }
         catch (error: kotlinx.coroutines.TimeoutCancellationException) {
             throw AssertionError("$step: ${diagnostics()}", error)
         }
     }
 
     private fun diagnostics(): String = "last state=${owner.state.value}, refresh=${owner.state.value.refresh}, " +
-        "epochs=${epochs?.starts?.get()}, stops=${epochs?.stops?.get()}, gets=${fake.gets.get()}, " +
+        "epochs=${epochs?.snapshot()}, stops=${epochs?.stops?.get()}, gets=${fake.gets.get()}, " +
         "held=${fake.held.map { it.diagnostics() }}, usage=${fake.usageCalls.map { it.diagnostics() }}"
 
     private fun store() = KeystoreCredentialStore(context, NativeConnection.session(context))
@@ -265,19 +268,22 @@ class UsageRefreshLifecycleTest {
 
     /** Attached before Compose registers its lifecycle observer, including after recreation. */
     private inner class ForegroundEpochs : Application.ActivityLifecycleCallbacks, AutoCloseable {
-        val starts = AtomicInteger()
         val stops = AtomicInteger()
         private val application get() = context.applicationContext as Application
         private val registrations = mutableListOf<Pair<MainActivity, LifecycleEventObserver>>()
+        private val ledger = mutableListOf<ForegroundEpoch>()
         private var armed = false
 
         fun install() { application.registerActivityLifecycleCallbacks(this) }
 
-        fun arm() {
-            starts.set(0); stops.set(0)
-            fake.beginReturnEpochs { starts.get() }
+        fun arm() = synchronized(fake.gate) {
+            stops.set(0)
+            ledger.clear()
+            fake.trackEpochs { ledger.size }
             armed = true
         }
+
+        fun snapshot(): List<ForegroundEpoch> = synchronized(fake.gate) { ledger.toList() }
 
         private fun watch(activity: MainActivity) {
             val observer = LifecycleEventObserver { _, event ->
@@ -287,10 +293,17 @@ class UsageRefreshLifecycleTest {
             activity.lifecycle.addObserver(observer)
         }
 
-        private fun record(event: Lifecycle.Event) {
+        private fun record(event: Lifecycle.Event) = synchronized(fake.gate) {
             when (event) {
-                Lifecycle.Event.ON_START -> starts.incrementAndGet()
-                Lifecycle.Event.ON_STOP -> stops.incrementAndGet()
+                Lifecycle.Event.ON_START -> ledger += ForegroundEpoch(ledger.size + 1)
+                Lifecycle.Event.ON_STOP -> {
+                    stops.incrementAndGet()
+                    ledger.lastOrNull()?.let { epoch ->
+                        // Capture skipped status at STOP, not from a later aggregate request count.
+                        ledger[ledger.lastIndex] = epoch.copy(stoppedBeforeAdmission =
+                            fake.usageCalls.none { it.epoch == epoch.index })
+                    }
+                }
                 else -> Unit
             }
         }
@@ -313,22 +326,20 @@ class UsageRefreshLifecycleTest {
         override fun onActivityDestroyed(activity: Activity) = Unit
     }
 
+    private data class ForegroundEpoch(val index: Int, val stoppedBeforeAdmission: Boolean? = null)
+
     private class LifecycleTransport : AuthTransport {
         @Volatile var holdUsage = false
         val held = CopyOnWriteArrayList<Held>()
         val usageCalls = CopyOnWriteArrayList<Held>()
         val gets = AtomicInteger()
-        private val gate = Any()
+        val gate = Any()
         private val active = AtomicInteger()
         val maximum = AtomicInteger()
         private var pendingInventory: Held? = null
-        private var returnStarts: (() -> Int)? = null
-        private var beforeReturns = 0
+        private var currentEpoch: (() -> Int)? = null
 
-        fun beginReturnEpochs(starts: () -> Int) = synchronized(gate) {
-            beforeReturns = usageCalls.size
-            returnStarts = starts
-        }
+        fun trackEpochs(index: () -> Int) { currentEpoch = index }
 
         override fun execute(request: ProviderHttpRequest, deadline: ReadDeadline,
             terminal: (TransportResult) -> Unit): CancellationHandle {
@@ -350,11 +361,10 @@ class UsageRefreshLifecycleTest {
             val call: Held
             val hold: Boolean
             synchronized(gate) {
-                returnStarts?.let { starts ->
-                    check(usageCalls.size - beforeReturns < starts()) { "Usage GET without an unconsumed return START" }
-                }
+                // Stamp the epoch at admission; never spend unused earlier START credits.
+                val epoch = currentEpoch?.invoke()
                 maximum.accumulateAndGet(active.incrementAndGet(), ::maxOf)
-                call = Held(usageCalls.size, terminal) { active.decrementAndGet() }
+                call = Held(usageCalls.size, epoch, terminal) { active.decrementAndGet() }
                 usageCalls += call
                 pendingInventory = call
                 hold = holdUsage
@@ -380,7 +390,8 @@ class UsageRefreshLifecycleTest {
         }
     }
 
-    private class Held(val id: Int, private val terminal: (TransportResult) -> Unit, private val release: () -> Unit) {
+    private class Held(val id: Int, val epoch: Int?, private val terminal: (TransportResult) -> Unit,
+        private val release: () -> Unit) {
         val cancelled = AtomicBoolean()
         val replied = AtomicBoolean()
         val inventory = AtomicBoolean()
@@ -389,7 +400,7 @@ class UsageRefreshLifecycleTest {
         fun cancel() { cancelled.set(true); releaseOnce() }
         fun reply(result: TransportResult) { replied.set(true); releaseOnce(); terminal(result) }
         private fun releaseOnce() { if (released.compareAndSet(false, true)) release() }
-        fun diagnostics(): String = "#$id(cancelled=${cancelled.get()}, replied=${replied.get()}, inventory=${inventory.get()})"
+        fun diagnostics(): String = "#$id(epoch=$epoch, cancelled=${cancelled.get()}, replied=${replied.get()}, inventory=${inventory.get()})"
     }
 
     private companion object {
