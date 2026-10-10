@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 
 import test_history_text_contract as text_contract
 from verify_test_reports import HISTORY_AUTHORITY_CASES, HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS, verify_reports
-from verify_test_reports import ACCOUNT_REMOVAL_CASES, ACCOUNT_REMOVAL_CLASS
+from verify_test_reports import ACCOUNT_REMOVAL_CASES
 from verify_test_reports import ACCOUNT_NAME_CASES, ACCOUNT_NAME_CLASS
 from verify_test_reports import HISTORY_ASSEMBLED_CASES
 

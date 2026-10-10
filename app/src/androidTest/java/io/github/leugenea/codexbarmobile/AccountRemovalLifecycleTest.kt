@@ -3,6 +3,7 @@ package io.github.leugenea.codexbarmobile
 import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -41,14 +42,12 @@ class AccountRemovalLifecycleTest {
             click("remove-account")
             dialogScope()
             click("remove-account-cancel")
-            compose.onNodeWithTag("remove-account-dialog").assertDoesNotExist()
+            awaitDialogDismissed("Cancel dismisses restored account confirmation")
             click("remove-account")
-            InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
-            compose.waitForIdle()
-            compose.onNodeWithTag("remove-account-dialog").assertDoesNotExist()
+            dismissRemovalDialogWithBack()
             click("remove-account")
             scenario.recreate(); compose.waitForIdle()
-            compose.onNodeWithTag("remove-account-dialog").assertDoesNotExist()
+            awaitDialogDismissed("recreation dismisses restored account confirmation")
             phase(ConnectionPhase.RESTORED)
             await("recreated local history adopted") { owner.historySnapshots.value.storage != null }
             assertArrayEquals(name, nameFile().readBytes())
@@ -75,8 +74,8 @@ class AccountRemovalLifecycleTest {
             click("remove-account-confirm"); phase(ConnectionPhase.SIGNED_OUT)
             assertTrue(late.cancelled)
             assertDeleted()
+            awaitDialogDismissed("confirmed removal dismisses predecessor confirmation")
             compose.onNodeWithTag("account-name").assertDoesNotExist()
-            compose.onNodeWithTag("remove-account-dialog").assertDoesNotExist()
             click("history-toggle")
             compose.onNodeWithTag("connection-history").assertExists()
             compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertDoesNotExist()
@@ -116,7 +115,7 @@ class AccountRemovalLifecycleTest {
                 owner.state.value.let { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing }
                     && owner.accountRemoval !== predecessor && owner.accountName.value?.edit != null
             }
-            compose.onNodeWithTag("remove-account-dialog").assertDoesNotExist()
+            awaitDialogDismissed("replacement dismisses predecessor confirmation")
             await("replacement history recorded") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
             saveName("Synthetic replacement successor")
             val credentials = credentialFile().readBytes()
@@ -130,7 +129,7 @@ class AccountRemovalLifecycleTest {
             assertEquals(requests, fixture.transport.counts())
             val cancelled = openRemovalDialog()
             owner.cancel(); phase(ConnectionPhase.CANCELLED)
-            compose.onNodeWithTag("remove-account-dialog").assertDoesNotExist()
+            awaitDialogDismissed("owner cancellation dismisses account confirmation")
             replay(cancelled, "cancel invalidates removal permission")
             assertArrayEquals(credentials, credentialFile().readBytes())
             assertArrayEquals(name, nameFile().readBytes())
@@ -159,17 +158,13 @@ class AccountRemovalLifecycleTest {
                 controller.state.value.let { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing }
                     && controller.accountRemoval !== predecessor && controller.accountName.value?.edit != null
             }
-            var dialogs = -1
-            await("same-phase permission replacement dismisses dialog",
-                lastState = { "${controller.state.value}, dialogCount=$dialogs" }) {
-                dialogs = compose.onAllNodesWithTag("remove-account-dialog").fetchSemanticsNodes().size
-                dialogs == 0
-            }
+            awaitDialogDismissed("same-phase permission replacement dismisses dialog")
             assertNotSame(predecessor, controller.accountRemoval)
             assertEquals(ConnectionPhase.OBSERVED, controller.state.value.phase)
             compose.onNodeWithTag("remove-account").assertIsEnabled().performClick()
             compose.onNodeWithTag("remove-account-dialog").assertIsDisplayed()
             compose.onNodeWithTag("remove-account-cancel").performClick()
+            awaitDialogDismissed("Cancel dismisses same-phase successor confirmation")
         }
     }
 
@@ -185,6 +180,7 @@ class AccountRemovalLifecycleTest {
             try {
                 val stale = openRemovalDialog()
                 click("remove-account-confirm"); phase(ConnectionPhase.FAILED)
+                awaitDialogDismissed("failed removal dismisses account confirmation")
                 assertEquals(ConnectionProblem.STORAGE, owner.state.value.problem)
                 assertFalse(credentialFile().exists())
                 assertFalse(keyExists())
@@ -200,10 +196,12 @@ class AccountRemovalLifecycleTest {
                 assertTrue(obstacle.delete()); assertTrue(nameFile().delete())
                 nameFile().writeBytes(name)
                 click("remove-account"); click("remove-account-cancel")
+                awaitDialogDismissed("Cancel dismisses removal retry confirmation")
                 assertEquals(ConnectionPhase.FAILED, owner.state.value.phase)
                 assertTrue(nameFile().isFile)
                 click("remove-account"); click("remove-account-confirm")
                 phase(ConnectionPhase.SIGNED_OUT)
+                awaitDialogDismissed("confirmed retry dismisses account confirmation")
                 assertDeleted()
                 assertEquals(requests, fixture.transport.counts())
             } finally { obstacle.delete(); if (nameFile().isDirectory) nameFile().delete() }
@@ -241,6 +239,33 @@ class AccountRemovalLifecycleTest {
         compose.onNodeWithTag("remove-account-confirm").assertHasClickAction()
         assertSame("Dialog opened with the captured removal permission", captured, owner.accountRemovalPermissions.value)
         return captured
+    }
+    private fun dismissRemovalDialogWithBack() {
+        // Semantics can be ready before the dialog window receives input focus.
+        // Fetch on the instrumentation thread; only read View properties on Main.
+        val dialog = compose.onNodeWithTag("remove-account-dialog").assertIsDisplayed()
+        val view = (dialog.fetchSemanticsNode().root as ViewRootForTest).view
+        var focused = false
+        var attached = false
+        await("removal dialog window focused before Back",
+            lastState = { "dialogAttached=$attached, dialogWindowFocused=$focused" }) {
+            compose.runOnUiThread {
+                attached = view.isAttachedToWindow
+                focused = view.hasWindowFocus()
+            }
+            attached && focused
+        }
+        // A real system Back, on the instrumentation thread, targets the focused dialog.
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        awaitDialogDismissed("Back dismisses restored account confirmation")
+    }
+    private fun awaitDialogDismissed(step: String) {
+        var dialogs = -1
+        await(step, lastState = { "${owner.state.value}, dialogCount=$dialogs" }) {
+            dialogs = compose.onAllNodesWithTag("remove-account-dialog").fetchSemanticsNodes().size
+            dialogs == 0
+        }
+        compose.onNodeWithTag("remove-account-dialog").assertDoesNotExist()
     }
     private fun replay(captured: AccountRemoval, step: String) {
         // Model delayed dialog confirmation at its owner boundary, not a detached clickable node.

@@ -9,7 +9,7 @@ import test_history_text_contract as text_contract
 from verify_history_text_captures import CAPTURES, INTEGRATED_CAPTURES, CHART_CAPTURES, CHART_COUNTS, verify_captures
 from verify_history_text_captures import ASSEMBLED_CAPTURES
 from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
-from verify_test_reports import ACCOUNT_REMOVAL_CASES, ACCOUNT_REMOVAL_CLASS
+from verify_test_reports import ACCOUNT_REMOVAL_CASES
 from verify_test_reports import ACCOUNT_NAME_CASES, ACCOUNT_NAME_CLASS
 from verify_test_reports import HISTORY_ASSEMBLED_CASES, HISTORY_ASSEMBLED_CLASS
 from verify_test_reports import HISTORY_AUTHORITY_CASES, HISTORY_NAVIGATION_CASES, HISTORY_CHART_CASES, HISTORY_CHART_CLASS, verify_reports
