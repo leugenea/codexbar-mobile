@@ -104,6 +104,9 @@ class DurableQuarantineTest {
             ControlledWorker { controller.readUsage(refreshSession = true) }.use { refreshing ->
                 try {
                     h.gate!!.awaitEntered()
+                    // Removal runs off-lane: entry can race reset's OBSERVED publication.
+                    // Await the post-invalidation READING, not the initial refreshing read.
+                    runBlocking { awaitPendingQuarantine(controller) }
                     assertEquals(ConnectionPhase.READING, controller.state.value.phase)
                     assertTrue(h.keyExists.get())
                     assertTrue(h.target.exists())
@@ -261,6 +264,17 @@ class DurableQuarantineTest {
         fun observerFailures() { failures.get()?.let { throw it } }
         fun absent() { assertEquals(1, deletes); assertFalse(keyExists.get()); assertFalse(target.exists()) }
         override fun close() { gate?.release(); controllers.forEach { runBlocking { withTimeout(5_000) { it.shutdown() } } }; observers.cancel() }
+    }
+}
+
+private suspend fun awaitPendingQuarantine(controller: ConnectionController) {
+    try {
+        withTimeout(2_000) { controller.state.first {
+            it.phase == ConnectionPhase.READING && !it.refresh.refreshing
+        } }
+    } catch (timeout: TimeoutCancellationException) {
+        val last = controller.state.value
+        throw AssertionError("Pending quarantine after refresh invalidation: expected READING with refresh stopped; last state=$last, refreshing=${last.refresh.refreshing}", timeout)
     }
 }
 
