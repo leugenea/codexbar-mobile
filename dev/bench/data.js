@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791657262965,
+  "lastUpdate": 1791664600456,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1587,6 +1587,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/c8d885c9faa8c71c56f85d95162b3f11c3636954"
         },
         "date": 1791657259097,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5cbcde5cd6213ddc2910eed51dc00c1bc1fa0b7d",
+          "message": "test(usage): make lifecycle refresh tests epoch-aware (#114) (#117)\n\n* test(usage): make Home-return and recreation refresh cases epoch-aware (#114)\n\n* test(usage): attribute lifecycle GETs to per-epoch ledger and drop Main busy-wait (#114)\n\nReplace cumulative START credits with a per-epoch usage-GET ledger: each\nadmission is stamped with its observed START epoch, skipped status is\ncaptured at STOP, every epoch admits at most one usage GET and totals are\nsummed from per-epoch outcomes. Replace the Main-thread yield loop with a\nbounded off-Main StateFlow wait.\n\n* test(usage): order lifecycle epochs on the owner lane (#114)\n\nAttribute usage GETs to lifecycle epochs opened and closed around the\nactual serialized foreground commands on the owner lane instead of Main's\ninstantaneous observation, so a partially admitted read can no longer be\nfrozen as a skipped epoch or relabelled into its successor.",
+          "timestamp": "2026-10-10T23:36:12+03:00",
+          "tree_id": "d9695d40cc761fe4462e5647e2d5b5eedc50d59d",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/5cbcde5cd6213ddc2910eed51dc00c1bc1fa0b7d"
+        },
+        "date": 1791664599604,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
