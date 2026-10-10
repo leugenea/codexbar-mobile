@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791633971703,
+  "lastUpdate": 1791633974622,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2813,6 +2813,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/e326af612638e176451d560c2dedaafe0ce7c6ed"
         },
         "date": 1791630735211,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f9a1ccbe35d8b9c8016263220ee26a334f9cd011",
+          "message": "ci(coverage): retry once when native .ec is missing after ADB offline (#106) (#110)\n\nRecord a native 'missing' collection failure (expected directory, no file\nmetadata) when no .ec was pulled, and accept it in the bounded retry guard\nunder the existing passing-suites, identity and ADB-offline preconditions.\nMatch the real exec-out coverage-pull offline error instead of later\nuninstall output. A missing JVM .exec stays a hard failure. Raise the\nhosted emulator memory to 4096 MiB.",
+          "timestamp": "2026-10-10T15:05:46+03:00",
+          "tree_id": "777f971e754f6fed74875453ed53408e8f4ec25e",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/f9a1ccbe35d8b9c8016263220ee26a334f9cd011"
+        },
+        "date": 1791633974060,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
