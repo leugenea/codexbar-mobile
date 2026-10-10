@@ -1,6 +1,7 @@
 """Console filtering and shipped pipeline checks using synthetic output, never Gradle."""
 import os
 from pathlib import Path
+import select
 import shutil
 import subprocess
 import sys
@@ -51,6 +52,46 @@ class GradleConsoleTests(unittest.TestCase):
                                 capture_output=True, timeout=5)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, DIAGNOSTICS.replace("\n", "\r\n").encode())
+
+    def test_manifest_near_matches_preserve_the_literal_dot_boundary(self):
+        for action in ('Loading', 'Merging'):
+            for name in ('AndroidManifestXxml', 'AndroidManifest-xml', 'AndroidManifest.xml.bak'):
+                with self.subTest(action=action, name=name):
+                    text = f'{action} library manifest /SYNTHETIC/library/{name}\n'
+                    result = self.filter(text)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, text)
+
+    def test_kept_bytes_and_unterminated_headers_are_preserved_exactly(self):
+        header = b'Caching disabled for AarTransform: /SYNTHETIC/\xff because:'
+        for text in (b'WARNING: invalid UTF-8 \xff\xfe\r\n', b'last diagnostic \xff',
+                     header, header + b'\r\n', header + b'\r\n  Other reason \xfe\r\n'):
+            with self.subTest(text=text):
+                result = subprocess.run(['bash', str(FILTER)], input=text,
+                                        capture_output=True, timeout=5)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, text)
+
+    def test_kept_line_is_readable_before_producer_closes_stdin(self):
+        line = b'GATE_TASK_OUTCOME :app:lintDebug SUCCESS\r\n'
+        with subprocess.Popen(['bash', str(FILTER)], stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0) as process:
+            assert process.stdin is not None
+            assert process.stdout is not None
+            assert process.stderr is not None
+            try:
+                process.stdin.write(line)
+                process.stdin.flush()
+                readable, _, _ = select.select([process.stdout], [], [], 2)
+                self.assertTrue(readable, 'Kept console line buffered until EOF')
+                self.assertEqual(os.read(process.stdout.fileno(), len(line)), line)
+                process.stdin.close()
+                self.assertEqual(process.wait(timeout=5), 0)
+                self.assertEqual(process.stderr.read(), b'')
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=5)
 
     def test_empty_or_all_noise_is_success_not_grep_exit_one(self):
         for text in ("", NOISE):
@@ -118,7 +159,8 @@ class GradleConsoleTests(unittest.TestCase):
             base = Path(temporary)
             tools = base / "tools/build"
             tools.mkdir(parents=True)
-            shutil.copyfile(FILTER, tools / FILTER.name)
+            for source in (FILTER, ROOT / 'tools/build/filter_gradle_console.py'):
+                shutil.copyfile(source, tools / source.name)
             # Parser doubles isolate log-pipeline exits; real gate semantics are tested separately.
             for filename in ("verify_manifests.py", "verify_test_reports.py", "verify_gradle_execution.py"):
                 (tools / filename).write_text("from pathlib import Path\nPath('parsers-ran').touch()\n")

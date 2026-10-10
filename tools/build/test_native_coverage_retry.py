@@ -363,7 +363,7 @@ class SyntheticRunnerTests(unittest.TestCase):
         tools = base / "tools/build"
         tools.mkdir(parents=True)
         for filename in ("coverage_gate.py", "native_coverage_retry.py", "verify_test_reports.py",
-                         "filter-gradle-console.sh", "verify_gradle_execution.py"):
+                         "filter-gradle-console.sh", "filter_gradle_console.py", "verify_gradle_execution.py"):
             shutil.copyfile(ROOT / "tools/build" / filename, tools / filename)
         evidence = base / "evidence/native"
         evidence.mkdir(parents=True)

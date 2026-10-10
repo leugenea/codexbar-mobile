@@ -1,6 +1,3 @@
-import com.android.build.gradle.internal.lint.AndroidLintTask
-import com.android.build.gradle.internal.lint.AndroidLintTextOutputTask
-
 // Applied by the app build, not only a hosted init script: local gates are fresh too.
 // Compile/dex/resources/package tasks retain their normal cacheability.
 def gateNames = [
@@ -27,13 +24,28 @@ String gateOutcome(state) {
     return 'SUCCESS'
 }
 
+// Applied scripts do not share the Android plugin's compile-time classpath.
+// Walk the runtime hierarchy to recognize Gradle's _Decorated subclasses too.
+boolean isLintReportOrTextTask(task) {
+    def lintTypes = [
+        'com.android.build.gradle.internal.lint.AndroidLintTask',
+        'com.android.build.gradle.internal.lint.AndroidLintTextOutputTask'
+    ]
+    def type = task.class
+    while (type != null) {
+        if (type.name in lintTypes) return true
+        type = type.superclass
+    }
+    return false
+}
+
 // AGP 9.4.1 disables only these redundant vital report/text tasks when their
 // same-variant full lint partner is in the graph (LintTaskManager.kt). Gradle
 // represents enabled=false as SKIPPED, not as a distinct skipMessage reason.
 // Freshness still applies to every lint task; this is not a cache/reuse exemption.
 def isRedundantVitalSuppression = { task, state ->
     if (state.skipMessage != 'SKIPPED' || task.enabled) return false
-    if (!(task instanceof AndroidLintTask || task instanceof AndroidLintTextOutputTask)) return false
+    if (!isLintReportOrTextTask(task)) return false
     def vital = task.name =~ /^lintVital(Report)?([A-Z].*)$/
     if (!vital.matches()) return false
     def fullLintName = 'lint' + (vital.group(1) ?: '') + vital.group(2)

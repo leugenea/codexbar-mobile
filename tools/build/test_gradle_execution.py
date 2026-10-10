@@ -78,12 +78,17 @@ class ExecutionEvidenceTests(unittest.TestCase):
 
     def test_failed_graph_with_successful_collection_cannot_omit_coverage_receipts(self):
         log = '\n'.join(line for line in successful_log('native').splitlines() if 'jacocoDebug' not in line)
-        for failed in ('testDebugUnitTest', 'connectedDebugAndroidTest', 'verifyResolvedToolchain', 'unrelatedTask'):
+        for failed in ('testDebugUnitTest', 'connectedDebugAndroidTest', 'verifyResolvedToolchain'):
             candidate = log.replace(f'{failed} SUCCESS', f'{failed} FAILED')
+            self.assertIn(f':app:{failed} FAILED', candidate)
             with self.subTest(failed=failed), self.assertRaisesRegex(ValueError, 'Missing'):
                 validate(candidate, 'native', 1)
+        # This lint failure is unrelated to coverage collection, which succeeded.
+        candidate = log + '\nGATE_TASK_OUTCOME :app:lintDebug FAILED'
+        self.assertIn(':app:collectDebugCoverageInputs SUCCESS', candidate)
+        self.assertIn(':app:lintDebug FAILED', candidate)
         with self.assertRaisesRegex(ValueError, 'Missing'):
-            validate(log + '\nGATE_TASK_OUTCOME :app:lintDebug FAILED', 'native', 1)
+            validate(candidate, 'native', 1)
 
 
 class LocalExecutionPolicyTests(unittest.TestCase):
@@ -105,10 +110,16 @@ class LocalExecutionPolicyTests(unittest.TestCase):
 
     def assert_vital_suppression_contract(self, policy):
         # Source contract: no local Gradle/Android execution is permitted here.
-        for contract in ("import com.android.build.gradle.internal.lint.AndroidLintTask",
-                         "import com.android.build.gradle.internal.lint.AndroidLintTextOutputTask",
+        # Applied scripts must not compile against plugin classes; none need imports.
+        self.assertNotRegex(policy, r'(?m)^\s*import\s+')
+        self.assertNotIn('instanceof', policy)
+        for contract in ("boolean isLintReportOrTextTask(task)",
+                         "'com.android.build.gradle.internal.lint.AndroidLintTask'",
+                         "'com.android.build.gradle.internal.lint.AndroidLintTextOutputTask'",
+                         "def type = task.class", "while (type != null)",
+                         "if (type.name in lintTypes) return true", "type = type.superclass",
                          "if (state.skipMessage != 'SKIPPED' || task.enabled) return false",
-                         "if (!(task instanceof AndroidLintTask || task instanceof AndroidLintTextOutputTask)) return false",
+                         "if (!isLintReportOrTextTask(task)) return false",
                          "def vital = task.name =~ /^lintVital(Report)?([A-Z].*)$/",
                          "if (!vital.matches()) return false",
                          "def fullLintName = 'lint' + (vital.group(1) ?: '') + vital.group(2)",
@@ -145,7 +156,19 @@ class LocalExecutionPolicyTests(unittest.TestCase):
         policy = self.policy_sources()[1]
         self.assert_vital_suppression_contract(policy)
         self.assertNotIn('AndroidLintAnalysisTask', policy)
-        self.assertIn('if (!(task instanceof AndroidLintTask || task instanceof AndroidLintTextOutputTask)) return false', policy)
+        match = re.search(r'def lintTypes = \[(.*?)\]', policy, re.S)
+        assert match is not None
+        self.assertEqual(re.findall(r"'([^']+)'", match[1]), [
+            'com.android.build.gradle.internal.lint.AndroidLintTask',
+            'com.android.build.gradle.internal.lint.AndroidLintTextOutputTask'])
+
+    def test_applied_script_rejects_plugin_import_regression(self):
+        policy = self.policy_sources()[1]
+        self.assert_vital_suppression_contract(policy)
+        for plugin in ('com.android.build.gradle.internal.lint.AndroidLintTask',
+                       'com.example.plugin.CustomTask'):
+            with self.subTest(plugin=plugin), self.assertRaises(AssertionError):
+                self.assert_vital_suppression_contract(f'import {plugin}\n' + policy)
 
     def test_vital_cache_and_up_to_date_states_cannot_use_suppression(self):
         policy = self.policy_sources()[1]
@@ -160,7 +183,9 @@ class LocalExecutionPolicyTests(unittest.TestCase):
     def test_removing_any_vital_suppression_guard_fails_contract(self):
         policy = self.policy_sources()[1]
         for guard in ("state.skipMessage != 'SKIPPED' || ", ' || task.enabled',
-                      'if (!(task instanceof AndroidLintTask || task instanceof AndroidLintTextOutputTask)) return false',
+                      'if (!isLintReportOrTextTask(task)) return false',
+                      'def type = task.class', 'while (type != null)',
+                      'if (type.name in lintTypes) return true', 'type = type.superclass',
                       'if (!vital.matches()) return false', 'gradle.taskGraph.allTasks.find',
                       'it.project == task.project && ', 'it.name == fullLintName',
                       'fullLint != null && ', 'isGate(fullLint) && ', ' && fullLint.enabled',
