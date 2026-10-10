@@ -3,6 +3,7 @@ package io.github.leugenea.codexbarmobile.history
 import io.github.leugenea.codexbarmobile.*
 import io.github.leugenea.codexbarmobile.auth.*
 import io.github.leugenea.codexbarmobile.credentials.*
+import io.github.leugenea.codexbarmobile.account.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import java.util.UUID
@@ -26,6 +27,13 @@ internal class LifetimeJournal {
     var appendFailure: HistoryAppendOutcome? = null
     var readFailure: HistoryReadOutcome? = null
     var throwRead = false
+    var name: AccountDisplayName? = null
+    @Volatile var failRestore = false
+    @Volatile var restoreCalls = 0
+    var failNameRead = false
+    var failNameWrite = false
+    var nameGate: ControlledGate? = null
+    var nameWrites = 0
     val admissions = mutableListOf<HistoryAdmission>()
 
     fun storage(): HistoryLifetimeStorage = object : HistoryLifetimeStorage {
@@ -46,7 +54,9 @@ internal class LifetimeJournal {
             return bind()
         }
         override fun restore(): HistoryLifetimeOutcome {
+            restoreCalls++
             restoreGate?.pause()
+            if (failRestore) return HistoryLifetimeOutcome.Unavailable
             return when (phase) {
                 Phase.ACTIVE -> bind()
                 Phase.DELETING -> HistoryLifetimeOutcome.RemovalRequired
@@ -61,8 +71,18 @@ internal class LifetimeJournal {
                 deletions++
                 deleteGate?.pause()
                 if (failDelete) HistoryDeleteOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE)
-                else { entries.clear(); phase = Phase.EMPTY; HistoryDeleteOutcome.Deleted }
+                else { entries.clear(); name = null; phase = Phase.EMPTY; HistoryDeleteOutcome.Deleted }
             }
+        }
+        override fun readName(partition: HistoryPartition): AccountNameRead =
+            if (failNameRead) AccountNameRead.Unavailable else AccountNameRead.Ready(name)
+        override fun writeName(partition: HistoryPartition, name: AccountDisplayName?): Boolean {
+            nameGate?.pause()
+            if (failNameWrite) return false
+            check(partition == this@LifetimeJournal.partition && phase == Phase.ACTIVE)
+            nameWrites++
+            this@LifetimeJournal.name = name
+            return true
         }
         override fun close() { active?.revoke() }
     }
@@ -142,7 +162,7 @@ internal class LifetimeFixture(
         return owner.historyCapability(ready.envelope.generation) ?: throw AssertionError("history capability: ${owner.historyAvailability}")
     }
     override fun close() {
-        journal.deleteGate?.release(); journal.stageGate?.release(); journal.activateGate?.release(); journal.restoreGate?.release()
+        journal.deleteGate?.release(); journal.stageGate?.release(); journal.activateGate?.release(); journal.restoreGate?.release(); journal.nameGate?.release()
         runBlocking { withTimeout(5_000) { owner.shutdown() } }
     }
 }

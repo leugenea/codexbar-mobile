@@ -2,6 +2,7 @@ package io.github.leugenea.codexbarmobile.history
 
 import android.system.Os
 import android.system.OsConstants
+import io.github.leugenea.codexbarmobile.account.AccountNameFile
 import java.io.DataInputStream
 import java.io.File
 import java.io.FileInputStream
@@ -98,7 +99,7 @@ internal class HistoryFiles(val directory: File, private val limits: HistoryStor
         if (files.sumOf { it.length() } + extra > limits.bytes) throw HistoryStorageException(HistoryUnavailable.STORAGE_FULL)
     }
 
-    private fun syncDirectory() {
+    internal fun syncDirectory() {
         val fd = Os.open(directory.path, OsConstants.O_RDONLY, 0)
         try { Os.fsync(fd) } finally { Os.close(fd) }
     }
@@ -108,7 +109,8 @@ internal class HistoryFiles(val directory: File, private val limits: HistoryStor
     }
 
     companion object {
-        private val databaseArtifacts = setOf("history.db", "history.db-journal", "history.db-wal", "history.db-shm")
+        private val databaseArtifacts = setOf("history.db", "history.db-journal", "history.db-wal", "history.db-shm",
+            AccountNameFile.FILE_NAME, AccountNameFile.PENDING_NAME)
         private val allowedArtifacts = databaseArtifacts + setOf("binding", "binding.pending", "lane")
     }
 }

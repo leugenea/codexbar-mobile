@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -110,8 +111,10 @@ internal object NativeConnection {
 @Composable
 internal fun ConnectionScreen(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit) {
     var historyOpen by remember { mutableStateOf(false) }
+    val accountName by controller.accountName.collectAsState()
     Column(Modifier.fillMaxSize().testTag("connection-screen").verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        AccountNameHeader(accountName, controller::renameAccount)
         OutlinedButton(onClick = { historyOpen = !historyOpen }, modifier = Modifier.testTag("history-toggle")) {
             Text(stringResource(if (historyOpen) R.string.history_return_connection else R.string.history_open))
         }

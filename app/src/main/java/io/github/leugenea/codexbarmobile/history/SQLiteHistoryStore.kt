@@ -3,6 +3,7 @@ package io.github.leugenea.codexbarmobile.history
 import android.content.Context
 import android.database.sqlite.SQLiteDatabaseCorruptException
 import android.database.sqlite.SQLiteFullException
+import io.github.leugenea.codexbarmobile.account.*
 import java.io.File
 import java.io.IOException
 import java.util.UUID
@@ -70,6 +71,7 @@ class SQLiteHistoryStore internal constructor(
     private val io = Any()
     private val admission = Any()
     private val files = HistoryFiles(directory, limits)
+    private val accountName = AccountNameFile(directory)
     private val schema = HistorySchema(files.database, limits)
     private var binding: HistoryBinding? = null
     private var active: HistoryGeneration? = null
@@ -144,6 +146,25 @@ class SQLiteHistoryStore internal constructor(
         if (current.phase != HistoryBindingPhase.ACTIVE) return@operation HistoryLifetimeOutcome.Unavailable
         adopt(current.partition).lifetimeOutcome()
     }
+
+    /** Metadata uses the continuing durable lifetime, not a foreground history read capability. */
+    internal fun readName(partition: HistoryPartition): AccountNameRead =
+        operation(HistoryUnavailable.READ_FAILURE, { AccountNameRead.Unavailable }) {
+            if (!nameAuthorized(partition)) return@operation AccountNameRead.Unavailable
+            accountName.read(partition)
+        }
+
+    internal fun writeName(partition: HistoryPartition, name: AccountDisplayName?): Boolean =
+        operation(HistoryUnavailable.WRITE_FAILURE, { false }) {
+            if (!nameAuthorized(partition)) return@operation false
+            if (name != null) files.checkBudget(AccountNameFile.MAX_BYTES.toLong())
+            accountName.write(partition, name)
+            files.syncDirectory()
+            true
+        }
+
+    private fun nameAuthorized(partition: HistoryPartition): Boolean =
+        binding == HistoryBinding(HistoryBindingPhase.ACTIVE, partition) && !hasRemoval()
 
     private fun partitionFailure(reason: HistoryUnavailable?): HistoryPartitionOutcome =
         if (reason == null) HistoryPartitionOutcome.Corrupt else HistoryPartitionOutcome.Unavailable(reason)

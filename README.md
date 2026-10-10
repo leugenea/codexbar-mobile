@@ -14,6 +14,8 @@ an opt-in native connection screen, not supported provider access.**
 - Serialized session refresh/rotation with durable save before publication, bounded
   401 recovery, re-auth on terminal/write failures, and generation-isolated local logout.
 - Explicit stored-session read/refresh controls; no invented token TTL.
+- A local display name for the one connected/restored account: set, edit or clear it;
+  unnamed accounts are labeled honestly and provider identity remains unverified.
 - Live Material 3 usage windows with precise provider percentages and fractional bars,
   five-hour/weekly duration labels (including weekly-only), independent permission/limit
   flags, missing/error/stale/exhausted states and accessible status announcements.
@@ -63,6 +65,13 @@ explicit storage failure, with no successor admission over unsettled cleanup. Ca
 shutdown retain a clean lifetime; the last foreground observer leaving revokes its runtime
 history capability without deleting it. A returning observer gets a fresh capability for the
 same continuing partition. Identity remains UNVERIFIED: there is no provider-account join.
+The display name belongs to that same opaque credential lifetime, not the stable slot,
+token text or a provider profile. Clean storage restoration and rotation retain it;
+logout, replacement and required reauthorization remove it with history. It is bounded
+to 80 Unicode code points, sandbox-private but not Keystore-encrypted, and excluded from
+backup like history. Saving a name makes no provider request. Drafts are memory-only;
+committed names survive Activity recreation and fresh-owner restoration from app storage.
+Stale editors cannot rename a successor; a storage failure is reported, not a successful save.
 Real accepted USAGE observations are now recorded only while a live observer is visible.
 Different successful reads at equal percent remain distinct; cache replay, inventory-only
 success, errors, local ticks and analytical baseline queries add no measured points.

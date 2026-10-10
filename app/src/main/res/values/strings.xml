@@ -345,4 +345,14 @@
     <string name="history_page_ordinals">Retained page ordinals: %1$s to %2$s</string>
     <string name="history_first_page">First retained page</string>
     <string name="history_next_page">Next admitted page</string>
+    <string name="account_name_fallback">Unnamed local account</string>
+    <string name="account_name_unavailable">Local account · name unavailable</string>
+    <string name="account_name_local_only">Local label only · provider identity remains unverified</string>
+    <string name="account_name_edit">Edit local display name</string>
+    <string name="account_name_label">Local display name</string>
+    <string name="account_name_limit">Up to 80 characters. Blank input clears the name.</string>
+    <string name="account_name_save">Save name</string>
+    <string name="account_name_clear">Clear name</string>
+    <string name="account_name_cancel">Cancel</string>
+    <string name="account_name_storage_failed">Local name storage is unavailable or the change could not be saved. Retry editing when available.</string>
 </resources>
