@@ -1,12 +1,15 @@
 package io.github.leugenea.codexbarmobile.history
 
 import io.github.leugenea.codexbarmobile.credentials.SessionGeneration
+import io.github.leugenea.codexbarmobile.account.*
 
 /** Blocking subordinate storage seam; scheduling belongs to the existing process session owner. */
 internal interface HistoryLifetimeStorage : AutoCloseable {
     fun stage(): HistoryPartitionOutcome
     fun activate(partition: HistoryPartition): HistoryLifetimeOutcome
     fun restore(): HistoryLifetimeOutcome
+    fun readName(partition: HistoryPartition): AccountNameRead
+    fun writeName(partition: HistoryPartition, name: AccountDisplayName?): Boolean
     /** Non-I/O reservation, including when no runtime access was adopted. */
     fun reserveDeletion(): HistoryDeletion
 }
@@ -44,6 +47,8 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
     private var staged: HistoryPartition? = null
     private var removal: HistoryDeletion? = null
     private var runtimeAllowed = true
+    private var accountName: AccountNameState? = null
+    val nameState: AccountNameState? get() = synchronized(admission) { accountName }
     @Volatile var availability = HistoryAvailability.UNAVAILABLE
         private set
 
@@ -77,18 +82,46 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
     @Volatile var requiresRemoval = false
         private set
 
-    private fun adopt(generation: SessionGeneration, result: HistoryLifetimeOutcome) = synchronized(admission) {
+    private fun adopt(generation: SessionGeneration, result: HistoryLifetimeOutcome) {
         val bound = (result as? HistoryLifetimeOutcome.Bound)?.access
-        if (!accepts(generation)) { bound?.revoke(); return@synchronized }
-        requiresRemoval = result == HistoryLifetimeOutcome.RemovalRequired
-        staged = null
-        if (!runtimeAllowed) {
-            bound?.revoke()
-            availability = HistoryAvailability.UNAVAILABLE
-            return@synchronized
+        val name = bound?.let { storage.readName(it.partition) }
+        synchronized(admission) {
+            if (!accepts(generation)) { bound?.revoke(); return@synchronized }
+            requiresRemoval = result == HistoryLifetimeOutcome.RemovalRequired
+            staged = null
+            adoptName(generation, bound?.partition, name)
+            if (!runtimeAllowed) {
+                bound?.revoke()
+                availability = HistoryAvailability.UNAVAILABLE
+                return@synchronized
+            }
+            access = bound
+            availability = if (bound == null) HistoryAvailability.STORAGE_FAILURE else HistoryAvailability.AVAILABLE
         }
-        access = bound
-        availability = if (bound == null) HistoryAvailability.STORAGE_FAILURE else HistoryAvailability.AVAILABLE
+    }
+
+    private fun adoptName(generation: SessionGeneration, partition: HistoryPartition?, result: AccountNameRead?) {
+        if (partition == null) { accountName = null; return }
+        val previous = accountName?.edit
+        val edit = previous?.takeIf { it.generation === generation && it.partition == partition }
+            ?: AccountNameEdit(generation, partition)
+        accountName = AccountNameState(edit, (result as? AccountNameRead.Ready)?.name, result !is AccountNameRead.Ready)
+    }
+
+    /** Check the captured UI authority before I/O and again before publication. Deletion shares io. */
+    fun editName(edit: AccountNameEdit, input: String): Boolean = synchronized(io) outer@ {
+        if (!acceptsName(edit)) return@outer false
+        val name = AccountDisplayName.from(input)
+        val saved = storage.writeName(edit.partition, name)
+        synchronized(admission) inner@ {
+            if (!acceptsName(edit)) return@inner
+            accountName = AccountNameState(edit, if (saved) name else accountName?.name, !saved)
+        }
+        saved
+    }
+
+    private fun acceptsName(edit: AccountNameEdit): Boolean = synchronized(admission) {
+        accountName?.edit === edit && accepts(edit.generation)
     }
 
     /** Capture on the owner lane. Old reads/writes use a retired native capability, never a UUID. */
@@ -111,6 +144,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         access = null
         generation = null
         staged = null
+        accountName = null
         availability = HistoryAvailability.UNAVAILABLE
     }
 

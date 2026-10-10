@@ -205,6 +205,15 @@ HISTORY_ISOLATION_CASES = {
 }
 
 
+ACCOUNT_NAME_CLASS = "io.github.leugenea.codexbarmobile.AccountNameLifecycleTest"
+ACCOUNT_NAME_CASES = {
+    "accessibleEditorSetsEditsCancelsClearsAndBoundsUnicodeWithoutChangingProviderTraffic",
+    "committedNameSurvivesRecreationAndFreshOwnerStorageRestorationWithoutRequests",
+    "logoutAndReplacementDeleteTheNameAndRejectCapturedPredecessorEdits",
+    "unreadableNameIsNotAnIdentityOrCredentialFailureAndKeyLossPurgesIt",
+}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -245,6 +254,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
             ("history display authority", HISTORY_AUTHORITY_CLASS, HISTORY_AUTHORITY_CASES),
             ("history isolation", HISTORY_ISOLATION_CLASS, HISTORY_ISOLATION_CASES),
             ("history assembled acceptance", HISTORY_ASSEMBLED_CLASS, HISTORY_ASSEMBLED_CASES),
+            ("local account name", ACCOUNT_NAME_CLASS, ACCOUNT_NAME_CASES),
         ):
             actual_names = {case["name"] for case in cases if case["class"] == classname}
             missing_names = required - actual_names

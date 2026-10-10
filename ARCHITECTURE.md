@@ -305,7 +305,8 @@ on open without a fresh trustworthy observation pair. Each applied bound retains
 highest removed ordinal across reopen; age-unknown statuses may remain below that cutoff.
 
 All history files are under `noBackupFilesDir/usage-history`: database, DELETE rollback
-journal, fixed 32-byte binding/privacy fence, pending binding replacement and lane lock.
+journal, fixed 32-byte binding/privacy fence, pending binding replacement, lane lock and
+the bounded local account-name sidecar/pending replacement described below.
 Memory temporaries and primary-key-ordered queries avoid external sort files. The database
 uses 4096-byte pages with a conservative one-quarter directory allocation after 64 KiB
 control reserve, leaving headroom for rollback pages/sector headers and control replacement.
@@ -387,6 +388,65 @@ The native report validator requires every new case, with omission/class-spoof/f
 skip contracts; all existing A10 and history-store mandatory cases stay required. All new
 handwritten code remains in the unchanged >=90% compatible JVM/native INSTRUCTION union;
 compilation alone does not establish runtime or coverage acceptance.
+
+## Local account display name
+
+The single connected/restored account surface shows a user-authored local label or
+**Unnamed local account**, with provider identity still explicitly unverified. This is
+not provider-account association, provider-side profile modification, a credential or
+multi-account selection. Unreadable name storage has a distinct **name unavailable**
+fallback rather than claiming that an inaccessible stored name is absent.
+
+`AccountDisplayName` normalizes Unicode whitespace to spaces, removes control/format
+characters and unpaired surrogates, bounds input to 80 Unicode code points, and trims
+on save. Blank saves and the explicit Clear action remove the label. The editable draft
+preserves spaces while typing. The header occupies at most two lines with ellipsis;
+its semantics retain the complete bounded label. The labeled single-line editor states
+the limit and blank behavior and exposes Save, Clear and Cancel. Draft/open-dialog state
+uses `remember`, never Bundle restoration; committed text is restored only from storage.
+
+The name shares the existing durable credential-lifetime history partition. An ACTIVE
+binding following protected credential adoption is required to read or write it. Clean
+fresh-owner restoration and token rotation preserve the partition/name. Foreground
+history-port retirement retains the name and its account-lifetime edit authority; Cancel
+and holder shutdown revoke the runtime editor without deleting a clean durable name.
+Logout, replacement, missing/corrupt/key-lost credentials, interrupted removal and terminal
+reauthorization revoke the editor immediately and delete the sidecar through the same
+combined credential/history cleanup. New login cannot start over unsettled removal.
+If history lifetime storage is unavailable, naming is unavailable too; it never invents
+a second identity or storage owner to bypass that contract.
+
+`AccountNameEdit` captures the exact runtime `SessionGeneration` and partition and is
+identity-compared against the current editor on the owner lane and subordinate I/O lane.
+The callback never reacquires successor permission. Blocking writes and their publication
+are generation-checked; writes are ordered, process-owned children and do not block the
+command lane. An already admitted write may settle during retirement, but deletion waits
+on the existing history I/O monitor and removes it before terminal success. Pausing a
+foreground history read capability does not authorize a different account editor.
+
+`AccountNameFile` stores a versioned bounded UTF-8 record containing the opaque partition
+and name under `usage-history/account-name` (at most 342 bytes). Pending writes are
+fsynced and renamed, then the existing storage adapter fsyncs the directory. Both files
+participate in the directory budget and fenced deletion; SQLite schema v1, history sample
+encoding and the encrypted credential envelope are unchanged. Missing files mean unnamed;
+wrong lifetime, oversized/truncated/invalid UTF-8/noncanonical text or interrupted pending
+files mean unavailable. Name failures leave auth/quota intact, show a categorical error,
+and permit explicit retry when lifetime authority exists. This metadata is sandbox-private,
+not encrypted or forensically erased, and inherits the existing no-backup policy.
+
+Name/state/edit diagnostics are redacted. No name is added to transport requests, logs,
+credentials, saved-instance state, offline demos or provider fixtures. Original synthetic
+labels are confined to regression tests. JVM `AccountNameFileTest` exercises normalization,
+bounded parsing, persistence/reopen, clear and write failures; `AccountNameLifetimeTest`
+exercises the real process-owner topology, rotation/restoration, foreground retention,
+held admitted writes, stale editors, replacement and failure/quarantine cleanup.
+Four mandatory `AccountNameLifecycleTest` cases use Compose waits, the actual Activity,
+isolated Keystore/SQLite and synthetic transport for edit/accessibility/bounds, recreation,
+fresh-owner storage restoration, deletion/stale callbacks and damaged-name/key-loss recovery.
+The report/retry fixtures require those cases without adding capture targets. These are
+authored test contracts: actual native execution, lint and compatible whole-handwritten
+>=90% INSTRUCTION coverage remain hosted gates; no process-death or live-provider claim
+is implied by compilation or fresh-holder restoration.
 
 ## Even-distribution reference and observed comparison (M4a-3)
 

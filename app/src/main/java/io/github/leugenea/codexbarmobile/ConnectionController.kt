@@ -4,6 +4,7 @@ import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
 import io.github.leugenea.codexbarmobile.credentials.*
 import io.github.leugenea.codexbarmobile.history.*
+import io.github.leugenea.codexbarmobile.account.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,6 +46,9 @@ internal class ConnectionController(
     private val ownerScope = CoroutineScope(scope.coroutineContext + mutationDispatcher)
     private val mutableState = MutableStateFlow(ConnectionState(ConnectionPhase.RESTORING))
     val state: StateFlow<ConnectionState> = mutableState
+    private val mutableName = MutableStateFlow<AccountNameState?>(null)
+    internal val accountName: StateFlow<AccountNameState?> = mutableName
+    private var nameWrite: Deferred<Boolean>? = null
     internal val session = reader.session(store, ownerScope, storageDispatcher, ::sessionInvalidated, ::removeHistory)
     private val authenticatedReader = AuthenticatedProviderReader(session, reader)
     private var work: Job? = null
@@ -75,6 +79,7 @@ internal class ConnectionController(
                     publish(0, if (awaitDeletion()) ConnectionState(ConnectionPhase.REAUTH_REQUIRED) else storageFailure())
                 } else {
                     session.adopt(restored.value)
+                    publishName()
                     publish(0, ConnectionState(ConnectionPhase.RESTORED))
                 }
             }
@@ -115,6 +120,7 @@ internal class ConnectionController(
         get() = history?.availability ?: HistoryAvailability.UNAVAILABLE
 
     private fun removeHistory() {
+        mutableName.value = null
         val coordinator = history ?: return
         if (historyDeletion != null) return
         historyRecorder.retire()
@@ -167,6 +173,7 @@ internal class ConnectionController(
                 ownerScope.async(storageDispatcher) { history?.activate(terminal.generation) }.await()
                 if (!current(owner)) return
                 session.adopt(credentials.value)
+                publishName()
                 if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
                 bindHistory(terminal.generation)
                 publish(owner, ConnectionState(ConnectionPhase.RESTORED, terminal))
@@ -197,6 +204,7 @@ internal class ConnectionController(
             ownerScope.async(storageDispatcher) { history?.restore(active.generation) }.await()
             historyRestore = null
             bindHistory(active.generation)
+            if (mutableName.value != null && generation === active.generation) publishName()
         }.also { it.start() }
     }
 
@@ -206,6 +214,26 @@ internal class ConnectionController(
     }
 
     internal fun queryHistory(query: HistoryGraphQuery) = command { historyRecorder.query(query) }
+
+    private fun publishName() {
+        mutableName.value = history?.nameState ?: AccountNameState(storageFailed = true)
+    }
+
+    /** The callback carries its original edit authority; never reacquire it inside delayed work. */
+    internal fun renameAccount(edit: AccountNameEdit, input: String) = command {
+        if (mutableName.value?.edit !== edit || !store.isActive(edit.generation) || cleanupPending()) return@command
+        val owner = revision
+        val previous = nameWrite
+        val writing = ownerScope.async(storageDispatcher) {
+            previous?.join()
+            history?.editName(edit, input) == true
+        }
+        nameWrite = writing
+        ownerScope.launch {
+            writing.await()
+            if (current(owner) && mutableName.value?.edit === edit) publishName()
+        }
+    }
 
     private fun refreshChanged(refresh: UsageRefreshState) {
         historyRecorder.metadata(refresh)
@@ -332,6 +360,7 @@ internal class ConnectionController(
         authenticator.cancel()
         historyRecorder.retire()
         history?.retire()
+        mutableName.value = null
         session.retire()
         return revision
     }
@@ -352,6 +381,7 @@ internal class ConnectionController(
             session.awaitShutdown()
             historyDeletion?.join()
             historyRecorder.settled()
+            nameWrite?.join()
             // A cancelled stage/activation waiter can leave its process-owned child running.
             history?.let { coordinator -> withContext(storageDispatcher) { coordinator.close() } }
             stopped.complete(Unit)
