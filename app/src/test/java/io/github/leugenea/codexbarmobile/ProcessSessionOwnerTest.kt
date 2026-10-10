@@ -338,6 +338,72 @@ class ProcessSessionOwnerTest {
         }
     }
 
+    @Test fun confirmedRemovalSurvivesOrdinaryReadAndRotationButIsConsumedExactlyOnce() = runBlocking {
+        Fixture().use { h ->
+            h.restored()
+            val confirmation = h.owner.accountRemoval
+            h.respondNormally()
+            h.owner.readUsage(refreshSession = true)
+            h.phase(ConnectionPhase.OBSERVED)
+            assertSame(confirmation, h.owner.accountRemoval)
+            h.second.owner.signOut(confirmation)
+            h.phase(ConnectionPhase.SIGNED_OUT)
+            val terminal = h.owner.state.value
+            val requests = h.fake.calls.size
+            h.first.owner.signOut(confirmation)
+            h.owner.commandsSettled()
+            assertSame(terminal, h.owner.state.value)
+            assertEquals(requests, h.fake.calls.size)
+            assertNull(h.persistence.durable)
+            assertEquals(1, h.persistence.deleteCount)
+        }
+    }
+
+    @Test fun queuedReplacementRejectsPredecessorConfirmationBeforeSuccessorPublication() = runBlocking {
+        Fixture().use { h ->
+            h.restored()
+            val predecessor = h.owner.accountRemoval
+            h.respondNormally()
+            h.first.owner.connect()
+            h.second.owner.signOut(predecessor) // Must check permission at execution, not enqueue.
+            h.phase(ConnectionPhase.OBSERVED)
+            val terminal = h.owner.state.value
+            val durable = h.persistence.durable
+            val count = h.fake.calls.size
+            h.owner.signOut(predecessor)
+            h.owner.commandsSettled()
+            assertNotSame(predecessor, h.owner.accountRemoval)
+            assertSame(terminal, h.owner.state.value)
+            assertSame(durable, h.persistence.durable)
+            assertNotNull(durable)
+            assertEquals(count, h.fake.calls.size)
+            assertEquals(1, h.persistence.deleteCount) // Only replacement's predecessor cleanup.
+        }
+    }
+
+    @Test fun failedConfirmedRemovalRequiresFreshPermissionAndRetriesTheSameTeardown() = runBlocking {
+        Fixture().use { h ->
+            h.restored()
+            val confirmation = h.owner.accountRemoval
+            h.persistence.deleteFailure = CredentialFailure.FAILED_WRITE
+            h.owner.signOut(confirmation)
+            h.phase(ConnectionPhase.FAILED)
+            val failed = h.owner.state.value
+            assertEquals(ConnectionProblem.STORAGE, failed.problem)
+            assertNotNull(h.persistence.durable)
+            h.persistence.deleteFailure = null
+            h.owner.signOut(confirmation)
+            h.owner.commandsSettled()
+            assertSame(failed, h.owner.state.value)
+            assertEquals(1, h.persistence.deleteCount)
+            h.owner.signOut(h.owner.accountRemoval)
+            h.phase(ConnectionPhase.SIGNED_OUT)
+            assertNull(h.persistence.durable)
+            assertTrue(h.fake.calls.isEmpty())
+            assertEquals(2, h.persistence.deleteCount)
+        }
+    }
+
     private class Commander(val owner: ConnectionController) {
         val states = ConcurrentLinkedQueue<ConnectionState>()
         private val observation = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)

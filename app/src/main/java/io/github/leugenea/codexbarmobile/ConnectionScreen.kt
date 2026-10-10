@@ -154,8 +154,5 @@ private fun ConnectionContent(state: ConnectionState, controller: ConnectionCont
         modifier = Modifier.testTag("cancel-connect")) {
         Text(stringResource(R.string.gate_cancel))
     }
-    OutlinedButton(onClick = controller::signOut, enabled = state.phase != ConnectionPhase.SIGNING_OUT,
-        modifier = Modifier.testTag("sign-out")) {
-        Text(stringResource(R.string.gate_sign_out))
-    }
+    AccountRemovalAction(state.phase, controller)
 }

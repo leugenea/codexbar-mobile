@@ -214,6 +214,15 @@ ACCOUNT_NAME_CASES = {
 }
 
 
+ACCOUNT_REMOVAL_CLASS = "io.github.leugenea.codexbarmobile.AccountRemovalLifecycleTest"
+ACCOUNT_REMOVAL_CASES = {
+    "restoredAccountConfirmationExplainsLocalScopeAndCancelDismissAndRecreationChangeNothing",
+    "confirmedRemovalDeletesAllLocalArtifactsAndHeldRepliesAndOldConfirmCannotTouchSuccessor",
+    "replacementAndCancelDismissOpenDialogAndCapturedConfirmNeverReacquiresNewAccount",
+    "nameArtifactDeletionFailureIsStorageFailureAndOnlyFreshConfirmedRetryReportsRemoval",
+}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -255,6 +264,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
             ("history isolation", HISTORY_ISOLATION_CLASS, HISTORY_ISOLATION_CASES),
             ("history assembled acceptance", HISTORY_ASSEMBLED_CLASS, HISTORY_ASSEMBLED_CASES),
             ("local account name", ACCOUNT_NAME_CLASS, ACCOUNT_NAME_CASES),
+            ("local account removal", ACCOUNT_REMOVAL_CLASS, ACCOUNT_REMOVAL_CASES),
         ):
             actual_names = {case["name"] for case in cases if case["class"] == classname}
             missing_names = required - actual_names
