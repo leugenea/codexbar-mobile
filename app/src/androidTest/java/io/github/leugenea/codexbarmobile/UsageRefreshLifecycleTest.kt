@@ -17,7 +17,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
 import io.github.leugenea.codexbarmobile.credentials.*
 import io.github.leugenea.codexbarmobile.transport.*
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -28,14 +28,21 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.FileInputStream
+import kotlin.coroutines.CoroutineContext
+import java.util.IdentityHashMap
+import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
+import io.github.leugenea.codexbarmobile.history.*
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /** Real Activity boundaries, real protected restoration, synthetic method/path-routed transport. */
 @RunWith(AndroidJUnit4::class)
+@OptIn(ExperimentalCoroutinesApi::class, DelicateCoroutinesApi::class)
 class UsageRefreshLifecycleTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    private val foregroundCaller = ThreadLocal<ForegroundCaller?>()
+    @get:Rule val compose = createEmptyComposeRule(effectContext = ForegroundContext())
+    private val mutationDispatcher = EpochDispatcher()
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private val originalFactory = NativeConnection.factory
@@ -47,7 +54,7 @@ class UsageRefreshLifecycleTest {
     @Before fun install() {
         NativeConnection.factory = { app ->
             factories++
-            NativeConnection.create(app, fake, SystemTransportClock) { kotlinx.coroutines.delay(it) }
+            withoutForegroundOrigin { createOwner(app) }
         }
         NativeConnection.resetForTests()
         val store = store()
@@ -61,10 +68,19 @@ class UsageRefreshLifecycleTest {
         }
     }
 
+    private fun createOwner(app: android.content.Context): ConnectionController {
+        val protected = KeystoreCredentialStore(app, NativeConnection.session(app))
+        val pause: suspend (Long) -> Unit = { delay(it) }
+        return ConnectionController(protected, DeviceCodeAuthenticator(fake, protected, SystemTransportClock, pause),
+            NativeFeasibilityReader(fake, SystemTransportClock, pause), CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            mutationDispatcher = mutationDispatcher, refreshClock = SystemTransportClock,
+            history = HistoryLifetimeCoordinator(SQLiteHistoryLifetimeStorage(SQLiteHistoryStore.open(app))))
+    }
+
     @After fun uninstall() {
         try {
             epochs?.close()
-            NativeConnection.resetForTests()
+            withoutForegroundOrigin { NativeConnection.resetForTests() }
             val store = store()
             assertTrue(store.delete(store.openSession()) is CredentialResult.Success)
         } finally { NativeConnection.factory = originalFactory }
@@ -74,12 +90,12 @@ class UsageRefreshLifecycleTest {
         launchGate().use { scenario ->
             var original: MainActivity? = null
             scenario.onActivity { original = it }
-            owner.readUsage()
+            withoutForegroundOrigin { owner.readUsage() }
             settleCommands("initial read command")
             waitFor("initial successful cycle") { observed() }
             val success = owner.state.value.refresh.usage.success
             fake.holdUsage = true
-            owner.readUsage()
+            withoutForegroundOrigin { owner.readUsage() }
             settleCommands("held foreground read command")
             val old = awaitLiveUsage("held foreground usage reached transport")
             armEpochs()
@@ -110,7 +126,7 @@ class UsageRefreshLifecycleTest {
             var original: MainActivity? = null
             scenario.onActivity { original = it }
             val shared = owner
-            shared.readUsage()
+            withoutForegroundOrigin { shared.readUsage() }
             settleCommands("pre-recreation read command")
             val old = awaitLiveUsage("pre-recreation usage is in flight")
             armEpochs()
@@ -154,7 +170,7 @@ class UsageRefreshLifecycleTest {
                 if (current != null && activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
                     check(current === selected || selected.cancelled.get()) { "Replacement must retire the selected call" }
                     val before = fake.gets.get()
-                    owner.readUsage(); owner.readUsage()
+                    withoutForegroundOrigin { owner.readUsage(); owner.readUsage() }
                     settleCommands("duplicate foreground read commands coalesce before release")
                     assertEquals("held duplicates issue no GET: ${diagnostics()}", before, fake.gets.get())
                     fake.releaseUsage(current)
@@ -178,6 +194,8 @@ class UsageRefreshLifecycleTest {
         waitFor("recovered Activity is stopped and all endpoint work has settled") {
             belowStarted(activity) && !owner.state.value.refresh.refreshing && fake.liveUsage() == null
         }
+        // Run delayed Compose cancellation finally blocks off Main before the owner receipt.
+        compose.waitForIdle()
         settleCommands("recovered foreground loss command")
         val fresh = owner.state.value.refresh.usage.success
         assertNotNull(fresh)
@@ -195,6 +213,8 @@ class UsageRefreshLifecycleTest {
         val ledger = tracker.snapshot()
         val returned = fake.usageCalls.filter { it.epoch != null }
         val byEpoch = returned.groupBy { requireNotNull(it.epoch) }
+        assertTrue("each foreground block submits exactly true then false: ${diagnostics()}",
+            tracker.ingressCounts().all { it == 2 })
         assertNotEquals("return must observe a START: ${diagnostics()}", 0, ledger.size)
         assertEquals("all return epochs have stopped: ${diagnostics()}", ledger.size + 1, tracker.stops.get())
         assertEquals("every return GET belongs to an observed epoch: ${diagnostics()}",
@@ -204,7 +224,11 @@ class UsageRefreshLifecycleTest {
     }
 
     private fun epochGets(epoch: ForegroundEpoch, calls: List<Held>): Int {
-        val skipped = requireNotNull(epoch.stoppedBeforeAdmission) { "Epoch did not stop: ${diagnostics()}" }
+        assertTrue("epoch ${epoch.index} observed STOP: ${diagnostics()}", epoch.stopped)
+        assertTrue("epoch ${epoch.index} has zero or one foreground ingress: ${diagnostics()}", epoch.ownerStarts in 0..1)
+        assertEquals("epoch ${epoch.index} has matching owner STOP: ${diagnostics()}", epoch.ownerStarts, epoch.ownerStops)
+        val skipped = if (epoch.ownerStarts == 0) true else
+            requireNotNull(epoch.stoppedBeforeAdmission) { "Owner epoch did not close: ${diagnostics()}" }
         assertEquals("epoch ${epoch.index} admits at most one usage GET: ${diagnostics()}",
             if (skipped) 0 else 1, calls.size)
         if (skipped) return 0
@@ -247,6 +271,14 @@ class UsageRefreshLifecycleTest {
         }
     }
 
+    // The v2 rule also inherits effectContext into its test coroutine. Test-issued commands
+    // must not be mistaken for commands from the production repeating lifecycle child.
+    private fun <T> withoutForegroundOrigin(action: () -> T): T {
+        val previous = foregroundCaller.get()
+        foregroundCaller.remove()
+        try { return action() } finally { foregroundCaller.set(previous) }
+    }
+
     private fun settleCommands(step: String) = awaitOwner(step) { owner.commandsSettled() }
 
     private fun awaitOwner(step: String, action: suspend () -> Unit) {
@@ -257,7 +289,8 @@ class UsageRefreshLifecycleTest {
     }
 
     private fun diagnostics(): String = "last state=${owner.state.value}, refresh=${owner.state.value.refresh}, " +
-        "epochs=${epochs?.snapshot()}, stops=${epochs?.stops?.get()}, gets=${fake.gets.get()}, " +
+        "epochs=${epochs?.snapshot()}, ingress=${epochs?.ingressCounts()}, ownerEpoch=${fake.currentEpoch}, " +
+        "stops=${epochs?.stops?.get()}, gets=${fake.gets.get()}, " +
         "held=${fake.held.map { it.diagnostics() }}, usage=${fake.usageCalls.map { it.diagnostics() }}"
 
     private fun store() = KeystoreCredentialStore(context, NativeConnection.session(context))
@@ -279,7 +312,6 @@ class UsageRefreshLifecycleTest {
         fun arm() = synchronized(fake.gate) {
             stops.set(0)
             ledger.clear()
-            fake.trackEpochs { ledger.size }
             armed = true
         }
 
@@ -298,13 +330,44 @@ class UsageRefreshLifecycleTest {
                 Lifecycle.Event.ON_START -> ledger += ForegroundEpoch(ledger.size + 1)
                 Lifecycle.Event.ON_STOP -> {
                     stops.incrementAndGet()
-                    ledger.lastOrNull()?.let { epoch ->
-                        // Capture skipped status at STOP, not from a later aggregate request count.
-                        ledger[ledger.lastIndex] = epoch.copy(stoppedBeforeAdmission =
-                            fake.usageCalls.none { it.epoch == epoch.index })
-                    }
+                    ledger.lastOrNull()?.let { ledger[ledger.lastIndex] = it.copy(stopped = true) }
                 }
                 else -> Unit
+            }
+        }
+
+        fun latest(): Int? = synchronized(fake.gate) { if (armed) ledger.lastOrNull()?.index else null }
+        private val submissions = IdentityHashMap<Any, Int>()
+        fun ingressCounts(): List<Int> = synchronized(fake.gate) { submissions.values.toList() }
+
+        // Only ObserveUsageLifecycle submits owner commands from a Compose effect in this fixture:
+        // history stays closed. Its block submits true then false with the same copied context ticket.
+        fun command(caller: ForegroundCaller): ForegroundCommand = synchronized(fake.gate) {
+            val count = (submissions[caller.origin] ?: 0) + 1
+            submissions[caller.origin] = count
+            ForegroundCommand(caller.epoch, count == 1)
+        }
+
+        fun enter(command: ForegroundCommand) = synchronized(fake.gate) {
+            if (command.foreground) {
+                fake.currentEpoch = command.epoch
+                command.epoch?.let { index ->
+                    val epoch = ledger[index - 1]
+                    ledger[index - 1] = epoch.copy(ownerStarts = epoch.ownerStarts + 1)
+                }
+            }
+        }
+
+        fun leave(command: ForegroundCommand) = synchronized(fake.gate) {
+            if (!command.foreground) {
+                command.epoch?.let { index ->
+                    val epoch = ledger[index - 1]
+                    // The actual foreground(false) command has now cancelled the lazy/entered read.
+                    // No old admission can overtake this point on the same serial owner lane.
+                    ledger[index - 1] = epoch.copy(ownerStops = epoch.ownerStops + 1,
+                        stoppedBeforeAdmission = fake.usageCalls.none { it.epoch == index })
+                }
+                fake.currentEpoch = null
             }
         }
 
@@ -326,7 +389,42 @@ class UsageRefreshLifecycleTest {
         override fun onActivityDestroyed(activity: Activity) = Unit
     }
 
-    private data class ForegroundEpoch(val index: Int, val stoppedBeforeAdmission: Boolean? = null)
+    private data class ForegroundEpoch(val index: Int, val stopped: Boolean = false,
+        val ownerStarts: Int = 0, val ownerStops: Int = 0, val stoppedBeforeAdmission: Boolean? = null)
+    private data class ForegroundCaller(val epoch: Int?, val origin: Any)
+    private data class ForegroundCommand(val epoch: Int?, val foreground: Boolean)
+
+    /** Capture START when the repeating child is created, not when it eventually executes. */
+    private inner class ForegroundContext(private val epoch: Int? = null) :
+        CopyableThreadContextElement<ForegroundCaller?> {
+        override val key get() = ForegroundKey
+        override fun copyForChild(): ForegroundContext = ForegroundContext(epochs?.latest())
+        override fun mergeForChild(overwritingElement: CoroutineContext.Element): CoroutineContext = overwritingElement
+        override fun updateThreadContext(context: CoroutineContext): ForegroundCaller? {
+            val previous = foregroundCaller.get()
+            // coroutineScope can change Job across undispatched entry and resumed finally;
+            // the copied element itself is the stable identity for both submissions.
+            foregroundCaller.set(ForegroundCaller(epoch, this))
+            return previous
+        }
+        override fun restoreThreadContext(context: CoroutineContext, oldState: ForegroundCaller?) {
+            foregroundCaller.set(oldState)
+        }
+    }
+
+    /** Same queued IO lane as production, with boundaries surrounding actual foreground commands. */
+    private inner class EpochDispatcher : CoroutineDispatcher() {
+        private val serial = Dispatchers.IO.limitedParallelism(1)
+        override fun dispatch(context: CoroutineContext, block: Runnable) {
+            val tracker = epochs
+            val command = foregroundCaller.get()?.let { tracker?.command(it) }
+            serial.dispatch(context, Runnable {
+                command?.let { tracker?.enter(it) }
+                block.run()
+                command?.let { tracker?.leave(it) }
+            })
+        }
+    }
 
     private class LifecycleTransport : AuthTransport {
         @Volatile var holdUsage = false
@@ -337,9 +435,7 @@ class UsageRefreshLifecycleTest {
         private val active = AtomicInteger()
         val maximum = AtomicInteger()
         private var pendingInventory: Held? = null
-        private var currentEpoch: (() -> Int)? = null
-
-        fun trackEpochs(index: () -> Int) { currentEpoch = index }
+        @Volatile var currentEpoch: Int? = null
 
         override fun execute(request: ProviderHttpRequest, deadline: ReadDeadline,
             terminal: (TransportResult) -> Unit): CancellationHandle {
@@ -361,8 +457,8 @@ class UsageRefreshLifecycleTest {
             val call: Held
             val hold: Boolean
             synchronized(gate) {
-                // Stamp the epoch at admission; never spend unused earlier START credits.
-                val epoch = currentEpoch?.invoke()
+                // The dispatcher owns this epoch; a later Main START cannot relabel this admission.
+                val epoch = currentEpoch
                 maximum.accumulateAndGet(active.incrementAndGet(), ::maxOf)
                 call = Held(usageCalls.size, epoch, terminal) { active.decrementAndGet() }
                 usageCalls += call
@@ -404,6 +500,7 @@ class UsageRefreshLifecycleTest {
     }
 
     private companion object {
+        val ForegroundKey = object : CoroutineContext.Key<ForegroundContext> {}
         const val USAGE = """{"rate_limit":{"primary_window":{"limit_window_seconds":18000,"used_percent":12,"reset_after_seconds":500}}}"""
         const val INVENTORY = """{"available_count":0,"credits":[]}"""
         fun response(body: String, status: Int = 200) = TransportResult.Response.bounded(status, body.toByteArray())
