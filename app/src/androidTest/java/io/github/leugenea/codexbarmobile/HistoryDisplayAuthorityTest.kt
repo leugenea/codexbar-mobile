@@ -64,14 +64,14 @@ class HistoryDisplayAuthorityTest {
     @Test fun heldBoundCollectionCannotReplayRetiredFactsOnActualHostReexecution() {
         boundPage()
         mount()
-        val old = retainedBoundPage()
-        observer.hold()
+        retainedBoundPage()
+        val old = holdPredecessor("bound retirement")
         try {
             owner.signOut()
             settled("sign-out processed")
             await("exact old context revoked") { old.displayPermission!!.current() == null }
             phase(ConnectionPhase.SIGNED_OUT)
-            challenge(old, HistoryReadiness.UNAVAILABLE)
+            challenge(old, HistoryReadiness.UNAVAILABLE, "bound retirement")
             assertEquals(7L, fixture.transport.requests.get())
             assertEquals(4L, fixture.transport.gets.get())
         } finally { observer.release() }
@@ -82,8 +82,8 @@ class HistoryDisplayAuthorityTest {
     @Test fun heldBoundCollectionRejectsReplacementThenShowsOnlySuccessorFacts() {
         boundPage()
         mount()
-        val old = retainedReplacementPage()
-        observer.hold()
+        retainedReplacementPage()
+        val old = holdPredecessor("bound replacement")
         try {
             fixture.transport.usageStatus = 200
             fixture.transport.advance(1000)
@@ -96,7 +96,7 @@ class HistoryDisplayAuthorityTest {
             }
             assertNotSame(old.displayPermission!!.context, old.displayPermission.current())
             assertNotNull(old.displayPermission.current()!!.generation)
-            challenge(old, HistoryReadiness.LOADING)
+            challenge(old, HistoryReadiness.LOADING, "bound replacement")
         } finally { observer.release() }
         await("successor facts reach the real host") { observer.last?.display?.points?.size == 1 }
         val successor = observer.last!!.display
@@ -125,28 +125,27 @@ class HistoryDisplayAuthorityTest {
         mount()
         await("current null context diagnostic rendered") { observer.last?.display?.lostSamples == 2L }
         click("history-select-WEEKLY")
-        val old = observer.last!!.source
+        val old = holdPredecessor("null diagnostic retirement")
         assertNull(old.generation)
         assertEquals(2L, observer.last!!.display.lostSamples)
         assertEquals(HistoryLiveMetadata(), observer.last!!.display.live)
         compose.onNodeWithTag("history-loss").assertTextEquals("Samples lost or unconfirmed: 2; history is incomplete.")
-        observer.hold()
         try {
             owner.cancel()
             settled("null diagnostic retirement processed")
             await("null diagnostic context revoked") { old.displayPermission!!.current() == null }
-            challenge(old, HistoryReadiness.UNAVAILABLE)
+            challenge(old, HistoryReadiness.UNAVAILABLE, "null diagnostic retirement")
             unavailableStorage = false
             fixture.transport.advance(1000)
             owner.connect()
             phase(ConnectionPhase.OBSERVED)
             await("bound successor after null diagnostics") { owner.historySnapshots.value.generation != null }
-            challenge(old, HistoryReadiness.LOADING)
+            challenge(old, HistoryReadiness.LOADING, "null diagnostic bound successor")
             owner.cancel()
             settled("bound successor retirement processed")
             await("successor context cleared") { old.displayPermission!!.current() == null }
             assertNull(owner.historySnapshots.value.generation)
-            challenge(old, HistoryReadiness.UNAVAILABLE)
+            challenge(old, HistoryReadiness.UNAVAILABLE, "null diagnostic successor retirement")
         } finally { observer.release() }
         await("cleared source collected") { observer.last?.source?.displayPermission == null }
         unavailableStorage = true
@@ -172,22 +171,23 @@ class HistoryDisplayAuthorityTest {
             "history-next-page" to HistoryNavigation(kind = WindowKind.WEEKLY, after = ObservationId(32)),
             "history-first-page" to HistoryNavigation(kind = WindowKind.WEEKLY),
             "history-select-FIVE_HOUR" to HistoryNavigation())
-        for ((tag, selection) in selections) {
-            val old = observer.last!!.source
-            assertTrue("a real previously published page must reach the host", old.points.isNotEmpty())
-            observer.hold()
+        for ((index, action) in selections.withIndex()) {
+            val (tag, selection) = action
+            val step = "selection ${index + 1}: $tag -> ${selection.query}"
+            val old = holdPredecessor(step)
+            assertTrue("$step: a real previously published page must reach the host", old.points.isNotEmpty())
             try {
                 click(tag)
-                await("authoritative successor query published while old collection stays held") {
+                await("$step: authoritative successor query published while old collection stays held") {
                     val source = owner.historySnapshots.value
                     source.query == selection.query && source.storage != null && source.readiness == HistoryReadiness.READY
                 }
                 assertSame("query supersession must not masquerade as lifecycle retirement",
                     old.displayPermission!!.context, old.displayPermission.current())
                 assertEquals(selection.query, observer.last!!.display.query)
-                challenge(old, HistoryReadiness.LOADING)
+                challenge(old, HistoryReadiness.LOADING, step)
             } finally { observer.release() }
-            await("only selected successor page reaches host after collection release") {
+            await("$step: only selected successor page reaches host after collection release") {
                 val display = observer.last?.display
                 display?.query == selection.query && display.entries.size == if (selection.after == null) 32 else 3
             }
@@ -247,14 +247,26 @@ class HistoryDisplayAuthorityTest {
         return source
     }
 
-    private fun challenge(old: HistoryGraphSnapshot, readiness: HistoryReadiness) {
-        await("UI collector independently parked") { observer.blocked != null }
+    private fun holdPredecessor(step: String): HistoryGraphSnapshot {
+        observer.hold()
+        // A passed-gate delivery may still be awaiting composition. Await that exact
+        // receipt, not owner.value: newer owner publications are allowed to be parked.
+        await("$step: host applied the last delivery admitted before hold") {
+            val delivered = observer.deliverySource
+            delivered != null && observer.last?.source === delivered
+        }
+        return requireNotNull(observer.deliverySource)
+    }
+
+    private fun challenge(old: HistoryGraphSnapshot, readiness: HistoryReadiness, step: String) {
+        await("$step: UI collector independently parked") { observer.blocked != null }
         val query = observer.last!!.display.query
         val expected = now.value.plusSeconds(1)
         compose.runOnUiThread { now.value = expected }
-        await("actual host pass with changed evaluation input") { observer.last?.now == expected }
+        await("$step: actual host pass with changed evaluation input") { observer.last?.now == expected }
         val pass = observer.last!!
-        assertSame("held source must still be the exact predecessor", old, pass.source)
+        assertSame("$step: held source must still be the exact predecessor; " +
+            "expected=${snapshotState(old)}, actual=${snapshotState(pass.source)}", old, pass.source)
         assertEquals(old.query, pass.source.query)
         assertEquals(readiness, pass.display.readiness)
         assertEquals("the challenged host selection must not change", query, pass.display.query)
@@ -341,13 +353,26 @@ class HistoryDisplayAuthorityTest {
 
     private fun settled(step: String) {
         try { runBlocking { withTimeout(5_000) { owner.commandsSettled() } } }
-        catch (error: TimeoutCancellationException) { throw AssertionError("$step: owner receipt timed out", error) }
+        catch (error: TimeoutCancellationException) {
+            throw AssertionError("$step: owner receipt timed out; phase=${owner.state.value.phase}, " +
+                "owner=${snapshotState(owner.historySnapshots.value)}, source=${snapshotState(observer.last?.source)}", error)
+        }
     }
+
+    private fun snapshotState(source: HistoryGraphSnapshot?): String = source?.let {
+        "id=${System.identityHashCode(it)}, query=${it.query}, readiness=${it.readiness}, " +
+            "generation=${it.generation?.let(System::identityHashCode)}, " +
+            "context=${it.displayPermission?.context?.let(System::identityHashCode)}, " +
+            "page=${it.storage?.let(System::identityHashCode)}, points=${it.points.size}, refreshing=${it.live.refreshing}"
+    } ?: "null"
 
     private fun await(step: String, condition: () -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 8_000, condition = condition) }
         catch (error: ComposeTimeoutException) {
-            throw AssertionError("$step: phase=${owner.state.value.phase}, source=${observer.last?.source?.readiness}, display=${observer.last?.display?.readiness}, blocked=${observer.blocked?.readiness}", error)
+            throw AssertionError("$step: phase=${owner.state.value.phase}, " +
+                "owner=${snapshotState(owner.historySnapshots.value)}, source=${snapshotState(observer.last?.source)}, " +
+                "display=${snapshotState(observer.last?.display)}, delivery=${snapshotState(observer.deliverySource)}, " +
+                "blocked=${snapshotState(observer.blocked)}", error)
         }
     }
 }
@@ -355,15 +380,33 @@ class HistoryDisplayAuthorityTest {
 private class HeldHistoryObserver : HistoryUiObserver {
     data class Pass(val source: HistoryGraphSnapshot, val display: HistoryGraphSnapshot, val now: Instant?)
     private val passes = CopyOnWriteArrayList<Pass>()
-    @Volatile private var gate: CompletableDeferred<Unit>? = null
+    private val deliveryLock = Any()
+    private var gate: CompletableDeferred<Unit>? = null
+    /** Last snapshot admitted past the gate, not necessarily projected by Compose yet. */
+    @Volatile var deliverySource: HistoryGraphSnapshot? = null
+        private set
     @Volatile var blocked: HistoryGraphSnapshot? = null
         private set
     val last get() = passes.lastOrNull()
-    fun hold() { check(gate == null); blocked = null; gate = CompletableDeferred() }
-    fun release() { gate?.complete(Unit); gate = null }
-    override fun snapshots(source: StateFlow<HistoryGraphSnapshot>): Flow<HistoryGraphSnapshot> = source.onEach {
-        val held = gate
-        if (held != null) { blocked = it; held.await() }
+    fun hold() = synchronized(deliveryLock) {
+        check(gate == null)
+        blocked = null
+        gate = CompletableDeferred()
+    }
+    fun release() {
+        val held = synchronized(deliveryLock) { gate.also { gate = null } }
+        held?.complete(Unit)
+    }
+    override fun snapshots(source: StateFlow<HistoryGraphSnapshot>): Flow<HistoryGraphSnapshot> = source.onEach { snapshot ->
+        while (true) {
+            // Admit and record atomically with hold(). Once held, this receipt is frozen;
+            // the host must acknowledge it before the test captures its predecessor.
+            val held = synchronized(deliveryLock) { gate.also { if (it == null) deliverySource = snapshot } }
+            if (held == null) break
+            blocked = snapshot
+            held.await()
+            // A released delivery must also respect a hold installed before it resumed.
+        }
     }
     override fun projected(source: HistoryGraphSnapshot, display: HistoryGraphSnapshot, now: Instant?) {
         passes += Pass(source, display, now)
