@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791589036098,
+  "lastUpdate": 1791617898607,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1247,6 +1247,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/84933c8eee7df6a9111e525f38f591ea5479df8f"
         },
         "date": 1791589032137,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "41d9d618403ee90791be5924b5a36055d5a37b84",
+          "message": "feat(account): add local display name for the connected account (#100)\n\nCloses #95",
+          "timestamp": "2026-10-10T10:37:56+03:00",
+          "tree_id": "f67ff523dbd1c2099c4111788e62dd3b4fb5ada1",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/41d9d618403ee90791be5924b5a36055d5a37b84"
+        },
+        "date": 1791617898261,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
