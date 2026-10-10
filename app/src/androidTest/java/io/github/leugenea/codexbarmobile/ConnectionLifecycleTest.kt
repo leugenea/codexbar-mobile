@@ -371,6 +371,7 @@ class ConnectionLifecycleTest {
             }
             assertSavedStateHasNoSecrets(scenario)
             click("connect") // replacement also deletes the previous durable pair before auth.
+            settleOwnerCommands("explicit account replacement connect command processed")
             await(scenario, "explicit account replacement") { it.phase == ConnectionPhase.OBSERVED }
             click("remove-account"); click("remove-account-confirm")
             await(scenario, "replacement local deletion") { it.phase == ConnectionPhase.SIGNED_OUT }
@@ -565,10 +566,11 @@ class ConnectionLifecycleTest {
             assertSame("$tag rejected without mutation", before, NativeConnection.get(context).state.value)
         }
     }
-    private fun settleOwnerCommands() {
+    private fun settleOwnerCommands(step: String = "owner command receipt") {
         try { runBlocking { withTimeout(5_000) { NativeConnection.get(context).commandsSettled() } } }
         catch (error: kotlinx.coroutines.TimeoutCancellationException) {
-            throw AssertionError("owner command receipt: ${NativeConnection.get(context).state.value}", error)
+            val state = NativeConnection.get(context).state.value
+            throw AssertionError("$step: last state=$state, refreshing=${state.refresh.refreshing}", error)
         }
     }
     private fun await(scenario: ActivityScenario<MainActivity>, step: String, test: (ConnectionState) -> Boolean) {

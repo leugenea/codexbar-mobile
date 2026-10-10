@@ -111,6 +111,7 @@ class AccountRemovalLifecycleTest {
             val stale = openRemovalDialog()
             val predecessor = owner.accountRemoval
             owner.connect()
+            settle(owner, "replacement connect command processed")
             await("replacement adopted successor") {
                 owner.state.value.let { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing }
                     && owner.accountRemoval !== predecessor && owner.accountName.value?.edit != null
@@ -154,6 +155,7 @@ class AccountRemovalLifecycleTest {
             compose.onNodeWithTag("remove-account").performClick()
             compose.onNodeWithTag("remove-account-dialog").assertIsDisplayed()
             controller.connect()
+            settle(controller, "same-phase replacement connect command processed")
             await("same-phase successor adopted") {
                 controller.state.value.let { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing }
                     && controller.accountRemoval !== predecessor && controller.accountName.value?.edit != null
@@ -270,10 +272,18 @@ class AccountRemovalLifecycleTest {
     private fun replay(captured: AccountRemoval, step: String) {
         // Model delayed dialog confirmation at its owner boundary, not a detached clickable node.
         compose.runOnUiThread { owner.signOut(captured) }
+        settle(owner, step)
+    }
+    private fun settle(controller: ConnectionController, step: String) {
+        // Permission rotation can precede AUTHENTICATING; acknowledge the command, not a conflated phase.
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val receipt = scope.async { owner.commandsSettled() }
-        try { await(step) { receipt.isCompleted }; runBlocking { receipt.await() } }
-        finally { scope.cancel() }
+        val receipt = scope.async { controller.commandsSettled() }
+        try {
+            await(step, lastState = {
+                "${controller.state.value}, refreshing=${controller.state.value.refresh.refreshing}, commandReceiptCompleted=${receipt.isCompleted}"
+            }) { receipt.isCompleted }
+            runBlocking { receipt.await() }
+        } finally { scope.cancel() }
     }
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
