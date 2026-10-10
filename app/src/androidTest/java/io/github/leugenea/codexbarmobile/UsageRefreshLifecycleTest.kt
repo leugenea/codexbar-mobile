@@ -1,12 +1,16 @@
 package io.github.leugenea.codexbarmobile
 
+import android.app.Activity
+import android.app.Application
 import android.content.ComponentName
 import android.content.Intent
+import android.os.Bundle
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -15,6 +19,7 @@ import io.github.leugenea.codexbarmobile.credentials.*
 import io.github.leugenea.codexbarmobile.transport.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -36,6 +41,7 @@ class UsageRefreshLifecycleTest {
     private val fake = LifecycleTransport()
     private var factories = 0
     private val owner get() = NativeConnection.get(context)
+    private var epochs: ForegroundEpochs? = null
 
     @Before fun install() {
         NativeConnection.factory = { app ->
@@ -49,10 +55,14 @@ class UsageRefreshLifecycleTest {
         val next = store.openSession()
         assertTrue(store.replace(CredentialEnvelope(next, SensitiveValue.copyOf("synthetic-b2-native-access".toByteArray()),
             SensitiveValue.copyOf("synthetic-b2-native-refresh".toByteArray())), CredentialCancellation()) is CredentialResult.Success)
+        epochs = ForegroundEpochs().also { tracker ->
+            instrumentation.runOnMainSync { tracker.install() }
+        }
     }
 
     @After fun uninstall() {
         try {
+            epochs?.close()
             NativeConnection.resetForTests()
             val store = store()
             assertTrue(store.delete(store.openSession()) is CredentialResult.Success)
@@ -64,12 +74,14 @@ class UsageRefreshLifecycleTest {
             var original: MainActivity? = null
             scenario.onActivity { original = it }
             owner.readUsage()
-            waitFor("initial successful cycle") { owner.state.value.phase == ConnectionPhase.OBSERVED }
+            settleCommands("initial read command")
+            waitFor("initial successful cycle") { observed() }
             val success = owner.state.value.refresh.usage.success
             fake.holdUsage = true
             owner.readUsage()
-            waitFor("held foreground usage reached transport") { fake.held.size == 1 }
-            val old = fake.held.single()
+            settleCommands("held foreground read command")
+            val old = awaitLiveUsage("held foreground usage reached transport")
+            armEpochs()
             pressHome()
             waitFor("Home stops Activity and cancellation has completed") {
                 old.cancelled.get() && !owner.state.value.refresh.refreshing && belowStarted(original!!)
@@ -80,24 +92,14 @@ class UsageRefreshLifecycleTest {
             context.startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
                 .setComponent(ComponentName(context, MainActivity::class.java))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
-            waitFor("original task resumes and admits one usage GET") {
-                resumed(original!!) && fake.held.size == 2
-            }
+            val returning = awaitLiveUsage("original task resumes with a live usage GET", original, old)
             scenario.onActivity { assertSame(original, it); assertSame(owner, it.connection) }
             assertEquals(1, factories)
-            owner.readUsage(); owner.readUsage()
-            settleCommands()
-            assertEquals(4, fake.gets.get())
-            fake.held.last().reply(response(USAGE))
+            releaseCoalescedUsage(returning, original!!)
             waitFor("bounded resumed cycle publishes both endpoints") {
-                owner.state.value.phase == ConnectionPhase.OBSERVED && owner.state.value.refresh.usage.success !== success
+                observed() && owner.state.value.refresh.usage.success !== success
             }
-            val fresh = owner.state.value.refresh.usage.success
-            old.reply(response("{}", 401))
-            settleCommands()
-            assertSame(fresh, owner.state.value.refresh.usage.success)
-            assertEquals(5, fake.gets.get())
-            assertEquals(1, fake.maximum.get())
+            finishRecovery(old, original, baselineGets = 3)
         }
     }
 
@@ -108,32 +110,104 @@ class UsageRefreshLifecycleTest {
             scenario.onActivity { original = it }
             val shared = owner
             shared.readUsage()
-            waitFor("pre-recreation usage is in flight") { fake.held.size == 1 }
-            val old = fake.held.single()
+            settleCommands("pre-recreation read command")
+            val old = awaitLiveUsage("pre-recreation usage is in flight")
+            armEpochs()
             scenario.recreate()
             var recreated: MainActivity? = null
             scenario.onActivity { recreated = it; assertSame(shared, it.connection) }
             assertNotSame(original, recreated)
             assertEquals(Lifecycle.State.DESTROYED, original!!.lifecycle.currentState)
-            waitFor("old transport cancelled and recreated Activity owns one resumed read") {
-                old.cancelled.get() && resumed(recreated!!) && fake.held.size == 2
-            }
-            shared.readUsage(); shared.readUsage()
-            settleCommands()
-            assertEquals(2, fake.gets.get())
+            val returning = awaitLiveUsage("old transport cancelled and recreated Activity owns a live resumed read",
+                recreated, old)
             assertEquals(1, factories)
-            fake.held.last().reply(response(USAGE))
-            waitFor("recreated cycle finishes with separate successful observations") {
-                shared.state.value.phase == ConnectionPhase.OBSERVED && !shared.state.value.refresh.refreshing
-            }
+            releaseCoalescedUsage(returning, recreated!!)
+            waitFor("recreated cycle finishes with separate successful observations") { observed() }
             assertNotNull(shared.state.value.refresh.usage.successfulAtMillis)
             assertNotNull(shared.state.value.refresh.inventory.successfulAtMillis)
-            val fresh = shared.state.value.refresh.usage.success
-            old.reply(response("{}", 401)); settleCommands()
-            assertSame(fresh, shared.state.value.refresh.usage.success)
-            assertEquals(3, fake.gets.get())
-            assertEquals(1, fake.maximum.get())
+            finishRecovery(old, recreated, baselineGets = 1)
         }
+    }
+
+    private fun observed(): Boolean {
+        val state = owner.state.value
+        return state.phase == ConnectionPhase.OBSERVED && !state.refresh.refreshing && state.problem == null &&
+            state.refresh.usage.success != null && state.refresh.inventory.success != null
+    }
+
+    private fun awaitLiveUsage(step: String, activity: MainActivity? = null, predecessor: Held? = null): Held {
+        var selected: Held? = null
+        waitFor(step) {
+            selected = fake.liveUsage()
+            selected != null && selected !== predecessor &&
+                (activity == null || resumed(activity)) && (predecessor == null || predecessor.cancelled.get())
+        }
+        return requireNotNull(selected)
+    }
+
+    private fun releaseCoalescedUsage(selected: Held, activity: MainActivity) {
+        waitFor("live return reaches the exact coalescing checkpoint") {
+            var released = false
+            instrumentation.runOnMainSync {
+                settleCommands("foreground commands before coalescing checkpoint")
+                val current = fake.liveUsage()
+                if (current != null && activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                    check(current === selected || selected.cancelled.get()) { "Replacement must retire the selected call" }
+                    val before = fake.gets.get()
+                    owner.readUsage(); owner.readUsage()
+                    settleCommands("duplicate foreground read commands coalesce before release")
+                    assertEquals("held duplicates issue no GET: ${diagnostics()}", before, fake.gets.get())
+                    fake.releaseUsage(current)
+                    // Only the IO-owned response/settlement is awaited here, never Compose.
+                    // Main is fenced so a new lifecycle epoch cannot mask a queued duplicate.
+                    waitFor("released cycle settles on owner lane", pumpCompose = false) { observed() }
+                    settleCommands("released cycle completion commands")
+                    assertEquals("coalesced cycle adds exactly its inventory GET: ${diagnostics()}",
+                        before + 1, fake.gets.get())
+                    released = true
+                }
+            }
+            released
+        }
+    }
+
+    private fun finishRecovery(old: Held, activity: MainActivity, baselineGets: Int) {
+        // Stop the real lifecycle observer before capturing the success/count oracle:
+        // a subsequent completed return epoch may otherwise legitimately replace it again.
+        pressHome()
+        waitFor("recovered Activity is stopped and all endpoint work has settled") {
+            belowStarted(activity) && !owner.state.value.refresh.refreshing && fake.liveUsage() == null
+        }
+        settleCommands("recovered foreground loss command")
+        val fresh = owner.state.value.refresh.usage.success
+        assertNotNull(fresh)
+        assertEpochRequests(old, baselineGets)
+        val total = fake.gets.get()
+        old.reply(response("{}", 401))
+        settleCommands("stale unauthorized predecessor reply")
+        assertSame(fresh, owner.state.value.refresh.usage.success)
+        assertEquals(total, fake.gets.get())
+        assertEquals(1, fake.maximum.get())
+    }
+
+    private fun assertEpochRequests(old: Held, baselineGets: Int) {
+        val returned = fake.usageCalls.filter { it.id > old.id }
+        val starts = requireNotNull(epochs).starts.get()
+        assertNotEquals("return must observe a START: ${diagnostics()}", 0, starts)
+        assertEquals("all return epochs have stopped: ${diagnostics()}", starts + 1, requireNotNull(epochs).stops.get())
+        // A brief START/STOP can cancel the lazy refresh before it reaches transport.
+        // Admission consumes an independently observed START budget in the fake; these
+        // zero-request epochs must not be mistaken for cancelled held requests.
+        val skipped = starts - returned.size
+        returned.forEach { call ->
+            assertEquals("cancelled epochs cannot reach inventory: ${diagnostics()}",
+                !call.cancelled.get(), call.inventory.get())
+        }
+        // Held cancelled epochs contribute usage only; released completed epochs contribute
+        // both endpoints. This includes extra complete STOP/START pairs after gate release.
+        val cancelled = returned.count { it.cancelled.get() }
+        assertEquals("exact epoch-aware GET total: ${diagnostics()}",
+            baselineGets + 2 * (starts - skipped) - cancelled, fake.gets.get())
     }
 
     private fun launchGate(): ActivityScenario<MainActivity> {
@@ -143,7 +217,7 @@ class UsageRefreshLifecycleTest {
         assertEquals(0, fake.gets.get())
         compose.onNodeWithTag("connection-tab").performClick()
         compose.waitForIdle()
-        settleCommands()
+        settleCommands("connection tab lifecycle registration")
         return scenario
     }
 
@@ -161,49 +235,161 @@ class UsageRefreshLifecycleTest {
         return state
     }
 
-    private fun waitFor(step: String, condition: () -> Boolean) {
-        try { compose.waitUntil(timeoutMillis = 10_000, condition = condition) }
-        catch (error: ComposeTimeoutException) { throw AssertionError("$step: last state=${owner.state.value}", error) }
-    }
-
-    private fun settleCommands() {
-        try { runBlocking { withTimeout(5_000) { owner.commandsSettled() } } }
-        catch (error: kotlinx.coroutines.TimeoutCancellationException) {
-            throw AssertionError("B2 owner commands did not settle: ${owner.state.value}", error)
+    private fun waitFor(step: String, pumpCompose: Boolean = true, condition: () -> Boolean) {
+        try {
+            if (pumpCompose) compose.waitUntil(timeoutMillis = 10_000, condition = condition)
+            else runBlocking { withTimeout(5_000) { while (!condition()) yield() } }
+        } catch (error: ComposeTimeoutException) {
+            throw AssertionError("$step: ${diagnostics()}", error)
+        } catch (error: kotlinx.coroutines.TimeoutCancellationException) {
+            throw AssertionError("$step: ${diagnostics()}", error)
         }
     }
 
+    private fun settleCommands(step: String) {
+        try { runBlocking { withTimeout(5_000) { owner.commandsSettled() } } }
+        catch (error: kotlinx.coroutines.TimeoutCancellationException) {
+            throw AssertionError("$step: ${diagnostics()}", error)
+        }
+    }
+
+    private fun diagnostics(): String = "last state=${owner.state.value}, refresh=${owner.state.value.refresh}, " +
+        "epochs=${epochs?.starts?.get()}, stops=${epochs?.stops?.get()}, gets=${fake.gets.get()}, " +
+        "held=${fake.held.map { it.diagnostics() }}, usage=${fake.usageCalls.map { it.diagnostics() }}"
+
     private fun store() = KeystoreCredentialStore(context, NativeConnection.session(context))
+
+    private fun armEpochs() {
+        instrumentation.runOnMainSync { requireNotNull(epochs).arm() }
+    }
+
+    /** Attached before Compose registers its lifecycle observer, including after recreation. */
+    private inner class ForegroundEpochs : Application.ActivityLifecycleCallbacks, AutoCloseable {
+        val starts = AtomicInteger()
+        val stops = AtomicInteger()
+        private val application get() = context.applicationContext as Application
+        private val registrations = mutableListOf<Pair<MainActivity, LifecycleEventObserver>>()
+        private var armed = false
+
+        fun install() { application.registerActivityLifecycleCallbacks(this) }
+
+        fun arm() {
+            starts.set(0); stops.set(0)
+            fake.beginReturnEpochs { starts.get() }
+            armed = true
+        }
+
+        private fun watch(activity: MainActivity) {
+            val observer = LifecycleEventObserver { _, event ->
+                if (armed) record(event)
+            }
+            registrations += activity to observer
+            activity.lifecycle.addObserver(observer)
+        }
+
+        private fun record(event: Lifecycle.Event) {
+            when (event) {
+                Lifecycle.Event.ON_START -> starts.incrementAndGet()
+                Lifecycle.Event.ON_STOP -> stops.incrementAndGet()
+                else -> Unit
+            }
+        }
+
+        override fun close() {
+            instrumentation.runOnMainSync {
+                application.unregisterActivityLifecycleCallbacks(this)
+                registrations.forEach { (activity, observer) -> activity.lifecycle.removeObserver(observer) }
+            }
+        }
+
+        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+            if (activity is MainActivity) watch(activity)
+        }
+        override fun onActivityStarted(activity: Activity) = Unit
+        override fun onActivityResumed(activity: Activity) = Unit
+        override fun onActivityPaused(activity: Activity) = Unit
+        override fun onActivityStopped(activity: Activity) = Unit
+        override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+        override fun onActivityDestroyed(activity: Activity) = Unit
+    }
 
     private class LifecycleTransport : AuthTransport {
         @Volatile var holdUsage = false
         val held = CopyOnWriteArrayList<Held>()
+        val usageCalls = CopyOnWriteArrayList<Held>()
         val gets = AtomicInteger()
+        private val gate = Any()
         private val active = AtomicInteger()
         val maximum = AtomicInteger()
+        private var pendingInventory: Held? = null
+        private var returnStarts: (() -> Int)? = null
+        private var beforeReturns = 0
+
+        fun beginReturnEpochs(starts: () -> Int) = synchronized(gate) {
+            beforeReturns = usageCalls.size
+            returnStarts = starts
+        }
+
         override fun execute(request: ProviderHttpRequest, deadline: ReadDeadline,
             terminal: (TransportResult) -> Unit): CancellationHandle {
             check(request is ProviderHttpRequest.Get) { "Unexpected synthetic method" }
             gets.incrementAndGet()
             return when (request.url.encodedPath) {
-                ReadOperation.USAGE.path -> if (holdUsage) {
-                    maximum.accumulateAndGet(active.incrementAndGet(), ::maxOf)
-                    val call = Held(terminal) { active.decrementAndGet() }
-                    held += call
-                    CancellationHandle { call.cancel() }
-                } else { terminal(response(USAGE)); CancellationHandle {} }
-                ReadOperation.RESET_INVENTORY.path -> { terminal(response(INVENTORY)); CancellationHandle {} }
+                ReadOperation.USAGE.path -> usage(terminal)
+                ReadOperation.RESET_INVENTORY.path -> {
+                    val call = requireNotNull(pendingInventory)
+                    check(call.replied.get() && !call.cancelled.get()) { "Inventory without a live usage response" }
+                    check(call.inventory.compareAndSet(false, true)) { "Duplicate inventory in one cycle" }
+                    terminal(response(INVENTORY)); CancellationHandle {}
+                }
                 else -> error("Unexpected synthetic path")
             }
         }
+
+        private fun usage(terminal: (TransportResult) -> Unit): CancellationHandle {
+            val call: Held
+            val hold: Boolean
+            synchronized(gate) {
+                returnStarts?.let { starts ->
+                    check(usageCalls.size - beforeReturns < starts()) { "Usage GET without an unconsumed return START" }
+                }
+                maximum.accumulateAndGet(active.incrementAndGet(), ::maxOf)
+                call = Held(usageCalls.size, terminal) { active.decrementAndGet() }
+                usageCalls += call
+                pendingInventory = call
+                hold = holdUsage
+                if (hold) held += call
+            }
+            if (!hold) call.reply(response(USAGE))
+            return CancellationHandle { call.cancel() }
+        }
+
+        fun liveUsage(): Held? = held.singleOrNull { it.live() }
+
+        fun releaseUsage(selected: Held) {
+            val live = synchronized(gate) {
+                check(held.any { it === selected }) { "Release must carry a recorded held-call identity" }
+                holdUsage = false
+                val current = held.filter { it.live() }
+                held.filter { predecessor -> current.none { it === predecessor } }.forEach {
+                    assertTrue("predecessor must be cancelled: ${it.diagnostics()}", it.cancelled.get())
+                }
+                current
+            }
+            live.forEach { it.reply(response(USAGE)) }
+        }
     }
 
-    private class Held(private val terminal: (TransportResult) -> Unit, private val release: () -> Unit) {
+    private class Held(val id: Int, private val terminal: (TransportResult) -> Unit, private val release: () -> Unit) {
         val cancelled = AtomicBoolean()
+        val replied = AtomicBoolean()
+        val inventory = AtomicBoolean()
         private val released = AtomicBoolean()
+        fun live(): Boolean = !cancelled.get() && !replied.get()
         fun cancel() { cancelled.set(true); releaseOnce() }
-        fun reply(result: TransportResult) { releaseOnce(); terminal(result) }
+        fun reply(result: TransportResult) { replied.set(true); releaseOnce(); terminal(result) }
         private fun releaseOnce() { if (released.compareAndSet(false, true)) release() }
+        fun diagnostics(): String = "#$id(cancelled=${cancelled.get()}, replied=${replied.get()}, inventory=${inventory.get()})"
     }
 
     private companion object {
