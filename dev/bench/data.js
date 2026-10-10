@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791633974622,
+  "lastUpdate": 1791636665351,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1417,6 +1417,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/f9a1ccbe35d8b9c8016263220ee26a334f9cd011"
         },
         "date": 1791633970848,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cafe0fe5bf8c5900baa6dde0889c7d556a7f5fe6",
+          "message": "test(history): hold delivery before capturing the predecessor snapshot (#109) (#111)\n\nHistoryDisplayAuthorityTest read the predecessor before installing the\ndelivery gate, so a snapshot that had already passed onEach (e.g. a\nrefresh-tick metadata publication) could reach the host afterwards and\nfail the exact-predecessor assertion. Install the gate first, record the\nlast admitted delivery atomically with hold(), wait until the host has\nprojected exactly that delivery, then capture it. Assertions unchanged;\nfailure messages now identify step, query and snapshot identities.",
+          "timestamp": "2026-10-10T15:50:39+03:00",
+          "tree_id": "7936805d5d0c7a2616175cb9d4707810f858aa05",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/cafe0fe5bf8c5900baa6dde0889c7d556a7f5fe6"
+        },
+        "date": 1791636664982,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
