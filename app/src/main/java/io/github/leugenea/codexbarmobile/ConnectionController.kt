@@ -39,7 +39,7 @@ internal class ConnectionController(
     reader: NativeFeasibilityReader,
     private val scope: CoroutineScope,
     private val storageReady: Boolean = true,
-    mutationDispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1),
+    private val mutationDispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1),
     private val storageWaitMillis: Long = 5_000L,
     private val storageDispatcher: CoroutineDispatcher = Dispatchers.IO,
     refreshClock: io.github.leugenea.codexbarmobile.transport.TransportClock = reader.clock,
@@ -301,6 +301,13 @@ internal class ConnectionController(
     private fun observedState(auth: AuthState, facts: FeasibilityObservations) =
         ConnectionState(ConnectionPhase.OBSERVED, auth, usageRefresh.state.observations,
             problem = if (facts.successful) null else ConnectionProblem.READ, refresh = usageRefresh.state)
+
+    /** Identity admission and clipboard write have no suspension on the existing serial owner lane. */
+    internal suspend fun copyDeviceCode(expected: AuthState.AwaitingUser, clipboard: DeviceCodeClipboard): Boolean =
+        withContext(mutationDispatcher) {
+            if (closed || mutableState.value.auth !== expected || !authenticator.canCopyUserCode(expected)) return@withContext false
+            clipboard.copy(expected.userCode)
+        }
 
     fun cancel() = command { cancelTo(ConnectionState(ConnectionPhase.CANCELLED)) }
     fun browserFailed() = command { cancelTo(ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.BROWSER)) }

@@ -10,7 +10,7 @@ enum class AuthFailure { MALFORMED, HTTP_STATUS, RATE_LIMITED, NETWORK, DEADLINE
 sealed interface AuthState {
     data object Idle : AuthState
     data object RequestingCode : AuthState
-    /** Owned memory only. A8 must not put this code in saved state, clipboard or logs. */
+    /** In-memory only except explicit owner-checked, sensitive-marked user copy; never saved state or logs. */
     class AwaitingUser(val userCode: SensitiveValue) : AuthState {
         val verificationUrl: String = AuthProtocol.VERIFICATION_URL
         override fun toString(): String = "AuthState.AwaitingUser(redacted)"

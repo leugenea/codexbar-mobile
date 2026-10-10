@@ -224,6 +224,14 @@ ACCOUNT_REMOVAL_CASES = {
 }
 
 
+DEVICE_CODE_COPY_CLASS = CONNECTION_CLASS
+DEVICE_CODE_COPY_CASES = {
+    "explicitDeviceCodeCopyWritesExactSensitiveClipAndAnnouncesSuccess",
+    "capturedDeviceCodeCopyRejectsCancelledCompletedAndSupersededAttempts",
+    "capturedDeviceCodeCopyRejectsMissingFailedAndExpiredAttempts",
+}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -266,6 +274,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
             ("history assembled acceptance", HISTORY_ASSEMBLED_CLASS, HISTORY_ASSEMBLED_CASES),
             ("local account name", ACCOUNT_NAME_CLASS, ACCOUNT_NAME_CASES),
             ("local account removal", ACCOUNT_REMOVAL_CLASS, ACCOUNT_REMOVAL_CASES),
+            ("device code copy", DEVICE_CODE_COPY_CLASS, DEVICE_CODE_COPY_CASES),
         ):
             actual_names = {case["name"] for case in cases if case["class"] == classname}
             missing_names = required - actual_names

@@ -59,6 +59,13 @@ class DeviceCodeAuthenticator(
         return owner.job
     }
 
+    /** Read on the supplied serial owner lane; expiry denies export even before the poll resumes. */
+    internal fun canCopyUserCode(expected: AuthState.AwaitingUser): Boolean {
+        val owner = active ?: return false
+        val end = owner.pollEnd ?: return false
+        return mutableState.value === expected && store.isActive(owner.generation) && clock.now().monotonicMillis < end
+    }
+
     fun cancel() {
         val previous = active ?: return
         active = null
@@ -116,6 +123,7 @@ class DeviceCodeAuthenticator(
 
     private suspend fun poll(owner: Attempt, device: DeviceCode): AuthorizationCode {
         val end = saturatedAdd(clock.now().monotonicMillis, AuthProtocol.POLL_BUDGET_MILLIS)
+        owner.pollEnd = end
         var consecutiveErrors = 0
         while (true) {
             pause(minOf(device.intervalMillis, remaining(end)))
@@ -212,6 +220,7 @@ class DeviceCodeAuthenticator(
     private class Attempt(val generation: SessionGeneration, val scope: CoroutineScope) {
         val cancellation = CredentialCancellation()
         var stage = AuthStage.USERCODE
+        var pollEnd: Long? = null
         lateinit var job: Job
     }
 }

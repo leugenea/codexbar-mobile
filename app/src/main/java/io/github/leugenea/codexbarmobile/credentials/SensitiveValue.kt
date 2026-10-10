@@ -3,7 +3,7 @@ package io.github.leugenea.codexbarmobile.credentials
 /**
  * Opaque immutable bytes. Equality is object identity, not secret comparison, and hashes
  * reveal nothing about contents. This is redaction, not secure erasure or timing proof.
- * Only trusted storage/transport adapters may explicitly copy bytes; never log that copy.
+ * Only trusted adapters and the visible user-code UI may explicitly copy bytes; never log that copy.
  */
 class SensitiveValue private constructor(private val bytes: ByteArray) {
     fun copyBytes(): ByteArray = bytes.copyOf()

@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 
 import test_history_text_contract as text_contract
 from verify_test_reports import ACCOUNT_REMOVAL_CASES
+from verify_test_reports import DEVICE_CODE_COPY_CASES
 from verify_test_reports import ACCOUNT_NAME_CASES, ACCOUNT_NAME_CLASS, verify_reports
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,7 +23,7 @@ class AccountNameContracts(unittest.TestCase):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/AccountNameLifecycleTest.kt").read_text()
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), ACCOUNT_NAME_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 111 + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 111 + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
         for name in ACCOUNT_NAME_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native local account name"):
