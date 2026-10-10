@@ -22,6 +22,11 @@ from verify_test_reports import (HISTORY_AUTHORITY_CASES, HISTORY_AUTHORITY_CLAS
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRATCH = Path(os.environ.get("RUNNER_TEMP", os.environ.get("BUILD_CONTRACT_SCRATCH", tempfile.gettempdir())))
+# Synthetic paths/package, with the exact AGP coverage-pull error shape seen in CI.
+COVERAGE_PULL_OFFLINE = (
+    "adb exec-out run-as SYNTHETIC.package cat /data/data/SYNTHETIC.package/coverage.ec "
+    "failed with exit code 255. Error: error: device offline"
+)
 
 
 def synthetic_reports(build, failed=False):
@@ -54,6 +59,9 @@ class RetryContracts(unittest.TestCase):
         self.native = self.build / "outputs/code_coverage/debugAndroidTest/connected/SYNTHETIC/coverage.ec"
         self.native.parent.mkdir(parents=True)
         self.native.write_bytes(b"")
+        self.unit = self.build / "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec"
+        self.unit.parent.mkdir(parents=True)
+        self.unit.write_bytes(b"SYNTHETIC JVM dataset")
         self.identity = {key: "SYNTHETIC-" + key for key in coverage_gate.IDENTITY_KEYS}
         self.context = dict(self.identity, startedMillis=5000)
         self.failure = {"kind": "native", "reason": "empty", "path": str(self.native),
@@ -70,6 +78,106 @@ class RetryContracts(unittest.TestCase):
                                                    self.context if context is None else context,
                                                    self.failure if failure is None else failure,
                                                    self.identity, 7000)
+
+    def prepare_missing(self):
+        self.native.unlink()
+        self.failure = {"kind": "native", "reason": "missing", "path": str(self.native.parent.parent)}
+        # Positive control ensures negatives exercise missing-specific guards,
+        # rather than passing because the reason is unconditionally unsupported.
+        self.assertEqual(self.require(), "missing")
+
+    def test_missing_native_accepts_root_child_and_absent_directory_without_file_claims(self):
+        self.prepare_missing()
+        for directory in (self.native.parent.parent, self.native.parent, self.native.parent / "absent"):
+            with self.subTest(directory=directory):
+                self.assertEqual(self.require(failure=dict(self.failure, path=str(directory))), "missing")
+
+    def test_missing_native_rejects_missing_jvm_dataset(self):
+        self.prepare_missing()
+        self.unit.unlink()
+        with self.assertRaisesRegex(ValueError, "Missing JVM exec"):
+            self.require()
+
+    def test_missing_record_rejects_existing_ec_even_outside_recorded_child(self):
+        self.prepare_missing()
+        self.native.write_bytes(b"SYNTHETIC unexpectedly present")
+        for directory in (self.native.parent.parent, self.native.parent.parent / "absent-sibling"):
+            with self.subTest(directory=directory), self.assertRaisesRegex(ValueError, "Native coverage exists"):
+                self.require(failure=dict(self.failure, path=str(directory)))
+
+    def test_missing_record_rejects_wrong_directory_and_file_paths(self):
+        self.prepare_missing()
+        for path in (self.build, self.build / "outputs/code_coverage/debugAndroidTest/connected-other",
+                     self.unit, self.native.parent / ".." / ".." / "outside"):
+            with self.subTest(path=path), self.assertRaisesRegex(ValueError, "output directory"):
+                self.require(failure=dict(self.failure, path=str(path)))
+        file = self.native.parent / "not-a-directory"
+        file.touch()
+        with self.assertRaisesRegex(ValueError, "output directory"):
+            self.require(failure=dict(self.failure, path=str(file)))
+
+    def test_missing_record_rejects_file_metadata_claims(self):
+        self.prepare_missing()
+        for field, value in (("bytes", 0), ("sha256", "SYNTHETIC"), ("modifiedMillis", 6000)):
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, "must not claim file metadata"):
+                self.require(failure=dict(self.failure, **{field: value}))
+
+    def test_missing_retry_requires_ordinary_failure_and_exact_phase_outcomes(self):
+        self.prepare_missing()
+        for status in (0, 2, 124, 130, 137, 143):
+            with self.subTest(status=status), self.assertRaisesRegex(ValueError, "ordinary Gradle failure"):
+                self.require(status=status)
+        for phase in ("jvm", "instrumentation"):
+            task = coverage_gate.PHASES[phase]
+            with self.subTest(phase=phase), self.assertRaisesRegex(ValueError, "passing suites"):
+                self.require(log=self.log.replace(f":app:{task} SUCCESS", f":app:{task} FAILED"))
+        for phase in ("report", "verification"):
+            with self.subTest(phase=phase), self.assertRaisesRegex(ValueError, "passing suites"):
+                self.require(log=self.log + f"\nCOVERAGE_TASK_OUTCOME :app:{coverage_gate.PHASES[phase]} SUCCESS")
+
+    def test_missing_retry_requires_matching_identity_and_valid_start_time(self):
+        self.prepare_missing()
+        for key in coverage_gate.IDENTITY_KEYS:
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "Wrong checkout/run/attempt"):
+                self.require(context=dict(self.context, **{key: "SYNTHETIC-other"}))
+        for start in ("invalid", 8000):
+            with self.subTest(start=start), self.assertRaisesRegex(ValueError, "Invalid retry context"):
+                self.require(context=dict(self.context, startedMillis=start))
+        for changes in ({"kind": "jvm"}, {"reason": "unknown"}):
+            with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, "native collection data"):
+                self.require(failure=dict(self.failure, **changes))
+
+    def test_missing_retry_requires_offline_evidence_after_last_collection(self):
+        self.prepare_missing()
+        for log in (self.log.replace("adb: device offline", ""),
+                    self.log + "\nCollecting code coverage data.\nPulling coverage file: SYNTHETIC\n"):
+            with self.subTest(log=log), self.assertRaisesRegex(ValueError, "ADB-offline evidence"):
+                self.require(log=log)
+
+    def test_missing_retry_rejects_failed_or_missing_jvm_and_native_junit_reports(self):
+        self.prepare_missing()
+        for kind, relative in (("jvm", "test-results/testDebugUnitTest"),
+                               ("native", "outputs/androidTest-results/connected")):
+            path = self.build / relative / "SYNTHETIC.xml"
+            tree = ET.parse(path)
+            ET.SubElement(tree.getroot()[0], "failure", message="SYNTHETIC failure")
+            tree.write(path)
+            with self.subTest(kind=kind), self.assertRaisesRegex(ValueError, "failed/errored/skipped"):
+                self.require()
+            path.unlink()
+            with self.subTest(kind=kind), self.assertRaisesRegex(ValueError, f"No {kind} JUnit XML"):
+                self.require()
+            synthetic_reports(self.build)
+
+    def test_coverage_pull_offline_line_is_sufficient_without_uninstall_output(self):
+        for line in (COVERAGE_PULL_OFFLINE, COVERAGE_PULL_OFFLINE.replace("Error: error:", "Error: adb:")):
+            with self.subTest(line=line):
+                self.assertEqual(self.require(log=self.log.replace("adb: device offline", line)), "empty")
+
+    def test_uninstall_only_offline_is_not_coverage_pull_evidence(self):
+        log = self.log.replace("adb: device offline", "Uninstalling SYNTHETIC.package.\nError Output: adb: device offline")
+        with self.assertRaisesRegex(ValueError, "ADB-offline evidence"):
+            self.require(log=log)
 
     def test_empty_and_truncated_transport_failures_after_green_suites_can_retry(self):
         self.assertEqual(self.require(), "empty")
@@ -192,7 +300,7 @@ import json, os
 from pathlib import Path
 import time
 import coverage_gate
-from test_native_coverage_retry import synthetic_reports
+from test_native_coverage_retry import COVERAGE_PULL_OFFLINE, synthetic_reports
 
 scenario = os.environ['SYNTHETIC_SCENARIO']
 count = Path('SYNTHETIC-invocations')
@@ -202,21 +310,28 @@ coverage_gate.prepare()
 synthetic_reports(coverage_gate.BUILD, failed=scenario == 'test-failure')
 context = json.loads((coverage_gate.COVERAGE / 'context.json').read_text())
 time.sleep(0.01)  # synthetic file timestamp ordering, never native readiness
+unit = coverage_gate.BUILD / 'outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec'
+unit.parent.mkdir(parents=True)
+unit.write_bytes(b'SYNTHETIC JVM dataset')
 path = coverage_gate.BUILD / 'outputs/code_coverage/debugAndroidTest/connected/SYNTHETIC/coverage.ec'
 path.parent.mkdir(parents=True)
-reason = 'truncated' if scenario == 'truncated-then-green' else 'empty'
-green = scenario in ('first-green', 'empty-then-green', 'truncated-then-green') and (attempt == 2 or scenario == 'first-green')
-path.write_bytes(b'SYNTHETIC current attempt data' if green else b'SYNTHETIC truncated' if reason == 'truncated' else b'')
+reason = scenario.split('-')[0] if scenario.startswith(('missing-', 'truncated-')) else 'empty'
+green = scenario in ('first-green', 'missing-then-green', 'empty-then-green', 'truncated-then-green') and (attempt == 2 or scenario == 'first-green')
+if green or reason != 'missing':
+    path.write_bytes(b'SYNTHETIC current attempt data' if green else b'SYNTHETIC truncated' if reason == 'truncated' else b'')
 if not green:
-    failure = dict(kind='native', reason=reason, path=str(path), bytes=path.stat().st_size,
-                   modifiedMillis=path.stat().st_mtime_ns // 1000000, sha256=coverage_gate.digest(path))
+    if reason == 'missing':
+        failure = dict(kind='native', reason=reason, path=str(path.parent.parent))
+    else:
+        failure = dict(kind='native', reason=reason, path=str(path), bytes=path.stat().st_size,
+                       modifiedMillis=path.stat().st_mtime_ns // 1000000, sha256=coverage_gate.digest(path))
     coverage_gate.write_json(coverage_gate.COVERAGE / 'collection-failure.json', failure)
 print("Caching disabled for task ':app:testDebugUnitTest' because:")
 print('  Build cache is disabled')
 print('Loading library manifest /SYNTHETIC/library/AndroidManifest.xml')
 print('Collecting code coverage data.')
 if scenario != 'no-offline' and not green:
-    print('adb: device offline')
+    print(COVERAGE_PULL_OFFLINE)
 for phase, task in coverage_gate.PHASES.items():
     if green:
         state = 'SUCCESS'
@@ -230,58 +345,106 @@ raise SystemExit(0 if green else 124 if scenario == 'timeout' else 1)
 
 
 class SyntheticRunnerTests(unittest.TestCase):
-    def test_real_runner_block_bounds_retry_and_preserves_each_attempt(self):
+    def runner_block(self):
         script = (ROOT / "tools/build/run-hosted-native-smoke.sh").read_text()
         block = script.split("graph_deadline=$((SECONDS + 900))", 1)[1].split(
             "# Evaluate the actual suites even if a later coverage task failed.", 1)[0]
-        block = "graph_deadline=$((SECONDS + 900))" + block + '\nexit "$test_status"\n'
+        return "graph_deadline=$((SECONDS + 900))" + block + '\nexit "$test_status"\n'
+
+    def run_scenario(self, base, scenario):
+        tools = base / "tools/build"
+        tools.mkdir(parents=True)
+        for filename in ("coverage_gate.py", "native_coverage_retry.py", "verify_test_reports.py",
+                         "filter-gradle-console.sh"):
+            shutil.copyfile(ROOT / "tools/build" / filename, tools / filename)
+        evidence = base / "evidence/native"
+        evidence.mkdir(parents=True)
+        (evidence / "boot-success.txt").touch()
+        binary = base / "bin"
+        binary.mkdir()
+        (binary / "git").write_text('#!/bin/sh\nprintf "%s\\n" "SYNTHETIC-checkout"\n')
+        (binary / "adb").write_text('#!/bin/sh\ncase "$*" in\n*get-state*) printf "device\\n";;\n*sys.boot_completed*) printf "1\\n";;\n*) printf "SYNTHETIC readiness\\n";;\nesac\n')
+        (base / "gradlew").write_text(f"#!{sys.executable}\n" + SYNTHETIC_GRADLE)
+        for executable in (binary / "git", binary / "adb", base / "gradlew"):
+            executable.chmod(0o755)
+        environment = {"PATH": str(binary) + os.pathsep + os.environ["PATH"],
+                       "PYTHONPATH": str(ROOT / "tools/build"), "PYTHONDONTWRITEBYTECODE": "1",
+                       "SYNTHETIC_SCENARIO": scenario}
+        prefix = 'set -euo pipefail\nadb="$PWD/bin/adb"\nANDROID_SERIAL=SYNTHETIC\nemulator_pid=$$\n'
+        return subprocess.run(["bash", "-c", prefix + self.runner_block()], cwd=base, env=environment,
+                              text=True, capture_output=True, timeout=15)
+
+    def assert_runner_logs(self, base, result, count):
+        evidence = base / "evidence/native"
+        for attempt in range(1, count + 1):
+            for filename in ("strict-connected.log", "graph-exit-status.txt", "task-phase-outcomes.json"):
+                self.assertTrue((evidence / f"attempt-{attempt}" / filename).is_file())
+        self.assertNotIn("Caching disabled for task", result.stdout)
+        self.assertNotIn("Loading library manifest", result.stdout)
+        latest = (evidence / "strict-connected.log").read_text()
+        self.assertIn("Caching disabled for task", latest)
+        self.assertIn("Loading library manifest", latest)
+        self.assertEqual(latest.count("COVERAGE_TASK_OUTCOME :app:connectedDebugAndroidTest"), 1)
+
+    def assert_archived_graph(self, base, scenario, status):
+        evidence = base / "evidence/native"
+        archived = evidence / "attempt-1/app/build"
+        saved = archived / "outputs/code_coverage/debugAndroidTest/connected/SYNTHETIC/coverage.ec"
+        reason = scenario.split("-")[0]
+        if reason == "missing":
+            self.assertFalse(saved.exists())
+            failure = json.loads((archived / "coverage-gate/collection-failure.json").read_text())
+            self.assertEqual(set(failure), {"kind", "reason", "path"})
+            self.assertEqual(failure["reason"], "missing")
+        else:
+            self.assertEqual(saved.read_bytes(), b"SYNTHETIC truncated" if reason == "truncated" else b"")
+        for relative in ("coverage-gate/context.json", "test-results/testDebugUnitTest/SYNTHETIC.xml",
+                         "outputs/androidTest-results/connected/SYNTHETIC.xml",
+                         "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec"):
+            self.assertTrue((archived / relative).is_file())
+        decision = json.loads((evidence / "retry-decision.json").read_text())
+        self.assertTrue(decision["retry"])
+        self.assertEqual(decision["reason"], f"ADB-offline/{reason}-native-coverage")
+        phases = json.loads((evidence / "task-phase-outcomes.json").read_text())
+        self.assertEqual(phases["graphExit"], status)
+        self.assertEqual(phases["inputs"], "SUCCESS" if status == 0 else "FAILED")
+
+    def test_real_runner_block_bounds_retry_and_preserves_each_attempt(self):
         for scenario, expected_count, expected_status in (
             ("first-green", 1, 0), ("empty-then-green", 2, 0), ("truncated-then-green", 2, 0),
+            ("missing-then-green", 2, 0), ("missing-twice", 2, 1),
             ("empty-twice", 2, 1), ("test-failure", 1, 1), ("no-offline", 1, 1), ("timeout", 1, 124),
         ):
             with self.subTest(scenario=scenario), tempfile.TemporaryDirectory(dir=SCRATCH) as temporary:
                 base = Path(temporary)
-                tools = base / "tools/build"
-                tools.mkdir(parents=True)
-                for filename in ("coverage_gate.py", "native_coverage_retry.py", "verify_test_reports.py",
-                                 "filter-gradle-console.sh"):
-                    shutil.copyfile(ROOT / "tools/build" / filename, tools / filename)
-                evidence = base / "evidence/native"
-                evidence.mkdir(parents=True)
-                (evidence / "boot-success.txt").touch()
-                binary = base / "bin"
-                binary.mkdir()
-                (binary / "git").write_text('#!/bin/sh\nprintf "%s\\n" "SYNTHETIC-checkout"\n')
-                (binary / "adb").write_text('#!/bin/sh\ncase "$*" in\n*get-state*) printf "device\\n";;\n*sys.boot_completed*) printf "1\\n";;\n*) printf "SYNTHETIC readiness\\n";;\nesac\n')
-                (base / "gradlew").write_text(f"#!{sys.executable}\n" + SYNTHETIC_GRADLE)
-                for executable in (binary / "git", binary / "adb", base / "gradlew"):
-                    executable.chmod(0o755)
-                environment = {"PATH": str(binary) + os.pathsep + os.environ["PATH"],
-                               "PYTHONPATH": str(ROOT / "tools/build"), "PYTHONDONTWRITEBYTECODE": "1",
-                               "SYNTHETIC_SCENARIO": scenario}
-                prefix = 'set -euo pipefail\nadb="$PWD/bin/adb"\nANDROID_SERIAL=SYNTHETIC\nemulator_pid=$$\n'
-                result = subprocess.run(["bash", "-c", prefix + block], cwd=base, env=environment,
-                                        text=True, capture_output=True, timeout=15)
+                result = self.run_scenario(base, scenario)
                 self.assertEqual(result.returncode, expected_status, result.stdout + result.stderr)
                 self.assertEqual(int((base / "SYNTHETIC-invocations").read_text()), expected_count)
-                for attempt in range(1, expected_count + 1):
-                    attempt_path = evidence / f"attempt-{attempt}"
-                    self.assertTrue((attempt_path / "strict-connected.log").is_file())
-                    self.assertTrue((attempt_path / "graph-exit-status.txt").is_file())
-                    self.assertTrue((attempt_path / "task-phase-outcomes.json").is_file())
-                self.assertNotIn("Caching disabled for task", result.stdout)
-                self.assertNotIn("Loading library manifest", result.stdout)
-                latest = (evidence / "strict-connected.log").read_text()
-                self.assertIn("Caching disabled for task", latest)
-                self.assertIn("Loading library manifest", latest)
-                self.assertEqual(latest.count("COVERAGE_TASK_OUTCOME :app:connectedDebugAndroidTest"), 1)
+                self.assert_runner_logs(base, result, expected_count)
                 if expected_count == 2:
-                    saved = evidence / "attempt-1/app/build/outputs/code_coverage/debugAndroidTest/connected/SYNTHETIC/coverage.ec"
-                    self.assertEqual(saved.read_bytes(), b"SYNTHETIC truncated" if scenario == "truncated-then-green" else b"")
-                    self.assertTrue(json.loads((evidence / "retry-decision.json").read_text())["retry"])
-                    phases = json.loads((evidence / "task-phase-outcomes.json").read_text())
-                    self.assertEqual(phases["graphExit"], expected_status)
-                    self.assertEqual(phases["inputs"], "SUCCESS" if expected_status == 0 else "FAILED")
+                    self.assert_archived_graph(base, scenario, expected_status)
+
+    def test_missing_native_diagnostic_source_contract_excludes_jvm_and_file_metadata(self):
+        build = (ROOT / "app/build.gradle").read_text()
+        unit_guard = "if (!unit.isFile()) throw new GradleException('Missing JVM exec coverage data')"
+        self.assertIn(unit_guard, build)
+        missing = build.split("if (nativeFiles.empty) {", 1)[1].split("def union =", 1)[0]
+        self.assertLess(build.index(unit_guard), build.index("if (nativeFiles.empty) {"))
+        for required in ("base.toPath().relativize(nativeDirectory.toPath()).toString()",
+                         "collection-failure.json", "kind: 'native', reason: 'missing', path: relative",
+                         "Missing native ec coverage data under:"):
+            self.assertIn(required, missing)
+        for forbidden in ("bytes:", "sha256:", "modifiedMillis:"):
+            self.assertNotIn(forbidden, missing)
+        self.assertIn("project.fileTree(nativeDirectory)", build)
+        self.assertIn("new File(project.buildDir, 'outputs/code_coverage/debugAndroidTest/connected')", build)
+
+    def test_hosted_emulator_launch_uses_4096_mib_and_retains_other_flags(self):
+        script = (ROOT / "tools/build/run-hosted-native-smoke.sh").read_text()
+        launch = script.split('"$emulator" -avd ', 1)[1].split('> evidence/native/emulator.log', 1)[0]
+        self.assertEqual(launch.replace("\\\n", "").split(),
+                         ['"$avd"', '-port', '5554', '-accel', 'on', '-cores', '2', '-memory', '4096',
+                          '-no-window', '-no-snapshot', '-no-boot-anim', '-noaudio', '-gpu', 'swiftshader_indirect'])
 
     def test_collection_diagnostic_wiring_keeps_parse_and_union_failures_closed(self):
         build = (ROOT / "app/build.gradle").read_text()

@@ -98,10 +98,18 @@ abstract class DebugCoverageInputs extends DefaultTask {
                 classes.find { it.name == coverage.name }.instructions = coverage.instructionCounter.totalCount
             }
             def unit = new File(project.buildDir, 'outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec')
-            def nativeFiles = project.fileTree(new File(project.buildDir, 'outputs/code_coverage/debugAndroidTest/connected')) {
+            def nativeDirectory = new File(project.buildDir, 'outputs/code_coverage/debugAndroidTest/connected')
+            def nativeFiles = project.fileTree(nativeDirectory) {
                 include '**/*.ec'
             }.files.sort()
-            if (!unit.isFile() || nativeFiles.empty) throw new GradleException('Missing JVM exec or native ec coverage data')
+            // A missing JVM dataset is not an ADB collection failure.
+            if (!unit.isFile()) throw new GradleException('Missing JVM exec coverage data')
+            if (nativeFiles.empty) {
+                def relative = base.toPath().relativize(nativeDirectory.toPath()).toString()
+                new File(output.parentFile, 'collection-failure.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
+                    kind: 'native', reason: 'missing', path: relative])) + '\n'
+                throw new GradleException("Missing native ec coverage data under: ${relative}")
+            }
             def union = newInstance('org.jacoco.core.tools.ExecFileLoader')
             def datasets = ([unit] + nativeFiles).collect { file ->
                 def kind = file == unit ? 'jvm' : 'native'

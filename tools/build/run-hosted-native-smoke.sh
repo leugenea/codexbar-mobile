@@ -108,7 +108,7 @@ grep -Fx "$avd" evidence/native/avd-list.txt
 cp "$ANDROID_AVD_HOME/$avd.avd/config.ini" evidence/native/avd-config.ini
 "$adb" keygen "$ANDROID_USER_HOME/adbkey" > evidence/native/adb-keygen.log 2>&1
 timeout 30 "$adb" start-server > evidence/native/adb-server.log 2>&1
-"$emulator" -avd "$avd" -port 5554 -accel on -cores 2 -memory 2048 \
+"$emulator" -avd "$avd" -port 5554 -accel on -cores 2 -memory 4096 \
   -no-window -no-snapshot -no-boot-anim -noaudio -gpu swiftshader_indirect \
   > evidence/native/emulator.log 2>&1 &
 emulator_pid=$!
@@ -151,7 +151,7 @@ logcat_pid=$!
 printf '%s\n' 'boundary=strict-native-tests' >> evidence/native/boundaries.txt
 # The complete native test task, no class/method filters and no metadata bypass/generation.
 # Keep the original 15-minute graph budget across both attempts. A retry is
-# allowed only for empty/truncated native coverage AND ADB-offline evidence after
+# allowed only for missing/empty/truncated native coverage AND ADB-offline evidence after
 # passing suites. It reruns the whole graph: JVM/native data must share compilation.
 graph_deadline=$((SECONDS + 900))
 coverage_attempt=1

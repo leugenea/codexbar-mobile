@@ -118,14 +118,14 @@ python3 tools/build/verify_test_reports.py jvm
 ```
 
 The workflow requires KVM; its native script prepares API 36
-`google_apis;x86_64` phone infrastructure,
+`google_apis;x86_64` phone infrastructure with 4096 MiB of emulator RAM,
 waits for ADB/boot readiness, then invokes JVM/native tests and
 `:app:jacocoDebugReport` / `:app:jacocoDebugCoverageVerification`; it checks native
 JUnit results and records phase outcomes. See the script for its hosted-only
 command and timeout environment, rather than inventing a local device procedure.
 
 The script permits **one bounded retry** only after passing JVM/native suites,
-with ADB-offline evidence at collection and empty or truncated native coverage
+with ADB-offline evidence at collection and missing, empty or truncated native coverage
 from the same checkout/run/attempt. It preserves the failed graph's data and
 logs, waits for device readiness, then reruns the complete JVM/native/coverage
 graph within the original 15-minute graph budget. It never combines coverage

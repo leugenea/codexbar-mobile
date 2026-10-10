@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import shutil
 import time
 
@@ -19,26 +20,46 @@ SNAPSHOT_PATHS = (
 )
 
 
-def require_transport_failure(status, log, context, failure, identity, now):
-    if status != 1:
-        raise ValueError("Not an ordinary Gradle failure (success/timeout/signal cannot retry)")
-    expected = {"jvm": "SUCCESS", "instrumentation": "SUCCESS", "inputs": "FAILED",
-                "report": "NOT_RUN", "verification": "NOT_RUN"}
-    if phase_outcomes(log) != expected:
-        raise ValueError("Retry requires passing suites and failure only at coverage collection")
-    # EOF alone could mean a producer/parser defect. Require the observed ADB
-    # disconnect at collection too, rather than retrying every invalid dataset.
+def require_collection_offline(log):
+    # Only the last collection boundary counts; an uninstall disconnect is not
+    # evidence of a failed coverage pull. AGP's exec-out error uses "error:",
+    # whereas other ADB collection output uses "adb:".
     collection = log.rsplit("Collecting code coverage data.", 1)
-    if len(collection) != 2 or "adb: device offline" not in collection[1]:
+    if len(collection) != 2:
         raise ValueError("No ADB-offline evidence at the coverage collection boundary")
+    pulling = collection[1].split("Uninstalling ", 1)[0]
+    exec_out_offline = re.search(
+        r"adb exec-out run-as [^\n]+ cat [^\n]+/coverage\.ec failed with exit code \d+\. "
+        r"Error: (?:error:|adb:) device offline", pulling)
+    if "adb: device offline" not in pulling and not exec_out_offline:
+        raise ValueError("No ADB-offline evidence at the coverage collection boundary")
+
+
+def require_retry_context(context, identity, now):
     if any(context.get(key) != identity.get(key) for key in IDENTITY_KEYS):
         raise ValueError("Wrong checkout/run/attempt for retry")
     started = context.get("startedMillis")
     if not isinstance(started, int) or started > now:
         raise ValueError("Invalid retry context start time")
-    if failure.get("kind") != "native" or failure.get("reason") not in ("empty", "truncated"):
-        raise ValueError("Not empty/truncated native collection data")
-    native_root = BUILD / "outputs/code_coverage/debugAndroidTest/connected"
+    return started
+
+
+def require_missing_native(failure, native_root):
+    directory = Path(failure["path"])
+    if not directory.resolve().is_relative_to(native_root.resolve()) or directory.is_file():
+        raise ValueError("Not a native coverage output directory")
+    if {"bytes", "sha256", "modifiedMillis"}.intersection(failure):
+        raise ValueError("Missing native coverage record must not claim file metadata")
+    # Scan the whole root, not only a recorded child, so a sibling dataset cannot
+    # be hidden by narrowing the directory in the failure record.
+    if any(native_root.rglob("*.ec")):
+        raise ValueError("Native coverage exists despite missing collection record")
+    unit = BUILD / "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec"
+    if not unit.is_file():
+        raise ValueError("Missing JVM exec coverage data cannot retry")
+
+
+def require_incomplete_native(failure, native_root, started):
     path = Path(failure["path"])
     if not path.resolve().is_relative_to(native_root.resolve()) or path.suffix != ".ec":
         raise ValueError("Not a native coverage output path")
@@ -49,6 +70,24 @@ def require_transport_failure(status, log, context, failure, identity, now):
         raise ValueError("Collection failure reason disagrees with file size")
     if failure["modifiedMillis"] < started or path.stat().st_mtime_ns // 1_000_000 < started:
         raise ValueError("Stale native coverage cannot retry")
+
+
+def require_transport_failure(status, log, context, failure, identity, now):
+    if status != 1:
+        raise ValueError("Not an ordinary Gradle failure (success/timeout/signal cannot retry)")
+    expected = {"jvm": "SUCCESS", "instrumentation": "SUCCESS", "inputs": "FAILED",
+                "report": "NOT_RUN", "verification": "NOT_RUN"}
+    if phase_outcomes(log) != expected:
+        raise ValueError("Retry requires passing suites and failure only at coverage collection")
+    require_collection_offline(log)
+    started = require_retry_context(context, identity, now)
+    if failure.get("kind") != "native" or failure.get("reason") not in ("missing", "empty", "truncated"):
+        raise ValueError("Not missing/empty/truncated native collection data")
+    native_root = BUILD / "outputs/code_coverage/debugAndroidTest/connected"
+    if failure["reason"] == "missing":
+        require_missing_native(failure, native_root)
+    else:
+        require_incomplete_native(failure, native_root, started)
     for kind, directory in (("jvm", BUILD / "test-results/testDebugUnitTest"),
                             ("native", BUILD / "outputs/androidTest-results/connected")):
         verify_reports(directory, kind)
