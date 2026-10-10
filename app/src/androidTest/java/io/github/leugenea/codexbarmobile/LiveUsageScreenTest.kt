@@ -445,7 +445,7 @@ class LiveUsageScreenTest {
             click("live-refresh")
             waitFor("old banked inventory GET held") { fake.heldInventory.size == 1 }
             val old = fake.heldInventory.single()
-            click("sign-out")
+            click("remove-account"); click("remove-account-confirm")
             waitFor("logout retires inventory and deletes protected credentials") {
                 owner.state.value.phase == ConnectionPhase.SIGNED_OUT && fake.cancelledInventory.get() == 1
             }
@@ -559,7 +559,7 @@ class LiveUsageScreenTest {
 
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
-        if (tag !in setOf("offline-tab", "connection-tab")) node.performScrollTo()
+        if (tag !in setOf("offline-tab", "connection-tab", "remove-account-confirm")) node.performScrollTo()
         node.performClick()
         compose.waitForIdle()
     }

@@ -448,6 +448,48 @@ authored test contracts: actual native execution, lint and compatible whole-hand
 >=90% INSTRUCTION coverage remain hosted gates; no process-death or live-provider claim
 is implied by compilation or fresh-holder restoration.
 
+## Explicit local account removal
+
+The connection controls expose **Remove account from this device**, not immediate
+sign-out. A Material 3 `AlertDialog` names saved sign-in credentials, local usage
+history and the local display name as the local removal scope, and explicitly
+excludes OpenAI/ChatGPT account deletion and subscription cancellation. Cancel,
+Back/outside dismissal and Activity recreation discard the memory-only confirmation
+without issuing an owner command. The action remains available for a current or
+restored account and failed storage cleanup, and is disabled while signing out.
+
+`AccountRemoval` is an opaque nonpersistable identity permission, not another
+session or teardown owner. The dialog captures the current process owner's permission;
+owner retirement and required history cleanup replace it before clearing facts.
+The existing `signOut` command checks captured identity on its serial lane before
+any mutation, then uses the unchanged combined credential/session/history teardown.
+An old callback cannot reacquire successor permission, even when its UI delivery or
+command is delayed. Dialog state is keyed by controller, permission and eligibility;
+ordinary reads/rotation do not replace account-level authority. Unconditional internal
+sign-out callers retain the same owner path and semantics.
+
+The name already participates in fenced durable history deletion: both sidecar and
+pending file are removed and the directory is fsynced before terminal success. No
+UI storage deletion was added. Partial failure/timeout remains FAILED/STORAGE,
+with inaccessible facts retired and successor admission blocked by actual cleanup.
+A fresh confirmation can retry the existing removal machinery; replaying an old
+confirmation cannot silently retry or erase a later login.
+
+Three added `ProcessSessionOwnerTest` methods cover production-default-lane admission,
+ordinary rotation, queued replacement, duplicate confirmation and credential failure
+retry. `AccountRemovalLifetimeTest` covers combined synthetic cleanup, admitted name
+writes, failed history removal, cancel invalidation and fresh-owner isolation. Five
+mandatory `AccountRemovalLifecycleTest` cases exercise the production Activity/default
+factory with isolated actual Keystore/SQLite, local-scope/accessibility text, cancel/Back/
+recreation, restored/current removal, actual name-artifact deletion failure and fresh
+confirmed retry, captured dialog permission replay at the owner boundary and late provider
+replies. The same-phase replacement case holds the rendered phase constant and verifies
+permission replacement alone dismisses the dialog. Existing mandatory
+connection/banked tests now traverse confirmation; the held SQLite-query/provider-reply
+isolation case does too. All inherited test identities/captures remain required. Actual
+native execution, lint and compatible whole-handwritten >=90% INSTRUCTION coverage
+remain hosted acceptance, not source or compile-only proof.
+
 ## Even-distribution reference and observed comparison (M4a-3)
 
 `history/EvenDistribution` is a pure consumer of M4a-1 `HistoryWindow`, not another

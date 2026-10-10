@@ -206,7 +206,7 @@ class ConnectionLifecycleTest {
             bounded("recreated live gate admits one resumed cycle") { fake.calls.size == beforeRecreation + 2 }
             await(scenario, "recreated observed state") { it.phase == ConnectionPhase.OBSERVED }
             assertEquals(beforeRecreation + 2, fake.calls.size)
-            click("sign-out")
+            click("remove-account"); click("remove-account-confirm")
             await(scenario, "local key and file deletion") { it.phase == ConnectionPhase.SIGNED_OUT }
             assertFalse(KeystoreCredentialStore.file(context, session).exists())
             assertFalse(keyExists(session))
@@ -241,7 +241,7 @@ class ConnectionLifecycleTest {
             openGate(scenario, ConnectionPhase.RESTORED)
             assertEquals(requests, fake.calls.size)
             assertSavedStateHasNoSecrets(scenario)
-            click("sign-out")
+            click("remove-account"); click("remove-account-confirm")
             await(scenario, "restored local logout") { it.phase == ConnectionPhase.SIGNED_OUT }
         }
         val selector = File(context.noBackupFilesDir, "connection-session")
@@ -253,7 +253,7 @@ class ConnectionLifecycleTest {
                 launch().use { scenario ->
                     openGate(scenario, ConnectionPhase.FAILED)
                     click("connect", expectTransition = false)
-                    click("sign-out")
+                    click("remove-account"); click("remove-account-confirm")
                     await(scenario, "corrupt local selector fails closed") { it.problem == ConnectionProblem.STORAGE }
                     assertEquals(requests, fake.calls.size)
                     assertSavedStateHasNoSecrets(scenario)
@@ -271,7 +271,7 @@ class ConnectionLifecycleTest {
             await(scenario, "code before held read") { it.auth is AuthState.AwaitingUser }
             fake.poll.complete(Unit)
             bounded("first GET reached") { fake.reads.isNotEmpty() }
-            click("sign-out")
+            click("remove-account"); click("remove-account-confirm")
             await(scenario, "logout cancels read") { it.phase == ConnectionPhase.SIGNED_OUT }
             assertTrue(fake.cancelledReads > 0)
             fake.reads.first().invoke(response(USAGE))
@@ -286,7 +286,7 @@ class ConnectionLifecycleTest {
                 assertEquals(ConnectionProblem.READ, it.connection.state.value.problem)
             }
             assertTrue(KeystoreCredentialStore.file(context, NativeConnection.session(context)).exists())
-            click("sign-out")
+            click("remove-account"); click("remove-account-confirm")
             await(scenario, "final local logout") { it.phase == ConnectionPhase.SIGNED_OUT }
         }
     }
@@ -333,7 +333,7 @@ class ConnectionLifecycleTest {
             fake.rejectOriginalBearer = false
             click("connect")
             await(scenario, "reauth replaces quarantined session") { it.phase == ConnectionPhase.OBSERVED }
-            click("sign-out")
+            click("remove-account"); click("remove-account-confirm")
             await(scenario, "reauthenticated local deletion") { it.phase == ConnectionPhase.SIGNED_OUT }
             assertFalse(keyExists(slot))
             assertFalse(KeystoreCredentialStore.file(context, slot).exists())
@@ -354,7 +354,7 @@ class ConnectionLifecycleTest {
             click("refresh-session")
             bounded("refresh reached transport") { fake.refreshes.isNotEmpty() }
             val late = fake.refreshes.single()
-            click("sign-out")
+            click("remove-account"); click("remove-account-confirm")
             await(scenario, "logout cancels refresh and deletes credentials") { it.phase == ConnectionPhase.SIGNED_OUT }
             assertEquals(1, fake.cancelledRefreshes)
             val slot = NativeConnection.session(context)
@@ -372,7 +372,7 @@ class ConnectionLifecycleTest {
             assertSavedStateHasNoSecrets(scenario)
             click("connect") // replacement also deletes the previous durable pair before auth.
             await(scenario, "explicit account replacement") { it.phase == ConnectionPhase.OBSERVED }
-            click("sign-out")
+            click("remove-account"); click("remove-account-confirm")
             await(scenario, "replacement local deletion") { it.phase == ConnectionPhase.SIGNED_OUT }
         }
     }
@@ -441,7 +441,7 @@ class ConnectionLifecycleTest {
                 await(scenario, "$mutation recovery code") { it.auth is AuthState.AwaitingUser || it.phase == ConnectionPhase.OBSERVED }
                 fake.poll.complete(Unit)
                 await(scenario, "$mutation explicit reauth") { it.phase == ConnectionPhase.OBSERVED }
-                click("sign-out")
+                click("remove-account"); click("remove-account-confirm")
                 await(scenario, "$mutation local deletion") { it.phase == ConnectionPhase.SIGNED_OUT }
                 assertFalse(KeystoreCredentialStore.file(context, slot).exists())
                 assertFalse(keyExists(slot))
@@ -552,10 +552,10 @@ class ConnectionLifecycleTest {
         assertConnectionHasNoDiagnosticDump(compose)
     }
     private fun click(tag: String, expectTransition: Boolean = true) {
-        val changesState = tag in setOf("connect", "read-usage", "refresh-session", "sign-out", "cancel-connect")
+        val changesState = tag in setOf("connect", "read-usage", "refresh-session", "remove-account-confirm", "cancel-connect")
         val before = if (changesState) NativeConnection.get(context).state.value else null
         val node = compose.onNodeWithTag(tag)
-        if (tag !in setOf("offline-tab", "connection-tab")) node.performScrollTo()
+        if (tag !in setOf("offline-tab", "connection-tab", "remove-account-confirm")) node.performScrollTo()
         node.performClick()
         if (before == null) return
         if (expectTransition) bounded("$tag owner admission", { NativeConnection.get(context).state.value.toString() }) {

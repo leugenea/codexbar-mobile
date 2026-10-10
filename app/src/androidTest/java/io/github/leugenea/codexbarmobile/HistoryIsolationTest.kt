@@ -107,7 +107,9 @@ class HistoryIsolationTest {
                 owner.readUsage()
                 await("${operation.name} request actually admitted") { transport.heldCall(operation.path) != null }
                 val late = transport.heldCall(operation.path)!!
-                owner.signOut(); phase(ConnectionPhase.SIGNED_OUT)
+                click("history-toggle"); click("remove-account"); click("remove-account-confirm")
+                phase(ConnectionPhase.SIGNED_OUT)
+                click("history-toggle")
                 fixture.settled("logout ${operation.name} processed")
                 assertTrue(late.cancelled)
                 assertNull(old.displayPermission!!.current())
@@ -256,7 +258,7 @@ class HistoryIsolationTest {
     private fun openHistory() { compose.waitForIdle(); click("connection-tab"); click("history-toggle") }
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
-        if (tag !in setOf("connection-tab", "offline-tab")) node.performScrollTo()
+        if (tag !in setOf("connection-tab", "offline-tab", "remove-account-confirm")) node.performScrollTo()
         node.performClick(); compose.waitForIdle()
     }
 

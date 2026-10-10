@@ -16,6 +16,9 @@ an opt-in native connection screen, not supported provider access.**
 - Explicit stored-session read/refresh controls; no invented token TTL.
 - A local display name for the one connected/restored account: set, edit or clear it;
   unnamed accounts are labeled honestly and provider identity remains unverified.
+- **Remove account from this device** requires confirmation before removing saved sign-in
+  credentials, local usage history and the local display name. Cancel/dismiss changes nothing;
+  this does not delete an OpenAI/ChatGPT account or cancel a subscription.
 - Live Material 3 usage windows with precise provider percentages and fractional bars,
   five-hour/weekly duration labels (including weekly-only), independent permission/limit
   flags, missing/error/stale/exhausted states and accessible status announcements.

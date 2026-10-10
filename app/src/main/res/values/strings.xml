@@ -39,7 +39,11 @@
     <string name="gate_refresh">Refresh session and read usage</string>
     <string name="gate_cancel">Cancel work</string>
     <string name="gate_browser">Open system browser</string>
-    <string name="gate_sign_out">Sign out locally (delete key and credentials)</string>
+    <string name="account_remove">Remove account from this device</string>
+    <string name="account_remove_title">Remove local account?</string>
+    <string name="account_remove_scope">This removes saved sign-in credentials, local usage history and the local display name from this device. It does not delete your OpenAI/ChatGPT account or cancel a subscription.</string>
+    <string name="account_remove_confirm">Remove account</string>
+    <string name="account_remove_cancel">Cancel</string>
 
     <!-- B1: absolute labels truncate to the containing hour, not an exact reset/expiry. -->
     <string name="time_absolute">%1$s, %2$s (hour precision)</string>

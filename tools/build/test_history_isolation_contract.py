@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 
 import test_history_text_contract as text_contract
 from verify_test_reports import HISTORY_AUTHORITY_CASES, HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS, verify_reports
+from verify_test_reports import ACCOUNT_REMOVAL_CASES
 from verify_test_reports import ACCOUNT_NAME_CASES, ACCOUNT_NAME_CLASS
 from verify_test_reports import HISTORY_ASSEMBLED_CASES
 
@@ -23,7 +24,7 @@ class HistoryIsolationContracts(unittest.TestCase):
         source = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryIsolationTest.kt"
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), HISTORY_ISOLATION_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 98 + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 98 + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES))
         for name in HISTORY_ISOLATION_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history isolation"):

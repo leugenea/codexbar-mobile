@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.first
 internal enum class ConnectionPhase { RESTORING, IDLE, AUTHENTICATING, READING, OBSERVED, RESTORED, CANCELLED, SIGNING_OUT, SIGNED_OUT, REAUTH_REQUIRED, FAILED }
 internal enum class ConnectionProblem { STORAGE, AUTH, READ, BROWSER }
 
+/** Nonpersistable permission for one removal intent; identity is checked on the owner lane. */
+internal class AccountRemoval
+
 /** Never serialize this state. Diagnostics deliberately omit even the in-memory code. */
 internal class ConnectionState(
     val phase: ConnectionPhase,
@@ -53,6 +56,9 @@ internal class ConnectionController(
     private val authenticatedReader = AuthenticatedProviderReader(session, reader)
     private var work: Job? = null
     private var revision = 0L
+    private val mutableAccountRemoval = MutableStateFlow(AccountRemoval())
+    internal val accountRemovalPermissions: StateFlow<AccountRemoval> = mutableAccountRemoval
+    internal val accountRemoval: AccountRemoval get() = mutableAccountRemoval.value
     private var generation: SessionGeneration? = null
     private var deletion: Deferred<CredentialResult<Unit>>? = null
     private var historyDeletion: Deferred<HistoryDeleteOutcome>? = null
@@ -125,6 +131,7 @@ internal class ConnectionController(
         get() = history?.availability ?: HistoryAvailability.UNAVAILABLE
 
     private fun removeHistory() {
+        mutableAccountRemoval.value = AccountRemoval()
         mutableName.value = null
         val coordinator = history ?: return
         if (historyDeletion != null) return
@@ -310,7 +317,11 @@ internal class ConnectionController(
         } else mutableState.value = terminal
     }
 
-    fun signOut() = command {
+    fun signOut() = signOut(null)
+
+    /** A delayed confirmation may remove only the lifetime it originally captured. */
+    internal fun signOut(expected: AccountRemoval?) = command {
+        if (expected != null && expected !== accountRemoval) return@command
         if (!storageReady) { mutableState.value = storageFailure(); return@command }
         val owner = retire()
         retryFailedDeletion()
@@ -362,6 +373,7 @@ internal class ConnectionController(
     private fun cleanupPending() = deletion?.isCompleted == false || historyDeletion?.isCompleted == false || session.removalPending()
 
     private fun retire(): Long {
+        mutableAccountRemoval.value = AccountRemoval()
         revision++
         usageRefresh.reset()
         work?.cancel()
