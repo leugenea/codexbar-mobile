@@ -931,7 +931,13 @@ specified in [CONTRIBUTING](CONTRIBUTING.md); metrics in [code quality](docs/cod
 The strict build/lint/JVM and instrumented/coverage jobs run in parallel, without
 sharing compiled outputs; `Android CI result` still requires both successes.
 The native graph repeats JVM compilation/tests to bind JVM `.exec` and native
-`.ec` to the same classes. Full `--info` evidence (including every retry attempt)
+`.ec` to the same classes. Its hosted API 36 emulator uses 4096 MiB of RAM. After
+passing JVM/native suites, missing, empty or truncated native coverage permits
+one full-graph retry only with ADB-offline collection evidence and matching
+checkout/run/attempt identity. Missing JVM data cannot retry. Attempt 1 is archived;
+no data is combined across attempts, and the original 15-minute graph budget stays
+in force. History screenshot verification runs after the retry loop on the final
+attempt and remains fail-closed. Full `--info` evidence (including every retry attempt)
 remains unfiltered; only known informational console noise is suppressed. The
 SHA-pinned checkout/upload-artifact actions use Node 24 without changing credential
 or artifact policy.
