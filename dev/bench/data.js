@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791652207046,
+  "lastUpdate": 1791657259980,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1553,6 +1553,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/c8fd30b3de3c4e0edaa8483104a1c61e18c395a0"
         },
         "date": 1791652203873,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c8d885c9faa8c71c56f85d95162b3f11c3636954",
+          "message": "feat(auth): add explicit sensitive copy of the device-login code (#97) (#116)\n\n* feat(auth): add explicit sensitive copy of the device-login code (#97)\n\n* fix(auth): use the documented sensitive-clip key on all APIs; retrigger copy feedback (#97)",
+          "timestamp": "2026-10-10T21:33:51+03:00",
+          "tree_id": "a64843f2cf872ff82509709450e27de88c11a2dd",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/c8d885c9faa8c71c56f85d95162b3f11c3636954"
+        },
+        "date": 1791657259097,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
