@@ -1,3 +1,6 @@
+import com.android.build.gradle.internal.lint.AndroidLintTask
+import com.android.build.gradle.internal.lint.AndroidLintTextOutputTask
+
 // Applied by the app build, not only a hosted init script: local gates are fresh too.
 // Compile/dex/resources/package tasks retain their normal cacheability.
 def gateNames = [
@@ -24,12 +27,29 @@ String gateOutcome(state) {
     return 'SUCCESS'
 }
 
+// AGP 9.4.1 disables only these redundant vital report/text tasks when their
+// same-variant full lint partner is in the graph (LintTaskManager.kt). Gradle
+// represents enabled=false as SKIPPED, not as a distinct skipMessage reason.
+// Freshness still applies to every lint task; this is not a cache/reuse exemption.
+def isRedundantVitalSuppression = { task, state ->
+    if (state.skipMessage != 'SKIPPED' || task.enabled) return false
+    if (!(task instanceof AndroidLintTask || task instanceof AndroidLintTextOutputTask)) return false
+    def vital = task.name =~ /^lintVital(Report)?([A-Z].*)$/
+    if (!vital.matches()) return false
+    def fullLintName = 'lint' + (vital.group(1) ?: '') + vital.group(2)
+    def fullLint = gradle.taskGraph.allTasks.find {
+        it.project == task.project && it.name == fullLintName
+    }
+    return fullLint != null && isGate(fullLint) && fullLint.enabled
+}
+
 // Terminal states, not start banners; keep configuration cache disabled.
 gradle.taskGraph.afterTask { task, state ->
     if (isGate(task)) {
         def outcome = gateOutcome(state)
         logger.lifecycle("GATE_TASK_OUTCOME ${task.path} ${outcome}")
-        if (!(outcome in ['SUCCESS', 'FAILED'])) {
+        def permittedSuppression = outcome == 'SKIPPED' && isRedundantVitalSuppression(task, state)
+        if (!(outcome in ['SUCCESS', 'FAILED']) && !permittedSuppression) {
             throw new GradleException("Required gate did not execute: ${task.path} ${outcome}")
         }
     }

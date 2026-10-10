@@ -1,6 +1,7 @@
 """Synthetic evidence only: these tests never invoke Gradle, tests or an emulator."""
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -38,12 +39,14 @@ class ExecutionEvidenceTests(unittest.TestCase):
                 validate('', graph)
 
     def test_headers_cannot_contradict_receipts_and_future_lint_gates_are_checked(self):
-        for name in ('testDebugUnitTest', 'lintAnalyzeNewVariant'):
+        for name in ('testDebugUnitTest', 'lintAnalyzeNewVariant', 'lintVitalRelease', 'lintVitalReportRelease'):
             for state in ('FROM-CACHE', 'UP-TO-DATE', 'SKIPPED', 'NO-SOURCE'):
                 with self.subTest(name=name, state=state), self.assertRaisesRegex(ValueError, 'header'):
                     validate(successful_log('build') + f'\n> Task :app:{name} {state}', 'build')
-        with self.assertRaises(ValueError):
-            validate(successful_log('build') + '\nGATE_TASK_OUTCOME :app:lintAnalyzeNewVariant UP_TO_DATE', 'build')
+            for state in ('FROM_CACHE', 'UP_TO_DATE'):
+                with self.subTest(name=name, receipt=state), self.assertRaises(ValueError):
+                    # Extra lint receipts are never exempt from freshness checks.
+                    validate(successful_log('native') + f'\nGATE_TASK_OUTCOME :app:{name} {state}', 'native')
 
     def test_cli_reads_both_graphs_and_returns_failure_for_reused_gates(self):
         scratch = Path(os.environ.get('RUNNER_TEMP', tempfile.gettempdir()))
@@ -73,6 +76,15 @@ class ExecutionEvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate(log, 'native', 0)
 
+    def test_failed_graph_with_successful_collection_cannot_omit_coverage_receipts(self):
+        log = '\n'.join(line for line in successful_log('native').splitlines() if 'jacocoDebug' not in line)
+        for failed in ('testDebugUnitTest', 'connectedDebugAndroidTest', 'verifyResolvedToolchain', 'unrelatedTask'):
+            candidate = log.replace(f'{failed} SUCCESS', f'{failed} FAILED')
+            with self.subTest(failed=failed), self.assertRaisesRegex(ValueError, 'Missing'):
+                validate(candidate, 'native', 1)
+        with self.assertRaisesRegex(ValueError, 'Missing'):
+            validate(log + '\nGATE_TASK_OUTCOME :app:lintDebug FAILED', 'native', 1)
+
 
 class LocalExecutionPolicyTests(unittest.TestCase):
     def assert_local_policy(self, app, policy, properties):
@@ -87,8 +99,75 @@ class LocalExecutionPolicyTests(unittest.TestCase):
                          'gradle.taskGraph.afterTask { task, state ->',
                          'GATE_TASK_OUTCOME ${task.path} ${outcome}',
                          "state.skipMessage == 'FROM-CACHE'", "state.noSource", "state.upToDate", "state.skipped",
-                         "if (!(outcome in ['SUCCESS', 'FAILED']))", 'throw new GradleException'):
+                         "if (!(outcome in ['SUCCESS', 'FAILED']) && !permittedSuppression)", 'throw new GradleException'):
             self.assertIn(contract, policy)
+        self.assert_vital_suppression_contract(policy)
+
+    def assert_vital_suppression_contract(self, policy):
+        # Source contract: no local Gradle/Android execution is permitted here.
+        for contract in ("import com.android.build.gradle.internal.lint.AndroidLintTask",
+                         "import com.android.build.gradle.internal.lint.AndroidLintTextOutputTask",
+                         "if (state.skipMessage != 'SKIPPED' || task.enabled) return false",
+                         "if (!(task instanceof AndroidLintTask || task instanceof AndroidLintTextOutputTask)) return false",
+                         "def vital = task.name =~ /^lintVital(Report)?([A-Z].*)$/",
+                         "if (!vital.matches()) return false",
+                         "def fullLintName = 'lint' + (vital.group(1) ?: '') + vital.group(2)",
+                         "def fullLint = gradle.taskGraph.allTasks.find {",
+                         "it.project == task.project && it.name == fullLintName",
+                         "return fullLint != null && isGate(fullLint) && fullLint.enabled",
+                         "def permittedSuppression = outcome == 'SKIPPED' && isRedundantVitalSuppression(task, state)"):
+            self.assertIn(contract, policy)
+
+    def vital_pattern(self):
+        policy = self.policy_sources()[1]
+        self.assert_vital_suppression_contract(policy)
+        match = re.search(r'def vital = task.name =~ /(.+)/', policy)
+        assert match is not None
+        return policy, match.group(1)
+
+    def test_disabled_vital_suppression_requires_matching_full_variant_in_same_graph(self):
+        _, pattern = self.vital_pattern()
+        for name, full in (('lintVitalRelease', 'lintRelease'),
+                           ('lintVitalReportRelease', 'lintReportRelease'),
+                           ('lintVitalReportPaidRelease', 'lintReportPaidRelease')):
+            match = re.fullmatch(pattern, name)
+            assert match is not None
+            self.assertEqual('lint' + (match[1] or '') + match[2], full)
+
+    def test_skipped_non_vital_gates_have_no_execution_exemption(self):
+        policy, pattern = self.vital_pattern()
+        for name in ('testDebugUnitTest', 'lintRelease', 'lintReportRelease', 'lintVital', 'lintDebug'):
+            self.assertIsNone(re.fullmatch(pattern, name))
+        self.assertIn("if (!(outcome in ['SUCCESS', 'FAILED']) && !permittedSuppression)", policy)
+        self.assertIn('throw new GradleException', policy)
+
+    def test_only_agp_report_and_text_types_allow_suppression_not_vital_analysis(self):
+        policy = self.policy_sources()[1]
+        self.assert_vital_suppression_contract(policy)
+        self.assertNotIn('AndroidLintAnalysisTask', policy)
+        self.assertIn('if (!(task instanceof AndroidLintTask || task instanceof AndroidLintTextOutputTask)) return false', policy)
+
+    def test_vital_cache_and_up_to_date_states_cannot_use_suppression(self):
+        policy = self.policy_sources()[1]
+        self.assert_vital_suppression_contract(policy)
+        # gateOutcome is evaluated first; only its literal SKIPPED result qualifies.
+        for fragment in ("if (state.skipMessage == 'FROM-CACHE') return 'FROM_CACHE'",
+                         "if (state.upToDate) return 'UP_TO_DATE'"):
+            self.assertIn(fragment, policy)
+            self.assertLess(policy.index(fragment), policy.index("if (state.skipped) return 'SKIPPED'"))
+        self.assertLess(policy.index('def outcome = gateOutcome(state)'), policy.index('def permittedSuppression ='))
+
+    def test_removing_any_vital_suppression_guard_fails_contract(self):
+        policy = self.policy_sources()[1]
+        for guard in ("state.skipMessage != 'SKIPPED' || ", ' || task.enabled',
+                      'if (!(task instanceof AndroidLintTask || task instanceof AndroidLintTextOutputTask)) return false',
+                      'if (!vital.matches()) return false', 'gradle.taskGraph.allTasks.find',
+                      'it.project == task.project && ', 'it.name == fullLintName',
+                      'fullLint != null && ', 'isGate(fullLint) && ', ' && fullLint.enabled',
+                      "outcome == 'SKIPPED' && "):
+            self.assertIn(guard, policy)
+            with self.subTest(guard=guard), self.assertRaises(AssertionError):
+                self.assert_vital_suppression_contract(policy.replace(guard, '', 1))
 
     def policy_sources(self):
         return [(ROOT / path).read_text() for path in

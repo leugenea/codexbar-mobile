@@ -17,6 +17,8 @@ NOISE = (
     "  Caching has not been enabled for the task\n"
     "Loading library manifest /SYNTHETIC/library/AndroidManifest.xml\n"
     "Merging library manifest /SYNTHETIC/library/AndroidManifest.xml\n"
+    "Caching disabled for AarTransform: /SYNTHETIC/transforms/library because:\n"
+    "  Caching not enabled.\n"
 )
 DIAGNOSTICS = (
     "> Task :app:testDebugUnitTest FAILED\n"
@@ -56,6 +58,47 @@ class GradleConsoleTests(unittest.TestCase):
                 result = self.filter(text)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, "")
+
+    def test_transform_blocks_filter_only_exact_no_caching_reason(self):
+        for name in ('AarTransform', 'MergeInstrumentationAnalysisTransform',
+                     'ExternalDependencyInstrumentingArtifactTransform', 'IdentityTransform',
+                     'NewPluginTransform'):
+            block = f'Caching disabled for {name}: /SYNTHETIC/transforms/library because:\n  Caching not enabled.\n'
+            for ending in ('\n', '\r\n'):
+                with self.subTest(name=name, ending=ending):
+                    result = subprocess.run(["bash", str(FILTER)],
+                                            input=(block + DIAGNOSTICS).replace('\n', ending).encode(),
+                                            capture_output=True, timeout=5)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(result.stdout, DIAGNOSTICS.replace('\n', ending).encode())
+
+    def test_transform_other_reasons_and_incomplete_blocks_are_preserved(self):
+        header = 'Caching disabled for AarTransform: /SYNTHETIC/transforms/library because:\n'
+        for reason in ('  Different caching reason.\n', '  Build cache is disabled\n',
+                       '  Caching has not been enabled for the task\n', ' Caching not enabled.\n',
+                       '  Caching not enabled. extra\n', '  Caching not enabled. \n', '', '\n'):
+            with self.subTest(reason=reason):
+                text = header + reason
+                result = self.filter(text)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, text)
+        # A lone first header must not conceal a subsequent complete noise block.
+        self.assertEqual(self.filter(header + header + '  Caching not enabled.\n').stdout, header)
+
+    def test_transform_reason_never_filters_task_level_or_near_match_diagnostics(self):
+        lines = ('  Caching not enabled.\n', '> Task :app:lintDebug SKIPPED\n',
+                 'WARNING: Caching disabled for AarTransform: /SYNTHETIC/library because:\n',
+                 'Caching disabled for NotAnArtifact: /SYNTHETIC/library because:\n',
+                 'Caching disabled for AarTransform: /SYNTHETIC/library because: warning\n')
+        for line in lines:
+            text = line + '  Caching not enabled.\n'
+            with self.subTest(line=line):
+                result = self.filter(text)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, text)
+        task = "Caching disabled for task ':app:lintDebug' because:\n  Caching not enabled.\n"
+        # Retain #104 task-header filtering, but not the new transform-only reason.
+        self.assertEqual(self.filter(task).stdout, '  Caching not enabled.\n')
 
     def run_pipeline(self, kind, text, exit_code, helper_failure=""):
         # Execute the actual workflow/native pipeline against a synthetic producer.

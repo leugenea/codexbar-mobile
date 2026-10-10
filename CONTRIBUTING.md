@@ -89,10 +89,12 @@ and separate Gradle user homes. The pinned setup-gradle basic provider persists
 `$GRADLE_USER_HOME/caches/build-cache-1`. No remote cache service is configured.
 Fork PRs remain read-only. Same-repository PR writes are scoped to their PR merge
 ref; GitHub does not let them overwrite or restore into the base branch's cache.
-Strict dependency verification remains mandatory on hits. Basic cache entries are
-immutable: an exact hit is not saved again, and its key hashes Gradle build scripts,
-not application sources. It is a reusable seed, not an accumulating output archive;
-inspect post-action saves and actual task hits before claiming a warm-run gain.
+Strict dependency verification remains mandatory on hits. The basic provider keys
+on a [hash of Gradle build files](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/sources/src/cache-service-basic.ts#L160-L168)
+with intentionally [no restore keys](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/sources/src/cache-service-basic.ts#L25-L39):
+the first run after dependency/build-script changes is cold. Exact hits remain
+immutable seeds, not accumulating archives; inspect saves and actual task hits
+before claiming a warm-run gain.
 
 `org.gradle.caching=true` enables local output reuse too, including clean builds,
 branches and worktrees sharing the same Gradle user home. CI explicitly passes
@@ -101,8 +103,11 @@ The app applies [always-execute.gradle](tools/build/always-execute.gradle) to fo
 fresh JVM/native tests, coverage preparation/collection/report/verification, resolved
 toolchain observation and **all lint tasks**: both up-to-date reuse and build-cache
 reuse are disabled for these tasks. Their terminal-state listener rejects skipped,
-no-source or reused gates locally as well as in CI. Global `--rerun-tasks` is
-forbidden in the hosted graphs because it would defeat output reuse. Configuration
+no-source or reused gates locally as well as in CI. Only AGP-disabled
+`lintVital[Report]<Variant>` may be skipped when its matching, enforced full lint
+partner is enabled in the same graph; vital lint still cannot reuse outputs.
+Global `--rerun-tasks` is forbidden in the hosted graphs because it would defeat
+output reuse. Configuration
 cache remains disabled (`--no-configuration-cache`) for the outcome listeners and
 init-script observation.
 
@@ -116,15 +121,17 @@ job is off the native critical path.
 
 Both graphs keep full `--info` output in `evidence/strict.log` and
 `evidence/native/strict-connected.log` (plus each native attempt's copy), before
-filtering known cache-disabled and library-manifest informational lines from the
-console. Warnings, errors, task/test output and coverage outcomes remain visible.
+filtering known cache-disabled and library-manifest informational lines, plus exact
+artifact-transform `Caching not enabled.` two-line blocks, from the console.
+Warnings, errors, task/test output and coverage outcomes remain visible.
 [verify_gradle_execution.py](tools/build/verify_gradle_execution.py) requires every
 expected verification/observation receipt to be `SUCCESS` and rejects reuse/skip
 headers, including lint analysis/report tasks. Missing, duplicate or malformed
 receipts fail closed. It checks each native attempt **before** retry eligibility;
-a failed collection may omit downstream report/verification but may never reuse a
-gate. Existing retry/JUnit checks still forbid failed suites. Evidence parsers and
-the bounded coverage retry read the unfiltered logs. Gradle/
+only a `FAILED` collection receipt in a failed graph may explain absent downstream
+report/verification receipts; an unrelated graph failure is not an exemption.
+No gate may reuse outputs. Existing retry/JUnit checks still forbid failed suites.
+Evidence parsers and the bounded coverage retry read the unfiltered logs. Gradle/
 timeout exit codes take precedence over pipeline helpers; evidence/filter failures
 also fail the job. Checkout v7.0.1 and upload-artifact v7.0.2 use Node 24 with full
 SHA pins; credential persistence remains disabled and existing artifact inputs

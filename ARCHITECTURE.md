@@ -935,13 +935,18 @@ The native graph retains JVM compilation/tests to bind JVM `.exec` and native
 and explicitly in CI; the pinned basic setup-gradle provider archives the user-home
 `caches/` tree, including `build-cache-1`. Forks cannot write, and PR-scoped cache
 writes cannot poison `main`'s cache scope. No remote cache is configured. Basic
-archives are immutable seeds, not accumulated outputs after an exact hit.
+archives are immutable seeds, not accumulated outputs after an exact hit. The
+basic provider [hashes Gradle build files](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/sources/src/cache-service-basic.ts#L160-L168)
+and intentionally has [no restore keys](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/sources/src/cache-service-basic.ts#L25-L39),
+so the first run after dependency/build-script changes starts with a cold home.
 
 The app-applied `always-execute.gradle` disables up-to-date and cache reuse for
 JVM/native suites, coverage preparation/collection/report/verification, all lint
 analysis/report tasks and toolchain observation, while compile/dex/resource/package
 outputs remain reusable. Local terminal-state checks and hosted full-log evidence
 checks reject reused/skipped/no-source gates; the native check precedes each retry.
+Only AGP-disabled redundant vital lint report/text tasks may be skipped with their
+same-variant enforced full lint partner enabled in the graph, never reused.
 Configuration cache remains off because these listeners and the init observation
 are not configuration-cache compatible. Cached compile/instrumentation outputs
 replay identical bytes, so caching itself cannot change JaCoCo class IDs; actual

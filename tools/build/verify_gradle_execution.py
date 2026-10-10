@@ -39,7 +39,7 @@ def validate(log, graph, graph_exit=0):
     required = {':app:' + name for name in REQUIRED[graph]}
     # A failed collection may legitimately prevent report/verification from running.
     # This exception never grants permission to reuse a gate or retry a failed suite.
-    if graph_exit != 0 and graph == 'native':
+    if graph_exit != 0 and graph == 'native' and observed.get(':app:collectDebugCoverageInputs') == 'FAILED':
         required -= {':app:jacocoDebugReport', ':app:jacocoDebugCoverageVerification'}
     missing = required - observed.keys()
     if missing:
