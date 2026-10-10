@@ -12,7 +12,7 @@ import androidx.compose.ui.res.stringResource
 /** The dialog is ephemeral and its callback never reacquires successor permission. */
 @Composable
 internal fun AccountRemovalAction(phase: ConnectionPhase, controller: ConnectionController) {
-    val removal = controller.accountRemoval
+    val removal by controller.accountRemovalPermissions.collectAsState()
     val enabled = phase !in setOf(ConnectionPhase.RESTORING, ConnectionPhase.SIGNING_OUT,
         ConnectionPhase.SIGNED_OUT, ConnectionPhase.REAUTH_REQUIRED, ConnectionPhase.IDLE)
     var confirming by remember(controller, removal, enabled) { mutableStateOf(false) }

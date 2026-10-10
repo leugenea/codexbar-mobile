@@ -219,6 +219,7 @@ ACCOUNT_REMOVAL_CASES = {
     "restoredAccountConfirmationExplainsLocalScopeAndCancelDismissAndRecreationChangeNothing",
     "confirmedRemovalDeletesAllLocalArtifactsAndHeldRepliesAndOldConfirmCannotTouchSuccessor",
     "replacementAndCancelDismissOpenDialogAndCapturedConfirmNeverReacquiresNewAccount",
+    "samePhaseReplacementDismissesOpenDialogWithoutIntermediatePhaseDelivery",
     "nameArtifactDeletionFailureIsStorageFailureAndOnlyFreshConfirmedRetryReportsRemoval",
 }
 

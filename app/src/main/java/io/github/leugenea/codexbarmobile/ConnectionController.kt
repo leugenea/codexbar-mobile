@@ -56,8 +56,9 @@ internal class ConnectionController(
     private val authenticatedReader = AuthenticatedProviderReader(session, reader)
     private var work: Job? = null
     private var revision = 0L
-    @Volatile internal var accountRemoval = AccountRemoval()
-        private set
+    private val mutableAccountRemoval = MutableStateFlow(AccountRemoval())
+    internal val accountRemovalPermissions: StateFlow<AccountRemoval> = mutableAccountRemoval
+    internal val accountRemoval: AccountRemoval get() = mutableAccountRemoval.value
     private var generation: SessionGeneration? = null
     private var deletion: Deferred<CredentialResult<Unit>>? = null
     private var historyDeletion: Deferred<HistoryDeleteOutcome>? = null
@@ -130,7 +131,7 @@ internal class ConnectionController(
         get() = history?.availability ?: HistoryAvailability.UNAVAILABLE
 
     private fun removeHistory() {
-        accountRemoval = AccountRemoval()
+        mutableAccountRemoval.value = AccountRemoval()
         mutableName.value = null
         val coordinator = history ?: return
         if (historyDeletion != null) return
@@ -372,7 +373,7 @@ internal class ConnectionController(
     private fun cleanupPending() = deletion?.isCompleted == false || historyDeletion?.isCompleted == false || session.removalPending()
 
     private fun retire(): Long {
-        accountRemoval = AccountRemoval()
+        mutableAccountRemoval.value = AccountRemoval()
         revision++
         usageRefresh.reset()
         work?.cancel()

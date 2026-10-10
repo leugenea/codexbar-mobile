@@ -478,11 +478,13 @@ confirmation cannot silently retry or erase a later login.
 Three added `ProcessSessionOwnerTest` methods cover production-default-lane admission,
 ordinary rotation, queued replacement, duplicate confirmation and credential failure
 retry. `AccountRemovalLifetimeTest` covers combined synthetic cleanup, admitted name
-writes, failed history removal, cancel invalidation and fresh-owner isolation. Four
+writes, failed history removal, cancel invalidation and fresh-owner isolation. Five
 mandatory `AccountRemovalLifecycleTest` cases exercise the production Activity/default
 factory with isolated actual Keystore/SQLite, local-scope/accessibility text, cancel/Back/
 recreation, restored/current removal, actual name-artifact deletion failure and fresh
-confirmed retry, captured Compose callbacks and late provider replies. Existing mandatory
+confirmed retry, captured dialog permission replay at the owner boundary and late provider
+replies. The same-phase replacement case holds the rendered phase constant and verifies
+permission replacement alone dismisses the dialog. Existing mandatory
 connection/banked tests now traverse confirmation; the held SQLite-query/provider-reply
 isolation case does too. All inherited test identities/captures remain required. Actual
 native execution, lint and compatible whole-handwritten >=90% INSTRUCTION coverage
