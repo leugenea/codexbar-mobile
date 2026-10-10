@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791630733241,
+  "lastUpdate": 1791630735593,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2745,6 +2745,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/ced44eae188f0cd3cdef94127eea6fd40bcd8b05"
         },
         "date": 1791626618420,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e326af612638e176451d560c2dedaafe0ce7c6ed",
+          "message": "ci(android): run instrumented job in parallel and filter Gradle console noise (#104) (#107)\n\nRun the instrumented job alongside build while Android CI result still\nrequires both. Tee complete --info output to evidence logs before a\nconsole-only filter of known informational lines; preserve Gradle exit\ncodes and fail closed on logging errors without triggering coverage\nretries. Bump checkout to v7.0.1 and upload-artifact to v7.0.2 (Node 24),\npinned by full SHA.",
+          "timestamp": "2026-10-10T14:11:46+03:00",
+          "tree_id": "df7b36eb01f266c79b5d8697c1bcfd7cf14161d5",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/e326af612638e176451d560c2dedaafe0ce7c6ed"
+        },
+        "date": 1791630735211,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
