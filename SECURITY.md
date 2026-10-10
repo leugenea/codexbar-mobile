@@ -27,8 +27,13 @@ account/workspace association or a supported client.
 One lazy process-scoped owner controls bounded login/read/refresh work. Activities
 only observe and submit commands; recreation, backgrounding and finish do not stop
 the process-owned work. The holder uses applicationContext only and retains no
-Activity. Launcher singleTask is defense in depth, not the ownership boundary. Device codes stay in owned memory, never Bundle/SavedStateHandle/clipboard,
-logs or exception diagnostics. The Activity sets FLAG_SECURE. Process death drops a
+Activity. Launcher singleTask is defense in depth, not the ownership boundary. Device-login
+user codes stay in owned memory except an explicit Copy code action, checked against the
+current attempt on the serial owner lane and marked sensitive before the clipboard write.
+Sensitivity suppresses system preview; it does not make the clipboard private storage.
+No automatic clipboard writes or clipboard reads occur. Device-auth IDs, verifiers and
+tokens never enter the clipboard; no code enters Bundle/SavedStateHandle, logs or
+exception diagnostics. The Activity sets FLAG_SECURE. Process death drops a
 pending login; encrypted credentials may restore only as unresolved, without automatic
 requests. Credentials use A6 AndroidKeyStore AES-GCM and an atomic no-backup ciphertext
 slot; its random local selector is also under noBackupFilesDir, not provider identity.

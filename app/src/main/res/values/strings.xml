@@ -39,6 +39,9 @@
     <string name="gate_refresh">Refresh session and read usage</string>
     <string name="gate_cancel">Cancel work</string>
     <string name="gate_browser">Open system browser</string>
+    <string name="device_code_copy">Copy code</string>
+    <string name="device_code_copied">Code copied</string>
+    <string name="device_code_clip_label">Codex device-login code</string>
     <string name="account_remove">Remove account from this device</string>
     <string name="account_remove_title">Remove local account?</string>
     <string name="account_remove_scope">This removes saved sign-in credentials, local usage history and the local display name from this device. It does not delete your OpenAI/ChatGPT account or cancel a subscription.</string>

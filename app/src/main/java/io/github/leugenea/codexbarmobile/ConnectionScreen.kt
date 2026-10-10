@@ -135,8 +135,7 @@ private fun ConnectionContent(state: ConnectionState, controller: ConnectionCont
     val awaiting = state.auth as? AuthState.AwaitingUser
     if (awaiting != null) {
         Text(awaiting.verificationUrl, Modifier.testTag("verification-url"))
-        // Plain Text only: no text field/saver, selection container, clipboard or diagnostics.
-        Text(awaiting.userCode.copyBytes().toString(Charsets.UTF_8), Modifier.testTag("device-code"))
+        DeviceLoginCode(awaiting, controller)
         Button(onClick = openBrowser, modifier = Modifier.testTag("open-browser")) {
             Text(stringResource(R.string.gate_browser))
         }

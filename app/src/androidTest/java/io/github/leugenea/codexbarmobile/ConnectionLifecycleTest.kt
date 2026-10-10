@@ -1,5 +1,8 @@
 package io.github.leugenea.codexbarmobile
 
+import android.content.ClipData
+import android.content.ClipDescription
+import android.content.ClipboardManager
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Intent
@@ -7,6 +10,11 @@ import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.os.Parcel
 import android.view.WindowManager
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.assertTextEquals
@@ -24,6 +32,9 @@ import io.github.leugenea.codexbarmobile.auth.AuthTransport
 import io.github.leugenea.codexbarmobile.credentials.*
 import io.github.leugenea.codexbarmobile.transport.*
 import io.github.leugenea.codexbarmobile.usage.SelectionState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -532,6 +543,155 @@ class ConnectionLifecycleTest {
         }
     }
 
+    @Test
+    fun explicitDeviceCodeCopyWritesExactSensitiveClipAndAnnouncesSuccess() {
+        launch().use { scenario ->
+            openGate(scenario)
+            awaitWindowFocus(scenario)
+            val clipboard = context.getSystemService(ClipboardManager::class.java)
+            scenario.onActivity { clipboard.setPrimaryClip(ClipData.newPlainText("Synthetic sentinel", "SYNTHETIC-UNCHANGED")) }
+            click("connect")
+            settleCopyCommands("initial copy login receipt")
+            await(scenario, "copy code appears") { it.auth is AuthState.AwaitingUser }
+            assertEquals("No automatic clipboard write", "SYNTHETIC-UNCHANGED", primaryClip(scenario).getItemAt(0).text.toString())
+            compose.onNodeWithTag("copy-device-code").performScrollTo().assertTextEquals("Copy code").assertHasClickAction()
+                .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ContentDescription))
+            click("copy-device-code")
+            bounded("accessible copy confirmation", { NativeConnection.get(context).state.value.toString() }) {
+                compose.onAllNodes(hasTestTag("device-code-copied")).fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithTag("device-code-copied").assertTextEquals("Code copied")
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+            assertSensitiveCode(primaryClip(scenario), CODE)
+            val firstConfirmationId = compose.onNodeWithTag("device-code-copied").fetchSemanticsNode().id
+            click("copy-device-code")
+            bounded("repeated copy creates fresh accessible confirmation", { NativeConnection.get(context).state.value.toString() }) {
+                compose.onAllNodes(hasTestTag("device-code-copied")).fetchSemanticsNodes().any { it.id != firstConfirmationId }
+            }
+            compose.onNodeWithTag("device-code-copied").assertTextEquals("Code copied")
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+            assertSensitiveCode(primaryClip(scenario), CODE)
+            val code = NativeConnection.get(context).state.value.auth as AuthState.AwaitingUser
+            // The compatibility key marks sensitivity identically on every supported API.
+            assertSensitiveCode(sensitiveDeviceCodeClip(code.userCode, "Synthetic label"), CODE)
+            val adapterWrites = CopyOnWriteArrayList<ClipData>()
+            assertTrue(AndroidDeviceCodeClipboard("Synthetic label", adapterWrites::add).copy(code.userCode))
+            assertSensitiveCode(adapterWrites.single(), CODE)
+            assertFalse(AndroidDeviceCodeClipboard("Synthetic label") { throw SecurityException("Synthetic platform failure") }.copy(code.userCode))
+            assertSavedStateHasNoSecrets(scenario)
+            scenario.recreate()
+            await(scenario, "copy attempt retained after recreation") { it.auth === code }
+            compose.onNodeWithTag("device-code-copied").assertDoesNotExist()
+            assertSensitiveCode(primaryClip(scenario), CODE)
+        }
+    }
+
+    @Test
+    fun capturedDeviceCodeCopyRejectsCancelledCompletedAndSupersededAttempts() {
+        val writes = CopyOnWriteArrayList<ClipData>()
+        val clipboard = DeviceCodeClipboard { code -> writes += sensitiveDeviceCodeClip(code, "Synthetic label"); true }
+        launch().use { scenario ->
+            openGate(scenario)
+            click("connect")
+            settleCopyCommands("predecessor login receipt")
+            await(scenario, "predecessor copy ready") { it.auth is AuthState.AwaitingUser }
+            val owner = NativeConnection.get(context)
+            val predecessor = owner.state.value.auth as AuthState.AwaitingUser
+            assertTrue(writes.isEmpty())
+            val stale: suspend () -> Boolean = { owner.copyDeviceCode(predecessor, clipboard) }
+            assertTrue(copyResult("copy current predecessor", stale))
+            assertSensitiveCode(writes.single(), CODE)
+            owner.cancel()
+            settleCopyCommands("copy cancellation receipt")
+            await(scenario, "cancel removes copy control") { it.phase == ConnectionPhase.CANCELLED }
+            compose.onNodeWithTag("copy-device-code").assertDoesNotExist()
+            assertFalse(copyResult("cancel rejects stale copy", stale))
+            fake.userCode = SECOND_CODE
+            owner.connect()
+            settleCopyCommands("successor login receipt")
+            await(scenario, "successor copy ready") { it.auth is AuthState.AwaitingUser && it.auth !== predecessor }
+            val successor = owner.state.value.auth as AuthState.AwaitingUser
+            assertFalse(copyResult("successor rejects predecessor copy", stale))
+            assertEquals(1, writes.size)
+            assertTrue(copyResult("copy exact successor") { owner.copyDeviceCode(successor, clipboard) })
+            assertSensitiveCode(writes.last(), SECOND_CODE)
+            fake.poll.complete(Unit)
+            await(scenario, "completed login removes copy control") { it.phase == ConnectionPhase.OBSERVED }
+            compose.onNodeWithTag("copy-device-code").assertDoesNotExist()
+            assertFalse(copyResult("completion rejects captured successor") { owner.copyDeviceCode(successor, clipboard) })
+            assertEquals(2, writes.size)
+        }
+    }
+
+    @Test
+    fun capturedDeviceCodeCopyRejectsMissingFailedAndExpiredAttempts() {
+        val writes = CopyOnWriteArrayList<SensitiveValue>()
+        val clipboard = DeviceCodeClipboard { writes += it; true }
+        launch().use { scenario ->
+            openGate(scenario)
+            val owner = NativeConnection.get(context)
+            val missing = AuthState.AwaitingUser(SensitiveValue.copyOf(CODE.toByteArray()))
+            assertFalse(copyResult("missing code rejects copy") { owner.copyDeviceCode(missing, clipboard) })
+            click("connect")
+            settleCopyCommands("failure login receipt")
+            await(scenario, "capture failed attempt copy") { it.auth is AuthState.AwaitingUser }
+            val failed = owner.state.value.auth as AuthState.AwaitingUser
+            owner.browserFailed()
+            settleCopyCommands("browser failure receipt")
+            await(scenario, "failed attempt removes copy control") { it.phase == ConnectionPhase.FAILED }
+            assertFalse(copyResult("failed attempt rejects copy") { owner.copyDeviceCode(failed, clipboard) })
+            owner.connect()
+            settleCopyCommands("expiring login receipt")
+            await(scenario, "capture expiring copy") { it.auth is AuthState.AwaitingUser && it.auth !== failed }
+            val expired = owner.state.value.auth as AuthState.AwaitingUser
+            fake.expirePendingCode()
+            assertSame("Projection still awaits the suspended poll", expired, owner.state.value.auth)
+            assertFalse(copyResult("elapsed deadline rejects copy before poll resumes") { owner.copyDeviceCode(expired, clipboard) })
+            fake.poll.complete(Unit)
+            await(scenario, "deadline removes copy control") { it.auth is AuthState.Failed }
+            assertEquals(io.github.leugenea.codexbarmobile.auth.AuthFailure.DEADLINE, (owner.state.value.auth as AuthState.Failed).category)
+            compose.onNodeWithTag("copy-device-code").assertDoesNotExist()
+            assertFalse(copyResult("expired attempt rejects copy") { owner.copyDeviceCode(expired, clipboard) })
+            assertTrue(writes.isEmpty())
+        }
+    }
+
+    private fun copyResult(step: String, action: suspend () -> Boolean): Boolean = ownerResult(step, action)
+
+    private fun settleCopyCommands(step: String) = ownerResult(step) { NativeConnection.get(context).commandsSettled() }
+
+    private fun <T> ownerResult(step: String, action: suspend () -> T): T {
+        val result = CoroutineScope(Dispatchers.IO).async { action() }
+        try {
+            bounded(step, { "completed=${result.isCompleted}; ${NativeConnection.get(context).state.value}" }) { result.isCompleted }
+            return runBlocking { result.await() }
+        } finally { result.cancel() }
+    }
+
+    private fun awaitWindowFocus(scenario: ActivityScenario<MainActivity>) {
+        var focused = false
+        bounded("foreground clipboard window focus", { "focused=$focused" }) {
+            scenario.onActivity { focused = it.window.decorView.hasWindowFocus() }
+            focused
+        }
+    }
+
+    private fun primaryClip(scenario: ActivityScenario<MainActivity>): ClipData {
+        awaitWindowFocus(scenario)
+        var clip: ClipData? = null
+        scenario.onActivity { clip = it.getSystemService(ClipboardManager::class.java).primaryClip }
+        return requireNotNull(clip) { "Synthetic primary clip missing while app focused" }
+    }
+
+    private fun assertSensitiveCode(clip: ClipData, expected: String) {
+        assertEquals(1, clip.itemCount)
+        assertEquals(expected, clip.getItemAt(0).text.toString())
+        assertNull(clip.getItemAt(0).intent)
+        assertNull(clip.getItemAt(0).uri)
+        assertTrue(clip.description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN))
+        assertTrue(clip.description.extras!!.getBoolean("android.content.extra.IS_SENSITIVE"))
+    }
+
     private fun launch(): ActivityScenario<MainActivity> = ActivityScenario.launch(MainActivity::class.java)
 
     private fun assertPresentedObservations(facts: FeasibilityObservations) {
@@ -631,7 +791,7 @@ class ConnectionLifecycleTest {
         compose.onNodeWithTag("connection-tab").assertExists()
         val parcel = Parcel.obtain()
         val bytes = try { parcel.writeBundle(bundle); parcel.marshall() } finally { parcel.recycle() }
-        for (secret in listOf(CODE, ACCESS, REFRESH, ROTATED_ACCESS, ROTATED_REFRESH, "synthetic-device", "synthetic-authorization", "synthetic-verifier")) {
+        for (secret in listOf(CODE, SECOND_CODE, ACCESS, REFRESH, ROTATED_ACCESS, ROTATED_REFRESH, "synthetic-device", "synthetic-authorization", "synthetic-verifier")) {
             assertFalse("Secret in diagnostic", diagnostics.contains(secret))
             assertFalse("Secret in saved Bundle UTF-8", bytes.toString(Charsets.UTF_8).contains(secret))
             assertFalse("Secret in saved Bundle UTF-16", bytes.toString(Charsets.UTF_16LE).contains(secret))
@@ -663,10 +823,12 @@ class ConnectionLifecycleTest {
         @Volatile var refreshCount = 0
         private val millis = AtomicLong()
         val clock = TransportClock { TransportTime(Instant.parse("2026-01-01T00:00:00Z").plusMillis(millis.get()), millis.get()) }
+        @Volatile var userCode = CODE
         @Volatile var holdReads = false
         @Volatile var readStatus = 200
         @Volatile var cancelledReads = 0
         suspend fun pause(duration: Long) { poll.await(); millis.addAndGet(duration) }
+        fun expirePendingCode() { millis.addAndGet(900_000L) }
         override fun execute(request: ProviderHttpRequest, deadline: ReadDeadline, terminal: (TransportResult) -> Unit): CancellationHandle {
             calls += request
             val refreshing = request is ProviderHttpRequest.FormPost &&
@@ -687,7 +849,7 @@ class ConnectionLifecycleTest {
         }
 
         private fun body(request: ProviderHttpRequest, refreshing: Boolean): String = when (request.url.encodedPath) {
-            "/api/accounts/deviceauth/usercode" -> """{"device_auth_id":"synthetic-device","user_code":"$CODE"}"""
+            "/api/accounts/deviceauth/usercode" -> """{"device_auth_id":"synthetic-device","user_code":"$userCode"}"""
             "/api/accounts/deviceauth/token" -> """{"authorization_code":"synthetic-authorization","code_verifier":"synthetic-verifier"}"""
             "/oauth/token" -> if (refreshing) """{"access_token":"$ROTATED_ACCESS","refresh_token":"$ROTATED_REFRESH"}"""
                 else """{"access_token":"$ACCESS","refresh_token":"$REFRESH"}"""
@@ -707,6 +869,7 @@ class ConnectionLifecycleTest {
 
     private companion object {
         const val CODE = "SYNTHETIC-NATIVE-CODE"
+        const val SECOND_CODE = "SYNTHETIC-SUCCESSOR-CODE"
         const val ACCESS = "synthetic-native-access"
         const val REFRESH = "synthetic-native-refresh"
         const val ROTATED_ACCESS = "synthetic-native-rotated-access"

@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 
 import test_history_text_contract as text_contract
 from verify_test_reports import ACCOUNT_REMOVAL_CASES
+from verify_test_reports import DEVICE_CODE_COPY_CASES
 from verify_test_reports import ACCOUNT_NAME_CASES, ACCOUNT_NAME_CLASS
 from verify_test_reports import HISTORY_ASSEMBLED_CASES, HISTORY_ASSEMBLED_CLASS, verify_reports
 from verify_history_text_captures import (ASSEMBLED_CAPTURES, ASSEMBLED_COUNTS, CAPTURES, decoded_samples,
@@ -27,7 +28,7 @@ class HistoryAssembledContracts(unittest.TestCase):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryAssembledAcceptanceTest.kt").read_text()
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_ASSEMBLED_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 107 + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 107 + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
         for name in HISTORY_ASSEMBLED_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history assembled acceptance"):

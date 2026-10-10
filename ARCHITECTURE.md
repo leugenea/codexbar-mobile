@@ -47,8 +47,23 @@ MainActivity / thin StateFlow observer
 ```
 
 MainActivity builds a fixed ACTION_VIEW/BROWSABLE intent for the system browser.
-The code is displayed from A7's owned memory, never saved or copied. One bounded
-attempt survives Activity recreation, backgrounding into the browser and Activity
+The user code is displayed from A7's owned memory and never saved. Copy code is an
+explicit resource-backed TextButton beside that visible code; only its click writes
+a plain-text clip through a write-only Android adapter. The description is marked
+sensitive using the compatibility key identical to the API 33 constant on every API.
+A polite resource-backed live region is recreated after each successful copy
+without a duplicate toast.
+The Main-thread click rejects an obsolete display identity; the controller repeats
+identity checks against its projection and A7 plus A7's existing monotonic poll deadline
+on its existing serial owner lane,
+with no suspension between admission and write. Android clipboard writes do not
+require Main: keeping that final operation on the owner lane prevents cancellation,
+completion, expiry or replacement from interleaving with authorization. A captured
+predecessor action never reacquires a successor code, even if its text is identical.
+Expiry denies copy even while a suspended poll still leaves the old code displayed;
+the poll budget, requests and scheduling are unchanged. No clipboard read, verifier/token
+export, automatic write or saved copy status is added.
+One bounded attempt survives Activity recreation, backgrounding into the browser and Activity
 finish. Every Activity observes the same process-scoped controller; no ViewModel or
 Activity coroutine owns authentication, refresh, reads or local deletion. The lazy
 holder constructs from applicationContext only. `singleTask` reduces duplicate

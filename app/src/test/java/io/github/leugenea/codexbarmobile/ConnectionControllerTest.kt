@@ -268,14 +268,120 @@ class ConnectionControllerTest {
         }
     }
 
-    private inner class Harness(ready: Boolean = true) : AutoCloseable {
+    @Test
+    fun copyDeviceCodeRequiresExactLiveIdentityAndNeverReacquiresEqualTextSuccessor() = runBlocking {
+        Harness().use { h ->
+            h.fake.respond = { call ->
+                if (call.request.url.encodedPath == "/api/accounts/deviceauth/usercode") h.respond(call)
+            }
+            h.controller.connect()
+            h.controller.commandsSettled()
+            val first = h.controller.state.value.auth as AuthState.AwaitingUser
+            val writes = mutableListOf<SensitiveValue>()
+            val clipboard = DeviceCodeClipboard { writes += it; true }
+            assertTrue(writes.isEmpty())
+            assertFalse(h.controller.copyDeviceCode(AuthState.AwaitingUser(first.userCode), clipboard))
+            assertTrue(h.controller.copyDeviceCode(first, clipboard))
+            assertSame(first.userCode, writes.single())
+            assertFalse(h.controller.copyDeviceCode(first, DeviceCodeClipboard { false }))
+            h.controller.cancel()
+            h.controller.commandsSettled()
+            assertFalse(h.controller.copyDeviceCode(first, clipboard))
+            h.controller.connect()
+            h.controller.commandsSettled()
+            val second = h.controller.state.value.auth as AuthState.AwaitingUser
+            assertNotSame(first, second)
+            assertArrayEquals(first.userCode.copyBytes(), second.userCode.copyBytes())
+            assertFalse(h.controller.copyDeviceCode(first, clipboard))
+            assertTrue(h.controller.copyDeviceCode(second, clipboard))
+            assertSame(second.userCode, writes.last())
+            h.respondNormally()
+            h.fake.calls.last().reply(SyntheticAuth.response(SyntheticAuth.AUTHORIZATION))
+            assertFalse(h.controller.copyDeviceCode(second, clipboard))
+            assertEquals(2, writes.size)
+        }
+    }
+
+    @Test
+    fun copyDeviceCodeRejectsMissingFailedAndClosedOwnerWithoutCallingAdapter() = runBlocking {
+        Harness().use { h ->
+            val missing = AuthState.AwaitingUser(SensitiveValue.copyOf("SYNTHETIC-MISSING".toByteArray()))
+            val clipboard = DeviceCodeClipboard { fail("Rejected code must not reach clipboard"); false }
+            assertFalse(h.controller.copyDeviceCode(missing, clipboard))
+            h.fake.respond = { call ->
+                if (call.request.url.encodedPath == "/api/accounts/deviceauth/usercode") h.respond(call)
+            }
+            h.controller.connect()
+            h.controller.commandsSettled()
+            val captured = h.controller.state.value.auth as AuthState.AwaitingUser
+            h.controller.browserFailed()
+            h.controller.commandsSettled()
+            assertFalse(h.controller.copyDeviceCode(captured, clipboard))
+            h.controller.close()
+            assertFalse(h.controller.copyDeviceCode(captured, clipboard))
+        }
+    }
+
+    @Test
+    fun elapsedPollDeadlineRejectsCopyBeforeAuthFailureIsDelivered() = runBlocking {
+        Harness().use { h ->
+            h.fake.respond = { call ->
+                if (call.request.url.encodedPath == "/api/accounts/deviceauth/usercode") h.respond(call)
+            }
+            h.controller.connect()
+            h.controller.commandsSettled()
+            val captured = h.controller.state.value.auth as AuthState.AwaitingUser
+            var writes = 0
+            val clipboard = DeviceCodeClipboard { writes++; true }
+            assertTrue(h.controller.copyDeviceCode(captured, clipboard))
+            h.clock.millis = AuthProtocol.POLL_BUDGET_MILLIS
+            assertSame("Poll response has not resumed", captured, h.controller.state.value.auth)
+            assertFalse(h.controller.copyDeviceCode(captured, clipboard))
+            assertEquals(1, writes)
+        }
+    }
+
+    @Test
+    fun queuedCancellationWinsBeforeClipboardAdmissionDespiteStillVisibleCode() = runBlocking {
+        val dispatcher = QueuedCopyDispatcher()
+        Harness(mutation = dispatcher).use { h ->
+            dispatcher.drain()
+            h.fake.respond = { call ->
+                if (call.request.url.encodedPath == "/api/accounts/deviceauth/usercode") h.respond(call)
+            }
+            h.controller.connect()
+            dispatcher.drain()
+            val captured = h.controller.state.value.auth as AuthState.AwaitingUser
+            var writes = 0
+            h.controller.cancel()
+            // A Main click can still see this predecessor before the queued command runs.
+            assertSame(captured, h.controller.state.value.auth)
+            val copying = async(start = CoroutineStart.UNDISPATCHED) {
+                h.controller.copyDeviceCode(captured, DeviceCodeClipboard { writes++; true })
+            }
+            assertFalse(copying.isCompleted)
+            dispatcher.drain()
+            assertFalse(copying.await())
+            assertEquals(0, writes)
+            assertEquals(ConnectionPhase.CANCELLED, h.controller.state.value.phase)
+        }
+        dispatcher.drain()
+    }
+
+    private class QueuedCopyDispatcher : CoroutineDispatcher() {
+        private val commands = ArrayDeque<Runnable>()
+        override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) { commands.addLast(block) }
+        fun drain() { while (commands.isNotEmpty()) commands.removeFirst().run() }
+    }
+
+    private inner class Harness(ready: Boolean = true, mutation: CoroutineDispatcher = Dispatchers.Unconfined) : AutoCloseable {
         val fake = AuthFake()
         val clock = AuthClock()
         val persistence = FakeCredentialPersistence()
         val store = SerializedCredentialStore(persistence)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val controller = ConnectionController(store, DeviceCodeAuthenticator(fake, store, clock, clock::pause, Dispatchers.Unconfined),
-            NativeFeasibilityReader(fake, clock, clock::pause), scope, ready, mutationDispatcher = Dispatchers.Unconfined, storageDispatcher = Dispatchers.Unconfined)
+            NativeFeasibilityReader(fake, clock, clock::pause), scope, ready, mutationDispatcher = mutation, storageDispatcher = Dispatchers.Unconfined)
         init { respondNormally() }
         fun respondNormally() { fake.respond = ::respond }
         fun respond(call: AuthFake.Call) {
