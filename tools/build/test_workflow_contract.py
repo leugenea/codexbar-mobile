@@ -376,10 +376,10 @@ class WorkflowContracts(unittest.TestCase):
         strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
         connected = script.split("./gradlew ", 1)[1].split("2>&1", 1)[0]
         for command in (strict, connected):
-            for flag in ("--no-daemon", "--dependency-verification strict", "--no-build-cache",
-                         "--no-configuration-cache", "--rerun-tasks", "--stacktrace", "--info"):
+            for flag in ("--no-daemon", "--dependency-verification strict", "--build-cache",
+                         "--no-configuration-cache", "--stacktrace", "--info", "--console=plain"):
                 self.assertIn(flag, command)
-            for unsafe in ("--build-cache", "--configuration-cache", "--dry-run", "--tests ",
+            for unsafe in ("--no-build-cache", "--rerun-tasks", "--configuration-cache", "--dry-run", "--tests ",
                            "testInstrumentationRunnerArguments", "--write-verification-metadata",
                            "--gradle-user-home", " -g "):
                 self.assertNotIn(unsafe, command)
@@ -430,6 +430,38 @@ class WorkflowContracts(unittest.TestCase):
         self.assertLess(native.index('bash tools/build/verify-hosted-toolchain.sh'),
                         native.index('bash tools/build/run-hosted-native-smoke.sh'))
 
+    def assert_execution_evidence(self, workflow, script):
+        strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
+        check = "          python3 tools/build/verify_gradle_execution.py build evidence/strict.log\n"
+        self.assertIn(check, strict)
+        self.assertLess(strict.index("graph_status[1] == 0"), strict.index(check))
+        graph = script.split('while :; do', 1)[1].split('coverage_attempt=2\ndone', 1)[0]
+        check = '  python3 tools/build/verify_gradle_execution.py native "$attempt_dir/strict-connected.log"'
+        for contract in (check, '--graph-exit "$test_status" > "$attempt_dir/gate-execution.log"',
+                         'gate_status=$?', 'if (( gate_status != 0 )); then', 'exit "$gate_status"'):
+            self.assertIn(contract, graph)
+        self.assertLess(graph.index(check), graph.index('native_coverage_retry.py'))
+        self.assertNotIn('|| true', graph.split(check, 1)[1].split('coverage_gate.py phases', 1)[0])
+
+    def test_every_attempt_checks_real_gate_execution_before_retry(self):
+        self.assert_execution_evidence((ROOT / '.github/workflows/android.yml').read_text(),
+                                       (ROOT / 'tools/build/run-hosted-native-smoke.sh').read_text())
+
+    def test_removing_or_bypassing_execution_evidence_fails_contract(self):
+        original = [(ROOT / path).read_text() for path in
+                    ('.github/workflows/android.yml', 'tools/build/run-hosted-native-smoke.sh')]
+        mutations = [(0, 'python3 tools/build/verify_gradle_execution.py build evidence/strict.log', 'true'),
+                     (1, 'verify_gradle_execution.py native', 'unused.py native'),
+                     (1, '--graph-exit "$test_status"', '--graph-exit 1'),
+                     (1, 'gate_status=$?', 'gate_status=0'),
+                     (1, 'exit "$gate_status"', 'true')]
+        for index, old, new in mutations:
+            texts = original.copy()
+            self.assertIn(old, texts[index])
+            texts[index] = texts[index].replace(old, new, 1)
+            with self.subTest(old=old), self.assertRaises(AssertionError):
+                self.assert_execution_evidence(*texts)
+
     def test_cached_execution_preserves_strict_real_gates_and_observed_sdk_receipts(self):
         self.assert_cached_execution(
             (ROOT / ".github/workflows/android.yml").read_text(),
@@ -442,7 +474,9 @@ class WorkflowContracts(unittest.TestCase):
             ".github/workflows/android.yml", "tools/build/run-hosted-native-smoke.sh",
             "tools/build/verify-hosted-toolchain.sh")]
         mutations = [(target, flag, "") for target in (0, 1) for flag in (
-            "--no-build-cache", "--no-configuration-cache", "--rerun-tasks")]
+            "--build-cache", "--no-configuration-cache", "--console=plain")]
+        mutations += [(target, "--build-cache", unsafe) for target in (0, 1)
+                      for unsafe in ("--no-build-cache", "--build-cache --rerun-tasks")]
         mutations += [
             (1, '${GRADLE_USER_HOME:?}', 'unused-home'),
             (1, 'image=', 'export GRADLE_USER_HOME="$RUNNER_TEMP/unrestored"\nimage='),

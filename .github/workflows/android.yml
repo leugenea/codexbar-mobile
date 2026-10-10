@@ -86,8 +86,8 @@ jobs:
         run: |
           set -o pipefail
           set +e
-          ./gradlew --no-daemon --dependency-verification strict --no-build-cache --no-configuration-cache --rerun-tasks \
-            --stacktrace --info --continue \
+          ./gradlew --no-daemon --dependency-verification strict --build-cache --no-configuration-cache \
+            --stacktrace --info --console=plain --continue \
             -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
             :app:lintDebug :app:assembleDebug :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
             :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
@@ -98,6 +98,7 @@ jobs:
           if (( graph_status[0] != 0 )); then exit "${graph_status[0]}"; fi
           # A successful Gradle graph cannot hide an evidence/filter failure.
           (( graph_status[1] == 0 && graph_status[2] == 0 ))
+          python3 tools/build/verify_gradle_execution.py build evidence/strict.log
           python3 tools/build/verify_manifests.py
           python3 tools/build/verify_test_reports.py jvm
       - name: Upload build logs and outputs (all outcomes)

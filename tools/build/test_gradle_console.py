@@ -76,7 +76,8 @@ class GradleConsoleTests(unittest.TestCase):
             tools = base / "tools/build"
             tools.mkdir(parents=True)
             shutil.copyfile(FILTER, tools / FILTER.name)
-            for filename in ("verify_manifests.py", "verify_test_reports.py"):
+            # Parser doubles isolate log-pipeline exits; real gate semantics are tested separately.
+            for filename in ("verify_manifests.py", "verify_test_reports.py", "verify_gradle_execution.py"):
                 (tools / filename).write_text("from pathlib import Path\nPath('parsers-ran').touch()\n")
             (base / "evidence/native/attempt-1").mkdir(parents=True)
             (base / "gradlew").write_text(

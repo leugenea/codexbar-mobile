@@ -300,6 +300,7 @@ import json, os
 from pathlib import Path
 import time
 import coverage_gate
+import verify_gradle_execution
 from test_native_coverage_retry import COVERAGE_PULL_OFFLINE, synthetic_reports
 
 scenario = os.environ['SYNTHETIC_SCENARIO']
@@ -316,7 +317,7 @@ unit.write_bytes(b'SYNTHETIC JVM dataset')
 path = coverage_gate.BUILD / 'outputs/code_coverage/debugAndroidTest/connected/SYNTHETIC/coverage.ec'
 path.parent.mkdir(parents=True)
 reason = scenario.split('-')[0] if scenario.startswith(('missing-', 'truncated-')) else 'empty'
-green = scenario in ('first-green', 'missing-then-green', 'empty-then-green', 'truncated-then-green') and (attempt == 2 or scenario == 'first-green')
+green = scenario in ('first-green', 'cached-green', 'missing-then-green', 'empty-then-green', 'truncated-then-green') and (attempt == 2 or scenario in ('first-green', 'cached-green'))
 if green or reason != 'missing':
     path.write_bytes(b'SYNTHETIC current attempt data' if green else b'SYNTHETIC truncated' if reason == 'truncated' else b'')
 if not green:
@@ -340,6 +341,13 @@ for phase, task in coverage_gate.PHASES.items():
     else:
         state = 'FAILED' if phase == 'inputs' else 'SUCCESS'
     print(f'COVERAGE_TASK_OUTCOME :app:{task} {state}')
+for task in verify_gradle_execution.REQUIRED['native']:
+    if not green and task.startswith('jacocoDebug'):
+        continue
+    state = 'FAILED' if task == 'collectDebugCoverageInputs' and not green else 'SUCCESS'
+    if scenario in ('cached-test', 'cached-green') and task == 'testDebugUnitTest':
+        state = 'FROM_CACHE'
+    print(f'GATE_TASK_OUTCOME :app:{task} {state}')
 raise SystemExit(0 if green else 124 if scenario == 'timeout' else 1)
 '''
 
@@ -355,7 +363,7 @@ class SyntheticRunnerTests(unittest.TestCase):
         tools = base / "tools/build"
         tools.mkdir(parents=True)
         for filename in ("coverage_gate.py", "native_coverage_retry.py", "verify_test_reports.py",
-                         "filter-gradle-console.sh"):
+                         "filter-gradle-console.sh", "verify_gradle_execution.py"):
             shutil.copyfile(ROOT / "tools/build" / filename, tools / filename)
         evidence = base / "evidence/native"
         evidence.mkdir(parents=True)
@@ -423,6 +431,24 @@ class SyntheticRunnerTests(unittest.TestCase):
                 self.assert_runner_logs(base, result, expected_count)
                 if expected_count == 2:
                     self.assert_archived_graph(base, scenario, expected_status)
+
+    def test_cached_gate_prevents_transport_retry_and_preserves_graph_exit(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as temporary:
+            base = Path(temporary)
+            result = self.run_scenario(base, "cached-test")
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertEqual((base / "SYNTHETIC-invocations").read_text(), "1")
+            gate_log = (base / "evidence/native/attempt-1/gate-execution.log").read_text()
+            self.assertIn("FROM_CACHE", gate_log)
+            self.assertFalse((base / "evidence/native/retry-decision.json").exists())
+
+    def test_green_graph_with_cached_gate_cannot_pass(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as temporary:
+            base = Path(temporary)
+            result = self.run_scenario(base, "cached-green")
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual((base / "evidence/native/graph-exit-status.txt").read_text(), "graph_task_exit=0\n")
+            self.assertIn("FROM_CACHE", (base / "evidence/native/attempt-1/gate-execution.log").read_text())
 
     def test_missing_native_diagnostic_source_contract_excludes_jvm_and_file_metadata(self):
         build = (ROOT / "app/build.gradle").read_text()

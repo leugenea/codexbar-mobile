@@ -163,7 +163,7 @@ while :; do
   (( remaining > 0 )) || exit 124
   set +e
   timeout --signal=TERM --kill-after=30s "${remaining}s" ./gradlew --no-daemon --dependency-verification strict \
-    --no-build-cache --no-configuration-cache --rerun-tasks \
+    --build-cache --no-configuration-cache \
     --stacktrace --info --console=plain -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
     :app:processReleaseManifest :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest \
     :app:connectedDebugAndroidTest :app:jacocoDebugCoverageVerification \
@@ -177,6 +177,16 @@ while :; do
   if (( graph_status[1] != 0 || graph_status[2] != 0 || receipt_status != 0 )); then
     if (( test_status != 0 )); then exit "$test_status"; fi
     exit 1
+  fi
+  # Reject reused/skipped gates on every attempt, before considering a transport retry.
+  set +e
+  python3 tools/build/verify_gradle_execution.py native "$attempt_dir/strict-connected.log" \
+    --graph-exit "$test_status" > "$attempt_dir/gate-execution.log" 2>&1
+  gate_status=$?
+  set -e
+  if (( gate_status != 0 )); then
+    if (( test_status != 0 )); then exit "$test_status"; fi
+    exit "$gate_status"
   fi
   python3 tools/build/coverage_gate.py phases > "$attempt_dir/phases.log" 2>&1
   cp evidence/native/task-phase-outcomes.json "$attempt_dir/task-phase-outcomes.json"

@@ -263,8 +263,10 @@ class ToolchainContract(unittest.TestCase):
         self.assert_cached_actions_setup(workflow)
         strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
         self.assertIn("--dependency-verification strict", strict)
-        for flag in ("--no-build-cache", "--no-configuration-cache", "--rerun-tasks"):
+        for flag in ("--build-cache", "--no-configuration-cache", "--console=plain"):
             self.assertIn(flag, strict)
+        self.assertNotIn("--rerun-tasks", strict)
+        self.assertNotIn("--no-build-cache", strict)
         for task in ("lintDebug", "assembleDebug", "compileDebugUnitTestKotlin",
                      "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest"):
             self.assertIn(":app:" + task, strict)

@@ -325,6 +325,8 @@ tasks.register('jacocoDebugCoverageVerification', JacocoCoverageVerification) {
         }.result.get().assertNormalExitValue()
     }
 }
+apply from: rootProject.file('tools/build/always-execute.gradle')
+
 // Configuration cache is explicitly disabled in the hosted gate. These are observed
 // terminal task states, not inferred from banners or the aggregate process exit.
 gradle.taskGraph.afterTask { task, state ->
