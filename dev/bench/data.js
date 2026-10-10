@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791643591137,
+  "lastUpdate": 1791643594240,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2949,6 +2949,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/cafe0fe5bf8c5900baa6dde0889c7d556a7f5fe6"
         },
         "date": 1791636667021,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "61dbe90c58f2304120c5771e11ba38d43c4c5e00",
+          "message": "ci(gradle): reuse build outputs via the build cache while gates always execute (#108) (#112)\n\n* ci(gradle): reuse build outputs via the build cache while gates always execute (#108)\n\nEnable the Gradle build cache locally (org.gradle.caching=true) and in\nboth hosted graphs (--build-cache), replacing the global --rerun-tasks.\nVerification and observation tasks (JVM/native tests, coverage prepare/\ncollect/report/verify, toolchain check, all lint) are never up-to-date or\ncacheable, a terminal-state listener fails the build if any of them is\nreused or skipped, and verify_gradle_execution.py enforces the same from\nthe full --info evidence on every hosted attempt before retry eligibility.\nCoverage class-ID/freshness validation and the 90% gate are unchanged.\n\n* ci(gradle): allow only AGP redundant lintVital suppression; narrow coverage receipt exception; filter transform cache noise (#108)\n\n* ci(gradle): name-based lint class check without AGP imports; streaming Python console filter (#108)",
+          "timestamp": "2026-10-10T17:46:01+03:00",
+          "tree_id": "051a6bd676accd55dfbb951d4b3c738db7efd6d2",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/61dbe90c58f2304120c5771e11ba38d43c4c5e00"
+        },
+        "date": 1791643593589,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
