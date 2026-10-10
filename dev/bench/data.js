@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791643594240,
+  "lastUpdate": 1791650344531,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1485,6 +1485,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/61dbe90c58f2304120c5771e11ba38d43c4c5e00"
         },
         "date": 1791643590298,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "166252edbb70f7a99858a1f0fc2ec6102ef6a0dc",
+          "message": "feat(account): add explicit confirmed local account removal (#96) (#113)\n\n* feat(account): add explicit confirmed local account removal (#96)\n\n* fix(account): observe removal permission in the dialog; replay stale confirms at the owner boundary\n\n* test(account): wait for dialog focus before Back and bound dismissal assertions",
+          "timestamp": "2026-10-10T19:38:37+03:00",
+          "tree_id": "c31c35e1250c1a57fb4719b2c9a28c54f63f2f47",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/166252edbb70f7a99858a1f0fc2ec6102ef6a0dc"
+        },
+        "date": 1791650343521,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
