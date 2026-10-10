@@ -563,9 +563,17 @@ class ConnectionLifecycleTest {
             compose.onNodeWithTag("device-code-copied").assertTextEquals("Code copied")
                 .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
             assertSensitiveCode(primaryClip(scenario), CODE)
+            val firstConfirmationId = compose.onNodeWithTag("device-code-copied").fetchSemanticsNode().id
+            click("copy-device-code")
+            bounded("repeated copy creates fresh accessible confirmation", { NativeConnection.get(context).state.value.toString() }) {
+                compose.onAllNodes(hasTestTag("device-code-copied")).fetchSemanticsNodes().any { it.id != firstConfirmationId }
+            }
+            compose.onNodeWithTag("device-code-copied").assertTextEquals("Code copied")
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+            assertSensitiveCode(primaryClip(scenario), CODE)
             val code = NativeConnection.get(context).state.value.auth as AuthState.AwaitingUser
-            // Exercise both API-key paths without touching any unrelated clipboard content.
-            for (sdk in listOf(26, 33)) assertSensitiveCode(sensitiveDeviceCodeClip(code.userCode, "Synthetic label", sdk), CODE)
+            // The compatibility key marks sensitivity identically on every supported API.
+            assertSensitiveCode(sensitiveDeviceCodeClip(code.userCode, "Synthetic label"), CODE)
             val adapterWrites = CopyOnWriteArrayList<ClipData>()
             assertTrue(AndroidDeviceCodeClipboard("Synthetic label", adapterWrites::add).copy(code.userCode))
             assertSensitiveCode(adapterWrites.single(), CODE)

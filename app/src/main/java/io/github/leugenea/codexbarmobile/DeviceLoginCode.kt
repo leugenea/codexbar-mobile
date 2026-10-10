@@ -23,18 +23,21 @@ internal fun DeviceLoginCode(awaiting: AuthState.AwaitingUser, controller: Conne
     val context = LocalContext.current
     val clipboard = remember(context) { AndroidDeviceCodeClipboard(context) }
     val scope = rememberCoroutineScope()
-    var copied by remember(controller, awaiting) { mutableStateOf(false) }
+    var copied by remember(controller, awaiting) { mutableStateOf<Any?>(null) }
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(awaiting.userCode.copyBytes().toString(Charsets.UTF_8), Modifier.weight(1f).testTag("device-code"))
         TextButton(onClick = {
             // Main-thread UI check; the owner repeats it atomically with the actual write.
             if (controller.state.value.auth === awaiting) scope.launch {
-                copied = controller.copyDeviceCode(awaiting, clipboard)
+                // A fresh identity recreates the live region even for repeated successful copies.
+                copied = if (controller.copyDeviceCode(awaiting, clipboard)) Any() else null
             }
         }, modifier = Modifier.testTag("copy-device-code")) {
             Text(stringResource(R.string.device_code_copy))
         }
     }
-    if (copied) Text(stringResource(R.string.device_code_copied),
-        Modifier.testTag("device-code-copied").semantics { liveRegion = LiveRegionMode.Polite })
+    if (copied != null) key(copied) {
+        Text(stringResource(R.string.device_code_copied),
+            Modifier.testTag("device-code-copied").semantics { liveRegion = LiveRegionMode.Polite })
+    }
 }

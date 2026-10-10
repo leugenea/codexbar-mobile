@@ -50,8 +50,9 @@ MainActivity builds a fixed ACTION_VIEW/BROWSABLE intent for the system browser.
 The user code is displayed from A7's owned memory and never saved. Copy code is an
 explicit resource-backed TextButton beside that visible code; only its click writes
 a plain-text clip through a write-only Android adapter. The description is marked
-sensitive (API 33 constant or the identical older-platform compatibility key).
-A polite resource-backed live region reports success without a duplicate toast.
+sensitive using the compatibility key identical to the API 33 constant on every API.
+A polite resource-backed live region is recreated after each successful copy
+without a duplicate toast.
 The Main-thread click rejects an obsolete display identity; the controller repeats
 identity checks against its projection and A7 plus A7's existing monotonic poll deadline
 on its existing serial owner lane,

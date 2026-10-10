@@ -1,10 +1,8 @@
 package io.github.leugenea.codexbarmobile
 
 import android.content.ClipData
-import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
-import android.os.Build
 import android.os.PersistableBundle
 import io.github.leugenea.codexbarmobile.credentials.SensitiveValue
 
@@ -27,10 +25,10 @@ internal class AndroidDeviceCodeClipboard(private val label: String,
     }
 }
 
-internal fun sensitiveDeviceCodeClip(userCode: SensitiveValue, label: String,
-    sdk: Int = Build.VERSION.SDK_INT): ClipData {
+internal fun sensitiveDeviceCodeClip(userCode: SensitiveValue, label: String): ClipData {
     val clip = ClipData.newPlainText(label, userCode.copyBytes().toString(Charsets.UTF_8))
-    val key = if (sdk >= 33) ClipDescription.EXTRA_IS_SENSITIVE else "android.content.extra.IS_SENSITIVE"
+    // ClipDescription.EXTRA_IS_SENSITIVE's documented value; compatible below API 33 too.
+    val key = "android.content.extra.IS_SENSITIVE"
     clip.description.extras = PersistableBundle().apply { putBoolean(key, true) }
     return clip
 }
