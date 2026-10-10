@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791617898607,
+  "lastUpdate": 1791617900528,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2541,6 +2541,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/84933c8eee7df6a9111e525f38f591ea5479df8f"
         },
         "date": 1791589035500,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "41d9d618403ee90791be5924b5a36055d5a37b84",
+          "message": "feat(account): add local display name for the connected account (#100)\n\nCloses #95",
+          "timestamp": "2026-10-10T10:37:56+03:00",
+          "tree_id": "f67ff523dbd1c2099c4111788e62dd3b4fb5ada1",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/41d9d618403ee90791be5924b5a36055d5a37b84"
+        },
+        "date": 1791617900282,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
