@@ -826,7 +826,7 @@ class SyntheticReportTests(unittest.TestCase):
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", native.read_text())), HISTORY_SAMPLING_CASES)
         self.assertEqual(sum(map(len, (EXPECTED["native"], CREDENTIAL_CASES, CONNECTION_CASES,
                                      USAGE_REFRESH_CASES, LIVE_USAGE_CASES, BANKED_RESET_CASES,
-                                     HISTORY_CASES, HISTORY_LIFETIME_CASES))), 72)
+                                     HISTORY_CASES, HISTORY_LIFETIME_CASES))), 74)
         for name in HISTORY_SAMPLING_CASES:
             self.write_report("native", missing=name)
             with self.assertRaisesRegex(ValueError, "Missing real native history sampling"):

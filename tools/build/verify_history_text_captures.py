@@ -402,13 +402,87 @@ def verify_captures(directory: Path) -> list[dict]:
     return receipts
 
 
+# Separate screen/locale identities; history identities and all 17 inherited PNGs remain exact.
+LIVE_CAPTURES = {"live-usage-portrait-light": False, "live-usage-portrait-dark": True}
+LIVE_FACTS = {
+    "live-five-hour-percent": "12.5% used",
+    "live-weekly-percent": "76.25% used",
+    "live-five-hour-reset-absolute": "Reset: Oct 8, 2026, 01:00 (hour precision)",
+    "live-five-hour-reset-relative": "Reset: 0 days 1 hour remaining",
+    "live-weekly-reset-absolute": "Reset: Oct 10, 2026, 01:00 (hour precision)",
+    "live-weekly-reset-relative": "Reset: 2 days 1 hour remaining",
+}
+
+
+def verify_live_samples(metadata: dict, image: bytes, size: tuple[int, int]) -> None:
+    samples = metadata.get("pixelSamples")
+    kinds = {"background", "card", "content", "progress", "track"}
+    if (not isinstance(samples, list) or len(samples) != len(kinds) or
+            any(not isinstance(item, dict) for item in samples) or
+            {item.get("kind") for item in samples} != kinds or metadata.get("pixelOraclePassed") is not True):
+        raise ValueError("Missing live theme paint samples")
+    for item, actual in zip(samples, decoded_samples(image, samples)):
+        verify_live_sample_bounds(item, size)
+        # Same channel tolerance/actual-byte check as the inherited chart oracle.
+        verify_sample(dict(item, kind="marker"), actual)
+
+
+def verify_live_sample_bounds(item: dict, size: tuple[int, int]) -> None:
+    bounds = item.get("bounds")
+    if not isinstance(bounds, list) or len(bounds) != 4:
+        raise ValueError("Missing live sample owner bounds")
+    if not all(type(value) in (int, float) and math.isfinite(value) for value in bounds):
+        raise ValueError("Missing finite live sample owner bounds")
+    left, top, right, bottom = bounds
+    contained = (0 <= left < right <= size[0], 0 <= top < bottom <= size[1],
+                 left <= item["x"] < right, top <= item["y"] < bottom)
+    if not all(contained):
+        raise ValueError("Live paint sample outside its native owner bounds")
+
+
+def live_capture_receipt(path: Path) -> dict:
+    metadata = json.loads(path.with_suffix(".json").read_text())
+    image = read_png(path)
+    size = png_size(image)
+    expected = dict(name=path.stem, screen="live-usage", synthetic=True, api=36, orientation=1,
+                    dark=LIVE_CAPTURES[path.stem], fontScale=1.0, productionEntry=True,
+                    activity="io.github.leugenea.codexbarmobile.MainActivity", renderedLocale="en-US", phase="OBSERVED")
+    if not valid_configuration(metadata, expected, size) or size[0] >= size[1]:
+        raise ValueError("Invalid observed live configuration or production screen identity")
+    if metadata.get("visibleFacts") != LIVE_FACTS or metadata.get("visibleControls") != ["connection-tab"]:
+        raise ValueError("Live usage/reset/control identities changed")
+    verify_live_layout(metadata)
+    verify_live_samples(metadata, image, size)
+    return dict(metadata, path=str(path), pngSha256=hashlib.sha256(image).hexdigest(),
+                metadataSha256=hashlib.sha256(path.with_suffix(".json").read_bytes()).hexdigest())
+
+
+def verify_live_layout(metadata: dict) -> None:
+    for key in ("density", "fontScale", "layoutDensity", "layoutFontScale"):
+        if type(metadata.get(key)) not in (int, float) or not math.isfinite(metadata[key]) or metadata[key] <= 0:
+            raise ValueError("Invalid effective live layout configuration")
+    if metadata["density"] != metadata["layoutDensity"] or metadata["fontScale"] != metadata["layoutFontScale"]:
+        raise ValueError("Live native layout disagrees with resource configuration")
+
+
+def verify_gallery(directory: Path) -> list[dict]:
+    history = verify_captures(directory)
+    live = sorted(directory.rglob("live-usage-*.png"))
+    if {path.stem for path in live} != set(LIVE_CAPTURES) or len(live) != len(LIVE_CAPTURES):
+        raise ValueError("Missing, extra or duplicate native live screenshots")
+    receipts = history + [live_capture_receipt(path) for path in live]
+    if len({item["density"] for item in receipts}) != 1:
+        raise ValueError("Capture gallery target density changed")
+    return receipts
+
+
 def main() -> None:
-    captures = verify_captures(ROOT / "app/build/outputs/connected_android_test_additional_output")
+    captures = verify_gallery(ROOT / "app/build/outputs/connected_android_test_additional_output")
     destination = ROOT / "evidence/native/history-text-captures.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(dict(current_identity(), captures=captures,
                                            visualInspection="pending independent actual-image review"), indent=2) + "\n")
-    print(f"Collected {len(captures)} native history screenshots; image review is not automated")
+    print(f"Collected {len(captures)} native history/live screenshots; image review is not automated")
 
 
 if __name__ == "__main__":
