@@ -166,8 +166,8 @@ class HistoryNavigationTest {
             assertEquals(1L, source.storage!!.lastAdmitted!!.ordinal)
             assertNotEquals(source.live.usage.sourceObservedAt, source.live.inventory.sourceObservedAt)
             historyText("Latest endpoint error: forbidden").performScrollTo().assertIsDisplayed()
-            historyText("Last successful source observation (exact UTC): 2027-01-15T08:00:00Z").assertExists()
-            historyText("Last successful source observation (exact UTC): 2027-01-15T08:00:01Z").assertExists()
+            historyText("Last successful source observation (second precision): Jan 15, 2027, 8:00:00\u202fAM").assertExists()
+            historyText("Last successful source observation (second precision): Jan 15, 2027, 8:00:01\u202fAM").assertExists()
             click("history-select-WEEKLY")
             page(WindowKind.WEEKLY, 0, 1)
             assertEquals(7L, fixture.transport.requests.get())
@@ -175,6 +175,16 @@ class HistoryNavigationTest {
             click("history-toggle")
             compose.onNodeWithTag("live-refresh").performScrollTo().assertIsEnabled()
         }
+    }
+
+    @androidx.test.filters.SdkSuppress(minSdkVersion = 33)
+    @Test fun productionLiveAndBankedClocksFollowSystemZoneResourceLocaleAndRecreationWithoutReads() {
+        if (android.os.Build.VERSION.SDK_INT >= 33) PhoneTimeEvidence(compose, fixture).run(history = false)
+    }
+
+    @androidx.test.filters.SdkSuppress(minSdkVersion = 33)
+    @Test fun productionHistoryClocksFollowSystemZoneResourceLocaleAndRecreationWithoutReads() {
+        if (android.os.Build.VERSION.SDK_INT >= 33) PhoneTimeEvidence(compose, fixture).run(history = true)
     }
 
     private fun seedDormant() {

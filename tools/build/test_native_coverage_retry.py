@@ -16,6 +16,7 @@ import coverage_gate
 import native_coverage_retry as retry
 from test_history_text_contract import RETAINED_TEXT_CASES
 from test_history_chart_contract import RETAINED_CHART_CASES
+from verify_test_reports import PHONE_TIME_CASES
 from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
 from verify_test_reports import ACCOUNT_REMOVAL_CASES, ACCOUNT_REMOVAL_CLASS
 from verify_test_reports import DEVICE_CODE_COPY_CASES, DEVICE_CODE_COPY_CLASS
@@ -276,7 +277,7 @@ class RetryContracts(unittest.TestCase):
         self.assertEqual(HISTORY_CHART_CASES, RETAINED_CHART_CASES)
         path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
         cases = list(ET.parse(path).getroot().iter("testcase"))
-        self.assertEqual(len(cases), 124)
+        self.assertEqual(len(cases), 124 + len(PHONE_TIME_CASES))
         for classname, expected in ((HISTORY_TEXT_CLASS, RETAINED_TEXT_CASES),
                                     (HISTORY_CHART_CLASS, RETAINED_CHART_CASES)):
             self.assertEqual({case.get("name") for case in cases if case.get("classname") == classname}, expected)

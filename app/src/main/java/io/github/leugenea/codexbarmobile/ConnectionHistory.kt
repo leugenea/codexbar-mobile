@@ -7,7 +7,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -16,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.usage.WindowKind
 import java.time.Instant
-import java.time.ZoneId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -34,7 +32,7 @@ internal fun ConnectionHistory(controller: ConnectionController, now: Instant?, 
     val display = historyForDisplay(source, query)
     SideEffect { observer?.projected(source, display, now) }
     val plot = remember(display) { HistoryPlotInputs.project(display) }
-    val locale = LocalConfiguration.current.locales[0]
+    val time = phoneTimeConfiguration()
     Column(Modifier.fillMaxWidth().testTag("connection-history"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.history_navigation_title), style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.testTag("history-navigation-title").semantics { heading() })
@@ -56,7 +54,7 @@ internal fun ConnectionHistory(controller: ConnectionController, now: Instant?, 
             modifier = Modifier.fillMaxWidth().testTag("history-next-page")) {
             Text(stringResource(R.string.history_next_page))
         }
-        HistoryChartComponent(plot, now, ZoneId.systemDefault(), locale, kind = navigation.kind)
+        HistoryChartComponent(plot, now, time.zone, time.locale, kind = navigation.kind)
     }
 }
 

@@ -7,6 +7,8 @@ import xml.etree.ElementTree as ET
 import test_history_text_contract as text_contract
 from verify_test_reports import DEVICE_CODE_COPY_CASES, DEVICE_CODE_COPY_CLASS, verify_reports
 
+from verify_test_reports import PHONE_TIME_CASES
+
 ROOT = Path(__file__).resolve().parents[2]
 MAIN = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
 
@@ -23,7 +25,7 @@ class DeviceCodeCopyContracts(unittest.TestCase):
         actual = set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source))
         self.assertTrue(DEVICE_CODE_COPY_CASES <= actual)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 121 + len(DEVICE_CODE_COPY_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 121 + len(PHONE_TIME_CASES) + len(DEVICE_CODE_COPY_CASES))
         for name in DEVICE_CODE_COPY_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native device code copy"):

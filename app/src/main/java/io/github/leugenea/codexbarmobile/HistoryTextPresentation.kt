@@ -22,7 +22,7 @@ internal object HistoryTextPresentation {
         val source = entry.source
         val facts = mutableListOf(
             HistoryTextFact(R.string.history_observation, source.id.ordinal.toString()),
-            HistoryTextFact(R.string.history_observed, source.observedAt?.toString()),
+            HistoryTextFact(R.string.history_observed, TimePresentation.timestamp(source.observedAt, zone, locale)),
             HistoryTextFact(R.string.history_gap, state = source.gap),
         )
         facts += field(R.string.history_allowed, source.allowed)
@@ -44,18 +44,18 @@ internal object HistoryTextPresentation {
         facts += field(R.string.history_duration, window.duration)
         facts += HistoryTextFact(R.string.history_reset_provenance, state = window.reset.provenance)
         window.reset.facts?.let { reset ->
-            facts += field(R.string.history_reset_exact, reset.absolute)
+            facts += timeField(R.string.history_reset_exact, reset.absolute, zone, locale)
             facts += field(R.string.history_reset_seconds, reset.relativeSeconds)
-            facts += field(R.string.history_reset_derived, reset.relativeDerived)
+            facts += timeField(R.string.history_reset_derived, reset.relativeDerived, zone, locale)
         }
-        window.point?.let { point -> facts += pointFacts(point) }
-        facts += comparisonFacts(source.comparison)
+        window.point?.let { point -> facts += pointFacts(point, zone, locale) }
+        facts += comparisonFacts(source.comparison, zone, locale)
         val reset = window.reset.facts?.let { TimePresentation.presentReset(it, observed, now, zone, locale) }
         return HistoryTextWindow(window.kind, facts, reset)
     }
 
-    private fun pointFacts(point: HistoryPoint): List<HistoryTextFact> = buildList {
-        add(HistoryTextFact(R.string.history_point_time, point.observedAt.toString()))
+    private fun pointFacts(point: HistoryPoint, zone: ZoneId, locale: Locale): List<HistoryTextFact> = buildList {
+        add(HistoryTextFact(R.string.history_point_time, TimePresentation.timestamp(point.observedAt, zone, locale)))
         add(HistoryTextFact(R.string.history_segment, point.segment.id.first.ordinal.toString()))
         add(HistoryTextFact(R.string.history_nominal_confidence, state = point.nominalStart))
         add(HistoryTextFact(R.string.history_eligibility, state = point.baseline))
@@ -63,12 +63,12 @@ internal object HistoryTextPresentation {
         point.segment.breaks.forEach { add(HistoryTextFact(R.string.history_break, state = it)) }
     }
 
-    private fun comparisonFacts(comparison: UsedComparison): List<HistoryTextFact> = when (comparison) {
+    private fun comparisonFacts(comparison: UsedComparison, zone: ZoneId, locale: Locale): List<HistoryTextFact> = when (comparison) {
         is UsedComparison.Available -> listOf(
             HistoryTextFact(R.string.history_baseline_value, comparison.baselinePercent.toString()),
             HistoryTextFact(R.string.history_delta, comparison.deltaPercentagePoints.toString()),
-            HistoryTextFact(R.string.history_nominal_start, comparison.reference.nominalStartAt.toString()),
-            HistoryTextFact(R.string.history_nominal_end, comparison.reference.window.resetAt.toString()),
+            HistoryTextFact(R.string.history_nominal_start, TimePresentation.timestamp(comparison.reference.nominalStartAt, zone, locale)),
+            HistoryTextFact(R.string.history_nominal_end, TimePresentation.timestamp(comparison.reference.window.resetAt, zone, locale)),
         )
         is UsedComparison.Unavailable -> listOf(HistoryTextFact(R.string.history_baseline_unavailable,
             state = unavailableState(comparison.reason)))
@@ -79,8 +79,11 @@ internal object HistoryTextPresentation {
         is DistributionUnavailable.InvalidFact -> reason
     }
 
-    private fun field(label: Int, field: Field<*>?): List<HistoryTextFact> = buildList {
-        add(HistoryTextFact(label, field?.value?.toString()))
+    private fun timeField(label: Int, field: Field<Instant>, zone: ZoneId, locale: Locale): List<HistoryTextFact> =
+        field(label, field, TimePresentation.timestamp(field.value, zone, locale))
+
+    private fun field(label: Int, field: Field<*>?, value: String? = field?.value?.toString()): List<HistoryTextFact> = buildList {
+        add(HistoryTextFact(label, value))
         field?.let { add(HistoryTextFact(R.string.history_knowledge, state = it.knowledge)) }
         field?.reason?.let { add(HistoryTextFact(R.string.history_reason, state = it)) }
     }

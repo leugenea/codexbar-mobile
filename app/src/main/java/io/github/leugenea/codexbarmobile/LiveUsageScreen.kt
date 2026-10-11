@@ -11,7 +11,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -26,13 +25,12 @@ import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import java.time.ZoneId
 
 /** Lives in the connection screen's one scroll container; facts come from the process owner. */
 @Composable
 internal fun LiveUsageScreen(state: ConnectionState, refresh: () -> Unit) {
-    // B2 ticks cause local reevaluation; read the effective locale/zone, never cache a wall label.
-    val model = UsagePresentation.present(state, ZoneId.systemDefault(), LocalConfiguration.current.locales[0])
+    val time = phoneTimeConfiguration()
+    val model = UsagePresentation.present(state, time.zone, time.locale)
     Column(Modifier.fillMaxWidth().testTag("live-usage"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -58,7 +56,7 @@ internal fun LiveUsageScreen(state: ConnectionState, refresh: () -> Unit) {
                     modifier = Modifier.testTag("live-rounding"))
             }
         }
-        BankedResetSection(BankedResetPresentation.present(state, ZoneId.systemDefault(), LocalConfiguration.current.locales[0]))
+        BankedResetSection(BankedResetPresentation.present(state, time.zone, time.locale))
     }
 }
 

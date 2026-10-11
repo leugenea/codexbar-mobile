@@ -318,7 +318,9 @@ class HistoryDisplayAuthorityTest {
 
     private fun assertNoOldClocks(old: HistoryGraphSnapshot) {
         listOf(old.live.usage.sourceObservedAt, old.live.inventory.sourceObservedAt).filterNotNull().forEach {
-            historyText(it.toString(), substring = true).assertCountEquals(0)
+            historyText(requireNotNull(TimePresentation.timestamp(it, java.time.ZoneId.systemDefault(),
+                androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.resources.configuration.locales[0])),
+                substring = true).assertCountEquals(0)
         }
     }
 

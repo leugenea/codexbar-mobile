@@ -36,9 +36,9 @@ internal fun BankedResetSection(model: PresentedBankedResetSection) {
         model.errorResource?.let { BankedStatus(stringResource(it), "banked-error") }
         BankedCount(facts.summaryAvailableCount, R.string.banked_summary, "banked-summary")
         BankedCount(facts.reportedAvailableCount, R.string.banked_inventory, "banked-inventory")
-        Text(stringResource(R.string.banked_summary_clock, facts.summaryObservedAt?.toString()
+        Text(stringResource(R.string.banked_summary_clock, model.summaryObservedLabel
             ?: stringResource(R.string.banked_field_unknown)), Modifier.testTag("banked-summary-clock"))
-        Text(stringResource(R.string.banked_inventory_clock, facts.inventoryObservedAt?.toString()
+        Text(stringResource(R.string.banked_inventory_clock, model.inventoryObservedLabel
             ?: stringResource(R.string.banked_field_unknown)), Modifier.testTag("banked-inventory-clock"))
         val container = facts.inventoryRowContainer
         val containerLabel = if (container?.knowledge == Knowledge.KNOWN && container.value != null) {

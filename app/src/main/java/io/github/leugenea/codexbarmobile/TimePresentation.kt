@@ -132,6 +132,22 @@ object TimePresentation {
         else -> TimeSnapshot.OBSERVED
     }
 
+    /** Localized second-precision source/detail clock. Original instants are never rounded.
+     * Null also represents a known instant outside the local date range; never emit raw ISO.
+     * Repeated local seconds carry their actual offset, including half-hour overlaps.
+     */
+    fun timestamp(target: Instant?, zone: ZoneId, locale: Locale): String? = try {
+        target?.atZone(zone)?.let { local ->
+            val text = local.format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM).withLocale(locale))
+            if (zone.rules.getValidOffsets(local.toLocalDateTime()).size > 1) {
+                val offset = if (local.offset.totalSeconds == 0) "+00:00" else local.offset.id
+                "$text UTC$offset"
+            } else text
+        }
+    } catch (_: DateTimeException) {
+        null
+    }
+
     private fun absolute(target: Instant, zone: ZoneId, locale: Locale): AbsoluteTime? = try {
         val local = target.atZone(zone)
         val hour = local.toLocalDateTime().withMinute(0).withSecond(0).withNano(0)
