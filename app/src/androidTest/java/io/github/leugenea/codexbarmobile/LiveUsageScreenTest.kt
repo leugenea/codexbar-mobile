@@ -17,6 +17,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
@@ -45,6 +46,13 @@ import java.util.TimeZone
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /** Real production Activity, process owner, A9/B2 state and protected store; synthetic data only. */
 @RunWith(AndroidJUnit4::class)
@@ -56,6 +64,7 @@ class LiveUsageScreenTest {
     private val originalLocale = Locale.getDefault()
     private val originalZone = TimeZone.getDefault()
     private lateinit var originalAppLocales: LocaleList
+    private val settings = HistoryAcceptanceSettings()
     private val clock = ScreenClock()
     private val fake = ScreenTransport()
     private val owner get() = NativeConnection.get(context)
@@ -82,11 +91,78 @@ class LiveUsageScreenTest {
             val store = store()
             assertTrue(store.delete(store.openSession()) is CredentialResult.Success)
         } finally {
-            NativeConnection.factory = originalFactory
-            context.getSystemService(LocaleManager::class.java).applicationLocales = originalAppLocales
-            Locale.setDefault(originalLocale)
-            TimeZone.setDefault(originalZone)
+            try { settings.restore() } finally {
+                NativeConnection.factory = originalFactory
+                context.getSystemService(LocaleManager::class.java).applicationLocales = originalAppLocales
+                Locale.setDefault(originalLocale)
+                TimeZone.setDefault(originalZone)
+            }
         }
+    }
+
+    @Test fun productionLiveLightPaintAndExactUsageResetCapture() {
+        themedCapture(false, "live-usage-portrait-light")
+    }
+
+    @Test fun productionLiveDarkPaintAndLargeFontRemainReadable() {
+        themedCapture(true, "live-usage-portrait-dark", largeFont = true)
+    }
+
+    private fun themedCapture(dark: Boolean, name: String, largeFont: Boolean = false) {
+        settings.apply(dark, 1f)
+        fake.usage = response("""{"rate_limit":{"allowed":true,"limit_reached":false,
+            "primary_window":{"limit_window_seconds":18000,"used_percent":12.5,"reset_after_seconds":5400},
+            "secondary_window":{"limit_window_seconds":604800,"used_percent":76.25,"reset_after_seconds":176400}}}""")
+        launchLive().use { scenario ->
+            settings.observe(compose, scenario, landscape = false, dark = dark, font = 1f)
+            read()
+            val capture = LiveUsageCapture(compose)
+            capture.inheritedContent(dark)
+            representativeFacts()
+            capture.capture(name, dark, scenario, owner)
+            if (largeFont) {
+                settings.apply(dark, 2f)
+                settings.observe(compose, scenario, landscape = false, dark = dark, font = 2f)
+                settleVisibleCommands()
+                waitFor("large-font live composition and retained usage settle") {
+                    !owner.state.value.refresh.refreshing &&
+                        compose.onAllNodes(hasTestTag("live-five-hour-percent")).fetchSemanticsNodes().isNotEmpty()
+                }
+                representativeFacts()
+                listOf("live-identity", "live-status", "live-allowed", "live-limit", "live-rounding",
+                    "live-five-hour-percent", "live-weekly-percent", "live-five-hour-reset-absolute",
+                    "live-weekly-reset-absolute", "live-five-hour-reset-relative", "live-weekly-reset-relative").forEach(::noOverflow)
+                compose.onNodeWithTag("live-refresh").performScrollTo().assertIsDisplayed().assertHasClickAction()
+                click("history-toggle")
+                compose.onNodeWithTag("history-select-FIVE_HOUR").performScrollTo().assertIsDisplayed()
+            }
+        }
+    }
+
+    private fun settleVisibleCommands() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val complete = AtomicBoolean()
+        val failure = AtomicReference<String?>()
+        scope.launch {
+            try { owner.commandsSettled() }
+            catch (error: Exception) { failure.set(error.javaClass.simpleName) }
+            finally { complete.set(true) }
+        }
+        try {
+            waitFor("large-font foreground owner command receipt") { complete.get() }
+            assertNull("Owner command receipt failed: ${failure.get()}", failure.get())
+        } finally { scope.cancel() }
+    }
+
+    private fun representativeFacts() {
+        progress("live-five-hour", 0.125f, "Five-hour window · 12.5% used", "Provider-reported usage", "12.5% used")
+        progress("live-weekly", 0.7625f, "Weekly window · 76.25% used", "Provider-reported usage", "76.25% used")
+        text("live-five-hour-reset-absolute", "Reset: Oct 8, 2026, 01:00 (hour precision)")
+        text("live-five-hour-reset-relative", "Reset: 0 days 1 hour remaining")
+        text("live-weekly-reset-absolute", "Reset: Oct 10, 2026, 01:00 (hour precision)")
+        text("live-weekly-reset-relative", "Reset: 2 days 1 hour remaining")
+        text("live-allowed", "Provider permission: allowed")
+        text("live-limit", "Provider limit status: limit not reached")
     }
 
     @Test fun fractionalWeeklyOnlyAndMissingResetHaveExactAccessibleSemantics() {

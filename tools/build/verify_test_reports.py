@@ -64,6 +64,8 @@ USAGE_REFRESH_CASES = {
 
 LIVE_USAGE_CLASS = "io.github.leugenea.codexbarmobile.LiveUsageScreenTest"
 LIVE_USAGE_CASES = {
+    "productionLiveLightPaintAndExactUsageResetCapture",
+    "productionLiveDarkPaintAndLargeFontRemainReadable",
     "fractionalWeeklyOnlyAndMissingResetHaveExactAccessibleSemantics",
     "manualRefreshRetainsValuesAndAnnouncesRefreshingThenError",
     "staleAndPassedResetReevaluateLocallyWithoutZeroOrNetwork",

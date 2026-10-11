@@ -37,6 +37,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -71,20 +72,24 @@ class MainActivity : ComponentActivity() {
                 var connectionTab by rememberSaveable { mutableStateOf(false) }
                 val connectionState by connection.state.collectAsState()
                 if (connectionTab) ObserveUsageLifecycle(connection, lifecycle)
-                Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        OutlinedButton(onClick = { connectionTab = false }, modifier = Modifier.testTag("offline-tab")) {
-                            Text(stringResource(R.string.offline_tab))
+                // Paint the selected theme and provide onBackground to both production branches.
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.onBackground) {
+                    Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                            OutlinedButton(onClick = { connectionTab = false }, modifier = Modifier.testTag("offline-tab")) {
+                                Text(stringResource(R.string.offline_tab))
+                            }
+                            OutlinedButton(onClick = { connectionTab = true }, modifier = Modifier.testTag("connection-tab")) {
+                                Text(stringResource(R.string.connection_tab))
+                            }
                         }
-                        OutlinedButton(onClick = { connectionTab = true }, modifier = Modifier.testTag("connection-tab")) {
-                            Text(stringResource(R.string.connection_tab))
-                        }
+                        if (connectionTab) ConnectionScreen(connectionState, connection, ::openVerificationBrowser)
+                        else OfflineShell(
+                            state = OfflineShellState.restore(savedPreview),
+                            onStateChange = { savedPreview = it.preview.savedKey },
+                        )
                     }
-                    if (connectionTab) ConnectionScreen(connectionState, connection, ::openVerificationBrowser)
-                    else OfflineShell(
-                        state = OfflineShellState.restore(savedPreview),
-                        onStateChange = { savedPreview = it.preview.savedKey },
-                    )
                 }
             }
         }

@@ -33,55 +33,57 @@ import java.time.ZoneId
 internal fun LiveUsageScreen(state: ConnectionState, refresh: () -> Unit) {
     // B2 ticks cause local reevaluation; read the effective locale/zone, never cache a wall label.
     val model = UsagePresentation.present(state, ZoneId.systemDefault(), LocalConfiguration.current.locales[0])
-    Column(Modifier.fillMaxWidth().testTag("live-usage"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(stringResource(R.string.live_title), style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.semantics { heading() })
-        Text(stringResource(R.string.live_identity), Modifier.testTag("live-identity"))
-        Text(stringResource(model.status.labelResource), Modifier.testTag("live-status")
-            .semantics { liveRegion = LiveRegionMode.Polite })
-        if (model.refreshing) Text(stringResource(R.string.live_refreshing), Modifier.testTag("live-refreshing")
-            .semantics { liveRegion = LiveRegionMode.Polite })
-        if (model.stale) Text(stringResource(R.string.live_stale_detail), Modifier.testTag("live-stale")
-            .semantics { liveRegion = LiveRegionMode.Polite })
-        model.errorResource?.let { Text(stringResource(it), Modifier.testTag("live-error")
-            .semantics { liveRegion = LiveRegionMode.Polite }) }
-        Button(onClick = refresh, enabled = model.refreshEnabled,
-            modifier = Modifier.fillMaxWidth().testTag("live-refresh")) { Text(stringResource(R.string.live_refresh)) }
-        Text(stringResource(R.string.live_provider_allowed, stringResource(model.allowedResource)),
-            Modifier.testTag("live-allowed").semantics { liveRegion = LiveRegionMode.Polite })
-        Text(stringResource(R.string.live_provider_limit, stringResource(model.limitResource)),
-            Modifier.testTag("live-limit").semantics { liveRegion = LiveRegionMode.Polite })
-        model.windows.forEach { UsageWindowCard(it) }
-        Text(stringResource(R.string.live_time_precision), style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.testTag("live-rounding"))
+    Column(Modifier.fillMaxWidth().testTag("live-usage"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(stringResource(R.string.live_title), style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.semantics { heading() })
+                Text(stringResource(R.string.live_identity), Modifier.testTag("live-identity"))
+                Text(stringResource(model.status.labelResource), Modifier.testTag("live-status")
+                    .semantics { liveRegion = LiveRegionMode.Polite })
+                if (model.refreshing) Text(stringResource(R.string.live_refreshing), Modifier.testTag("live-refreshing")
+                    .semantics { liveRegion = LiveRegionMode.Polite })
+                if (model.stale) Text(stringResource(R.string.live_stale_detail), Modifier.testTag("live-stale")
+                    .semantics { liveRegion = LiveRegionMode.Polite })
+                model.errorResource?.let { Text(stringResource(it), Modifier.testTag("live-error")
+                    .semantics { liveRegion = LiveRegionMode.Polite }) }
+                Button(onClick = refresh, enabled = model.refreshEnabled,
+                    modifier = Modifier.fillMaxWidth().testTag("live-refresh")) { Text(stringResource(R.string.live_refresh)) }
+                Text(stringResource(R.string.live_provider_allowed, stringResource(model.allowedResource)),
+                    Modifier.testTag("live-allowed").semantics { liveRegion = LiveRegionMode.Polite })
+                Text(stringResource(R.string.live_provider_limit, stringResource(model.limitResource)),
+                    Modifier.testTag("live-limit").semantics { liveRegion = LiveRegionMode.Polite })
+                model.windows.forEach { UsageWindowSection(it) }
+                Text(stringResource(R.string.live_time_precision), style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.testTag("live-rounding"))
+            }
+        }
         BankedResetSection(BankedResetPresentation.present(state, ZoneId.systemDefault(), LocalConfiguration.current.locales[0]))
     }
 }
 
 @Composable
-private fun UsageWindowCard(window: PresentedUsageWindow) {
+private fun UsageWindowSection(window: PresentedUsageWindow) {
     val label = stringResource(window.labelResource)
     val status = stringResource(window.status.labelResource)
-    Card(Modifier.fillMaxWidth().testTag(window.tag)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
-            Text(status, Modifier.testTag("${window.tag}-status").semantics { liveRegion = LiveRegionMode.Polite })
-            if (window.percent != null && window.progress != null) {
-                val percent = stringResource(R.string.live_percent, window.percent)
-                val description = stringResource(R.string.live_progress_description, label, percent)
-                Text(percent, Modifier.testTag("${window.tag}-percent")
-                    .semantics { hideFromAccessibility() })
-                LinearProgressIndicator(progress = { window.progress }, modifier = Modifier.fillMaxWidth()
-                    .testTag("${window.tag}-progress").clearAndSetSemantics {
-                        contentDescription = description
-                        stateDescription = status
-                        progressBarRangeInfo = ProgressBarRangeInfo(window.progress, 0f..1f)
-                    })
-            }
-            if (window.malformed) Text(stringResource(R.string.live_malformed_detail),
-                Modifier.testTag("${window.tag}-warning"))
-            ResetLabels(window.reset, window.tag)
+    Column(Modifier.fillMaxWidth().testTag(window.tag), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+        Text(status, Modifier.testTag("${window.tag}-status").semantics { liveRegion = LiveRegionMode.Polite })
+        if (window.percent != null && window.progress != null) {
+            val percent = stringResource(R.string.live_percent, window.percent)
+            val description = stringResource(R.string.live_progress_description, label, percent)
+            Text(percent, Modifier.testTag("${window.tag}-percent")
+                .semantics { hideFromAccessibility() })
+            LinearProgressIndicator(progress = { window.progress }, modifier = Modifier.fillMaxWidth()
+                .testTag("${window.tag}-progress").clearAndSetSemantics {
+                    contentDescription = description
+                    stateDescription = status
+                    progressBarRangeInfo = ProgressBarRangeInfo(window.progress, 0f..1f)
+                })
         }
+        if (window.malformed) Text(stringResource(R.string.live_malformed_detail),
+            Modifier.testTag("${window.tag}-warning"))
+        ResetLabels(window.reset, window.tag)
     }
 }
 

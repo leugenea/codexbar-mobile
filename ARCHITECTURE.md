@@ -161,6 +161,13 @@ B2's retained usage success, latest attempt, freshness and evaluation time. Its 
 exponent notation for extreme scales) alongside approximate fractional bar semantics;
 permission and limit flags remain independent. Duration-classified missing/ambiguous
 windows never become zero, and malformed fields do not hide independently known facts.
+The shared production root uses a Material3 `Surface` with the selected background
+and inherited on-background content color in both light and system-dark configurations.
+The live periodic-usage card follows the offline preview's 20dp content padding,
+16dp grouping and 8dp window spacing, title roles and theme-default progress bars;
+all percentages and reset/status facts still come from the normalized presentation.
+The banked section remains independently grouped below it. Preview availability,
+tab defaults, foreground eligibility and the one scroll container are unchanged.
 B1 alone supplies reset absolute/relative labels, including unknown/sub-hour/passed and
 repeated-hour offsets. Status transitions use polite accessibility live regions; ordinary
 countdowns do not repeatedly announce. One wrapping, vertically scrollable content tree
@@ -942,6 +949,30 @@ not runtime or visual approval. Activity recreation and fresh-owner storage rest
 remain precisely those scopes, not process-death, reboot, live-provider, signed release
 or instantaneous physical-pixel erasure proof. Diagnostics removal #69 and M5 remain
 separate; this roll-up does not waive either.
+
+## Live usage visual acceptance
+
+`LiveUsageScreenTest.productionLiveLightPaintAndExactUsageResetCapture` and
+`productionLiveDarkPaintAndLargeFontRemainReadable` enter the actual `MainActivity`
+with its default process owner, isolated real Keystore and synthetic transport.
+They require inherited root text paint, selected root/card/content/bar/track pixels,
+exact 12.5% and 76.25% semantics and independently projected absolute/relative reset
+labels. The dark case also checks effective font scale 2, complete native line
+extents and reachable refresh/history controls. Existing landscape, malformed,
+unavailable, stale/error, exhausted, banked, preview and lifecycle cases remain
+mandatory; this adds no duplicate lifecycle campaign.
+
+The existing collector keeps all 17 history images and additionally requires
+`live-usage-portrait-light` and `live-usage-portrait-dark`. Live metadata identifies
+the actual screen, production Activity, observed US resource locale, density/font
+scale and visible facts. Registered samples refer to the exact saved root bitmap
+and native owner bounds; the host compares decoded PNG bytes with each receipt.
+API 36 and gallery-wide density constraints remain in force, with separate live
+screen/locale identities. Native execution, lint, compatible whole-handwritten
+>=90% INSTRUCTION union, independent exact-source review and individual actual-PNG
+inspection remain hosted/delivery gates; source/compile/parser checks do not prove
+runtime paint or visual acceptance. Reset conflict reconciliation, phone-local
+formatting of remaining timestamps and offline-preview retirement are separate work.
 
 ## Verification boundaries
 
