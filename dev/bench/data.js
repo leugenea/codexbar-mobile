@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791754988100,
+  "lastUpdate": 1791754991115,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -3833,6 +3833,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/87749d84ee216f32f6f7c3734c25ee8b9f8082bb"
         },
         "date": 1791747298150,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4fe0ebd167a42c887605fc330f1f7abc78fd1d59",
+          "message": "fix: render timestamps in phone-local time (#138)\n\nCloses #133. Complete independent source, hosted artifact, and actual-image acceptance on faff9d20e18e0f1c9c879be52a5ceb258beb3fb6.",
+          "timestamp": "2026-10-11T21:42:42Z",
+          "tree_id": "6205cd7df6d26119dc6e337a5cf110f935899a5f",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/4fe0ebd167a42c887605fc330f1f7abc78fd1d59"
+        },
+        "date": 1791754990615,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
