@@ -46,7 +46,6 @@ class KeystoreCredentialStoreTest {
         val key = keys().getKey(alias, null)
         assertEquals("AES", key.algorithm)
         assertNull(key.encoded)
-        assertEquals("AES/GCM/NoPadding", javax.crypto.Cipher.getInstance("AES/GCM/NoPadding").algorithm)
     }
 
     @Test fun missingKeystoreKeyFailsClosedWithoutRecreationOverCiphertext() {

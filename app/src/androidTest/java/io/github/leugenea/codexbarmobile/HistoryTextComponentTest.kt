@@ -51,26 +51,6 @@ class HistoryTextComponentTest {
     private var renderedOrientation = Configuration.ORIENTATION_UNDEFINED
     private var renderedLocale = ""
 
-    @Test fun independentKindsExposeExactMeasuredAndObservedOnlyDelta() {
-        launch(HistoryTextFixture.plot()).use {
-            text("Five-hour window", 1)
-            text("Weekly window", 1)
-            compose.onNodeWithTag("history-five-hour-counts").assertTextEquals(
-                "Timestamped measurements: 1 · Nominal analytical reference segments: 1")
-            compose.onNodeWithTag("history-weekly-counts").assertTextEquals(
-                "Timestamped measurements: 1 · Nominal analytical reference segments: 1")
-            text("The nominal baseline assumes evenly distributed full quota from reset minus window duration to reset. It is analytical, not measured usage or a prediction of exhaustion.")
-            openDetails()
-            text("Measured used percent (exact %): 12.345678901234567890")
-            text("Measured used percent (exact %): 87.50")
-            text("Observed-only delta (percentage points): -67.655006969815432110")
-            text("Measurement observed at (exact UTC): 2026-10-09T00:00:00.123456789Z", 2)
-            text("Provider allowed: false")
-            text("Provider limit reached: true")
-            assertNoChatterOrMergedDescription()
-        }
-    }
-
     @Test fun readinessContentErrorsLossAndTruncationRemainIndependent() {
         launch(HistoryTextFixture.plot()).use { scenario ->
             for (state in HistoryReadiness.entries) {
@@ -166,9 +146,23 @@ class HistoryTextComponentTest {
 
     @Test fun portraitLightMeasuredScreenshotHasReachableUnclippedLabels() {
         launch(HistoryTextFixture.plot()).use {
+            text("Five-hour window", 1)
+            text("Weekly window", 1)
+            compose.onNodeWithTag("history-five-hour-counts").assertTextEquals(
+                "Timestamped measurements: 1 · Nominal analytical reference segments: 1")
+            compose.onNodeWithTag("history-weekly-counts").assertTextEquals(
+                "Timestamped measurements: 1 · Nominal analytical reference segments: 1")
+            text("The nominal baseline assumes evenly distributed full quota from reset minus window duration to reset. It is analytical, not measured usage or a prediction of exhaustion.")
             verifyLayout("history-title", "history-legend", "history-five-hour-content", "history-weekly-content")
             capture("history-measured-portrait-light", dark = false)
             openDetails()
+            text("Measured used percent (exact %): 12.345678901234567890")
+            text("Measured used percent (exact %): 87.50")
+            text("Observed-only delta (percentage points): -67.655006969815432110")
+            text("Measurement observed at (exact UTC): 2026-10-09T00:00:00.123456789Z", 2)
+            text("Provider allowed: false")
+            text("Provider limit reached: true")
+            assertNoChatterOrMergedDescription()
             val value = compose.onNodeWithText("Measured used percent (exact %): 12.345678901234567890")
             value.performScrollTo().assertIsDisplayed()
             assertLayout(value)

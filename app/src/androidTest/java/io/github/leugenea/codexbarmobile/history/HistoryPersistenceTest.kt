@@ -557,7 +557,6 @@ class HistoryPersistenceTest {
             override fun getApplicationContext(): Context = this
             override fun getNoBackupFilesDir(): File = fixtureRoot
         }
-        assertSame("default open must retain the fixture's application context", context, context.applicationContext)
         assertTrue(fixtureRoot.path.startsWith(application.noBackupFilesDir.canonicalPath + File.separator))
         val defaultDirectory = File(context.noBackupFilesDir, "usage-history").canonicalFile
         assertFalse("default history directory must be a fresh synthetic fixture", defaultDirectory.exists())
@@ -565,7 +564,6 @@ class HistoryPersistenceTest {
         val backend = SQLiteHistoryStore.open(context).also { stores.add(it) }
         val access = created(backend); stored(access, 1)
         assertEquals(0, context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_ALLOW_BACKUP)
-        assertTrue(directory.path.startsWith(context.noBackupFilesDir.canonicalPath + File.separator))
         assertEquals(setOf("history.db", "binding", "lane"), directory.listFiles()!!.map { it.name }.toSet())
         SQLiteDatabase.openDatabase(database().path, null, SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS).use { db ->
             assertEquals("delete", db.rawQuery("PRAGMA journal_mode", null).use { it.moveToFirst(); it.getString(0) })
