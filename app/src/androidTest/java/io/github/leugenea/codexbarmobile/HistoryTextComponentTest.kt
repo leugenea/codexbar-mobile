@@ -129,7 +129,7 @@ class HistoryTextComponentTest {
             openDetails()
             text("Reset: Oct 9, 2026, 01:00 (hour precision)", 2)
             text("Reset: <1h remaining", 2)
-            text("Absolute reset source (second precision): Oct 9, 2026, 1:00:00 AM", 2)
+            text("Absolute reset source (second precision): Oct 9, 2026, 1:00:00\u202fAM", 2)
         }
     }
 
@@ -165,7 +165,7 @@ class HistoryTextComponentTest {
             text("Measured used percent (exact %): 12.345678901234567890")
             text("Measured used percent (exact %): 87.50")
             text("Observed-only delta (percentage points): -67.655006969815432110")
-            text("Measurement observed at (second precision): Oct 9, 2026, 12:00:00 AM", 2)
+            text("Measurement observed at (second precision): Oct 9, 2026, 12:00:00\u202fAM", 2)
             val original = plot.source.entries.single().source
             assertEquals(java.time.Instant.parse("2026-10-09T00:00:00.123456789Z"), original.observedAt)
             assertEquals(123456789, original.windows.first().point!!.observedAt.nano)

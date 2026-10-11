@@ -35,7 +35,8 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
             locales.applicationLocales = LocaleList(Locale.US)
             setZone("UTC")
             fixture.transport.advance(123)
-            fixture.transport.inventoryBody = """{"available_count":1,"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"2027-01-15T09:00:00.123456789Z"}]}"""
+            // The evidenced wire grammar accepts up to six fractional digits; keep that source exact.
+            fixture.transport.inventoryBody = """{"available_count":1,"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"2027-01-15T09:00:00.123456Z"}]}"""
             fixture.owner.usageForeground(fixture.observer, true)
             settleConnectionCommands(compose, fixture.owner, "timestamp fixture foreground receipt")
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
@@ -49,16 +50,17 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
                 val inventory = fixture.owner.state.value.refresh.inventory.success
                 val entry = fixture.owner.historySnapshots.value.storage!!.entries.single()
                 assertEquals("source receipt precision", Instant.parse("2027-01-15T08:00:00.123Z"), entry.observedAt)
-                assertEquals("expiry source precision", Instant.parse("2027-01-15T09:00:00.123456789Z"),
+                assertEquals("expiry source precision", Instant.parse("2027-01-15T09:00:00.123456Z"),
                     inventory!!.inventory!!.items.single().value!!.expiresAt.value)
                 val routes = fixture.transport.counts()
                 ready(scenario, history, Locale.US)
-                labels(history, "Jan 15, 2027, 8:00:00 AM", "Jan 15, 2027, 09:00 (hour precision)", "Jan 15, 2027, 9:00:00 AM", "Jan 15, 2027, 4:00:00 AM")
+                // API36 en-US MEDIUM clocks use U+202F before the day period (unlike the JDK oracle).
+                labels(history, "Jan 15, 2027, 8:00:00\u202fAM", "Jan 15, 2027, 09:00 (hour precision)", "Jan 15, 2027, 9:00:00\u202fAM", "Jan 15, 2027, 4:00:00\u202fAM")
                 var activity: MainActivity? = null
                 scenario.onActivity { activity = it }
                 setZone("America/Los_Angeles")
                 await("actual system zone broadcast updates visible labels") { ZoneId.systemDefault().id == "America/Los_Angeles" }
-                labels(history, "Jan 15, 2027, 12:00:00 AM", "Jan 15, 2027, 01:00 (hour precision)", "Jan 15, 2027, 1:00:00 AM", "Jan 14, 2027, 8:00:00 PM")
+                labels(history, "Jan 15, 2027, 12:00:00\u202fAM", "Jan 15, 2027, 01:00 (hour precision)", "Jan 15, 2027, 1:00:00\u202fAM", "Jan 14, 2027, 8:00:00\u202fPM")
                 scenario.onActivity { assertSame("zone-only update keeps visible Activity", activity, it) }
                 assertSame("formatting preserves accepted usage source", usage, fixture.owner.state.value.refresh.usage.success)
                 assertSame("formatting preserves accepted inventory source", inventory, fixture.owner.state.value.refresh.inventory.success)

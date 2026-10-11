@@ -490,7 +490,7 @@ class LiveUsageScreenTest {
             assertEquals(inventory.successfulAtMillis, owner.state.value.refresh.inventory.successfulAtMillis)
             assertEquals(inventory.stale, owner.state.value.refresh.inventory.stale)
             text("banked-status", "Provider-reported banked entitlements")
-            text("banked-inventory-clock", "Inventory observed at (second precision): Oct 8, 2026, 12:00:00 AM")
+            text("banked-inventory-clock", "Inventory observed at (second precision): Oct 8, 2026, 12:00:00\u202fAM")
             compose.onNodeWithTag("banked-error").assertDoesNotExist()
             fake.heldInventory.single()(response("{}", 403))
             waitFor("inventory error settles separately") { !owner.state.value.refresh.refreshing }
@@ -507,7 +507,7 @@ class LiveUsageScreenTest {
             text("live-five-hour-percent", "12.5% used")
             assertEquals(clock.now().wall, usage.success?.observedAt)
             assertEquals(1_000L, usage.successfulAtMillis)
-            text("banked-inventory-clock", "Inventory observed at (second precision): Oct 8, 2026, 12:00:00 AM")
+            text("banked-inventory-clock", "Inventory observed at (second precision): Oct 8, 2026, 12:00:00\u202fAM")
             text("banked-inventory-text", "Inventory reports: 1 available banked reset")
         }
     }
