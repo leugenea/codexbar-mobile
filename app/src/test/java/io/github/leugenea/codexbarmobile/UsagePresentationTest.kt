@@ -115,6 +115,37 @@ class UsagePresentationTest {
         assertNotNull(unknown.windows.first().reset!!.absolute)
     }
 
+    @Test fun acceptedWeeklyPairUsesOriginalAbsoluteForCountdownAndKeepsClockAndConflictStatesDistinct() {
+        val observed = Instant.parse("2026-10-08T00:00:00.250Z")
+        fun usage(relative: Long) = UsageNormalizer.normalize(UsageInput(primary = Input.Value(WindowInput(
+            Input.Value(604800), Input.Value(BigDecimal("12.345678901234567890")),
+            Input.Value(1791594000), Input.Value(relative)))), observed, observed)
+        val source = usage(176400)
+        val endpoint = EndpointObservation(ReadOperation.USAGE, observedAt = observed, usage = source)
+        val cached = UsageRefreshState(usage = RefreshedEndpoint(endpoint, endpoint, 250), evaluatedAt = observed)
+        fun weekly(at: Instant?, stale: Boolean = false) = present(ConnectionState(ConnectionPhase.OBSERVED,
+            refresh = cached.copy(evaluatedAt = at, usage = cached.usage.copy(stale = stale)))).windows[1]
+        val current = weekly(observed)
+        assertEquals("12.345678901234567890", current.percent)
+        assertEquals(AbsoluteTime("Oct 10, 2026", "01:00", null), current.reset!!.absolute)
+        assertEquals(RemainingTime(2, 0), current.reset.remaining)
+        assertEquals(TimeState.LESS_THAN_HOUR, weekly(Instant.parse("2026-10-10T00:59:59Z")).reset!!.state)
+        val passed = weekly(Instant.parse("2026-10-10T01:00:00Z"))
+        assertEquals(TimeState.AWAITING_REFRESH, passed.reset!!.state)
+        assertEquals(TimeSnapshot.STALE, passed.reset.snapshot)
+        assertEquals(current.percent, passed.percent)
+        assertEquals(current.reset.absolute, passed.reset.absolute)
+        assertEquals(TimeState.UNKNOWN_CLOCK, weekly(null).reset!!.state)
+        assertEquals(TimeSnapshot.CLOCK_BEFORE_OBSERVATION, weekly(NOW).reset!!.snapshot)
+        assertEquals(TimeSnapshot.STALE, weekly(observed, stale = true).reset!!.snapshot)
+        val conflict = model(usage(176460)).windows[1]
+        assertEquals(TimeState.DISCREPANT, conflict.reset!!.state)
+        assertNull(conflict.reset.absolute)
+        assertNull(conflict.reset.remaining)
+        assertEquals(current.percent, conflict.percent)
+        assertEquals(Instant.parse("2026-10-10T01:00:00.250Z"), source.weekly.candidates.single().reset.relativeDerived.value)
+    }
+
     @Test fun exhaustedAndZeroBarsNeverGrantOrDenyProviderPermission() {
         val exhausted = model(observation(BigDecimal("100.00"), allowed = Input.Value(true), limit = Input.Value(false)))
         assertEquals("100.00", exhausted.windows.first().percent)

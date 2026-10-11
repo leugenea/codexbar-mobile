@@ -181,6 +181,16 @@ activation/purchase request or new owner is introduced. Retirement discards ever
 entitlement fact; the existing A10/B2 generation path rejects late inventory results.
 The gate retains explicit read/session-refresh controls and sign-in-again action.
 
+A1 applies the owner-selected app precision policy only to recognized weekly windows
+(604800 seconds), in either source slot: two valid absolute/relative-derived reset
+instants are discrepant only when their full difference exceeds 60 seconds in either
+direction. Exactly 60 seconds is accepted; 60 seconds plus one nanosecond is not.
+This is an application policy, not a provider sampling, rounding or latency guarantee.
+Accepted pairs keep the exact original absolute reset as the effective target; original
+relative seconds, derived instant and observation clocks retain their precision.
+Five-hour, unknown/unsupported-duration, single-source, malformed/overflow and clock
+handling are unchanged. B1 still formats/counts down from the original target.
+
 B2's `UsageRefresh` is a subordinate scheduler in that same owner scope/lane, not
 another session owner. The default Activity observes `repeatOnLifecycle(STARTED)`;
 identity-tagged observers keep one disappearing Activity from cancelling another
@@ -238,6 +248,9 @@ Candidate window identity is exactly partition + A1 duration-classified kind + s
 SI-second duration + exact known non-discrepant **absolute** reset. Primary/secondary
 is only source provenance. Relative-derived resets remain explicitly relative-derived,
 not absolute identity; unknown/malformed/unsupported/discrepant reset facts stay typed.
+New weekly observations accepted by the 60-second app policy can therefore use their
+exact original absolute reset as identity. Nearby absolute resets remain distinct;
+no stored observation is rewritten or previously recorded discrepancy reinterpreted.
 A malformed relative sibling does not erase an independently known non-discrepant
 absolute reset or a known percentage. Missing/ambiguous/unsupported-duration selections
 produce status, never a guessed periodic point. An unambiguous known percentage with
@@ -955,7 +968,10 @@ separate; this roll-up does not waive either.
 with its default process owner, isolated real Keystore and synthetic transport.
 They require inherited root text paint, selected root/card/content/bar/track pixels,
 exact 12.5% and 76.25% semantics and independently projected absolute/relative reset
-labels. The dark case also checks effective font scale 2, complete native line
+labels; the weekly pair differs by 30 seconds and retains the original absolute
+target under the app precision policy. The existing weekly-only/missing-reset
+case also covers fractional receipt time and a difference greater than 60 seconds.
+The dark case also checks effective font scale 2, complete native line
 extents and reachable refresh/history controls. Existing landscape, malformed,
 unavailable, stale/error, exhausted, banked and lifecycle cases remain
 mandatory; this adds no duplicate lifecycle campaign.
@@ -969,8 +985,8 @@ API 36 and gallery-wide density constraints remain in force, with separate live
 screen/locale identities. Native execution, lint, compatible whole-handwritten
 >=90% INSTRUCTION union, independent exact-source review and individual actual-PNG
 inspection remain hosted/delivery gates; source/compile/parser checks do not prove
-runtime paint or visual acceptance. Reset conflict reconciliation, phone-local
-formatting of remaining timestamps remain separate work.
+runtime paint or visual acceptance. The actual reported phone reset cause remains
+unknown; phone-local formatting of remaining timestamps remains separate work.
 
 ## Default-launch regression contract
 
