@@ -81,8 +81,10 @@ internal class LiveUsageCapture(private val compose: ComposeTestRule) {
         samples.put(sample(bitmap, "background", 1, bounds.center.y.roundToInt(), colors.background.toArgb(),
             Rect(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat())))
         val gutter = Rect(bounds.left - 16 * density, bounds.top, bounds.left - 4 * density, bounds.bottom)
+        // Material3 1.4.0 FilledCardTokens.ContainerColor is SurfaceContainerHighest,
+        // shared by the live and preview default filled Cards.
         samples.put(sample(bitmap, "card", gutter.center.x.roundToInt(), gutter.center.y.roundToInt(),
-            colors.surfaceContainerLow.toArgb(), gutter))
+            colors.surfaceContainerHighest.toArgb(), gutter))
         val point = glyph(bitmap, bounds, colors.onSurface.toArgb())
         samples.put(sample(bitmap, "content", point.first, point.second, colors.onSurface.toArgb(), bounds))
         samples.put(sample(bitmap, "progress", (bar.left + bar.width * 0.06f).roundToInt(), bar.center.y.roundToInt(),
