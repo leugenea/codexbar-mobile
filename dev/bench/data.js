@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791664603579,
+  "lastUpdate": 1791679019738,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1621,6 +1621,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/5cbcde5cd6213ddc2910eed51dc00c1bc1fa0b7d"
         },
         "date": 1791664599604,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "24fcd338b7cec5925434f3cf25811c6aa8ad9a1a",
+          "message": "fix(policy): remove CodeQL ReDoS finding and document scanning (#120)\n\n* fix(policy): remove exponential expression quote backtracking (#119)\n\n* fix(build): compile Android sources during cached CodeQL extraction",
+          "timestamp": "2026-10-11T03:36:35+03:00",
+          "tree_id": "6013f3a200ddc90cd21460712bdecdf43221faf0",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/24fcd338b7cec5925434f3cf25811c6aa8ad9a1a"
+        },
+        "date": 1791679019143,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
