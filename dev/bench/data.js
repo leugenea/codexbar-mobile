@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791738280857,
+  "lastUpdate": 1791738284018,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -3697,6 +3697,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/6efde84fa708687d0f5c5fb7da1f393bc3e5b57f"
         },
         "date": 1791726205657,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0f529fafe64832847c00abdf1bf81db6e6616b46",
+          "message": "refactor(ui): retire offline preview and launch real flow (#136)\n\n* refactor(ui): remove offline preview and launch real flow\n\n* test(ui): bind relaunch counts to owner foreground epochs",
+          "timestamp": "2026-10-11T20:03:42+03:00",
+          "tree_id": "c60e75d0597e089d81b379847ab8032031722dfd",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/0f529fafe64832847c00abdf1bf81db6e6616b46"
+        },
+        "date": 1791738283419,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
