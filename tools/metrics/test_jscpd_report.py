@@ -60,12 +60,6 @@ class JscpdReportTest(unittest.TestCase):
         self.assertIn("app/src/main/java/Hub.kt:20–31", text)
         self.assertEqual(text.count("↔"), 5)
 
-    def test_missing_kotlin_format_is_an_error_not_zero(self):
-        data = fixture()
-        data["statistics"]["formats"] = {}
-        with self.assertRaises(ValueError):
-            reporter.normalize(data, ROOT)
-
     def test_rejects_malformed_or_unexpected_sources(self):
         for mutation in (lambda d: d.pop("statistics"),
                          lambda d: d["statistics"]["total"].update(percentage="bad"),

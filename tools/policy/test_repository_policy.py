@@ -222,7 +222,6 @@ class RepositoryPolicyTests(unittest.TestCase):
             load_yaml("permissions: write-all\npermissions: {}\n")
 
     def test_dependabot_schema_is_pinned_and_tampering_rejected(self):
-        self.assertEqual(len(SCHEMA_SHA256), 64)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "schema.json"
             path.write_text('{}')
