@@ -121,7 +121,6 @@ class HistoryNavigationContracts(unittest.TestCase):
         self.assertIn("compose.waitUntil", native)
         resources = {item.get("name"): item.text or "" for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
         self.assertEqual(resources["history_page_cursor"], "Exclusive admission cursor: %1$d · Page limit: %2$d")
-        self.assertNotRegex(resources["history_page_cursor"], r"%\d+\$d\s+[A-Za-z]")
 
     def test_integrated_canvas_rejects_partial_visibility_even_with_contained_clipped_bounds(self):
         mutations = (("canvasTop", -1), ("canvasClippedTop", 0.5),

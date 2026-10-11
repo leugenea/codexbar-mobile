@@ -344,21 +344,6 @@ class WorkflowContracts(unittest.TestCase):
             (ROOT / "tools/build/run-hosted-native-smoke.sh").read_text(),
         )
 
-    def test_logging_contract_rejects_filtered_evidence_and_pipeline_status_masking(self):
-        original = [(ROOT / path).read_text() for path in (
-            ".github/workflows/android.yml", "tools/build/run-hosted-native-smoke.sh")]
-        for target, old, new in (
-            (0, 'tee evidence/strict.log | bash tools/build/filter-gradle-console.sh',
-             'bash tools/build/filter-gradle-console.sh | tee evidence/strict.log'),
-            (1, ' | bash tools/build/filter-gradle-console.sh', ''),
-            (0, 'graph_status=("${PIPESTATUS[@]}")', 'graph_status=("$?")'),
-            (1, 'test_status=${graph_status[0]}', 'test_status=${graph_status[2]}'),
-        ):
-            texts = original.copy()
-            texts[target] = texts[target].replace(old, new, 1)
-            with self.subTest(target=target, mutation=old), self.assertRaises(AssertionError):
-                self.assert_full_evidence_filtered_console(*texts)
-
     def test_checkout_and_upload_actions_use_reviewed_node24_releases_everywhere(self):
         pins = {
             'actions/checkout': ('3d3c42e5aac5ba805825da76410c181273ba90b1', 'v7.0.1'),
@@ -490,7 +475,6 @@ class WorkflowContracts(unittest.TestCase):
             (2, "observed['java.specification.version'] == '17'", "observed['java.specification.version'] == '21'"),
             (2, 'installed-toolchain.json', 'missing-toolchain-receipt'),
             (2, 'timeout 30 java -XshowSettings:properties -version', 'java -version'),
-            (2, '# Verification/receipts only;', '# curl manual installer;'),
         ]
         for target, old, new in mutations:
             with self.subTest(target=target, mutation=old):

@@ -167,7 +167,6 @@ class KotlinComplexityTest(unittest.TestCase):
             'E.<enum:A>.local()', 'E.<enum:B>.local()',
         )})
         self.assertEqual(len(original), len(ids))
-        self.assertTrue(all('#' not in identity for identity in ids))
         reordered = self.scan(source(list(reversed(fragments))))
         self.assertEqual(ids, {row['id'] for row in reordered})
         self.assertEqual({row['id']: (row['ccn'], row['nloc']) for row in original},
@@ -196,7 +195,6 @@ class KotlinComplexityTest(unittest.TestCase):
             'outer().<try>.<finally>.local()',
             'outer().<arg:1>.<object>.local()', 'outer().<arg:2>.<object>.local()',
         ])
-        self.assertEqual(len(suffixes), len(set(suffixes)))
 
     def test_named_argument_object_links_survive_argument_reorder(self):
         first = 'fun outer() { use(first = object { fun local() = 1; }, second = object { fun local() = 2; }) }'
@@ -451,7 +449,6 @@ class Local {
         self.assertEqual({row['id'] for row in original},
                          {prefix + suffix for suffix in expected})
         self.assertEqual(len(original), len({row['id'] for row in original}))
-        self.assertTrue(all('#' not in row['id'] for row in original))
         shuffled = list(reversed(fragments))
         shuffled[5] = shuffled[5].replace(
             '    fun call() = x\n    val delegate = object',

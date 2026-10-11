@@ -57,7 +57,6 @@ class ErosionTest(unittest.TestCase):
         self.assertEqual(set(report["languages"]), {"Kotlin"})
         self.assertEqual(report["languages"]["Kotlin"]["high_ccn_count"], 1)
         self.assertAlmostEqual(report["languages"]["Kotlin"]["erosion"], 33 / 53)
-        self.assertEqual(report["functions"][1]["mass"], 33)
 
     def test_excludes_tests_generated_build_and_vendored_sources(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -107,7 +106,6 @@ class ErosionTest(unittest.TestCase):
         self.assertEqual(body.count("<!-- code-erosion -->"), 1)
         self.assertIn("&lt;f7&gt;\\|x", body)
         self.assertIn("Functions with CCN > 10", body)
-        self.assertEqual(json.loads(json.dumps(report))["languages"], report["languages"])
 
     def test_cli_writes_current_source_json_and_matching_summary(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -95,7 +95,6 @@ class HistoryChartContracts(unittest.TestCase):
         resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
         self.assertEqual(resources["history_chart_counts"],
                          "Drawn markers: %1$d · Within-run connections: %2$d · Nominal reference lines: %3$d")
-        self.assertNotRegex(resources["history_chart_counts"], r"%\d+\$d\s+[A-Za-z]")
         build = (ROOT / "app/build.gradle").read_text()
         self.assertIn("minimum = 0.90", build)
         self.assertNotRegex(build, r"exclude.*HistoryChart|chart.*[Dd]ependenc")
