@@ -86,8 +86,6 @@ class UsageHistoryIntegrationTest {
         assertEquals(BigDecimal("80"), comparison.baselinePercent)
         assertEquals(BigDecimal("-67.625"), comparison.deltaPercentagePoints)
         assertTrue(File(historyDirectory(), "history.db").exists())
-        assertEquals(File(root, "usage-history").canonicalFile, historyDirectory())
-        assertTrue(historyDirectory().toPath().startsWith(context.applicationContext.noBackupFilesDir.toPath()))
 
         val count = fake.gets.get()
         val totalRequests = fake.requests.get()

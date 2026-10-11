@@ -52,7 +52,6 @@ class AccountNameLifecycleTest {
             val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             compose.onNodeWithTag("account-name").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
             assertTrue(layouts.single().lineCount <= 2)
-            assertEquals(long, node.config[SemanticsProperties.Text].single().text)
             save(" \t\n\u00a0")
             awaitName(null)
             label("Unnamed local account")

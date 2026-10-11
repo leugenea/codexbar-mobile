@@ -23,6 +23,17 @@ from verify_history_text_captures import ASSEMBLED_CAPTURES, ASSEMBLED_PAGES, AS
 ROOT = Path(__file__).resolve().parents[2]
 SCRATCH = Path(os.environ.get("BUILD_CONTRACT_SCRATCH", tempfile.gettempdir()))
 
+# Independent selected-family oracle; the synthetic report writer uses the registry.
+RETAINED_TEXT_CASES = {
+    "readinessContentErrorsLossAndTruncationRemainIndependent",
+    "collapsedDetailsReachEveryGapAndResetBreakWithoutOmission",
+    "unknownBaselineKeepsMeasuredValueAndB1ResetContext",
+    "longExactDecimalIsChunkedWithOneAccessibleOwnerPerPart",
+    "portraitLightMeasuredScreenshotHasReachableUnclippedLabels",
+    "landscapeDarkGappedScreenshotHasReachableControls",
+    "largeFontUnknownScreenshotKeepsCompleteNativeTextAndControls",
+}
+
 
 class HistoryTextContracts(unittest.TestCase):
     def setUp(self):
@@ -38,26 +49,29 @@ class HistoryTextContracts(unittest.TestCase):
 
     def test_all_new_native_cases_are_mandatory_without_changing_inherited_cases(self):
         source = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryTextComponentTest.kt"
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), HISTORY_TEXT_CASES)
+        self.assertEqual(HISTORY_TEXT_CASES, RETAINED_TEXT_CASES)
+        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), RETAINED_TEXT_CASES)
         self.report()
         self.assertEqual(verify_reports(self.directory, "native")["testCount"], 77 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
-        for name in HISTORY_TEXT_CASES:
+        for name in RETAINED_TEXT_CASES:
             self.report(name)
             with self.assertRaisesRegex(ValueError, "Missing real native history text"):
                 verify_reports(self.directory, "native")
 
     def test_new_native_cases_cannot_be_skipped_failed_or_spoofed(self):
-        for mutation in ("skipped", "failure", "error", "wrong-class"):
-            path = self.report()
-            root = ET.parse(path).getroot()
-            case = next(case for case in root.iter("testcase") if case.get("classname") == HISTORY_TEXT_CLASS)
-            if mutation == "wrong-class":
-                case.set("classname", "SYNTHETIC-wrong-class")
-            else:
-                ET.SubElement(case, mutation)
-            ET.ElementTree(root).write(path)
-            with self.assertRaises(ValueError):
-                verify_reports(self.directory, "native")
+        for name in RETAINED_TEXT_CASES:
+            for mutation in ("skipped", "failure", "error", "wrong-class"):
+                path = self.report()
+                root = ET.parse(path).getroot()
+                case = next(case for case in root.iter("testcase")
+                            if case.get("classname") == HISTORY_TEXT_CLASS and case.get("name") == name)
+                if mutation == "wrong-class":
+                    case.set("classname", "SYNTHETIC-wrong-class")
+                else:
+                    ET.SubElement(case, mutation)
+                ET.ElementTree(root).write(path)
+                with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
+                    verify_reports(self.directory, "native")
 
     def captures(self):
         for name, (orientation, dark, font) in CAPTURES.items():

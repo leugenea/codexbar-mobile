@@ -73,6 +73,19 @@ class HistoryChartComponentTest {
             compose.onNodeWithTag("history-chart-weekly-first").assertTextEquals(
                 "Time axis start: Oct 2, 2026, 01:00 (hour precision)")
             capture("history-chart-reference-portrait-light", plot, dark = false)
+            compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assert(
+                SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+            click("history-details-toggle")
+            val scope = hasTestTag("history-charts") or hasAnyAncestor(hasTestTag("history-charts"))
+            compose.onAllNodes(scope and hasText("Measured used percent (exact %): 12.345678901234567890"),
+                useUnmergedTree = true).assertCountEquals(1)
+            compose.onAllNodes(scope and hasText("Observed-only delta (percentage points): -67.655006969815432110"),
+                useUnmergedTree = true).assertCountEquals(1)
+            compose.onAllNodes(scope and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion),
+                useUnmergedTree = true).assertCountEquals(0)
+            compose.onAllNodes(scope and SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription),
+                useUnmergedTree = true).assertCountEquals(0)
+            compose.onAllNodesWithText("Reset: Oct 9, 2026, 01:00 (hour precision)").assertCountEquals(2)
         }
     }
 
@@ -92,25 +105,15 @@ class HistoryChartComponentTest {
     }
 
     @Test fun gapsCorrectionsAndResetChangesHaveNoPaintedBridgeInLandscapeDark() {
-        launch(HistoryTextFixture.plot(), landscape = true, dark = true).use { scenario ->
-            val pages = listOf(HistoryChartFixture.page(gap = true), HistoryChartFixture.page(correction = true),
-                HistoryChartFixture.page(changedReset = true))
-            for (entries in pages) {
-                val plot = HistoryTextFixture.plot(entries)
-                render(scenario, plot, dark = true)
-                counts("Drawn markers: 4 · Within-run connections: 2 · Nominal reference lines: 0")
-                withCanvas { bitmap ->
-                    markerPixels(bitmap, plot.fiveHour)
-                    edgePixels(bitmap, plot.fiveHour)
-                    val a = plot.fiveHour.segments[0].points.last().position as PlotPosition.Available
-                    val b = plot.fiveHour.segments[1].points.first().position as PlotPosition.Available
-                    assertFalse("No measured bridge across a supplied run boundary",
-                        pixelMatches(bitmap, (a.x + b.x) / 2, (a.y + b.y) / 2, measured))
-                }
-            }
-            val gapped = HistoryTextFixture.plot(pages.first())
+        val correction = HistoryTextFixture.plot(HistoryChartFixture.page(correction = true))
+        val changedReset = HistoryTextFixture.plot(HistoryChartFixture.page(changedReset = true))
+        val gapped = HistoryTextFixture.plot(HistoryChartFixture.page(gap = true))
+        launch(correction, landscape = true, dark = true).use { scenario ->
+            boundaryPixels(correction)
+            render(scenario, changedReset, dark = true)
+            boundaryPixels(changedReset)
             render(scenario, gapped, dark = true)
-            withCanvas { markerPixels(it, gapped.fiveHour); edgePixels(it, gapped.fiveHour) }
+            boundaryPixels(gapped)
             capture("history-chart-gap-landscape-dark", gapped, dark = true)
             click("history-details-toggle")
             click("history-next")
@@ -193,23 +196,6 @@ class HistoryChartComponentTest {
                 }
             }
             capture("history-chart-measured-landscape-light", plot, dark = false)
-        }
-    }
-
-    @Test fun accessibleTextRemainsTheOnlyExactFactOwnerWithoutCountdownChatter() {
-        launch(HistoryTextFixture.plot()).use {
-            compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assert(
-                SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
-            click("history-details-toggle")
-            val scope = hasTestTag("history-charts") or hasAnyAncestor(hasTestTag("history-charts"))
-            compose.onAllNodes(scope and hasText("Measured used percent (exact %): 12.345678901234567890"),
-                useUnmergedTree = true).assertCountEquals(1)
-            compose.onAllNodes(scope and hasText("Observed-only delta (percentage points): -67.655006969815432110"),
-                useUnmergedTree = true).assertCountEquals(1)
-            for (key in listOf(SemanticsProperties.LiveRegion, SemanticsProperties.ContentDescription)) {
-                compose.onAllNodes(scope and SemanticsMatcher.keyIsDefined(key), useUnmergedTree = true).assertCountEquals(0)
-            }
-            compose.onAllNodesWithText("Reset: Oct 9, 2026, 01:00 (hour precision)").assertCountEquals(2)
         }
     }
 
@@ -296,6 +282,18 @@ class HistoryChartComponentTest {
         val points = series.segments.flatMap { it.points }.map { it.position as PlotPosition.Available }
         assertTrue("Positive marker evidence required", points.isNotEmpty())
         points.forEach { point -> assertTrue("Actual measured marker at $point", pixelMatches(bitmap, point.x, point.y, measured)) }
+    }
+
+    private fun boundaryPixels(plot: HistoryPlotSnapshot) {
+        counts("Drawn markers: 4 · Within-run connections: 2 · Nominal reference lines: 0")
+        withCanvas { bitmap ->
+            markerPixels(bitmap, plot.fiveHour)
+            edgePixels(bitmap, plot.fiveHour)
+            val a = plot.fiveHour.segments[0].points.last().position as PlotPosition.Available
+            val b = plot.fiveHour.segments[1].points.first().position as PlotPosition.Available
+            assertFalse("No measured bridge across a supplied run boundary",
+                pixelMatches(bitmap, (a.x + b.x) / 2, (a.y + b.y) / 2, measured))
+        }
     }
 
     private fun edgePixels(bitmap: Bitmap, series: HistoryPlotSeries) {

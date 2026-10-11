@@ -22,7 +22,7 @@ class AccountRemovalContracts(unittest.TestCase):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/AccountRemovalLifecycleTest.kt").read_text()
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), ACCOUNT_REMOVAL_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 115 + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 113 + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
         for name in ACCOUNT_REMOVAL_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native local account removal"):

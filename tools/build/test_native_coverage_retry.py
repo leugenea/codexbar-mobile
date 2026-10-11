@@ -14,6 +14,8 @@ import xml.etree.ElementTree as ET
 
 import coverage_gate
 import native_coverage_retry as retry
+from test_history_text_contract import RETAINED_TEXT_CASES
+from test_history_chart_contract import RETAINED_CHART_CASES
 from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
 from verify_test_reports import ACCOUNT_REMOVAL_CASES, ACCOUNT_REMOVAL_CLASS
 from verify_test_reports import DEVICE_CODE_COPY_CASES, DEVICE_CODE_COPY_CLASS
@@ -246,6 +248,37 @@ class RetryContracts(unittest.TestCase):
             tree.write(path)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history display authority"):
                 self.require()
+
+    def test_retained_component_families_are_present_in_positive_retry_reports(self):
+        self.assertEqual(HISTORY_TEXT_CASES, RETAINED_TEXT_CASES)
+        self.assertEqual(HISTORY_CHART_CASES, RETAINED_CHART_CASES)
+        path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
+        cases = list(ET.parse(path).getroot().iter("testcase"))
+        self.assertEqual(len(cases), 121)
+        for classname, expected in ((HISTORY_TEXT_CLASS, RETAINED_TEXT_CASES),
+                                    (HISTORY_CHART_CLASS, RETAINED_CHART_CASES)):
+            self.assertEqual({case.get("name") for case in cases if case.get("classname") == classname}, expected)
+        self.assertEqual(self.require(), "empty")
+
+    def test_each_retained_component_case_rejects_omission_failure_error_skip_and_class_spoof_for_retry(self):
+        for classname, names in ((HISTORY_TEXT_CLASS, RETAINED_TEXT_CASES),
+                                 (HISTORY_CHART_CLASS, RETAINED_CHART_CASES)):
+            for name in names:
+                for mutation in ("missing", "failure", "error", "skipped", "wrong-class"):
+                    synthetic_reports(self.build)
+                    path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
+                    tree = ET.parse(path)
+                    root = tree.getroot()
+                    case = next(case for case in root if case.get("classname") == classname and case.get("name") == name)
+                    if mutation == "missing":
+                        root.remove(case)
+                    elif mutation == "wrong-class":
+                        case.set("classname", "SYNTHETIC-wrong-class")
+                    else:
+                        ET.SubElement(case, mutation)
+                    tree.write(path)
+                    with self.subTest(classname=classname, name=name, mutation=mutation), self.assertRaises(ValueError):
+                        self.require()
 
     def test_snapshot_preserves_failed_inputs_and_tests_before_prepare_deletes_them(self):
         coverage = self.build / "coverage-gate"

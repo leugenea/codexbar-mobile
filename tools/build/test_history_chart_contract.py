@@ -17,6 +17,17 @@ from verify_test_reports import HISTORY_AUTHORITY_CASES, HISTORY_NAVIGATION_CASE
 
 ROOT = Path(__file__).resolve().parents[2]
 
+# Independent selected-family oracle, not names derived from generated XML.
+RETAINED_CHART_CASES = {
+    "singleMeasuredMarkerAndDashedNominalAreSeparateActualPixels",
+    "connectedMeasurementsDrawStraightEdgesAndPercentAxisInDarkPortrait",
+    "gapsCorrectionsAndResetChangesHaveNoPaintedBridgeInLandscapeDark",
+    "emptyStatusOnlyLoadingAndErrorsNeverInventACanvasOrZero",
+    "typedUnavailableGeometryAndUnderflowKeepExactFactsInsteadOfClamping",
+    "unknownBaselineLargeFontKeepsSinglePointCompleteLabelsAndReachableDetails",
+    "endpointMarkersAreFullyInsetAndVisibleInLandscapeLight",
+}
+
 
 class HistoryChartContracts(unittest.TestCase):
     def setUp(self):
@@ -25,18 +36,19 @@ class HistoryChartContracts(unittest.TestCase):
         self.addCleanup(self.fixture.doCleanups)
         self.directory = self.fixture.directory
 
-    def test_every_chart_native_identity_is_required_on_top_of_all_85_inherited(self):
+    def test_every_chart_native_identity_is_required_on_top_of_all_84_inherited(self):
         source = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryChartComponentTest.kt"
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), HISTORY_CHART_CASES)
+        self.assertEqual(HISTORY_CHART_CASES, RETAINED_CHART_CASES)
+        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), RETAINED_CHART_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 85 + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
-        for name in HISTORY_CHART_CASES:
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 84 + len(RETAINED_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
+        for name in RETAINED_CHART_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history chart"):
                 verify_reports(self.directory, "native")
 
     def test_each_chart_case_rejects_skip_failure_error_and_class_spoof(self):
-        for name in HISTORY_CHART_CASES:
+        for name in RETAINED_CHART_CASES:
             for mutation in ("skipped", "failure", "error", "wrong-class"):
                 path = self.fixture.report()
                 tree = ET.parse(path)

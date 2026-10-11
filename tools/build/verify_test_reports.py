@@ -144,7 +144,6 @@ HISTORY_SAMPLING_CASES = {
 
 HISTORY_TEXT_CLASS = "io.github.leugenea.codexbarmobile.HistoryTextComponentTest"
 HISTORY_TEXT_CASES = {
-    "independentKindsExposeExactMeasuredAndObservedOnlyDelta",
     "readinessContentErrorsLossAndTruncationRemainIndependent",
     "collapsedDetailsReachEveryGapAndResetBreakWithoutOmission",
     "unknownBaselineKeepsMeasuredValueAndB1ResetContext",
@@ -164,7 +163,6 @@ HISTORY_CHART_CASES = {
     "typedUnavailableGeometryAndUnderflowKeepExactFactsInsteadOfClamping",
     "unknownBaselineLargeFontKeepsSinglePointCompleteLabelsAndReachableDetails",
     "endpointMarkersAreFullyInsetAndVisibleInLandscapeLight",
-    "accessibleTextRemainsTheOnlyExactFactOwnerWithoutCountdownChatter",
 }
 
 
