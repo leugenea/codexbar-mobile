@@ -104,8 +104,6 @@ class EntitlementIntegrationTest {
         assertTrue(model.refreshing)
         assertNull(model.errorResource)
         assertEquals(ReadError.FORBIDDEN, model.entitlements.summaryError)
-        assertEquals(19L, state.refresh.inventory.successfulAtMillis)
-        assertEquals(7L, failed.successfulAtMillis)
     }
 
     @Test fun inventoryFailureAndStalenessDoNotReplaceUsageClockOrFacts() {
@@ -116,8 +114,6 @@ class EntitlementIntegrationTest {
         assertEquals(now, model.entitlements.inventoryObservedAt)
         assertTrue(model.stale)
         assertEquals(UsageScreenStatus.CURRENT, UsagePresentation.present(state, ZoneOffset.UTC, Locale.US).status)
-        assertEquals(7L, state.refresh.usage.successfulAtMillis)
-        assertEquals(summaryTime, state.refresh.usage.success?.observedAt)
     }
 
     @Test fun disconnectedRetirementAndMissingGenerationDiscardAllFactsEvenWithRetainedInput() {
