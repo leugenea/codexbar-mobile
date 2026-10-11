@@ -8,8 +8,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from repository_policy import (ROOT, SCHEMA_SHA256, action_policy, dependabot_policy,
-                               load_yaml, verified_schema, workflow_files, workflow_policy)
+from repository_policy import (EXPRESSION, ROOT, SCHEMA_SHA256, action_policy, contains_secrets_context,
+                               dependabot_policy, load_yaml, verified_schema, workflow_files, workflow_policy)
 
 
 class RepositoryPolicyTests(unittest.TestCase):
@@ -112,6 +112,56 @@ class RepositoryPolicyTests(unittest.TestCase):
             fixture = original.replace("  policy:\n", "  policy:\n    if: " + condition + "\n", 1)
             with self.subTest(condition=condition):
                 workflow_policy(fixture, "fixture.yaml")
+
+    def test_expression_boundaries_preserve_spans_and_literal_contents(self):
+        for value, expected in (
+            ("${{ 'it''s }}' }}", [((0, 17), " 'it''s }}' ")]),
+            ("${{ '}}' }}", [((0, 11), " '}}' ")]),
+            ("${{ 'a' }} ${{ 'b' }}", [((0, 10), " 'a' "), ((11, 21), " 'b' ")]),
+            ("${{ 'a' }}' }}", [((0, 10), " 'a' ")]),
+            ("${{ 'a''' }}", [((0, 12), " 'a''' ")]),
+            ("${{ 'unterminated }}", []),
+            ("${{ 'a'' }}", []),
+            ("${{ 'outer ${{ secrets.X }}", [((11, 27), " secrets.X ")]),
+        ):
+            with self.subTest(value=value):
+                self.assertEqual([(match.span(), match.group(1)) for match in EXPRESSION.finditer(value)],
+                                 expected)
+
+    def test_pr_quote_escapes_hide_only_literal_identifiers(self):
+        original = (ROOT / ".github/workflows/repository-policy.yml").read_text()
+        for value, forbidden in (
+            ("${{ 'it''s }} SECRETS.X' }}", False),
+            ("${{ 'it''s }}' || env.secrets }}", False),
+            ("${{ 'secrets' }} ${{ '}}''secrets' }}", False),
+            ("${{ 'unterminated secrets.X }}", False),
+            ("${{ 'it''s }}' || SECRETS.X }}", True),
+            ("${{ 'secrets' }} ${{ '}}''x' || secrets['X'] }}", True),
+            ("${{ 'outer ${{ secrets.X }}", True),
+        ):
+            fixture = original + "\nenv:\n  REVIEW_VALUE: " + value + "\n"
+            with self.subTest(value=value):
+                if forbidden:
+                    with self.assertRaisesRegex(ValueError, "must not use secrets"):
+                        workflow_policy(fixture, "fixture.yaml")
+                else:
+                    workflow_policy(fixture, "fixture.yaml")
+
+    def test_linear_time_expression_quote_regression(self):
+        # Bounded 50k-quote inputs exercise the old exponential ambiguity without
+        # a flaky elapsed-time assertion, including CodeQL's exact opener shape.
+        quotes = "'" + "''" * 25_000
+        for prefix in ("${{", "${{{{"):
+            for suffix in ("", " }}"):
+                value = prefix + quotes + suffix
+                with self.subTest(prefix=prefix, suffix=suffix):
+                    self.assertEqual(list(EXPRESSION.finditer(value)), [])
+                    self.assertFalse(contains_secrets_context(value))
+            value = prefix + quotes + "' }}"
+            with self.subTest(prefix=prefix, suffix="closed literal"):
+                expected = prefix[3:] + quotes + "' "
+                self.assertEqual([match.group(1) for match in EXPRESSION.finditer(value)], [expected])
+                self.assertFalse(contains_secrets_context(value))
 
     def test_checkout_identity_is_case_insensitive_and_includes_subpaths(self):
         original = (ROOT / ".github/workflows/repository-policy.yml").read_text()

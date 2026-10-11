@@ -98,7 +98,8 @@ before claiming a warm-run gain.
 
 `org.gradle.caching=true` enables local output reuse too, including clean builds,
 branches and worktrees sharing the same Gradle user home. CI explicitly passes
-`--build-cache`. Compile, dex, resources and packaging retain normal cacheability.
+`--build-cache`. Ordinary compile, dex, resource and packaging tasks retain normal
+cacheability.
 The app applies [always-execute.gradle](tools/build/always-execute.gradle) to force
 fresh JVM/native tests, coverage preparation/collection/report/verification, resolved
 toolchain observation and **all lint tasks**: both up-to-date reuse and build-cache
@@ -110,6 +111,16 @@ Global `--rerun-tasks` is forbidden in the hosted graphs because it would defeat
 output reuse. Configuration
 cache remains disabled (`--no-configuration-cache`) for the outcome listeners and
 init-script observation.
+
+CodeQL default setup's `clean` / `assemble` must compile sources, not restore
+compiled task outputs. When `CODEQL_EXTRACTOR_JAVA_TRAP_DIR` is present,
+[settings.gradle](settings.gradle) disables the local task-output cache for that
+traced build; ordinary builds keep output reuse. CodeQL dependency/wrapper caching
+remains enabled and is distinct from task-output caching. No remote build cache is
+configured; any future backend must also avoid output reuse during extraction.
+The marker comes from the released extractor, not a documented GitHub default-setup
+option: extractor changes require hosted warm-cache validation; static source
+contracts cannot prove the marker's continued identity or successful extraction.
 
 `build` and `instrumented` run independently in parallel; `Android CI result`
 still requires both to succeed, including the native union-coverage gate. The
@@ -223,7 +234,9 @@ or live-provider evidence. Outputs stay in CI artifacts or external scratch.
 [Dependabot](.github/dependabot.yml) scans Actions, Gradle and both Python locations
 weekly; minor/patch groups and separate majors do not imply automerge. SHA-pinned
 Action version scans are not a promise of immediate advisory/security-update PRs.
-PR workflows and tests must not use secrets or live credentials.
+PR workflows and tests must not use secrets or live credentials. CodeQL default
+setup scans Actions, Java/Kotlin and Python; its code-scanning rule is separate
+from required status checks.
 
 See [code-quality policy](docs/code-quality.md) and the
 [metric chart](https://leugenea.github.io/codexbar-mobile/dev/bench/).

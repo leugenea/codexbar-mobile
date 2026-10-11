@@ -45,9 +45,11 @@ ACTION_USE = re.compile(
 ACTION_REFERENCE = re.compile(
     r"[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*@[0-9a-fA-F]{40}"
 )
-# Single-quoted expression literals escape quotes by doubling them. Delimiters
-# inside those literals must not end the expression or expose fake identifiers.
-EXPRESSION = re.compile(r"\$\{\{((?:'(?:[^']|'')*'|[^'])*?)\}\}", re.DOTALL)
+# For expression boundaries, doubled quotes are a close/open pair with no gap:
+# splitting there cannot expose a delimiter. Pair each quote with the next quote
+# to avoid ambiguous escaped-quote/adjacent-literal backtracking; the tokenizer
+# below still keeps doubled-quote literals whole when inspecting identifiers.
+EXPRESSION = re.compile(r"\$\{\{((?:'[^']*'|[^'])*?)\}\}", re.DOTALL)
 EXPRESSION_TOKEN = re.compile(r"'(?:[^']|'')*'|[A-Za-z_][A-Za-z0-9_-]*|[^\s]")
 WRITERS = {
     "history": (

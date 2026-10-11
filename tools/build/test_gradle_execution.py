@@ -194,6 +194,51 @@ class LocalExecutionPolicyTests(unittest.TestCase):
             with self.subTest(guard=guard), self.assertRaises(AssertionError):
                 self.assert_vital_suppression_contract(policy.replace(guard, '', 1))
 
+    def assert_codeql_cache_policy(self, settings):
+        # Static source contract, not an executable Gradle or extractor-marker proof.
+        source = re.sub(r'(?m)//[^\n]*', '', settings)
+        self.assertRegex(source, (
+            r"(?m)^if \(providers\.environmentVariable\('CODEQL_EXTRACTOR_JAVA_TRAP_DIR'\)"
+            r"\.isPresent\(\)\) \{\s*buildCache \{\s*local \{\s*enabled = false\s*\}\s*\}\s*\}"
+            r"\s*rootProject\.name"
+        ))
+        self.assertEqual(re.findall(r'\b(buildCache|local)\s*\{', source), ['buildCache', 'local'])
+        self.assertEqual(re.findall(r'\benabled\s*=\s*\w+', source), ['enabled = false'])
+        self.assertNotIn('startParameter', source)
+        self.assertNotRegex(source, r'\bremote\s*[({]')
+
+    def test_codeql_alone_disables_local_task_output_cache(self):
+        self.assert_codeql_cache_policy((ROOT / 'settings.gradle').read_text())
+        # Ordinary caching/fresh-gate policy remains covered by the same contract.
+        self.assert_local_policy(*self.policy_sources())
+
+    def test_codeql_cache_guard_removal_or_reversal_fails_contract(self):
+        settings = (ROOT / 'settings.gradle').read_text()
+        guard = "if (providers.environmentVariable('CODEQL_EXTRACTOR_JAVA_TRAP_DIR').isPresent()) {"
+        for old, new in ((guard, 'if (true) {'),
+                         (guard, guard.replace('if (', 'if (!', 1)),
+                         ('CODEQL_EXTRACTOR_JAVA_TRAP_DIR', 'GITHUB_ACTIONS'),
+                         ('enabled = false', ''),
+                         ('enabled = false', 'enabled = true'),
+                         ('local {', 'remote(HttpBuildCache) {')):
+            self.assertIn(old, settings)
+            with self.subTest(old=old, new=new), self.assertRaises(AssertionError):
+                self.assert_codeql_cache_policy(settings.replace(old, new, 1))
+        # Moving the backend out of the marker branch disables ordinary reuse.
+        unconditional = re.sub(re.escape(guard), '', settings, count=1)
+        unconditional = unconditional.replace("\n}\n\nrootProject.name", "\n\nrootProject.name", 1)
+        self.assertNotEqual(unconditional, settings)
+        with self.assertRaises(AssertionError):
+            self.assert_codeql_cache_policy(unconditional)
+
+    def test_unconditional_or_deprecated_cache_policy_additions_fail_contract(self):
+        settings = (ROOT / 'settings.gradle').read_text()
+        for addition in ('buildCache { local { enabled = false } }',
+                         'gradle.startParameter.buildCacheEnabled = false',
+                         'buildCache { remote(HttpBuildCache) { enabled = true } }'):
+            with self.subTest(addition=addition), self.assertRaises(AssertionError):
+                self.assert_codeql_cache_policy(settings + '\n' + addition)
+
     def policy_sources(self):
         return [(ROOT / path).read_text() for path in
                 ('app/build.gradle', 'tools/build/always-execute.gradle', 'gradle.properties')]
