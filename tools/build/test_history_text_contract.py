@@ -1,4 +1,5 @@
 """Synthetic report/capture parser controls only; never execute application code."""
+from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT
 import json
 import os
 from pathlib import Path
@@ -52,7 +53,7 @@ class HistoryTextContracts(unittest.TestCase):
         self.assertEqual(HISTORY_TEXT_CASES, RETAINED_TEXT_CASES)
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), RETAINED_TEXT_CASES)
         self.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 80 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 80 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT)
         for name in RETAINED_TEXT_CASES:
             self.report(name)
             with self.assertRaisesRegex(ValueError, "Missing real native history text"):
@@ -83,7 +84,7 @@ class HistoryTextContracts(unittest.TestCase):
                 metadata.update(pixelOraclePassed=True, canvasLeft=0.1, canvasTop=0.1, canvasRight=1.9, canvasBottom=1.9)
             if name in INTEGRATED_CAPTURES:
                 metadata.update(productionEntry=True, visibleRoots=["connection-screen"], activity="io.github.leugenea.codexbarmobile.MainActivity",
-                                phase="RESTORED", queryKind="FIVE_HOUR", queryLimit=32, queryAfter=0,
+                                phase="OBSERVED", queryKind="FIVE_HOUR", queryLimit=32, queryAfter=0,
                                 firstOrdinal=1, lastOrdinal=32, pageEntries=32, hasMore=True, requests=5, gets=2,
                                 visibleControls=INTEGRATED_CONTROLS[name], canvasLeft=0.1, canvasTop=0.1,
                                 canvasRight=1.9, canvasBottom=1.9,
@@ -100,8 +101,32 @@ class HistoryTextContracts(unittest.TestCase):
                     metadata.update(pixelOraclePassed=True, canvasLeft=0.1, canvasTop=0.1, canvasRight=1.9, canvasBottom=1.9,
                                     canvasClippedLeft=0.1, canvasClippedTop=0.1, canvasClippedRight=1.9, canvasClippedBottom=1.9)
                     metadata["pixelSamples"] = self.assembled_samples(ASSEMBLED_COUNTS[name])
+            image = self.png(*size)
+            if name.startswith("history-current-"):
+                image = self.current_capture(metadata, name, dark)
             (self.directory / (name + ".json")).write_text(json.dumps(metadata))
-            (self.directory / (name + ".png")).write_bytes(self.png(*size))
+            (self.directory / (name + ".png")).write_bytes(image)
+
+    def current_capture(self, metadata, name, dark):
+        primary, reference = ((-10006364, -11975345) if not dark else (-3097345, -3488560))
+        metadata.update(width=4, height=5, currentOnly=True, currentReset="2027-01-15T09:00:00Z", currentDuration=18000,
+                        selectedOrdinals=[301, 302, 304, 305, 306], lastAdmitted=307,
+                        canvasLeft=0, canvasTop=0, canvasRight=4, canvasBottom=4,
+                        canvasClippedLeft=0, canvasClippedTop=0, canvasClippedRight=4, canvasClippedBottom=4)
+        samples = []
+        for item in self.assembled_samples(ASSEMBLED_COUNTS[name]):
+            kind = item["kind"]
+            target = reference if kind == "dash" else primary
+            matched = item["matched"]
+            x, y = ((2, 2) if matched else (3, 2)) if kind == "dash" else ((1, 1) if matched else (0, 0))
+            samples.append(dict(kind=kind, x=x, y=y, targetArgb=target, actualArgb=target if matched else -1, matched=matched))
+        metadata["pixelSamples"] = samples
+        pixels = bytearray(b"\xff" * 4 * 5 * 3)
+        for x, y, color in ((1, 1, primary), (2, 2, reference)):
+            index = (y * 4 + x) * 3
+            pixels[index:index + 3] = bytes((color >> shift) & 255 for shift in (16, 8, 0))
+        filtered = b"".join(b"\0" + pixels[y * 12:(y + 1) * 12] for y in range(5))
+        return self.png(4, 5, filtered=filtered)
 
     @staticmethod
     def assembled_samples(counts):

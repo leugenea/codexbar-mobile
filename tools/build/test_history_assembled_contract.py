@@ -1,4 +1,5 @@
 """Explicitly synthetic #83 parser/source controls; no application/native execution."""
+from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT
 import copy
 import json
 from pathlib import Path
@@ -30,7 +31,7 @@ class HistoryAssembledContracts(unittest.TestCase):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryAssembledAcceptanceTest.kt").read_text()
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_ASSEMBLED_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 108 + len(PHONE_TIME_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 108 + len(PHONE_TIME_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT)
         for name in HISTORY_ASSEMBLED_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history assembled acceptance"):
@@ -52,11 +53,11 @@ class HistoryAssembledContracts(unittest.TestCase):
 
     def test_five_representative_images_extend_all_twelve_inherited_and_are_each_required(self):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryAssembledAcceptanceTest.kt").read_text()
-        self.assertEqual(set(re.findall(r'"(history-assembled-[^"]+)"', source)), set(ASSEMBLED_CAPTURES))
+        self.assertEqual(set(re.findall(r'"(history-assembled-[^"]+)"', source)), {name for name in ASSEMBLED_CAPTURES if name.startswith("history-assembled-")})
         self.assertEqual(len(CAPTURES), 12 + len(ASSEMBLED_CAPTURES))
         for name in ASSEMBLED_CAPTURES:
             self.fixture.captures()
-            self.assertEqual(len(verify_captures(self.directory)), 17)
+            self.assertEqual(len(verify_captures(self.directory)), len(CAPTURES))
             (self.directory / (name + ".png")).unlink()
             with self.subTest(name=name), self.assertRaises(ValueError):
                 verify_captures(self.directory)

@@ -320,7 +320,7 @@
     <string name="history_open">View local history</string>
     <string name="history_return_connection">Return to live connection controls</string>
     <string name="history_navigation_title">Local usage history</string>
-    <string name="history_navigation_policy">Bounded pages in storage admission order, starting with the earliest retained entries. Window selection filters this page, not the storage cursor. This is not newest-first or a time-range view.</string>
+    <string name="history_navigation_policy">Bounded pages preserve storage admission order. Current charts select only the authoritative live period; stored text starts with the earliest retained entries. Missing or truncated history remains incomplete.</string>
     <string name="history_page_cursor">Exclusive admission cursor: %1$d · Page limit: %2$d</string>
     <string name="history_page_ordinals">Retained page ordinals: %1$s to %2$s</string>
     <string name="history_first_page">First retained page</string>
@@ -335,4 +335,8 @@
     <string name="account_name_clear">Clear name</string>
     <string name="account_name_cancel">Cancel</string>
     <string name="account_name_storage_failed">Local name storage is unavailable or the change could not be saved. Retry editing when available.</string>
+    <string name="history_current_charts">View current charts</string>
+    <string name="history_stored_text">Browse stored text history</string>
+    <string name="history_current_policy">Charts contain only the current live five-hour or weekly period. Stored observations are sparse; the dashed line is an analytical even-use reference, not a prediction.</string>
+    <string name="history_current_unavailable">Current period unavailable: %1$s. Stored history cannot establish a current period.</string>
 </resources>

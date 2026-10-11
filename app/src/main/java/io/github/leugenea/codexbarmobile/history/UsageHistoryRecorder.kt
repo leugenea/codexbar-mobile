@@ -63,6 +63,7 @@ internal class UsageHistoryRecorder(
     private var readPending = false
     private var query = HistoryGraphQuery()
     private var queryRevision = 0L
+    private var refresh = UsageRefreshState()
     private var live = HistoryLiveMetadata()
     private var page: HistoryReadSnapshot? = null
     private var problem: HistoryRecorderProblem? = null
@@ -94,6 +95,7 @@ internal class UsageHistoryRecorder(
         displayAuthority.install(HistoryGeneration())
         val current = Binding(session, access, requireNotNull(displayAuthority.permission()))
         binding = current
+        current.permission.context.periods = currentHistoryPeriods(current.access.partition, refresh)
         lifetime = session to access.partition
         adoptWaiting(current)
         problem = null
@@ -151,6 +153,8 @@ internal class UsageHistoryRecorder(
     }
 
     fun metadata(refresh: UsageRefreshState) {
+        this.refresh = refresh
+        displayAuthority.current()?.periods = currentHistoryPeriods(binding?.access?.partition, refresh)
         live = HistoryLiveMetadata.from(refresh)
         if (binding != null) publish(mutableState.value.readiness)
     }
@@ -167,6 +171,7 @@ internal class UsageHistoryRecorder(
 
     /** Cancel/logout/new login discard queued old facts. No later worker can publish them. */
     fun retire() {
+        refresh = UsageRefreshState()
         live = HistoryLiveMetadata()
         query = HistoryGraphQuery()
         queryRevision++
@@ -240,6 +245,11 @@ internal class UsageHistoryRecorder(
     private fun apply(outcome: HistoryReadOutcome) {
         when (outcome) {
             is HistoryReadOutcome.Ready -> {
+                if (query.currentOnly && query.window == null) {
+                    page = null
+                    publish(if (problem == null) HistoryReadiness.UNAVAILABLE else HistoryReadiness.ERROR)
+                    return
+                }
                 page = outcome.snapshot
                 publish(if (problem != null) HistoryReadiness.ERROR else if (page!!.content == HistoryContent.EMPTY)
                     HistoryReadiness.EMPTY else HistoryReadiness.READY)
@@ -289,6 +299,9 @@ internal class UsageHistoryRecorder(
 
     private fun read(current: Binding, requested: HistoryGraphQuery): HistoryReadOutcome {
         if (current.revoked) return HistoryReadOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
+        if (requested.currentOnly && requested.window == null) return HistoryReadOutcome.Ready(
+            HistoryReadSnapshot(requested.storage(current.access.partition), emptyList(), null, false))
+        if (requested.currentOnly) return CurrentHistoryRead.read(current.access, requested) { current.revoked }
         return current.access.read(requested.storage(current.access.partition))
     }
 

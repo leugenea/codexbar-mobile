@@ -89,6 +89,10 @@ internal class HistoryAcceptanceCapture(private val compose: ComposeTestRule) {
             .put("queryKind", source.query.kind?.name ?: "NONE").put("queryLimit", source.query.limit)
             .put("queryAfter", source.query.after?.ordinal ?: 0).put("pageEntries", entries.size)
             .put("firstOrdinal", entries.firstOrNull()?.id?.ordinal ?: 0).put("lastOrdinal", entries.lastOrNull()?.id?.ordinal ?: 0)
+            .put("currentOnly", source.query.currentOnly).put("currentReset", source.query.window?.resetAt?.toString() ?: "NONE")
+            .put("currentDuration", source.query.window?.durationSeconds ?: 0)
+            .put("selectedOrdinals", JSONArray(entries.map { it.id.ordinal }))
+            .put("lastAdmitted", source.storage?.lastAdmitted?.ordinal ?: 0)
             .put("hasMore", source.hasMore).put("requests", fixture.transport.requests.get()).put("gets", fixture.transport.gets.get())
         scenario.onActivity {
             assertSame(fixture.owner, it.connection)

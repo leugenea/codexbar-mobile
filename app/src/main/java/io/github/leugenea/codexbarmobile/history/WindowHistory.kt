@@ -137,6 +137,25 @@ object WindowHistory {
         return WindowIdentity(partition, source.kind, source.durationSeconds.value!!, source.reset.absolute.value!!)
     }
 
+    /** The same duration/reset identity rule for live selection and retained status facts. */
+    fun identity(partition: HistoryPartition, selection: WindowSelection, kind: WindowKind): WindowIdentity? {
+        val source = unambiguousSource(selection, kind) ?: return null
+        return candidate(partition, source, selectionReset(source, selection))
+    }
+
+    fun identity(partition: HistoryPartition, source: HistoryWindow): WindowIdentity? {
+        val seconds = source.duration?.takeIf { it.knowledge == Knowledge.KNOWN }?.value ?: return null
+        val expected = when (source.kind) {
+            WindowKind.FIVE_HOUR -> 18000L
+            WindowKind.WEEKLY -> 604800L
+            else -> return null
+        }
+        if (seconds != expected || source.reset.provenance != ResetProvenance.ABSOLUTE) return null
+        val reset = source.reset.facts ?: return null
+        if (reset.discrepant || reset.absolute.knowledge != Knowledge.KNOWN) return null
+        return reset.absolute.value?.let { WindowIdentity(partition, source.kind, seconds, it) }
+    }
+
     private fun breaks(
         cursor: WindowCursor, admission: HistoryAdmission, usage: UsageObservation,
         source: UsageWindow, candidate: WindowIdentity?,

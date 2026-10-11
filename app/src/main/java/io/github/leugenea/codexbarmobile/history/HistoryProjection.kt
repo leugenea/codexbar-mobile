@@ -12,12 +12,17 @@ internal data class HistoryGraphQuery(
     val after: ObservationId? = null,
     val kind: WindowKind? = null,
     val window: WindowIdentity? = null,
+    val currentOnly: Boolean = false,
 ) {
     init { require(limit in 1..256) }
     fun storage(partition: HistoryPartition) = HistoryReadQuery(partition, limit, after)
     fun selects(source: HistoryWindow): Boolean =
-        (kind == null || source.kind == kind) && (window == null || source.point?.segment?.window == window)
+        (kind == null || source.kind == kind) && (window == null || matchesWindow(source, window))
 }
+
+private fun matchesWindow(source: HistoryWindow, window: WindowIdentity): Boolean =
+    WindowHistory.identity(window.partition, source) == window &&
+        (source.point == null || source.point.segment.window == window)
 
 internal enum class HistoryReadiness { UNAVAILABLE, LOADING, EMPTY, READY, ERROR }
 internal enum class HistoryRecorderProblem { STORAGE_UNAVAILABLE, READ_FAILURE, WRITE_FAILURE, CORRUPT, QUEUE_OVERFLOW, ORDINAL_CAPACITY }
@@ -52,14 +57,17 @@ internal class HistoryGraphEntry(val source: HistoryEntry, windows: Collection<H
 }
 
 /** Opaque diagnostic context or bound runtime context; never persisted or reused after revocation. */
-internal class HistoryDisplayContext(val generation: HistoryGeneration?)
+internal class HistoryDisplayContext(val generation: HistoryGeneration?) {
+    /** Updated on the existing owner lane before publication; independent of delayed collectors. */
+    @Volatile var periods: CurrentHistoryPeriods = CurrentHistoryPeriods()
+}
 
 /** Read-only view of the recorder's actual worker/display revocation slot, not collected state. */
 internal fun interface HistoryDisplayAuthority {
     fun current(): HistoryDisplayContext?
 }
 
-/** Retains only an empty context descriptor and its slot, never the recorder/controller/storage. */
+/** Retains safe period descriptors and their slot, never provider text, credentials or controller/storage. */
 internal class HistoryDisplayPermission(
     val context: HistoryDisplayContext,
     private val authority: HistoryDisplayAuthority,

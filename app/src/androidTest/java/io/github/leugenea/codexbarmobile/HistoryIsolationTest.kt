@@ -193,7 +193,7 @@ class HistoryIsolationTest {
             assertTrue(fresh.read(HistoryReadQuery(fresh.partition, 1)) is HistoryReadOutcome.Ready)
             assertRevoked(access) // Deliberately after the positive successor proof, not an already-dead-port oracle.
             assertNotSame(old.displayPermission!!.context, old.displayPermission.current())
-            if (recreate) click("history-toggle")
+            if (recreate) { click("history-toggle"); click("history-stored-text") }
             assertNoPage()
             gate.release(); page(query(), 32)
             val current = owner.historySnapshots.value.generation
@@ -257,7 +257,7 @@ class HistoryIsolationTest {
         assertDormant()
     }
 
-    private fun openHistory() { awaitConnectionScreen(compose, owner); click("history-toggle") }
+    private fun openHistory() { awaitConnectionScreen(compose, owner); click("history-toggle"); click("history-stored-text") }
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
         if (tag != "remove-account-confirm") node.performScrollTo()
@@ -287,6 +287,7 @@ class HistoryIsolationTest {
     }
 
     private fun page(expected: HistoryGraphQuery, count: Int, readiness: HistoryReadiness = HistoryReadiness.READY) {
+        if (owner.historySnapshots.value.query.currentOnly) click("history-stored-text")
         await("actual page $expected count=$count readiness=$readiness") {
             owner.historySnapshots.value.let { it.query == expected && it.generation != null && it.storage?.entries?.size == count && it.readiness == readiness }
         }

@@ -47,6 +47,38 @@ CLASS = {
 }
 
 
+CURRENT_HISTORY_JVM = {
+    "io.github.leugenea.codexbarmobile.history.CurrentHistoryPeriodTest": {
+        "normalizedDurationSelectionUsesExactAbsoluteIdentityAndExistingEvaluationClock",
+        "expiryClockLossBeforeStartAmbiguityAndRelativeDiscrepantMalformedResetNeverFallback",
+        "weeklyToleranceKeepsAbsoluteOriginalAndChangedResetGetsANewQueryKey",
+        "staleAndEndpointFailureRemainIndependentOfKnownUnexpiredIdentity",
+        "freshHostAuthorityRejectsHeldPeriodOnExpiryClockLossResetChangeAndAccountRetirement",
+    },
+    "io.github.leugenea.codexbarmobile.history.CurrentHistoryReadTest": {
+        "currentMeasurementsBehindArchiveFilledPagesUseRealSelectedLookaheadAndBoundedReads",
+        "selectedOrdinalHolesCorrectionsAndResetBoundariesCannotCreateContiguousMeasuredEdges",
+        "emptySelectionRetentionReadFailuresCorruptionAndRevocationRemainExplicit",
+        "keyedUnknownPercentStatusIsRetainedWithoutInventedMeasurementOrReference",
+    },
+}
+CURRENT_HISTORY_NATIVE = {
+    "io.github.leugenea.codexbarmobile.CurrentWindowHistoryTest": {
+        "currentPeriodBehindArchivedPagesHasExactMeasuredReferencePaintInProductionLight",
+        "currentPeriodBehindArchivedPagesHasExactMeasuredReferencePaintInProductionDark",
+        "expiryChangedResetUnknownAndAmbiguousRetireCurrentChartsWithoutArchivedFallback",
+        "dormantRestoreHasTextHistoryButNoCurrentChartAndOpeningAddsNoRequests",
+    },
+    "io.github.leugenea.codexbarmobile.CurrentWindowRetirementTest": {
+        "lateCurrentQueryCannotReplayRetiredAccountIntoProductionSuccessorChart",
+        "lateSameAccountQueryCannotReplayOldResetAfterCurrentKeyRollover",
+        "currentRetainedGraphKeepsStaleErrorLossAndRealRetentionExplicit",
+        "knownCurrentPeriodWithLostOnlyAdmissionHasEmptyHistoryThenOneActualMarker",
+    },
+}
+CURRENT_HISTORY_NATIVE_COUNT = sum(map(len, CURRENT_HISTORY_NATIVE.values()))
+
+
 CREDENTIAL_CLASS = "io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStoreTest"
 CREDENTIAL_CASES = {
     "realKeystoreRoundTripFreshInstanceAndRandomizedIv",
@@ -279,6 +311,12 @@ def verify_reports(directory: Path, kind: str) -> dict:
     missing = EXPECTED[kind] - actual
     if missing:
         raise ValueError(f"Missing real {kind} launch/refresh tests: {sorted(missing)}")
+    current_history = CURRENT_HISTORY_JVM if kind == "jvm" else CURRENT_HISTORY_NATIVE
+    for classname, required in current_history.items():
+        for name in required:
+            matches = [case for case in cases if case["class"] == classname and case["name"] == name]
+            if len(matches) != 1:
+                raise ValueError(f"Expected exactly one real {kind} current history case: {classname}.{name}")
     if kind == "native":
         for label, classname, required in (
             ("credential", CREDENTIAL_CLASS, CREDENTIAL_CASES),

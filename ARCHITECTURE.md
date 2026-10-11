@@ -651,8 +651,9 @@ math. The snapshot is detached and immutable, with:
   A retained snapshot is not authority for a retired login; new UI work uses the current
   generation. Logout clears the view, query and endpoint metadata before any successor.
 - `HistoryGraphQuery(limit=1..256, after=exclusive ordinal, kind?, window?)`. Storage pagination
-  stays ordinal-ordered and single-partition; selection filters window facts on that page,
-  not the storage cursor. A query is not a provider read or new observation. Latest query
+  stays ordinal-ordered and single-partition. Reusable/text queries select facts on
+  that page; production `currentOnly` queries use the bounded matching scan described
+  below, with an exact authoritative window key. A query is not a provider read or new observation. Latest query
   revision rejects held earlier-query publication. No invented tail/time-range API exists.
 - The original `HistoryReadSnapshot`: entries, high-water, next-after/has-more, EMPTY /
   STATUS_ONLY / MEASUREMENTS content, retention truncation and ordinal eviction cutoffs.
@@ -815,21 +816,40 @@ storage port, network action or sampling timer. The Activity's directly attached
 STARTED lifecycle remains the only UI registration; opening dormant restored
 history does not activate B2.
 
-A five-hour/weekly selection renders the selected chart and its textual equivalent.
-`HistoryNavigation` holds only the kind and one exclusive ordinal cursor, with a
-fixed limit of 32 admitted entries. **First retained page** resets that cursor;
-**Next admitted page** uses the storage page's `nextAfter` only when `hasMore` is
-true. There is no page stack, accumulation, newest-first or time-range query.
-Window selection preserves the storage cursor, and status/gap/filtered pages do
-not redefine pagination. Explicit cursor/limit/retained-ordinal labels complement
-the unchanged content, error, loss, retention and independent endpoint metadata.
+The production entry defaults to current-only five-hour/weekly charts. The bound
+recorder projects normalized live `UsageRefreshState` into safe period keys and
+typed absence in its existing display context. The existing evaluation clock and the exact `WindowHistory.identity` duration/
+absolute-reset rule qualify the active period. Missing/ambiguous/unkeyed live
+facts, lost/backwards evaluation clocks, before-start or expired periods show
+unavailable rather than choosing an archived reset. Stale successes and independent
+endpoint errors retain their existing metadata. Weekly reset tolerance and absolute
+originals remain the normalizer's policy, never a second graph normalization.
+
+Current queries carry `currentOnly` plus the exact partition/kind/duration/reset key.
+`CurrentHistoryRead` scans existing ascending bounded store pages, using actual
+exclusive cursors and an initial admitted high-water fence. It examines at most the
+existing 100,000-observation retention ceiling, holds only one read batch plus a
+selected page and one real matching lookahead, and retains exact entries, ordinal
+holes, segments and retention/cutoffs. Current measurements remain reachable after
+archived pages. `hasMore` needs a matching retained lookahead; failed/corrupt/resource
+reads stay typed errors. A missing current identity performs no store read. No
+SQLite schema, retention, recorder admission, provider cadence or storage port changes.
+
+**Browse stored text history** exposes the original ordinal pages as text only;
+archived periods have no chart route. `HistoryNavigation` retains one kind, current
+key/mode and exclusive cursor, with a limit of 32. First/next controls use only real
+selected-page cursors; mode/current-key changes reset the cursor. Current kind changes select a different
+key; stored-text kind changes preserve the original ordinal cursor. There is no
+page stack or accumulated history. Current chart projection reuses the existing
+EvenDistribution, plot inputs, renderer and phone-local time labels, preserving
+actual markers/within-run solid edges and eligible dashed analytical references.
 
 Selection and detail state are in-memory `remember`, not Bundle/saved snapshots.
 The recorder's one volatile display-context slot replaces its private Binding
 revocation flag: workers and the host use the same authority, not a mirrored flow.
 Each snapshot carries only a read-only nonpersistable permission retaining an opaque
-context (with nullable bound generation) and the slot, never controller/storage or
-credentials. Replacement revokes the predecessor before publication; invalidation
+context (with nullable bound generation, safe current period keys and evaluation
+time) and the slot, never provider text, controller/storage or credentials. Replacement revokes the predecessor before publication; invalidation
 clears the slot before publishing unavailable. A foreground bind without storage
 has a distinct diagnostic context, still with null generation. Its current ERROR
 loss survives selection changes, but its retired context cannot replay even across
@@ -838,7 +858,9 @@ background/resume loss retention and retirement loss reset are unchanged.
 
 On each actual `ConnectionHistory` execution, one independent descriptor read
 immediately before projection authorizes context/generation identity and requested
-query equality. Ordinary StateFlow collection still schedules UI updates; it is not
+query equality. Current queries additionally recheck the latest live period through
+that context, independently of delayed collection; rollover/expiry/clock loss cannot
+authorize the previous key. Ordinary StateFlow collection still schedules UI updates; it is not
 render permission. Missing/revoked permission scrubs all facts and loss, showing
 loading only for a current bound successor, otherwise unavailable. This is a host
 composition-time check, not a frame/child/hardware atomic-erasure promise. No
@@ -919,9 +941,36 @@ review, hosted runtime/lint/compatible whole-handwritten >=90% INSTRUCTION cover
 and actual-image inspection remain required; #83 and diagnostics removal #69 stay
 separate.
 
+## Current-period integration (issue 134)
+
+`CurrentHistoryPeriodTest` and `CurrentHistoryReadTest` cover normalized slot-independent
+identity, exact weekly reset policy, expiry/unknown/ambiguous/discrepant/backwards clocks,
+fresh authority despite held delivery, selection beyond archived pages, real lookahead,
+ordinal-hole isolation, empty/retention/errors and exact values. `CurrentWindowHistoryTest`
+and `CurrentWindowRetirementTest` add actual MainActivity/production-owner current charts,
+300 archived admissions before current measurements, measured/reference light/dark paint,
+reset/expiry/unavailable/dormant behavior, unchanged request/high-water counts and a held
+SQLite completions across account replacement and same-account reset rollover,
+and current empty/stale/error/loss/retention states without synthetic measurements. These are source contracts; hosted execution,
+lint, >=90% compatible handwritten instruction coverage and image inspection remain gates.
+
+The inherited navigation/isolation/delayed-collection suites now explicitly enter stored
+text history for arbitrary ordinal browsing. Their cursor, exact textual facts, endpoint
+metadata, lifecycle/security/isolation and no-request contracts remain required. The
+integrated chart and assembled single capture use a live active identity. Expired sparse
+and unknown-reset assembled captures now show stored text, with no archived Canvas; their
+arbitrary-period paint expectations are replaced by the new current light/dark campaign.
+Reusable component fixtures still cover arbitrary input geometry. All 19 existing gallery
+names/configurations remain required, plus two current production captures (21 total).
+The collector adds exact current key/selected-ordinal receipts and registered default
+Material3 measured/reference targets, retaining physical bounds, +/-12 color tolerance,
+PNG decode/sample equality, source/run/attempt/configuration and fail-closed uniqueness.
+
 ## Assembled history acceptance and original-parent map (M4b-4)
 
-This is an evidence-only roll-up, not a second implementation of the pure projection,
+This source map retains the assembled foundation with issue-134 current-period
+dispositions described above. The original #83 work was an evidence-only roll-up,
+not a second implementation of the pure projection,
 chart, text or owner/navigation contracts. `HistoryAssembledAcceptanceTest` enters the
 unmodified production `MainActivity`, uses the same default process owner with actual
 isolated no-backup SQLite/Keystore and synthetic transport, and arranges additional
@@ -934,7 +983,7 @@ an assertion that a newly authored test or screenshot has already passed:
 | Original criterion | Inherited source and evidence contract | Missing assembled evidence supplied by #83 |
 | --- | --- | --- |
 | Actual measurements versus even-distribution baseline, with units/reset context | `EvenDistribution` and `HistoryPlotInputs` preserve exact observed-only comparisons and separate analytical endpoints; `HistoryChartDrawing` and chart/text components label percent versus percentage points and reuse B1 reset formatting. `EvenDistributionTest`, `HistoryPlotInputsTest`, `HistoryChartDrawingTest`, `HistoryTextPresentationTest` and component native cases retain their deterministic, layout, semantics and actual-pixel oracles. | `freshInstallAndSingleObservationExposeNoInventedTrendAndObservedOnlySignedDeltas` requires a real-entry single marker, painted dashed reference plus unpainted dash gaps, exact negative/zero/positive observed-only deltas, UTC observation/reset facts and both window selections. |
-| Fresh installs and sparse/unknown history remain truthful; no fake trend | Pure plot tests and native component cases distinguish no/empty/status-only/single/multiple pages, unknown baseline/geometry, and breaks. Navigation/isolation tests retain bounded pagination, storage loss/retention and independent endpoint errors. | Fresh entry has unavailable facts, no Canvas, no detail/zero and no requests. `sparseGapCorrectionAndChangedResetRemainSeparatedInActualLandscapeDarkPixelsAndDetails` requires six markers, two within-run edges and three unpainted boundaries plus reachable gap/correction/reset details. `unknownResetAndUnknownPercentAtActualLargeFontKeepCompleteAccessibleFactsAndReachableControls` preserves a real known point but unavailable baseline and a separate unknown-percent window with no Canvas/zero. `truncatedPageLandscapeLightKeepsHonestLocalCursorAndEveryBoundedDetailReachable` requires explicit more-page copy, exclusive cursor 32, only ordinals 33..35, all three reachable entries, disabled terminal controls and unchanged admission high-water. |
+| Fresh installs and sparse/unknown history remain truthful; no fake trend | Pure plot tests and native component cases distinguish no/empty/status-only/single/multiple pages, unknown baseline/geometry, and breaks. Navigation/isolation tests retain bounded pagination, storage loss/retention and independent endpoint errors. | Fresh entry has unavailable facts, no Canvas, no detail/zero and no requests. `sparseGapCorrectionAndChangedResetRemainSeparatedInActualLandscapeDarkPixelsAndDetails` preserves reachable expired gap/correction/reset text with no archived Canvas. The current light/dark campaign above verifies five markers, two solid edges and two unpainted boundaries for the authoritative period. `unknownResetAndUnknownPercentAtActualLargeFontKeepCompleteAccessibleFactsAndReachableControls` preserves the unkeyed known point and unknown-percent facts as stored text, with no current or archived Canvas/zero. `truncatedPageLandscapeLightKeepsHonestLocalCursorAndEveryBoundedDetailReachable` requires explicit more-page copy, exclusive cursor 32, only ordinals 33..35, all three reachable entries, disabled terminal controls and unchanged admission high-water. |
 | Hosted phone layout/theme/readability/accessibility | Ten inherited synthetic reusable-component captures establish their component scopes, not integrated reachability; two inherited production-entry captures establish basic navigation. All owner/query/lifecycle/privacy adversaries remain required, not duplicated here. | Four new mandatory native methods add five representative real-entry viewports: fresh portrait/light, single portrait/dark, gap/correction/reset landscape/dark, unknown portrait/light at effective font scale 2, and bounded-page landscape/light. Native text-layout complete-line/ellipsis/extent checks, full versus independently clipped bounds, root containment, hidden decorative Canvas, exact-fact ownership and click/reachable-control assertions accompany them. Actual effective resource configuration is checked against native text-layout density/font scale, not inferred from filenames/requested settings. |
 
 The phone fixture changes hosted night/font settings and restores them on failure;
@@ -944,11 +993,12 @@ driver checks complete labels/details after reaching them rather than claiming a
 history page fits in one image. The campaign is not a full configuration Cartesian product,
 a blanket contrast certification or a physical-device accessibility audit.
 
-The fail-closed JUnit/retry contracts require all 107 inherited identities plus four
-assembled identities. The collector requires all twelve inherited captures plus the five
-new declared captures, observed API/configuration, exact owner/page/request identities,
-per-file hashes and checkout/source-head/run/attempt provenance. The three new Canvas
-captures retain independent unclipped/clipped bounds; registered Bitmap pixel samples
+The four assembled identities remain mandatory alongside all inherited and new
+current-period identities. The collector retains the twelve earlier history captures
+and five assembled viewports, adds two current viewports and keeps both live-usage
+images, observed API/configuration, exact owner/page/request identities, per-file
+hashes and checkout/source-head/run/attempt provenance. The assembled single and
+two current Canvas captures retain independent unclipped/clipped bounds; registered Bitmap pixel samples
 are compared again with bounded decoded RGB/RGBA PNG pixels on the host, so metadata or
 filenames alone cannot establish painted markers/edges, absent bridges or dash gaps.
 Explicitly synthetic parser controls reject omitted/failed/errored/skipped methods,

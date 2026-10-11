@@ -229,6 +229,7 @@ class HistoryDisplayAuthorityTest {
             }
         }
         compose.waitForIdle()
+        click("history-stored-text")
     }
 
     private fun retainedBoundPage(): HistoryGraphSnapshot {
@@ -336,6 +337,8 @@ class HistoryDisplayAuthorityTest {
         restored.usageForeground(fixture.observer, true)
         settled("dormant foreground read admitted")
         compose.runOnUiThread { hostedOwner.value = restored }
+        compose.waitForIdle()
+        click("history-stored-text")
         await("dormant local history restored through host") { observer.last?.display?.generation === restored.historySnapshots.value.generation && observer.last?.display?.entries?.size == 1 }
         click("history-select-WEEKLY")
         await("dormant selected page settled through host") { observer.last?.display?.query == HistoryNavigation(kind = WindowKind.WEEKLY).query && observer.last?.display?.entries?.size == 1 }

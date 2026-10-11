@@ -26,14 +26,20 @@ class HistoryNavigationTest {
     @After fun cleanup() { fixture.cleanup() }
 
     @Test fun productionEntrySelectsWindowsAndNavigatesBoundedOrdinalPagesWithNativeCaptures() {
-        seedDormant()
+        seedDormant(fresh = false)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             openHistory()
             page(WindowKind.FIVE_HOUR, 0, 32)
             assertPage(1, 32, more = true)
             compose.onNodeWithTag("history-chart-weekly").assertDoesNotExist()
             captureNavigation(scenario)
+            click("history-stored-text")
+            await("current graph identity admitted") {
+                fixture.owner.historySnapshots.value.let { it.query.currentOnly && it.query.window != null && it.storage?.entries?.size == 32 }
+            }
             captureChart(scenario)
+            click("history-stored-text")
+            page(WindowKind.FIVE_HOUR, 0, 32)
             click("history-select-WEEKLY")
             page(WindowKind.WEEKLY, 0, 32)
             compose.onNodeWithTag("history-chart-five-hour").assertDoesNotExist()
@@ -187,19 +193,18 @@ class HistoryNavigationTest {
         if (android.os.Build.VERSION.SDK_INT >= 33) PhoneTimeEvidence(compose, fixture).run(history = true)
     }
 
-    private fun seedDormant() {
+    private fun seedDormant(fresh: Boolean = true) {
         phase(ConnectionPhase.IDLE)
         fixture.owner.usageForeground(fixture.observer, true)
         fixture.owner.connect()
         phase(ConnectionPhase.OBSERVED)
         await("synthetic seed's original accepted endpoint settled") { fixture.owner.historySnapshots.value.storage?.entries?.size == 1 }
         fixture.seedLocalPage()
-        fixture.freshRuntime()
-        phase(ConnectionPhase.RESTORED)
+        if (fresh) { fixture.freshRuntime(); phase(ConnectionPhase.RESTORED) }
         assertDormantCounts()
     }
 
-    private fun openHistory() { awaitConnectionScreen(compose, fixture.owner); click("history-toggle") }
+    private fun openHistory() { awaitConnectionScreen(compose, fixture.owner); click("history-toggle"); click("history-stored-text") }
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
         node.performScrollTo()
@@ -208,6 +213,7 @@ class HistoryNavigationTest {
     }
 
     private fun page(kind: WindowKind, after: Long, count: Int) {
+        if (fixture.owner.historySnapshots.value.query.currentOnly) click("history-stored-text")
         await("page $kind after=$after count=$count") {
             val source = fixture.owner.historySnapshots.value
             source.query == HistoryGraphQuery(HistoryNavigation.PAGE_LIMIT, after.takeIf { it > 0 }?.let(::ObservationId), kind)

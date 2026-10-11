@@ -7,8 +7,10 @@ import io.github.leugenea.codexbarmobile.usage.WindowKind
 internal data class HistoryNavigation(
     val kind: WindowKind = WindowKind.FIVE_HOUR,
     val after: ObservationId? = null,
+    val window: WindowIdentity? = null,
+    val currentOnly: Boolean = false,
 ) {
-    val query get() = HistoryGraphQuery(limit = PAGE_LIMIT, after = after, kind = kind)
+    val query get() = HistoryGraphQuery(limit = PAGE_LIMIT, after = after, kind = kind, window = window, currentOnly = currentOnly)
 
     fun next(source: HistoryGraphSnapshot): HistoryNavigation {
         if (source.query != query || !source.hasMore) return this
@@ -30,6 +32,9 @@ internal fun historyForDisplay(
     val current = permission?.current()
     if (current == null || current !== permission.context) return hiddenHistory(current, query)
     if (current.generation != null) {
+        if (query.currentOnly && query.window == null) return currentPeriodUnavailable(source, query)
+        if (query.currentOnly && !currentQueryMatches(current, query))
+            return hiddenHistory(null, query)
         if (source.generation === current.generation && source.query == query) return source
         return hiddenHistory(current, query)
     }
@@ -46,3 +51,13 @@ private fun unavailableHistory(source: HistoryGraphSnapshot, query: HistoryGraph
     }
     return HistoryGraphSnapshot(HistoryReadiness.UNAVAILABLE, query = query)
 }
+
+private fun currentQueryMatches(current: HistoryDisplayContext, query: HistoryGraphQuery): Boolean {
+    val kind = query.kind ?: return false
+    val period = current.periods.forKind(kind)
+    return period.window == query.window
+}
+
+private fun currentPeriodUnavailable(source: HistoryGraphSnapshot, query: HistoryGraphQuery) =
+    HistoryGraphSnapshot(if (source.problem == null) HistoryReadiness.UNAVAILABLE else HistoryReadiness.ERROR,
+        query = query, problem = source.problem, storageReason = source.storageReason, lostSamples = source.lostSamples, live = source.live)

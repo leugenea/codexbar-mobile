@@ -71,7 +71,7 @@ class LiveUsageVisualContracts(unittest.TestCase):
 
     def test_gallery_preserves_17_history_images_and_requires_both_live_images(self):
         self.captures()
-        self.assertEqual(len(verify_gallery(self.directory)), 19)
+        self.assertEqual(len(verify_gallery(self.directory)), 21)
         for name in LIVE_CAPTURES:
             self.captures()
             (self.directory / (name + ".png")).unlink()
