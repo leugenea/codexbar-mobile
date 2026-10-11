@@ -318,6 +318,42 @@ class UsageRefreshTest {
         assertEquals(Instant.parse("2026-01-01T00:00:02Z"), state.refresh.evaluatedAt)
     } }
 
+    @Test fun weeklyPolicyFlowsThroughReceiptCacheAndTicksWithoutReanchoringOrLosingStaleFacts() = runTest { fixture {
+        fake.usageResult = SyntheticAuth.response("""{"rate_limit":{"primary_window":{"limit_window_seconds":604800,
+            "used_percent":12.345678901234567890,"reset_at":1767225602,"reset_after_seconds":61}}}""")
+        advance(250); visible(true); manual()
+        val success = state.refresh.usage.success!!
+        val source = success.usage!!.weekly.candidates.single()
+        assertEquals(Instant.parse("2026-01-01T00:00:00.250Z"), success.observedAt)
+        assertEquals(250L, success.receivedAtMillis)
+        assertEquals(Instant.parse("2026-01-01T00:00:02Z"), source.reset.absolute.value)
+        assertEquals(Instant.parse("2026-01-01T00:01:01.250Z"), source.reset.relativeDerived.value)
+        assertEquals(61L, source.reset.relativeSeconds.value)
+        assertFalse(source.reset.discrepant) // Difference is 59.25s, despite the future derived reset.
+        assertEquals(TimeState.LESS_THAN_HOUR, state.refresh.reset(source, ZoneOffset.UTC, Locale.US).state)
+        val requests = fake.gets.size
+        advance(1_000)
+        assertEquals(requests, fake.gets.size)
+        assertSame(success, state.refresh.usage.success)
+        fake.usageResult = SyntheticAuth.response("{}", 403)
+        manual()
+        assertEquals(ReadError.FORBIDDEN, state.refresh.usage.attempt!!.error)
+        assertSame(success, state.refresh.usage.success)
+        assertEquals(Instant.parse("2026-01-01T00:00:01.250Z"), state.refresh.inventory.success!!.observedAt)
+        advance(1_000)
+        val passed = state.refresh.reset(source, ZoneOffset.UTC, Locale.US)
+        assertEquals(TimeState.AWAITING_REFRESH, passed.state)
+        assertEquals(TimeSnapshot.STALE, passed.snapshot)
+        assertEquals(AbsoluteTime("Jan 1, 2026", "00:00", null), passed.absolute)
+        assertEquals(BigDecimal("12.345678901234567890"), source.usedPercent.value)
+        advance(898_000)
+        assertTrue(state.refresh.usage.stale)
+        assertSame(success, state.refresh.usage.success)
+        assertSame(source, state.refresh.usage.success!!.usage!!.weekly.candidates.single())
+        assertEquals(250L, state.refresh.usage.successfulAtMillis)
+        assertEquals(Instant.parse("2026-01-01T00:01:01.250Z"), source.reset.relativeDerived.value)
+    } }
+
     @Test fun connectCompletedInBackgroundWaitsForTheLiveSurface() = runTest { fixture {
         visible(true); visible(false)
         owner.connect(); settle(); advance(5_000)

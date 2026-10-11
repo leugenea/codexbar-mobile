@@ -164,6 +164,25 @@ class UsageResponseParserTest {
         }
     }
 
+    @Test fun weeklyDualResetParsingRetainsFractionalObservationAndOriginalFieldsInEitherSlot() {
+        val observed = Instant.ofEpochSecond(1791154800, 250000000)
+        for (secondary in listOf(false, true)) for ((relative, conflict) in listOf(176400 to false, 176460 to true)) {
+            val source = window("12.345678901234567890", "604800",
+                ",\"reset_at\":1791331200,\"reset_after_seconds\":$relative")
+            val result = parse(if (secondary) payload("null", source) else payload(source), observed, observed)
+            val weekly = result.weekly.candidates.single()
+            assertEquals(observed, result.observedAt)
+            assertEquals(if (secondary) Slot.SECONDARY else Slot.PRIMARY, weekly.slot)
+            assertEquals(BigDecimal("12.345678901234567890"), weekly.usedPercent.value)
+            assertEquals(Instant.ofEpochSecond(1791331200), weekly.reset.absolute.value)
+            assertEquals(relative.toLong(), weekly.reset.relativeSeconds.value)
+            assertEquals(Instant.ofEpochSecond(if (conflict) 1791331260 else 1791331200, 250000000),
+                weekly.reset.relativeDerived.value)
+            assertEquals(conflict, weekly.reset.discrepant)
+            assertEquals(if (conflict) null else false, weekly.reset.due)
+        }
+    }
+
     @Test fun resetAndSummaryTypesRangesAndOverflowNeverInventDefaults() {
         for (bad in listOf("true", "\"2\"", "-1", "0.5", "9223372036854775808", "[]", "{}")) {
             val result = parse("""{"rate_limit":{"primary_window":${window(reset = ",\"reset_at\":$bad,\"reset_after_seconds\":$bad")}},"rate_limit_reset_credits":{"available_count":$bad}}""")

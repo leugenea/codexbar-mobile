@@ -1,5 +1,6 @@
 package io.github.leugenea.codexbarmobile.usage
 
+import java.time.Duration
 import java.time.Instant
 
 object UsageNormalizer {
@@ -23,7 +24,7 @@ object UsageNormalizer {
         val duration = PrimitiveNormalizer.integer(it.durationSeconds, 1)
         PrimitiveNormalizer.known(UsageWindow(
             slot, kind(duration), duration, PrimitiveNormalizer.percent(it.usedPercent),
-            reset(it, observedAt, evaluatedAt),
+            reset(it, duration.value, observedAt, evaluatedAt),
         ))
     })
 
@@ -50,15 +51,22 @@ object UsageNormalizer {
         window.reset.relativeSeconds.knowledge, window.reset.relativeDerived.knowledge,
     ).any { it == Knowledge.MALFORMED }
 
-    private fun reset(input: WindowInput, observedAt: Instant?, evaluatedAt: Instant?): ResetTime {
+    private fun reset(input: WindowInput, durationSeconds: Long?, observedAt: Instant?, evaluatedAt: Instant?): ResetTime {
         val absolute = PrimitiveNormalizer.epoch(input.resetAt)
         val relative = PrimitiveNormalizer.integer(input.resetAfterSeconds)
         val derived = derive(relative, observedAt)
-        val conflict = absolute.value != null && derived.value != null && absolute.value != derived.value
+        val conflict = discrepant(absolute.value, derived.value, durationSeconds)
         // Conflict has no single trustworthy instant to evaluate; retain both originals.
         val effective = if (conflict) null else absolute.value ?: derived.value
         val due = effective?.let { instant -> evaluatedAt?.let { instant <= it } }
         return ResetTime(absolute, relative, derived, conflict, due)
+    }
+
+    private fun discrepant(absolute: Instant?, derived: Instant?, durationSeconds: Long?): Boolean = when {
+        absolute == null || derived == null -> false
+        // Owner-selected weekly app precision, not a provider rounding or latency guarantee.
+        durationSeconds == 604800L -> Duration.between(absolute, derived).abs() > Duration.ofSeconds(60)
+        else -> absolute != derived
     }
 
     private fun derive(relative: Field<Long>, observedAt: Instant?): Field<Instant> {

@@ -143,6 +143,110 @@ class UsageNormalizerTest {
         assertNull(UsageNormalizer.normalize(input).observedAt)
     }
 
+    @Test fun weeklyPrecisionComparesFullInstantsInBothDirectionsAndSlotsWithoutChangingFacts() {
+        val absolute = Instant.ofEpochSecond(1791331200)
+        val cases = listOf(
+            Triple(now, 176400L, false),
+            Triple(now.plusNanos(250000000), 176400L, false),
+            Triple(now.plusNanos(250000000), 176399L, false),
+            Triple(now, 176459L, false),
+            Triple(now, 176341L, false),
+            Triple(now, 176460L, false),
+            Triple(now, 176340L, false),
+            Triple(now.plusNanos(1), 176460L, true),
+            Triple(now.minusNanos(1), 176340L, true),
+            Triple(now, 176461L, true),
+            Triple(now, 176339L, true),
+        )
+        for (slot in Slot.entries) for ((observed, relative, conflict) in cases) {
+            val input = M0Fixtures.window(BigDecimal("12.345678901234567890"), 604800,
+                value(1791331200), value(relative))
+            val result = normalize(if (slot == Slot.PRIMARY) M0Fixtures.usage(input, Input.Null)
+                else M0Fixtures.usage(Input.Null, input), observed, observed)
+            val weekly = result.weekly.candidates.single()
+            val context = "$slot observed=$observed relative=$relative"
+            assertEquals(context, SelectionState.KNOWN, result.weekly.state)
+            assertEquals(context, slot, weekly.slot)
+            assertEquals(context, observed, result.observedAt)
+            assertEquals(context, BigDecimal("12.345678901234567890"), weekly.usedPercent.value)
+            assertEquals(context, Field(Knowledge.KNOWN, absolute), weekly.reset.absolute)
+            assertEquals(context, Field(Knowledge.KNOWN, relative), weekly.reset.relativeSeconds)
+            assertEquals(context, Field(Knowledge.KNOWN, observed.plusSeconds(relative)), weekly.reset.relativeDerived)
+            assertEquals(context, conflict, weekly.reset.discrepant)
+            assertEquals(context, if (conflict) null else false, weekly.reset.due)
+            assertEquals(context, SelectionState.UNAVAILABLE, result.fiveHour.state)
+        }
+    }
+
+    @Test fun weeklyPrecisionDoesNotApplyToOtherOrUnusableDurations() {
+        val durations = listOf(value(18000), value(3600), value(604799), value(604801),
+            Input.Missing, Input.Null, Input.Invalid, value("604800"), value(true),
+            value(604800.5), value(-604800))
+        for (duration in durations) {
+            val result = normalize(UsageInput(primary = Input.Value(WindowInput(
+                duration, value(22), value(1791331200), value(176400)))), now.plusNanos(1), now)
+            val reset = result.slots.first().window.value!!.reset
+            assertTrue("duration=$duration must keep exact comparison", reset.discrepant)
+            assertNull(reset.due)
+        }
+    }
+
+    @Test fun weeklyPrecisionPreservesSingleSourceBadFieldsAndUnknownClocks() {
+        fun weekly(absolute: Input<Any>, relative: Input<Any>, observed: Instant? = now,
+            evaluated: Instant? = now) = normalize(M0Fixtures.usage(M0Fixtures.window(
+                22, 604800, absolute, relative)), observed, evaluated).weekly.candidates.single()
+        val absoluteOnly = weekly(value(1791331200), Input.Missing, now.plusNanos(1))
+        assertFalse(absoluteOnly.reset.discrepant)
+        assertEquals(Reason.MISSING, absoluteOnly.reset.relativeSeconds.reason)
+        assertEquals(Instant.ofEpochSecond(1791331200), absoluteOnly.reset.absolute.value)
+        val relativeOnly = weekly(Input.Null, value(176400), now.plusNanos(1))
+        assertEquals(Reason.PROVIDER_NULL, relativeOnly.reset.absolute.reason)
+        assertEquals(Instant.ofEpochSecond(1791331200, 1), relativeOnly.reset.relativeDerived.value)
+        assertFalse(relativeOnly.reset.discrepant)
+        for (observed in listOf(null, Instant.EPOCH, Instant.ofEpochSecond(-1))) {
+            val unknown = weekly(Input.Missing, value(176400), observed)
+            assertEquals(Reason.CLOCK_REQUIRED, unknown.reset.relativeDerived.reason)
+            assertNull(unknown.reset.due)
+            val knownAbsolute = weekly(value(1791331200), value(176400), observed)
+            assertEquals(Reason.CLOCK_REQUIRED, knownAbsolute.reset.relativeDerived.reason)
+            assertEquals(Instant.ofEpochSecond(1791331200), knownAbsolute.reset.absolute.value)
+            assertFalse(knownAbsolute.reset.discrepant)
+        }
+        for (bad in listOf(Input.Null, Input.Invalid, value(false), value("176400"), value(-1), value(0.5))) {
+            val reset = weekly(value(1791331200), bad).reset
+            assertNotEquals(Knowledge.KNOWN, reset.relativeSeconds.knowledge)
+            assertFalse(reset.discrepant)
+            assertEquals(Instant.ofEpochSecond(1791331200), reset.absolute.value)
+        }
+        for (bad in listOf(Input.Missing, Input.Null, Input.Invalid, value(false), value("1791331200"), value(0))) {
+            val reset = weekly(bad, value(176400)).reset
+            assertNotEquals(Knowledge.KNOWN, reset.absolute.knowledge)
+            assertFalse(reset.discrepant)
+            assertEquals(Instant.ofEpochSecond(1791331200), reset.relativeDerived.value)
+        }
+        val unknownEvaluation = weekly(value(1791331200), value(176400), evaluated = null)
+        assertFalse(unknownEvaluation.reset.discrepant)
+        assertNull(unknownEvaluation.reset.due)
+        val elapsed = weekly(value(1791154800), value(59))
+        assertFalse(elapsed.reset.discrepant)
+        assertEquals(true, elapsed.reset.due) // Original absolute is due although derived is still future.
+        assertEquals(BigDecimal(22), elapsed.usedPercent.value)
+    }
+
+    @Test fun weeklyPrecisionHandlesLargeInstantDifferencesAndDerivationOverflow() {
+        val input = M0Fixtures.usage(M0Fixtures.window(22, 604800, value(1), value(0)))
+        val distant = normalize(input, observed = Instant.MAX, evaluated = null).weekly.candidates.single().reset
+        assertEquals(Instant.MAX, distant.relativeDerived.value)
+        assertTrue(distant.discrepant) // Full Duration is safe even when nanosecond scalars would overflow.
+        assertNull(distant.due)
+        val overflow = normalize(input.copy(primary = M0Fixtures.window(22, 604800, value(1), value(1))),
+            observed = Instant.MAX, evaluated = null).weekly.candidates.single().reset
+        assertEquals(Knowledge.MALFORMED, overflow.relativeDerived.knowledge)
+        assertFalse(overflow.discrepant)
+        assertEquals(Instant.ofEpochSecond(1), overflow.absolute.value)
+        assertNull(overflow.due)
+    }
+
     @Test fun resetBoundaryRetainsPercentAndDoesNotRollInstantForward() {
         val input = M0Fixtures.usage(M0Fixtures.window(83, absolute = value(now.epochSecond)))
         val at = window(normalize(input))

@@ -24,6 +24,7 @@ EXPECTED = {
         "foregroundLossCancelsReadAndResumeStartsOneBoundedCycle",
         "removingOneOfTwoVisibleObserversDoesNotCancelTheirSharedRead",
         "countdownTicksMakeNoRequestsAndPassedResetRetainsPercent",
+        "weeklyPolicyFlowsThroughReceiptCacheAndTicksWithoutReanchoringOrLosingStaleFacts",
         "connectCompletedInBackgroundWaitsForTheLiveSurface",
         "cancellationBeforeCycleEntryCannotWedgeResumeOrAccountReplacement",
         "failedQuarantineRemovalClearsRetainedSuccessAndStopsAutomaticWork",

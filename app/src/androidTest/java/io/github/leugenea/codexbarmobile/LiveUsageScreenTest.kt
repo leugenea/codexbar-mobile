@@ -112,7 +112,7 @@ class LiveUsageScreenTest {
         settings.apply(dark, 1f)
         fake.usage = response("""{"rate_limit":{"allowed":true,"limit_reached":false,
             "primary_window":{"limit_window_seconds":18000,"used_percent":12.5,"reset_after_seconds":5400},
-            "secondary_window":{"limit_window_seconds":604800,"used_percent":76.25,"reset_after_seconds":176400}}}""")
+            "secondary_window":{"limit_window_seconds":604800,"used_percent":76.25,"reset_at":1791594000,"reset_after_seconds":176430}}}""")
         launchLive().use { scenario ->
             settings.observe(compose, scenario, landscape = false, dark = dark, font = 1f)
             read()
@@ -176,6 +176,26 @@ class LiveUsageScreenTest {
             text("live-weekly-reset-relative", "Reset: Time unavailable")
             compose.onNodeWithTag("live-weekly-reset-absolute").assertDoesNotExist()
             compose.onNodeWithTag("live-status").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
+            clock.wall = Instant.parse("2026-10-08T00:00:00.250Z")
+            fake.usage = response(weekly("12.345678901234567890",
+                reset = ",\"reset_at\":1791594000,\"reset_after_seconds\":176400"))
+            read()
+            text("live-weekly-reset-absolute", "Reset: Oct 10, 2026, 01:00 (hour precision)")
+            text("live-weekly-reset-relative", "Reset: 2 days 0 hours remaining")
+            progress("live-weekly", 0.12345679f, "Weekly window · 12.345678901234567890% used",
+                "Provider-reported usage", "12.345678901234567890% used")
+            val accepted = owner.state.value.refresh.usage.success!!
+            assertEquals(Instant.parse("2026-10-08T00:00:00.250Z"), accepted.observedAt)
+            assertEquals(Instant.parse("2026-10-10T01:00:00Z"), accepted.usage!!.weekly.candidates.single().reset.absolute.value)
+            assertEquals(Instant.parse("2026-10-10T01:00:00.250Z"), accepted.usage.weekly.candidates.single().reset.relativeDerived.value)
+            fake.usage = response(weekly("12.345678901234567890",
+                reset = ",\"reset_at\":1791594000,\"reset_after_seconds\":176460"))
+            read() // Full difference is 60.25 seconds, outside the app policy.
+            text("live-weekly-reset-relative", "Reset: Conflicting time information")
+            compose.onNodeWithTag("live-weekly-reset-absolute").assertDoesNotExist()
+            text("live-weekly-percent", "12.345678901234567890% used")
+            text("live-five-hour-status", "Window or usage percentage unavailable · not zero")
+            compose.onNodeWithTag("live-five-hour-progress").assertDoesNotExist()
         }
     }
 
@@ -793,7 +813,7 @@ class LiveUsageScreenTest {
         fun bankedUsage(count: Long = 1) = """{"rate_limit_reset_credits":{"available_count":$count},"credits":{"balance":"999999","has_credits":true},"rate_limit":{"allowed":true,"primary_window":{"limit_window_seconds":18000,"used_percent":12.5}}}"""
         fun fiveHour(percent: String, allowed: Boolean = true, reached: Boolean = false, reset: String = "") =
             """{"rate_limit":{"allowed":$allowed,"limit_reached":$reached,"primary_window":{"limit_window_seconds":18000,"used_percent":$percent$reset}}}"""
-        fun weekly(percent: String) = """{"rate_limit":{"primary_window":{"limit_window_seconds":604800,"used_percent":$percent},"secondary_window":null}}"""
+        fun weekly(percent: String, reset: String = "") = """{"rate_limit":{"primary_window":{"limit_window_seconds":604800,"used_percent":$percent$reset},"secondary_window":null}}"""
         fun response(body: String, status: Int = 200) = TransportResult.Response.bounded(status, body.toByteArray())
     }
 }

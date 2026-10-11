@@ -3,6 +3,7 @@ package io.github.leugenea.codexbarmobile.history
 import io.github.leugenea.codexbarmobile.*
 import io.github.leugenea.codexbarmobile.auth.SyntheticAuth
 import io.github.leugenea.codexbarmobile.transport.*
+import io.github.leugenea.codexbarmobile.usage.Input
 import io.github.leugenea.codexbarmobile.usage.WindowKind
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.*
@@ -14,6 +15,55 @@ import java.time.Instant
 /** Synthetic integration: actual controller/B2/reader/parser/reducer/math, not StateFlow sample counting. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class UsageHistoryRecorderTest {
+    @Test fun weeklyAcceptedObservationsKeepExactAbsoluteIdentitiesAndDiscrepantPointsIsolated() = runTest { fixture {
+        fun payload(absolute: Long, relative: Long) = SyntheticAuth.response("""{"rate_limit":{"primary_window":{
+            "limit_window_seconds":604800,"used_percent":12.345678901234567890,
+            "reset_at":$absolute,"reset_after_seconds":$relative}}}""")
+        advance(250); visible(true)
+        usage = payload(1800176400, 176400); read()
+        val first = journal.entries.single().windows.single { it.kind == WindowKind.WEEKLY }
+        assertEquals(ResetProvenance.ABSOLUTE, first.reset.provenance)
+        assertEquals(Instant.ofEpochSecond(1800176400), first.point!!.segment.window!!.resetAt)
+        assertEquals(Instant.ofEpochSecond(1800000000, 250000000), first.point.observedAt)
+        assertEquals(250L, first.point.clock.monotonicMillis)
+        assertEquals(Instant.ofEpochSecond(1800176400, 250000000), first.reset.facts!!.relativeDerived.value)
+        assertEquals(BaselineEligibility.ELIGIBLE, first.baseline)
+        advance(1_000)
+        usage = payload(1800176401, 176400); read()
+        val second = journal.entries.last().windows.single { it.kind == WindowKind.WEEKLY }
+        assertEquals(Instant.ofEpochSecond(1800176401), second.point!!.segment.window!!.resetAt)
+        assertNotEquals(first.point.segment.window, second.point.segment.window)
+        assertEquals(setOf(BreakReason.WINDOW_CHANGED), second.point.segment.breaks)
+        advance(1_000)
+        usage = payload(1800176401, 176460); read()
+        val conflicting = journal.entries.last().windows.single { it.kind == WindowKind.WEEKLY }
+        assertEquals(ResetProvenance.DISCREPANT, conflicting.reset.provenance)
+        assertEquals(BaselineEligibility.UNKEYED_RESET, conflicting.baseline)
+        assertNull(conflicting.point!!.segment.window)
+        assertEquals(BigDecimal("12.345678901234567890"), conflicting.point.usedPercent)
+        advance(1_000)
+        usage = payload(1800176401, 176398); read()
+        assertEquals(ResetProvenance.ABSOLUTE, journal.entries.last().windows.single { it.kind == WindowKind.WEEKLY }.reset.provenance)
+        assertEquals(first, journal.entries.first().windows.single { it.kind == WindowKind.WEEKLY })
+        assertEquals(conflicting, journal.entries[2].windows.single { it.kind == WindowKind.WEEKLY })
+        assertTrue(conflicting.reset.facts!!.discrepant)
+    } }
+
+    @Test fun historicalWeeklyDiscrepancyFlagIsConsumedWithoutRenormalizingStoredFacts() {
+        val normalized = SyntheticHistory.usage(primary = SyntheticHistory.window(
+            duration = Input.Value(604800L), relative = Input.Value(3599L)))
+        val source = normalized.weekly.candidates.single()
+        assertFalse(source.reset.discrepant)
+        // An already recorded pre-policy discrepancy is a model fact, not a fresh response to normalize.
+        val historical = source.copy(reset = source.reset.copy(discrepant = true, due = null))
+        val retained = normalized.copy(weekly = normalized.weekly.copy(candidates = listOf(historical)))
+        val result = SyntheticHistory.weekly(SyntheticHistory.append(usage = retained))
+        assertEquals(ResetProvenance.DISCREPANT, result.reset.provenance)
+        assertEquals(historical.reset, result.reset.facts)
+        assertNull(result.point!!.segment.window)
+        assertEquals(BaselineEligibility.UNKEYED_RESET, result.baseline)
+    }
+
     @Test fun acceptedEqualPercentReadsHaveDistinctIdsButCoalescingTicksAndQueriesDoNotSample() = runTest { fixture {
         visible(true)
         assertEquals(HistoryReadiness.EMPTY, snapshot.readiness)
