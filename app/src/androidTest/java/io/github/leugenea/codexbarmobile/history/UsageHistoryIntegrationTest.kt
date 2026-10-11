@@ -211,8 +211,14 @@ class UsageHistoryIntegrationTest {
             composeHistory(current, "Compose observer records connect usage") { it.points.size == 1 }
             val initial = capability(current)
             scenario.moveToState(Lifecycle.State.CREATED)
-            composeHistory(current, "STOP revokes history") { it.readiness == HistoryReadiness.UNAVAILABLE }
-            assertTrue(initial.read(HistoryReadQuery(initial.partition, 1)) is HistoryReadOutcome.Unavailable)
+            // Graph invalidation precedes native revoke; coordinator availability is post-revoke.
+            composeHistory(current, "STOP completes native history revocation") {
+                it.readiness == HistoryReadiness.UNAVAILABLE && current.historyAvailability == HistoryAvailability.UNAVAILABLE
+            }
+            val stoppedRead = initial.read(HistoryReadQuery(initial.partition, 1))
+            assertTrue("STOP captured port: native=${stoppedRead.javaClass.simpleName}, " +
+                "graph=${current.historySnapshots.value.readiness}, coordinator=${current.historyAvailability}",
+                stoppedRead is HistoryReadOutcome.Unavailable)
             fake.advance(1_000)
             scenario.moveToState(Lifecycle.State.RESUMED)
             compose.waitForIdle()
@@ -226,10 +232,18 @@ class UsageHistoryIntegrationTest {
             }
             scenario.onActivity { assertSame(current, it.connection) }
             afterRecreation = capability(current)
-            assertTrue(afterRecreation.read(HistoryReadQuery(afterRecreation.partition, 1)) is HistoryReadOutcome.Ready)
+            val usableRead = afterRecreation.read(HistoryReadQuery(afterRecreation.partition, 1))
+            assertTrue("post-recreation captured port before finish: native=${usableRead.javaClass.simpleName}, " +
+                "graph=${current.historySnapshots.value.readiness}, coordinator=${current.historyAvailability}",
+                usableRead is HistoryReadOutcome.Ready)
         } finally { scenario.close() }
-        composeHistory(current, "finish retires the post-recreation capability") { it.readiness == HistoryReadiness.UNAVAILABLE }
-        assertTrue(afterRecreation.read(HistoryReadQuery(afterRecreation.partition, 1)) is HistoryReadOutcome.Unavailable)
+        composeHistory(current, "finish completes native history revocation") {
+            it.readiness == HistoryReadiness.UNAVAILABLE && current.historyAvailability == HistoryAvailability.UNAVAILABLE
+        }
+        val finishedRead = afterRecreation.read(HistoryReadQuery(afterRecreation.partition, 1))
+        assertTrue("finish captured post-recreation port: native=${finishedRead.javaClass.simpleName}, " +
+            "graph=${current.historySnapshots.value.readiness}, coordinator=${current.historyAvailability}",
+            finishedRead is HistoryReadOutcome.Unavailable)
         assertTrue(KeystoreCredentialStore.file(context, NativeConnection.session(context)).exists())
         assertNotEquals(ConnectionPhase.SIGNED_OUT, current.state.value.phase)
     }
@@ -259,7 +273,10 @@ class UsageHistoryIntegrationTest {
     }
     private fun composeHistory(current: ConnectionController, step: String, predicate: (HistoryGraphSnapshot) -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 5_000) { predicate(current.historySnapshots.value) } }
-        catch (_: ComposeTimeoutException) { throw AssertionError("$step: last readiness=${current.historySnapshots.value.readiness}, points=${current.historySnapshots.value.points.size}") }
+        catch (_: ComposeTimeoutException) {
+            throw AssertionError("$step: last readiness=${current.historySnapshots.value.readiness}, " +
+                "points=${current.historySnapshots.value.points.size}, coordinator=${current.historyAvailability}")
+        }
     }
     private fun awaitProtectedRemoval() = runBlocking {
         val slot = NativeConnection.session(context)
