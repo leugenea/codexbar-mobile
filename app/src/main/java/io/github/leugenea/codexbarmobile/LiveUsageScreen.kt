@@ -28,7 +28,7 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import java.time.ZoneId
 
-/** Lives in the opt-in screen's one scroll container; preview fixtures never enter this UI. */
+/** Lives in the connection screen's one scroll container; facts come from the process owner. */
 @Composable
 internal fun LiveUsageScreen(state: ConnectionState, refresh: () -> Unit) {
     // B2 ticks cause local reevaluation; read the effective locale/zone, never cache a wall label.

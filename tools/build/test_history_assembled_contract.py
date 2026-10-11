@@ -28,7 +28,7 @@ class HistoryAssembledContracts(unittest.TestCase):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryAssembledAcceptanceTest.kt").read_text()
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_ASSEMBLED_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 107 + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 108 + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
         for name in HISTORY_ASSEMBLED_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history assembled acceptance"):
@@ -74,7 +74,7 @@ class HistoryAssembledContracts(unittest.TestCase):
                                ("layoutDensity", 2), ("orientation", True), ("productionEntry", False), ("activity", "fixture"),
                                ("queryLimit", 257), ("queryAfter", -1), ("pageEntries", True), ("phase", "FAILED"),
                                ("readiness", "ERROR"), ("hasMore", True), ("requests", 99), ("gets", 99),
-                               ("uiCursor", "newest"), ("visibleControls", [])):
+                               ("uiCursor", "newest"), ("visibleControls", ["connection-tab"]), ("visibleRoots", None), ("visibleControls", None), ("visibleRoots", []), ("visibleRoots", ["offline-tab"])):
                 with self.subTest(name=name, key=key):
                     self.mutate(name, key, value)
 

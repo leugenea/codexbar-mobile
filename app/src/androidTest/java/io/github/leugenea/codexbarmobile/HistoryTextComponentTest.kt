@@ -34,6 +34,8 @@ import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.usage.WindowKind
 import org.json.JSONObject
 import org.junit.Assert.*
+import org.junit.Before
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -45,6 +47,9 @@ import java.util.Locale
 @RunWith(AndroidJUnit4::class)
 class HistoryTextComponentTest {
     @get:Rule val compose = createEmptyComposeRule()
+    private val fixture = HistoryNavigationFixture()
+    @Before fun prepareOwner() { fixture.prepare() }
+    @After fun cleanupOwner() { fixture.cleanup() }
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private var renderedDensity = 0f
     private var renderedFont = 0f
@@ -204,7 +209,13 @@ class HistoryTextComponentTest {
                 scenario.onActivity { orientation = it.resources.configuration.orientation }
                 orientation == expected
             }
+            // Default launch now attaches the real observer before the component replaces content.
+            // Isolate that owner so this synthetic component campaign cannot activate a retained session.
+            awaitConnectionScreen(compose, fixture.owner)
+            assertEquals(0L, fixture.transport.requests.get())
             render(scenario, plot, dark, font)
+            settleConnectionCommands(compose, fixture.owner, "component replacement retires launcher observer")
+            assertEquals(0L, fixture.transport.requests.get())
         } catch (error: Throwable) { scenario.close(); throw AssertionError("History fixture orientation/render readiness", error) }
         return scenario
     }

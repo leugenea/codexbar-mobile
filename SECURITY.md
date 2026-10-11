@@ -18,15 +18,17 @@ passwords, device codes or raw account data, including in private reports.
 
 Development fixes target `main`. There is no signed production release or promise
 of maintained older releases. The app declares INTERNET as network infrastructure,
-with cleartext traffic explicitly disabled in every app build. The separate offline
-preview still makes no provider traffic. Explicit connect enters the selected
+with cleartext traffic explicitly disabled in every app build. The launcher enters
+the real connection/live flow. Fresh-owner restoration stays dormant. Explicit connect enters the selected
 system-browser device-code flow, the same selected token endpoint for session refresh,
 and two read-only WHAM endpoints only. The native gate is not authoritative
 account/workspace association or a supported client.
 
 One lazy process-scoped owner controls bounded login/read/refresh work. Activities
-only observe and submit commands; recreation, backgrounding and finish do not stop
-the process-owned work. The holder uses applicationContext only and retains no
+only observe and submit commands; recreation, backgrounding and finish retain the
+process owner. The directly attached STARTED observer cancels eligible reads on
+foreground loss and resumes an already activated owner, while authentication and
+rotation settlement retain their independent process ownership. The holder uses applicationContext only and retains no
 Activity. Launcher singleTask is defense in depth, not the ownership boundary. Device-login
 user codes stay in owned memory except an explicit Copy code action, checked against the
 current attempt on the serial owner lane and marked sensitive before the clipboard write.

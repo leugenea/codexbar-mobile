@@ -3,21 +3,19 @@
 ## Implemented application
 
 One Android phone app module, `io.github.leugenea.codexbarmobile`, launches
-`MainActivity` via MAIN/LAUNCHER. Compose Material3 renders four explicitly offline
-previews: disconnected, frozen loading, simulated error and demo usage.
+`MainActivity` via MAIN/LAUNCHER directly into the real `ConnectionScreen`.
+Disconnected, restoring/loading, reauthorization, error and unknown usage remain
+honest projections of the one process owner; no sample model or preview route is shipped.
 
 ```text
-MainActivity / rememberSaveable preview key
-    -> OfflineShellState (pure synchronous transitions)
-    -> Compose screens / string resources
-    -> OfflineFixtures (fixed synthetic percentages, only in demo)
+MainActivity / StateFlow observer + identity-tagged STARTED lifecycle observer
+    -> ConnectionScreen / live usage, authentication and local history controls
+    -> NativeConnection.get(applicationContext) / one lazy process owner
 ```
 
-The saved key restores preview selection across Activity recreation; malformed or
-unknown keys restore disconnected. It is not an account/session identity or a
-persistent history store. Retry only selects the loading preview; displaying a
-sample only selects demo. No timer, background request or live reset observation
-runs. Resources label all samples and connection absence explicitly.
+Launch and Activity recreation always render this flow. There is no saved preview
+or tab selector, and no legacy Bundle selection can switch the destination.
+No storage migration is needed for the retired ephemeral UI choices.
 
 The source manifest requests INTERNET only, with `usesCleartextTraffic="false"`.
 The exact merged/APK/installed allowlist also includes the existing AndroidX Core
@@ -27,13 +25,12 @@ permission and any Network Security Config override. The manifest flag is suffic
 for the current API 26 minimum / API 37 target; moving to target API 38 or adding
 a Network Security Config requires a separately reviewed cleartext policy update.
 Debug/test builds do not opt into device cleartext; JVM local-server tests do not
-need that opt-in. This replaces the historical no-INTERNET invariant, not the
-offline demo boundary: preview actions still initiate no requests. Backup/extraction rules
-exclude app data. The default offline preview initiates no provider requests.
+need that opt-in. Backup/extraction rules exclude app data. Fresh process-owner
+construction/restoration remains dormant before explicit activation, even on launch.
 
 ## Native connection screen
 
-A separate Connection screen is opt-in and never uses the offline fixtures:
+The default Connection screen consumes the real owner state:
 
 ```text
 MainActivity / thin StateFlow observer
@@ -163,17 +160,17 @@ permission and limit flags remain independent. Duration-classified missing/ambig
 windows never become zero, and malformed fields do not hide independently known facts.
 The shared production root uses a Material3 `Surface` with the selected background
 and inherited on-background content color in both light and system-dark configurations.
-The live periodic-usage card follows the offline preview's 20dp content padding,
+The live periodic-usage card uses 20dp content padding,
 16dp grouping and 8dp window spacing, title roles and theme-default progress bars;
 all percentages and reset/status facts still come from the normalized presentation.
-The banked section remains independently grouped below it. Preview availability,
-tab defaults, foreground eligibility and the one scroll container are unchanged.
+The banked section remains independently grouped below it, in the same single scroll
+container. The selected root/card/content/bar/track paint contract remains unchanged.
 B1 alone supplies reset absolute/relative labels, including unknown/sub-hour/passed and
 repeated-hour offsets. Status transitions use polite accessibility live regions; ordinary
 countdowns do not repeatedly announce. One wrapping, vertically scrollable content tree
-keeps actions reachable in landscape. Only the existing harmless tab/preview selection
-is Bundle-restored; usage stays with the process owner across Activity recreation, not
-with a saved credential or a persistent history store. C2's read-only banked-reset
+keeps actions reachable in landscape. Usage stays with the process owner across
+Activity recreation; no connection state, credential or obsolete UI selector is
+Bundle-restored. C2's read-only banked-reset
 section consumes B2's inventory cache through C1
 `EntitlementPresentation`; `BankedResetPresentation` only adapts resource labels and
 independent freshness/error metadata. Provider counts and comparison clocks are kept
@@ -185,12 +182,13 @@ entitlement fact; the existing A10/B2 generation path rejects late inventory res
 The gate retains explicit read/session-refresh controls and sign-in-again action.
 
 B2's `UsageRefresh` is a subordinate scheduler in that same owner scope/lane, not
-another session owner. The opt-in live gate observes `repeatOnLifecycle(STARTED)`;
+another session owner. The default Activity observes `repeatOnLifecycle(STARTED)`;
 identity-tagged observers keep one disappearing Activity from cancelling another
 visible observer. Connect/manual read activates refresh for the current generation.
-Protected restoration remains dormant until an explicit action, including when the
-restored gate is opened: default offline previews and fresh-runtime restoration
-remain no-network. After activation, foreground resume requests one bounded cycle;
+Protected restoration in a fresh owner remains dormant until an explicit action,
+including on default launch. Holder construction alone does not activate reads.
+An already activated process owner becomes foreground eligible on Activity launch
+without a tab click. Foreground launch/recreation/resume requests one bounded cycle;
 manual/resume/connect triggers coalesce while a cycle is in flight. Foreground loss
 cancels eligible reads, local ticks and polls but never owns token rotation or auth.
 A10's independent rotation settlement and durable quarantine rules are unchanged;
@@ -457,7 +455,7 @@ and permit explicit retry when lifetime authority exists. This metadata is sandb
 not encrypted or forensically erased, and inherits the existing no-backup policy.
 
 Name/state/edit diagnostics are redacted. No name is added to transport requests, logs,
-credentials, saved-instance state, offline demos or provider fixtures. Original synthetic
+credentials, saved-instance state or provider fixtures. Original synthetic
 labels are confined to regression tests. JVM `AccountNameFileTest` exercises normalization,
 bounded parsing, persistence/reopen, clear and write failures; `AccountNameLifetimeTest`
 exercises the real process-owner topology, rotation/restoration, foreground retention,
@@ -597,7 +595,7 @@ percentage comparison or persisted account ID. The worker allocates the contiguo
 independently classified window facts; missing/unknown windows stay status, not invented
 points. Equal-percent independent reads still get distinct ordinals. Usage success is
 recorded before inventory completes and remains valid when inventory fails. Inventory-only
-success, retained cache, failure, preview, local tick and analytical evaluation add no points.
+success, retained cache, failure, local tick and analytical evaluation add no points.
 Endpoint wall `observedAt` and its paired `receivedAtMillis` are captured before decoding;
 storage completion and graph query time never replace them.
 
@@ -798,9 +796,9 @@ The existing Connection screen exposes **View local history** and a return contr
 for the live usage and authentication controls. `ConnectionHistory`
 collects the same process owner's `historySnapshots` and sends only
 `queryHistory(HistoryGraphQuery)`. It adds no observer registration, controller,
-storage port, network action or sampling timer. The existing Connection-tab
+storage port, network action or sampling timer. The Activity's directly attached
 STARTED lifecycle remains the only UI registration; opening dormant restored
-history does not activate B2. Offline previews remain separate.
+history does not activate B2.
 
 A five-hour/weekly selection renders the selected chart and its textual equivalent.
 `HistoryNavigation` holds only the kind and one exclusive ordinal cursor, with a
@@ -846,7 +844,7 @@ the 98 native identities without changing the twelve captures. Hosted execution
 and fresh lint/coverage/image review remain acceptance, not source-level proof.
 
 Five mandatory `HistoryNavigationTest` instrumentation cases exercise the actual
-MainActivity entry, window/page controls, dormant restore and offline request
+MainActivity entry, window/page controls, dormant restore and zero new request
 counts, logout/relogin deletion, recreation/foreground retirement and independent
 endpoint errors. They use a route-dispatched synthetic transport and the production
 owner factory with actual Keystore/SQLite under a test-owned application/no-backup
@@ -888,7 +886,7 @@ read is held, then require rejection of the predecessor and successor-only pages
 Fresh-holder restoration here remains restoration from app storage, not process-death
 or live-provider evidence.
 
-The inherited default-factory dormant restore and offline cases count every transport
+The inherited default-factory dormant restore and local-navigation cases count every transport
 call; the new local query/lifecycle cases additionally compare all five route counters
 (user-code, auth poll, token exchange, usage and inventory) and unchanged high-water.
 A synthetic tighter count ceiling plus an actual SQLite read fault exercises retained
@@ -959,7 +957,7 @@ They require inherited root text paint, selected root/card/content/bar/track pix
 exact 12.5% and 76.25% semantics and independently projected absolute/relative reset
 labels. The dark case also checks effective font scale 2, complete native line
 extents and reachable refresh/history controls. Existing landscape, malformed,
-unavailable, stale/error, exhausted, banked, preview and lifecycle cases remain
+unavailable, stale/error, exhausted, banked and lifecycle cases remain
 mandatory; this adds no duplicate lifecycle campaign.
 
 The existing collector keeps all 17 history images and additionally requires
@@ -972,14 +970,38 @@ screen/locale identities. Native execution, lint, compatible whole-handwritten
 >=90% INSTRUCTION union, independent exact-source review and individual actual-PNG
 inspection remain hosted/delivery gates; source/compile/parser checks do not prove
 runtime paint or visual acceptance. Reset conflict reconciliation, phone-local
-formatting of remaining timestamps and offline-preview retirement are separate work.
+formatting of remaining timestamps remain separate work.
+
+## Default-launch regression contract
+
+`ConnectionLaunchSmokeTest` enters the production launcher with an isolated real
+Keystore/SQLite and synthetic transport. Its disconnected, recreation/legacy-Bundle
+and landscape cases retain installed INTERNET plus AndroidX signature-only permission,
+cleartext-off and FLAG_SECURE assertions and real connection/history reachability.
+Its activated-owner relaunch case acknowledges foreground loss and command completion,
+holds the automatically resumed usage operation, rejects duplicate admissions and
+requires exactly one usage/inventory pair plus one real history observation after the
+background gap. Fresh-owner dormant restoration remains covered by live/history/account
+and scheduler tests. `UsageRefreshLifecycleTest` retains operation-provenance-based
+Home/recreation cancellation and coalescing; raw Activity START counts are not request
+counts. Stale-generation transport/write/privacy oracles pause through actual STOP
+and resume through STARTED instead of selecting a removed screen.
+
+All 19 meaningful capture names/configurations remain required. Production captures
+now require `visibleRoots = ["connection-screen"]`; only the retired tab is removed
+from `visibleControls`. Chart viewports can have an explicitly empty control list,
+while navigation/page viewports still require their exact real controls. Missing root
+or control receipts fail closed. Independent geometry, expected colors, +/-12 channel
+tolerance and actual saved-PNG sample equality remain unchanged. Removal changes the
+integrated layout, so individual actual-image inspection remains a hosted acceptance
+gate, alongside runtime/lint/coverage and independent full-candidate review.
 
 ## Verification boundaries
 
 - `app/src/test`: JVM state transitions, restore behavior and percentage validation.
 - `app/src/androidTest`: real production Activity/launcher, exact installed permission
-  allowlist and effective cleartext-off policy, preview actions, recreation and
-  landscape UI checks.
+  allowlist, effective cleartext-off policy and FLAG_SECURE, default connection flow,
+  legacy-selection rejection, recreation, foreground coalescing and landscape UI checks.
 - `tools/build`: scaffold/workflow/toolchain/strict dependency contracts, manifests,
   JUnit and compatible class-ID/freshness/denominator coverage validation.
 - `tools/research`: offline fixture/schema contracts; not a production provider parser.
@@ -1057,10 +1079,9 @@ or artifact policy.
 
 [Historical M0 research](docs/research/m0.md), schemas and attributed fixtures
 are offline research inputs, not shipped provider support. The app does not load
-those research JSON files. Locally authored demo values are a separate UI fixture.
-Offline previews do not initiate requests. The separate native connection gate has its own
-JVM and hosted fake Activity/browser/Keystore scenarios; it does not use the demo
-values. Public sources and successful token receipt still do not establish Android
+those research JSON files. Synthetic live-test transports and normalized research
+fixtures remain test/research inputs, never a shipped sample screen. The native connection
+gate has JVM and hosted fake Activity/browser/Keystore scenarios. Public sources and successful token receipt still do not establish Android
 account/workspace association or service distribution permission.
 
 The native gate implements selected connect, explicit two-read/session-refresh,

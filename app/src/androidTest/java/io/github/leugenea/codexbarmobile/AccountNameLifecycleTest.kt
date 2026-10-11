@@ -160,7 +160,7 @@ class AccountNameLifecycleTest {
         fixture.owner.connect(); phase(ConnectionPhase.OBSERVED)
         fixture.freshRuntime(); phase(ConnectionPhase.RESTORED)
     }
-    private fun openConnection() { compose.waitForIdle(); click("connection-tab") }
+    private fun openConnection() { awaitConnectionScreen(compose, fixture.owner) }
     private fun save(input: String) {
         click("account-name-edit")
         compose.onNodeWithTag("account-name-input").performTextReplacement(input)
@@ -185,8 +185,11 @@ class AccountNameLifecycleTest {
     private fun awaitName(expected: String?) = await("committed name settled") {
         fixture.owner.accountName.value?.let { !it.storageFailed && it.name?.text == expected } == true
     }
-    private fun phase(expected: ConnectionPhase) = await("phase $expected") {
-        fixture.owner.state.value.let { it.phase == expected && !it.refresh.refreshing }
+    private fun phase(expected: ConnectionPhase) {
+        settleConnectionCommands(compose, fixture.owner, "phase $expected owner receipt")
+        await("phase $expected") {
+            fixture.owner.state.value.let { it.phase == expected && !it.refresh.refreshing }
+        }
     }
     private fun await(step: String, predicate: () -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 8_000, condition = predicate) }

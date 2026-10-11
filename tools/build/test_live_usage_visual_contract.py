@@ -32,7 +32,7 @@ class LiveUsageVisualContracts(unittest.TestCase):
                         activity=LIVE_USAGE_CLASS.replace("LiveUsageScreenTest", "MainActivity"), phase="OBSERVED",
                         api=36, orientation=1, dark=dark, fontScale=1.0, layoutFontScale=1.0,
                         density=1, layoutDensity=1, renderedLocale="en-US", width=2, height=3,
-                        visibleFacts=LIVE_FACTS, visibleControls=["connection-tab"], pixelSamples=samples, pixelOraclePassed=True)
+                        visibleFacts=LIVE_FACTS, visibleControls=[], visibleRoots=["connection-screen"], pixelSamples=samples, pixelOraclePassed=True)
             (self.directory / (name + ".png")).write_bytes(self.fixture.png(2, 3))
             (self.directory / (name + ".json")).write_text(json.dumps(data))
 
@@ -86,7 +86,7 @@ class LiveUsageVisualContracts(unittest.TestCase):
             for key, value in (("screen", "history"), ("renderedLocale", "de-DE"), ("api", 35),
                                ("dark", not data["dark"]), ("fontScale", 2), ("density", 2),
                                ("layoutFontScale", True), ("orientation", 2), ("productionEntry", False),
-                               ("phase", "RESTORED"), ("visibleFacts", {}), ("pixelSamples", []),
+                               ("phase", "RESTORED"), ("visibleRoots", None), ("visibleControls", None), ("visibleRoots", []), ("visibleRoots", ["offline-tab"]), ("visibleControls", ["connection-tab"]), ("visibleFacts", {}), ("pixelSamples", []),
                                ("pixelOraclePassed", False)):
                 path.write_text(json.dumps(dict(data, **{key: value})))
                 with self.subTest(name=name, key=key), self.assertRaises(ValueError):

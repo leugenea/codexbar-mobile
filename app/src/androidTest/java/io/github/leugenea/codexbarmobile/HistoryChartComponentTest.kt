@@ -30,6 +30,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.leugenea.codexbarmobile.history.*
 import org.json.JSONObject
 import org.junit.Assert.*
+import org.junit.Before
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,6 +46,9 @@ import kotlin.math.roundToInt
 @RunWith(AndroidJUnit4::class)
 class HistoryChartComponentTest {
     @get:Rule val compose = createEmptyComposeRule()
+    private val fixture = HistoryNavigationFixture()
+    @Before fun prepareOwner() { fixture.prepare() }
+    @After fun cleanupOwner() { fixture.cleanup() }
     private var density = 0f
     private var fontScale = 0f
     private var orientation = 0
@@ -211,7 +216,13 @@ class HistoryChartComponentTest {
                 scenario.onActivity { actual = it.resources.configuration.orientation }
                 actual == expected
             }
+            // Default launch now attaches the real observer before the component replaces content.
+            // Isolate that owner so this synthetic component campaign cannot activate a retained session.
+            awaitConnectionScreen(compose, fixture.owner)
+            assertEquals(0L, fixture.transport.requests.get())
             render(scenario, plot, dark, font)
+            settleConnectionCommands(compose, fixture.owner, "component replacement retires launcher observer")
+            assertEquals(0L, fixture.transport.requests.get())
         } catch (error: Throwable) { scenario.close(); throw AssertionError("Chart fixture orientation/render readiness", error) }
         return scenario
     }

@@ -52,7 +52,7 @@ class HistoryTextContracts(unittest.TestCase):
         self.assertEqual(HISTORY_TEXT_CASES, RETAINED_TEXT_CASES)
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), RETAINED_TEXT_CASES)
         self.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 79 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 80 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES))
         for name in RETAINED_TEXT_CASES:
             self.report(name)
             with self.assertRaisesRegex(ValueError, "Missing real native history text"):
@@ -82,7 +82,7 @@ class HistoryTextContracts(unittest.TestCase):
                 metadata.update(zip(("markerCount", "connectionCount", "referenceCount"), CHART_COUNTS[name]))
                 metadata.update(pixelOraclePassed=True, canvasLeft=0.1, canvasTop=0.1, canvasRight=1.9, canvasBottom=1.9)
             if name in INTEGRATED_CAPTURES:
-                metadata.update(productionEntry=True, activity="io.github.leugenea.codexbarmobile.MainActivity",
+                metadata.update(productionEntry=True, visibleRoots=["connection-screen"], activity="io.github.leugenea.codexbarmobile.MainActivity",
                                 phase="RESTORED", queryKind="FIVE_HOUR", queryLimit=32, queryAfter=0,
                                 firstOrdinal=1, lastOrdinal=32, pageEntries=32, hasMore=True, requests=5, gets=2,
                                 visibleControls=INTEGRATED_CONTROLS[name], canvasLeft=0.1, canvasTop=0.1,
@@ -92,7 +92,7 @@ class HistoryTextContracts(unittest.TestCase):
             if name in ASSEMBLED_CAPTURES:
                 keys = ("phase", "readiness", "queryKind", "queryLimit", "queryAfter", "firstOrdinal", "lastOrdinal", "pageEntries", "requests", "gets")
                 metadata.update(zip(keys, ASSEMBLED_PAGES[name]))
-                metadata.update(productionEntry=True, activity="io.github.leugenea.codexbarmobile.MainActivity", hasMore=False,
+                metadata.update(productionEntry=True, visibleRoots=["connection-screen"], activity="io.github.leugenea.codexbarmobile.MainActivity", hasMore=False,
                                 visibleControls=ASSEMBLED_CONTROLS[name], layoutFontScale=font, layoutDensity=1,
                                 uiCursor=f"Exclusive admission cursor: {metadata['queryAfter']} · Page limit: 32")
                 if name in ASSEMBLED_COUNTS:

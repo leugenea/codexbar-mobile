@@ -46,9 +46,9 @@ INTEGRATED_CAPTURES = {
     "history-integrated-chart-portrait-light": (1, False, 1.0),
 }
 INTEGRATED_CONTROLS = {
-    "history-integrated-navigation-portrait-light": ["connection-tab", "history-select-FIVE_HOUR",
+    "history-integrated-navigation-portrait-light": ["history-select-FIVE_HOUR",
                                                     "history-select-WEEKLY", "history-first-page", "history-next-page"],
-    "history-integrated-chart-portrait-light": ["connection-tab"],
+    "history-integrated-chart-portrait-light": [],
 }
 CAPTURES.update(INTEGRATED_CAPTURES)
 
@@ -69,11 +69,11 @@ ASSEMBLED_PAGES = {
     "history-assembled-page-landscape-light": ("RESTORED", "READY", "FIVE_HOUR", 32, 32, 33, 35, 3, 5, 2),
 }
 ASSEMBLED_CONTROLS = {
-    "history-assembled-fresh-portrait-light": ["connection-tab", "history-select-FIVE_HOUR", "history-select-WEEKLY"],
-    "history-assembled-single-portrait-dark": ["connection-tab"],
-    "history-assembled-breaks-landscape-dark": ["connection-tab"],
-    "history-assembled-unknown-large-font": ["connection-tab"],
-    "history-assembled-page-landscape-light": ["connection-tab", "history-first-page", "history-next-page"],
+    "history-assembled-fresh-portrait-light": ["history-select-FIVE_HOUR", "history-select-WEEKLY"],
+    "history-assembled-single-portrait-dark": [],
+    "history-assembled-breaks-landscape-dark": [],
+    "history-assembled-unknown-large-font": [],
+    "history-assembled-page-landscape-light": ["history-first-page", "history-next-page"],
 }
 ASSEMBLED_COUNTS = {
     "history-assembled-single-portrait-dark": (1, 0, 1, 0),
@@ -242,7 +242,15 @@ def verify_integrated_canvas(metadata: dict, size: tuple[int, int]) -> None:
         raise ValueError("Integrated Canvas is partially clipped in its captured root")
 
 
+def verify_production_root(metadata: dict) -> None:
+    # Tabs are retired. An observed real screen root remains mandatory even when
+    # the chart viewport has no visible clickable controls.
+    if metadata.get("visibleRoots") != ["connection-screen"]:
+        raise ValueError("Production capture lacks the observed connection screen root")
+
+
 def verify_integrated_metadata(metadata: dict, name: str, size: tuple[int, int]) -> None:
+    verify_production_root(metadata)
     expected = dict(queryLimit=32, queryAfter=0, firstOrdinal=1, lastOrdinal=32, pageEntries=32, requests=5, gets=2)
     if any(type(metadata.get(key)) is not int or metadata[key] != value for key, value in expected.items()):
         raise ValueError("Integrated capture lacks bounded dormant page/request identities")
@@ -351,6 +359,7 @@ def verify_assembled_pixels(metadata: dict, name: str, image: bytes) -> None:
 
 
 def verify_assembled_metadata(metadata: dict, name: str, size: tuple[int, int], image: bytes) -> None:
+    verify_production_root(metadata)
     keys = ("phase", "readiness", "queryKind", "queryLimit", "queryAfter", "firstOrdinal", "lastOrdinal", "pageEntries", "requests", "gets")
     expected = dict(zip(keys, ASSEMBLED_PAGES[name]))
     if any(type(metadata.get(key)) is not type(value) or metadata[key] != value for key, value in expected.items()):
@@ -449,7 +458,8 @@ def live_capture_receipt(path: Path) -> dict:
                     activity="io.github.leugenea.codexbarmobile.MainActivity", renderedLocale="en-US", phase="OBSERVED")
     if not valid_configuration(metadata, expected, size) or size[0] >= size[1]:
         raise ValueError("Invalid observed live configuration or production screen identity")
-    if metadata.get("visibleFacts") != LIVE_FACTS or metadata.get("visibleControls") != ["connection-tab"]:
+    verify_production_root(metadata)
+    if metadata.get("visibleFacts") != LIVE_FACTS or metadata.get("visibleControls") != []:
         raise ValueError("Live usage/reset/control identities changed")
     verify_live_layout(metadata)
     verify_live_samples(metadata, image, size)

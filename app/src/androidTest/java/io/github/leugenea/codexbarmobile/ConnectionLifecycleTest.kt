@@ -498,13 +498,14 @@ class ConnectionLifecycleTest {
             assertEquals("Retired usage transport cancelled", 1, fake.cancelledReads)
             // Local B2 ticks legitimately replace ConnectionState while the gate is visible.
             // Pause only that scheduler before the strict retired-generation identity oracle.
-            click("offline-tab")
-            compose.waitForIdle()
-            settleOwnerCommands()
-            await(scenario, "shared-owner paused $phase") { it.phase == phase }
+            scenario.moveToState(Lifecycle.State.CREATED)
+            compose.waitUntil(timeoutMillis = 10_000) { !shared.state.value.refresh.refreshing }
+            settleConnectionCommands(compose, shared, "shared-owner stopped lifecycle receipt")
+            assertEquals(phase, shared.state.value.phase)
             val previousAttempt = shared.state.value.refresh.usage.attempt
             assertRetiredReadCannotAffectSharedOwner(scenario, shared, held, replace)
-            click("connection-tab")
+            scenario.moveToState(Lifecycle.State.RESUMED)
+            awaitConnectionScreen(compose, shared)
             if (replace) await(scenario, "shared-owner foreground refresh settled") {
                 it.phase == ConnectionPhase.OBSERVED && it.refresh.usage.attempt !== previousAttempt
             }
@@ -709,14 +710,14 @@ class ConnectionLifecycleTest {
     private fun openGate(scenario: ActivityScenario<MainActivity>, phase: ConnectionPhase = ConnectionPhase.IDLE) {
         compose.waitForIdle()
         await(scenario, "initial $phase") { it.phase == phase }
-        click("connection-tab")
+        awaitConnectionScreen(compose, NativeConnection.get(context))
         assertConnectionHasNoDiagnosticDump(compose)
     }
     private fun click(tag: String, expectTransition: Boolean = true) {
         val changesState = tag in setOf("connect", "read-usage", "refresh-session", "remove-account-confirm", "cancel-connect")
         val before = if (changesState) NativeConnection.get(context).state.value else null
         val node = compose.onNodeWithTag(tag)
-        if (tag !in setOf("offline-tab", "connection-tab", "remove-account-confirm")) node.performScrollTo()
+        if (tag != "remove-account-confirm") node.performScrollTo()
         node.performClick()
         if (before == null) return
         if (expectTransition) bounded("$tag owner admission", { NativeConnection.get(context).state.value.toString() }) {
@@ -745,10 +746,8 @@ class ConnectionLifecycleTest {
             }
             matches
         }
-        // Some owner waits run on the offline tab; require the real live root before this UI oracle.
-        if (compose.onAllNodes(hasTestTag("live-usage")).fetchSemanticsNodes().isNotEmpty()) {
-            assertConnectionHasNoDiagnosticDump(compose)
-        }
+        // A stopped Activity has no registered Compose root; query only the real resumed UI.
+        if (scenario.state.isAtLeast(Lifecycle.State.STARTED)) assertConnectionHasNoDiagnosticDump(compose)
     }
     private fun bounded(step: String, last: () -> String = { "no diagnostic" }, test: () -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 10_000, condition = test) }
@@ -788,7 +787,7 @@ class ConnectionLifecycleTest {
         }
         // A resumed scenario alone is not proof that the Compose root is usable.
         // Query semantics on the test thread, never inside onActivity.
-        compose.onNodeWithTag("connection-tab").assertExists()
+        compose.onNodeWithTag("connection-screen").assertExists()
         val parcel = Parcel.obtain()
         val bytes = try { parcel.writeBundle(bundle); parcel.marshall() } finally { parcel.recycle() }
         for (secret in listOf(CODE, SECOND_CODE, ACCESS, REFRESH, ROTATED_ACCESS, ROTATED_REFRESH, "synthetic-device", "synthetic-authorization", "synthetic-verifier")) {

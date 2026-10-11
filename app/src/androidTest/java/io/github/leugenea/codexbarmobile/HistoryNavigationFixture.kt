@@ -26,11 +26,16 @@ internal class HistoryNavigationFixture {
     }
     val transport = NavigationTransport()
     val observer = Any()
+    var ownerCreations = 0
+        private set
     val owner get() = NativeConnection.get(context)
 
     fun prepare() {
         assertTrue(root.mkdir())
-        NativeConnection.factory = { NativeConnection.create(context, transport, transport.clock, transport::pause) }
+        NativeConnection.factory = {
+            ownerCreations++
+            NativeConnection.create(context, transport, transport.clock, transport::pause)
+        }
         NativeConnection.resetForTests()
     }
 

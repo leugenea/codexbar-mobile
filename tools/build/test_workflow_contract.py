@@ -217,18 +217,18 @@ class WorkflowContracts(unittest.TestCase):
 
     def test_all_required_real_tests_are_declared_and_placeholders_removed(self):
         for kind, tree, filename in (
-            ("jvm", "test", "OfflineShellStateTest.kt"),
-            ("native", "androidTest", "OfflineShellSmokeTest.kt"),
+            ("jvm", "test", "UsageRefreshTest.kt"),
+            ("native", "androidTest", "ConnectionLaunchSmokeTest.kt"),
         ):
             source_dir = ROOT / f"app/src/{tree}/java/io/github/leugenea/codexbarmobile"
             source = (source_dir / filename).read_text()
             declared = set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source))
             self.assertEqual(declared, EXPECTED[kind])
             self.assertFalse((source_dir / "BootstrapCompileTest.kt").exists())
-        native = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/OfflineShellSmokeTest.kt").read_text()
+        native = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/ConnectionLaunchSmokeTest.kt").read_text()
         for actual in ("createEmptyComposeRule", "ActivityScenario.launch(intent)", "scenario.recreate()",
                        "compose.waitUntil", "last state=", "assertInstalledNetworkPolicy()",
-                       "assertIsSelected()", "assertIdentity()", "ProgressBarRangeInfo",
+                       "assertSecureWindow(scenario)", "assertRetiredSurfaceAbsent()", "awaitConnectionScreen",
                        "SemanticsActions.GetTextLayoutResult"):
             self.assertIn(actual, native)
         permission_set = re.search(r'setOf\((.*?)\),', native, re.S)
@@ -253,8 +253,8 @@ class WorkflowContracts(unittest.TestCase):
         declared = {element.get("name") for element in resources}
         source = (ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile/MainActivity.kt").read_text()
         self.assertTrue(set(re.findall(r"R\.string\.(\w+)", source)) <= declared)
-        self.assertIn("heightIn(min = 48.dp)", source)
-        self.assertIn("LiveRegionMode.Polite", source)
+        live = (ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile/LiveUsageScreen.kt").read_text()
+        self.assertIn("LiveRegionMode.Polite", live)
 
     def test_native_job_is_narrow_strict_read_only_and_observable(self):
         workflow = (ROOT / ".github/workflows/android.yml").read_text()
@@ -696,6 +696,25 @@ class SyntheticReportTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "Missing real"):
                         verify_reports(self.directory, kind)
 
+    def test_each_launch_and_refresh_anchor_rejects_omission_failure_error_skip_and_spoof(self):
+        for kind, required in EXPECTED.items():
+            for name in required:
+                for mutation in ("missing", "failure", "error", "skipped", "wrong-class"):
+                    path = self.write_report(kind)
+                    tree = ET.parse(path)
+                    root = tree.getroot()
+                    case = next(item for item in root.iter("testcase")
+                                if item.get("classname") == CLASS[kind] and item.get("name") == name)
+                    if mutation == "missing":
+                        root.remove(case)
+                    elif mutation == "wrong-class":
+                        case.set("classname", "SYNTHETIC-wrong-class")
+                    else:
+                        ET.SubElement(case, mutation)
+                    tree.write(path)
+                    with self.subTest(kind=kind, name=name, mutation=mutation), self.assertRaises(ValueError):
+                        verify_reports(self.directory, kind)
+
     def test_mandatory_keystore_cases_match_source_and_cannot_be_omitted_or_spoofed(self):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/credentials/KeystoreCredentialStoreTest.kt").read_text()
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), CREDENTIAL_CASES)
@@ -826,7 +845,7 @@ class SyntheticReportTests(unittest.TestCase):
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", native.read_text())), HISTORY_SAMPLING_CASES)
         self.assertEqual(sum(map(len, (EXPECTED["native"], CREDENTIAL_CASES, CONNECTION_CASES,
                                      USAGE_REFRESH_CASES, LIVE_USAGE_CASES, BANKED_RESET_CASES,
-                                     HISTORY_CASES, HISTORY_LIFETIME_CASES))), 74)
+                                     HISTORY_CASES, HISTORY_LIFETIME_CASES))), 75)
         for name in HISTORY_SAMPLING_CASES:
             self.write_report("native", missing=name)
             with self.assertRaisesRegex(ValueError, "Missing real native history sampling"):

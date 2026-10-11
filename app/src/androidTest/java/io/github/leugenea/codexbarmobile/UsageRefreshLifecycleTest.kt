@@ -7,8 +7,6 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.test.core.app.ActivityScenario
@@ -244,9 +242,8 @@ class UsageRefreshLifecycleTest {
         compose.waitForIdle()
         waitFor("restored session is dormant") { owner.state.value.phase == ConnectionPhase.RESTORED }
         assertEquals(0, fake.gets.get())
-        compose.onNodeWithTag("connection-tab").performClick()
-        compose.waitForIdle()
-        settleCommands("connection tab lifecycle registration")
+        awaitConnectionScreen(compose, owner)
+        settleCommands("default launch lifecycle registration")
         return scenario
     }
 

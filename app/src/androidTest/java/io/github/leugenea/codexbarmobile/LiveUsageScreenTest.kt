@@ -283,7 +283,7 @@ class LiveUsageScreenTest {
         }
     }
 
-    @Test fun recreationRestoresLiveTabAndOwnerAndOfflinePreviewStaysSeparate() {
+    @Test fun recreationKeepsRealScreenAndOwnerAndStoppedActivityAdmitsNoReads() {
         launchLive().use { scenario ->
             read()
             val shared = owner
@@ -296,19 +296,22 @@ class LiveUsageScreenTest {
             }
             scenario.onActivity { assertSame(shared, it.connection) }
             text("live-five-hour-percent", "12.5% used")
-            click("offline-tab")
-            waitFor("offline root replaces live data") {
-                compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.TestTag, "state-disconnected")).fetchSemanticsNodes().isNotEmpty()
-            }
-            settleOwnerCommands()
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            compose.waitUntil(timeoutMillis = 10_000) { !shared.state.value.refresh.refreshing }
+            settleConnectionCommands(compose, shared, "stopped Activity foreground loss")
             val before = fake.gets.get()
-            click("preview-demo")
-            text("demo-identity", "Unofficial · offline demo", scroll = false)
-            compose.onNodeWithTag("live-usage").assertDoesNotExist()
-            scenario.recreate()
-            compose.waitForIdle()
-            compose.onNodeWithTag("state-demo").assertExists()
-            assertEquals(before, fake.gets.get())
+            clock.advance(120_000)
+            settleConnectionCommands(compose, shared, "stopped owner remains settled")
+            assertEquals("Background cannot admit a cycle", before, fake.gets.get())
+            val stoppedAttempt = shared.state.value.refresh.usage.attempt
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            awaitConnectionScreen(compose, shared)
+            waitFor("return to real screen resumes activated owner") {
+                shared.state.value.refresh.usage.attempt !== stoppedAttempt && !shared.state.value.refresh.refreshing
+            }
+            text("live-five-hour-percent", "12.5% used")
+            compose.onNodeWithTag("offline-tab").assertDoesNotExist()
+            compose.onNodeWithTag("preview-demo").assertDoesNotExist()
         }
     }
 
@@ -318,7 +321,7 @@ class LiveUsageScreenTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             compose.waitForIdle()
             waitFor("no synthetic credentials restores disconnected") { owner.state.value.phase == ConnectionPhase.IDLE }
-            click("connection-tab")
+            awaitConnectionScreen(compose, owner)
             text("live-status", "Disconnected · use the connection controls below to sign in")
             compose.onNodeWithTag("live-refresh").assertIsNotEnabled()
             compose.onNodeWithTag("live-five-hour-progress").assertDoesNotExist()
@@ -335,7 +338,7 @@ class LiveUsageScreenTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             compose.waitForIdle()
             waitFor("missing key publishes durable reauthorization") { owner.state.value.phase == ConnectionPhase.REAUTH_REQUIRED }
-            click("connection-tab")
+            awaitConnectionScreen(compose, owner)
             text("live-status", "Authorization required · sign in again using the controls below")
             compose.onNodeWithTag("live-status").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
             compose.onNodeWithTag("live-weekly-progress").assertDoesNotExist()
@@ -619,7 +622,7 @@ class LiveUsageScreenTest {
         }
         waitFor("restored dormant synthetic session") { owner.state.value.phase == ConnectionPhase.RESTORED }
         assertEquals(0, fake.gets.get())
-        click("connection-tab")
+        awaitConnectionScreen(compose, owner)
         text("live-status", "Usage unavailable · refresh to request an observation")
         return scenario
     }
@@ -635,16 +638,19 @@ class LiveUsageScreenTest {
 
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
-        if (tag !in setOf("offline-tab", "connection-tab", "remove-account-confirm")) node.performScrollTo()
+        if (tag != "remove-account-confirm") node.performScrollTo()
         node.performClick()
         compose.waitForIdle()
+        if (tag in setOf("connect", "live-refresh", "remove-account-confirm")) {
+            settleConnectionCommands(compose, owner, "$tag owner admission")
+        }
     }
 
     private fun text(tag: String, expected: String, scroll: Boolean = true) {
         val node = compose.onNodeWithTag(tag)
         if (scroll) node.performScrollTo()
         node.assertTextEquals(expected)
-        if (tag != "demo-identity") assertConnectionHasNoDiagnosticDump(compose)
+        assertConnectionHasNoDiagnosticDump(compose)
     }
 
     private fun progress(tag: String, fraction: Float, description: String, status: String, percent: String) {
@@ -712,9 +718,9 @@ class LiveUsageScreenTest {
                 kotlinx.coroutines.withTimeout(5_000) { owner.commandsSettled() }
             }
         } catch (error: kotlinx.coroutines.TimeoutCancellationException) {
-            throw AssertionError("Offline foreground-loss command did not settle: ${owner.state.value}", error)
+            throw AssertionError("Owner command did not settle: ${owner.state.value}", error)
         }
-        waitFor("offline cancellation is complete") { !owner.state.value.refresh.refreshing }
+        waitFor("owner cycle is settled") { !owner.state.value.refresh.refreshing }
     }
 
     private fun store() = KeystoreCredentialStore(context, NativeConnection.session(context))

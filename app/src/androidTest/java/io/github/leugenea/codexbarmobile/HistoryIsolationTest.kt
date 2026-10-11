@@ -92,7 +92,7 @@ class HistoryIsolationTest {
 
     private fun logoutWithHeldResponse(operation: ReadOperation) {
         ActivityScenario.launch(MainActivity::class.java).use {
-            compose.waitForIdle(); click("connection-tab"); phase(ConnectionPhase.IDLE)
+            awaitConnectionScreen(compose, owner); phase(ConnectionPhase.IDLE)
             click("connect"); phase(ConnectionPhase.OBSERVED)
             await("initial login recorded") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
             click("history-toggle"); page(query(), 1)
@@ -203,7 +203,7 @@ class HistoryIsolationTest {
     @Test fun integratedStaleUsageIndependentInventoryLossAndRetentionNeverBecomeEmptyOrCurrent() {
         fixture.limits = HistoryStorageLimits(observations = 3) // Synthetic tighter ceiling, never a production-policy change.
         ActivityScenario.launch(MainActivity::class.java).use {
-            compose.waitForIdle(); click("connection-tab"); phase(ConnectionPhase.IDLE)
+            awaitConnectionScreen(compose, owner); phase(ConnectionPhase.IDLE)
             click("connect"); phase(ConnectionPhase.OBSERVED)
             await("original accepted usage persisted") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
             fixture.native.seedLocalPage()
@@ -255,10 +255,10 @@ class HistoryIsolationTest {
         assertDormant()
     }
 
-    private fun openHistory() { compose.waitForIdle(); click("connection-tab"); click("history-toggle") }
+    private fun openHistory() { awaitConnectionScreen(compose, owner); click("history-toggle") }
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
-        if (tag !in setOf("connection-tab", "offline-tab", "remove-account-confirm")) node.performScrollTo()
+        if (tag != "remove-account-confirm") node.performScrollTo()
         node.performClick(); compose.waitForIdle()
     }
 
@@ -331,8 +331,11 @@ class HistoryIsolationTest {
         assertEquals(expected.getValue(ReadOperation.USAGE.path) + expected.getValue(ReadOperation.RESET_INVENTORY.path), transport.gets.get())
     }
 
-    private fun phase(expected: ConnectionPhase) = await("phase $expected") {
-        owner.state.value.let { it.phase == expected && !it.refresh.refreshing }
+    private fun phase(expected: ConnectionPhase) {
+        settleConnectionCommands(compose, owner, "phase $expected owner receipt")
+        await("phase $expected") {
+            owner.state.value.let { it.phase == expected && !it.refresh.refreshing }
+        }
     }
 
     private fun await(step: String, condition: () -> Boolean) {
