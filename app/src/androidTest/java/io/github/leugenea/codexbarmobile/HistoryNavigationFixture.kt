@@ -7,6 +7,11 @@ import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.transport.*
 import androidx.test.core.app.ApplicationProvider
+import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.junit.Assert.*
 import java.io.File
 import java.time.Instant
@@ -26,6 +31,8 @@ internal class HistoryNavigationFixture {
     }
     val transport = NavigationTransport()
     val observer = Any()
+    // Optional serial-lane provenance seam for the launch checkpoint; other campaigns keep the default factory.
+    var mutationDispatcher: CoroutineDispatcher? = null
     var ownerCreations = 0
         private set
     val owner get() = NativeConnection.get(context)
@@ -34,7 +41,16 @@ internal class HistoryNavigationFixture {
         assertTrue(root.mkdir())
         NativeConnection.factory = {
             ownerCreations++
-            NativeConnection.create(context, transport, transport.clock, transport::pause)
+            val dispatcher = mutationDispatcher
+            if (dispatcher == null) NativeConnection.create(context, transport, transport.clock, transport::pause)
+            else {
+                val store = KeystoreCredentialStore(context, NativeConnection.session(context))
+                ConnectionController(store, DeviceCodeAuthenticator(transport, store, transport.clock, transport::pause),
+                    NativeFeasibilityReader(transport, transport.clock, transport::pause),
+                    CoroutineScope(SupervisorJob() + Dispatchers.IO), mutationDispatcher = dispatcher,
+                    refreshClock = transport.clock,
+                    history = HistoryLifetimeCoordinator(SQLiteHistoryLifetimeStorage(SQLiteHistoryStore.open(context))))
+            }
         }
         NativeConnection.resetForTests()
     }
@@ -72,13 +88,18 @@ internal class HistoryNavigationFixture {
 }
 
 internal class NavigationTransport : AuthTransport {
-    class HeldCall(val path: String, private val result: TransportResult, private val terminal: (TransportResult) -> Unit) {
+    class HeldCall(val path: String, private val result: TransportResult, private val terminal: (TransportResult) -> Unit,
+        val epoch: Int? = null) {
         @Volatile var cancelled = false
         private val delivered = java.util.concurrent.atomic.AtomicBoolean()
+        fun live(): Boolean = !cancelled && !delivered.get()
         fun reply() { if (delivered.compareAndSet(false, true)) terminal(result) }
     }
     val requests = AtomicLong()
     val gets = AtomicLong()
+    val calls = CopyOnWriteArrayList<HeldCall>()
+    var operationEpoch: () -> Int? = { null }
+    var usageAdmission: (Int?) -> Unit = {}
     private val routes = ConcurrentHashMap<String, AtomicLong>()
     private val held = CopyOnWriteArrayList<HeldCall>()
     @Volatile var heldPath: String? = null
@@ -92,14 +113,19 @@ internal class NavigationTransport : AuthTransport {
     suspend fun pause(value: Long) { require(value >= 0) }
     fun counts(): Map<String, Long> = routes.mapValues { it.value.get() }
     fun heldCall(path: String): HeldCall? = held.lastOrNull { it.path == path }
+    fun liveHeldCall(path: String): HeldCall? = held.singleOrNull { it.path == path && it.live() }
     fun releaseHeld() { heldPath = null; held.forEach { it.reply() } }
 
     override fun execute(request: ProviderHttpRequest, deadline: ReadDeadline, terminal: (TransportResult) -> Unit): CancellationHandle {
+        val path = request.url.encodedPath
+        val epoch = operationEpoch()
+        // Admission provenance precedes counters/recorded calls on the serial owner lane.
+        if (path == ReadOperation.USAGE.path) usageAdmission(epoch)
         requests.incrementAndGet()
         if (request is ProviderHttpRequest.Get) gets.incrementAndGet()
-        val path = request.url.encodedPath
         routes.computeIfAbsent(path) { AtomicLong() }.incrementAndGet()
-        val call = HeldCall(path, response(path), terminal)
+        val call = HeldCall(path, response(path), terminal, epoch)
+        calls += call
         if (path == heldPath) held += call else call.reply()
         return CancellationHandle { call.cancelled = true }
     }

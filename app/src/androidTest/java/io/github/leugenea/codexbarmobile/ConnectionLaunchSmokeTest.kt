@@ -20,6 +20,9 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SdkSuppress
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.leugenea.codexbarmobile.transport.ReadOperation
+import io.github.leugenea.codexbarmobile.history.BreakReason
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -28,7 +31,8 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @SdkSuppress(minSdkVersion = 29)
 class ConnectionLaunchSmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    private val checkpoint = LaunchForegroundCheckpoint()
+    @get:Rule val compose = createEmptyComposeRule(effectContext = checkpoint.context)
     private val fixture = HistoryNavigationFixture()
     @Before fun prepare() { fixture.prepare() }
     @After fun cleanup() { fixture.cleanup() }
@@ -95,6 +99,9 @@ class ConnectionLaunchSmokeTest {
     }
 
     @Test fun defaultRelaunchResumesActivatedOwnerOnceAndDuplicateTriggersCoalesce() {
+        fixture.mutationDispatcher = checkpoint.dispatcher
+        fixture.transport.operationEpoch = { checkpoint.ownerEpoch }
+        fixture.transport.usageAdmission = checkpoint::admitted
         val shared = fixture.owner
         // Constructing/restoring the holder before UI activation is dormant.
         boundedWait("fresh process owner settles before launch") { shared.state.value.phase == ConnectionPhase.IDLE }
@@ -114,33 +121,70 @@ class ConnectionLaunchSmokeTest {
         settleConnectionCommands(compose, shared, "finish foreground loss")
         val success = shared.state.value.refresh.usage.success
         fixture.transport.heldPath = ReadOperation.USAGE.path
+        checkpoint.install(fixture.transport)
         try {
             launch().use { scenario ->
                 awaitConnectionScreen(compose, shared)
-                scenario.onActivity { assertSame(shared, it.connection) }
-                boundedWait("default launch automatically resumes activated owner") {
-                    fixture.transport.heldCall(ReadOperation.USAGE.path) != null && shared.state.value.refresh.refreshing
+                lateinit var activity: MainActivity
+                scenario.onActivity { activity = it; assertSame(shared, it.connection) }
+                boundedWait("default launch reaches a live, owner-attributed return checkpoint") {
+                    var completed = false
+                    // Fence actual lifecycle delivery only during the checkpoint. Earlier fast
+                    // STOP/STARTs remain real events, with independent owner-lane provenance.
+                    InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                        checkpoint.awaitOwner("foreground commands before launch checkpoint", shared) { shared.commandsSettled() }
+                        val selected = fixture.transport.liveHeldCall(ReadOperation.USAGE.path)
+                        if (selected != null && activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
+                            checkpoint.isCurrent(selected.epoch)) {
+                            val epoch = requireNotNull(selected.epoch)
+                            try {
+                                assertSame(shared, fixture.owner)
+                                assertEquals("Launch/relaunch shares one constructed owner", 1, fixture.ownerCreations)
+                                // Initial five requests plus THIS admitted return, never a subtraction
+                                // from global totals or a budget inferred from observed calls.
+                                checkpoint.assertCampaignCounts(epoch, 6L, 3L)
+                                checkpoint.withoutForegroundOrigin { shared.readUsage(); shared.readUsage() }
+                                checkpoint.awaitOwner("duplicate foreground triggers", shared) { shared.commandsSettled() }
+                                assertSame("Reply must carry the exact still-live operation", selected,
+                                    fixture.transport.liveHeldCall(ReadOperation.USAGE.path))
+                                checkpoint.assertCampaignCounts(epoch, 6L, 3L)
+                                selected.reply()
+                                checkpoint.awaitOwner("released return settles and records its observation", shared) {
+                                    combine(shared.state, shared.historySnapshots) { state, history ->
+                                        state.phase == ConnectionPhase.OBSERVED && !state.refresh.refreshing &&
+                                            state.refresh.usage.success !== success &&
+                                            history.storage?.lastAdmitted?.ordinal == 3L
+                                    }.first { it }
+                                }
+                                // State publication can precede finished()'s drain. The serial
+                                // receipt must execute after that owner block, while Main stays fenced.
+                                checkpoint.awaitOwner("released return completion commands", shared) { shared.commandsSettled() }
+                                assertFalse("Settled return cannot leave another cycle active", shared.state.value.refresh.refreshing)
+                                // Keep usage held: a sabotaged pending duplicate cannot escape as
+                                // a fast completed pair before this positive settled checkpoint.
+                                assertTrue("Returned observation records the BACKGROUND break",
+                                    BreakReason.BACKGROUND in shared.historySnapshots.value.points.last().segment.breaks)
+                                checkpoint.assertCampaignCounts(epoch, 7L, 4L)
+                                assertEquals(1L, fixture.transport.counts().getValue("/oauth/token"))
+                                checkpoint.completed(epoch)
+                                completed = true
+                            } finally { selected.reply() }
+                        }
+                    }
+                    completed
                 }
-                assertSame(shared, fixture.owner)
-                assertEquals("Launch/relaunch shares one constructed owner", 1, fixture.ownerCreations)
-                assertEquals(6L, fixture.transport.requests.get())
-                assertEquals(3L, fixture.transport.gets.get())
-                shared.readUsage(); shared.readUsage()
-                settleConnectionCommands(compose, shared, "duplicate foreground triggers")
-                assertEquals("Held duplicates must not admit more requests", 6L, fixture.transport.requests.get())
-                fixture.transport.heldPath = null
-                fixture.transport.heldCall(ReadOperation.USAGE.path)!!.reply()
-                boundedWait("one resumed cycle completes and records one new observation") {
-                    shared.state.value.let { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing } &&
-                        shared.state.value.refresh.usage.success !== success &&
-                        shared.historySnapshots.value.storage?.lastAdmitted?.ordinal == 3L
-                }
-                // STOP records one background gap at ordinal 2; the admitted return is ordinal 3.
-                assertEquals(7L, fixture.transport.requests.get())
-                assertEquals(4L, fixture.transport.gets.get())
-                assertEquals(1L, fixture.transport.counts().getValue("/oauth/token"))
             }
-        } finally { fixture.transport.releaseHeld() }
+            boundedWait("return finish retires history and cancels every live usage") {
+                shared.historySnapshots.value.generation == null && !shared.state.value.refresh.refreshing &&
+                    fixture.transport.liveHeldCall(ReadOperation.USAGE.path) == null
+            }
+            compose.waitForIdle()
+            settleConnectionCommands(compose, shared, "all real return epochs stopped")
+            checkpoint.assertStoppedEpochs()
+        } finally {
+            fixture.transport.releaseHeld()
+            checkpoint.close()
+        }
     }
 
     private fun launch(): ActivityScenario<MainActivity> {
