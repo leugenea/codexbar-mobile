@@ -44,7 +44,7 @@ class HistoryAssembledAcceptanceTest {
             capture.label("$five-no-geometry")
             compose.onNodeWithTag("history-navigation-title").performScrollTo()
             capture.capture("history-assembled-fresh-portrait-light", scenario, fixture,
-                listOf("connection-tab", "history-select-FIVE_HOUR", "history-select-WEEKLY"))
+                listOf("history-select-FIVE_HOUR", "history-select-WEEKLY"))
             assertEquals(0L, fixture.transport.requests.get())
         }
         seedDormant()
@@ -145,7 +145,7 @@ class HistoryAssembledAcceptanceTest {
             capture.label("history-page-ordinals")
             compose.onNodeWithTag("history-first-page").performScrollTo()
             capture.capture("history-assembled-page-landscape-light", scenario, fixture,
-                listOf("connection-tab", "history-first-page", "history-next-page"))
+                listOf("history-first-page", "history-next-page"))
             click("history-details-toggle")
             detail(1, 3, "Admission ordinal: 33")
             click("history-next"); detail(2, 3, "Admission ordinal: 34")
@@ -175,6 +175,7 @@ class HistoryAssembledAcceptanceTest {
         await("initial isolated default owner") { fixture.owner.state.value.phase == ConnectionPhase.IDLE }
         fixture.owner.usageForeground(fixture.observer, true)
         fixture.owner.connect()
+        settleConnectionCommands(compose, fixture.owner, "synthetic seed connect admission")
         await("original synthetic usage observation persisted") {
             fixture.owner.state.value.phase == ConnectionPhase.OBSERVED && !fixture.owner.state.value.refresh.refreshing &&
                 fixture.owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L
@@ -187,10 +188,10 @@ class HistoryAssembledAcceptanceTest {
         await("fresh owner dormant restore (not process death)") { fixture.owner.state.value.phase == ConnectionPhase.RESTORED }
     }
 
-    private fun openHistory() { click("connection-tab"); click("history-toggle") }
+    private fun openHistory() { awaitConnectionScreen(compose, fixture.owner); click("history-toggle") }
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
-        if (tag != "connection-tab") node.performScrollTo()
+        node.performScrollTo()
         node.assertHasClickAction().performClick()
         compose.waitForIdle()
     }
@@ -214,7 +215,7 @@ class HistoryAssembledAcceptanceTest {
 
     private fun captureCanvas(name: String, scenario: ActivityScenario<MainActivity>) {
         compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
-        capture.capture(name, scenario, fixture, listOf("connection-tab"), chart = true)
+        capture.capture(name, scenario, fixture, emptyList(), chart = true)
     }
 
     private fun effectiveFont(expected: Float) {

@@ -39,7 +39,7 @@ internal class LiveUsageCapture(private val compose: ComposeTestRule) {
         val tags = listOf("live-five-hour-percent", "live-five-hour-reset-absolute", "live-five-hour-reset-relative",
             "live-weekly-percent", "live-weekly-reset-absolute", "live-weekly-reset-relative")
         val layouts = tags.associateWith { HistoryAcceptanceCapture(compose).layout(compose.onNodeWithTag(it)) }
-        compose.onNodeWithTag("connection-tab").assertIsDisplayed().assertHasClickAction()
+        compose.onNodeWithTag("connection-screen").assertIsDisplayed()
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         try {
             val data = metadata(name, dark, scenario, owner, bitmap, layouts.values.first())
@@ -56,7 +56,7 @@ internal class LiveUsageCapture(private val compose: ComposeTestRule) {
         val data = JSONObject().put("name", name).put("screen", "live-usage").put("synthetic", true)
             .put("productionEntry", true).put("activity", MainActivity::class.java.name).put("api", Build.VERSION.SDK_INT)
             .put("width", bitmap.width).put("height", bitmap.height).put("phase", owner.state.value.phase.name)
-            .put("visibleControls", JSONArray(listOf("connection-tab")))
+            .put("visibleControls", JSONArray()).put("visibleRoots", JSONArray(listOf("connection-screen")))
             .put("scope", "production MainActivity and default process owner, real isolated Keystore, synthetic transport; not live provider")
         scenario.onActivity {
             assertSame(owner, it.connection)
@@ -82,7 +82,7 @@ internal class LiveUsageCapture(private val compose: ComposeTestRule) {
             Rect(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat())))
         val gutter = Rect(bounds.left - 16 * density, bounds.top, bounds.left - 4 * density, bounds.bottom)
         // Material3 1.4.0 FilledCardTokens.ContainerColor is SurfaceContainerHighest,
-        // shared by the live and preview default filled Cards.
+        // used by the production live default filled Card.
         samples.put(sample(bitmap, "card", gutter.center.x.roundToInt(), gutter.center.y.roundToInt(),
             colors.surfaceContainerHighest.toArgb(), gutter))
         val point = glyph(bitmap, bounds, colors.onSurface.toArgb())

@@ -16,7 +16,7 @@ import java.util.Locale
 /** Virtual time drives the actual process owner, A2/A9 reads and cancellable fake transport. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class UsageRefreshTest {
-    @Test fun restorationAndOfflinePreviewsAreDormantUntilAnExplicitRead() = runTest { fixture {
+    @Test fun restoredOwnerRemainsDormantWithForegroundObserversUntilExplicitRead() = runTest { fixture {
         assertEquals(ConnectionPhase.RESTORED, state.phase)
         visible(true)
         advance(120_000)

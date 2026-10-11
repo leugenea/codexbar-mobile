@@ -62,6 +62,7 @@ internal class HistoryAcceptanceCapture(private val compose: ComposeTestRule) {
     fun capture(name: String, scenario: ActivityScenario<MainActivity>, fixture: HistoryNavigationFixture,
         visible: List<String>, chart: Boolean = false) {
         val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithTag("connection-screen").assertIsDisplayed()
         visible.forEach { tag ->
             val node = compose.onNodeWithTag(tag).assertIsDisplayed().assertHasClickAction().fetchSemanticsNode()
             assertFalse(node.config.contains(SemanticsProperties.HideFromAccessibility))
@@ -80,6 +81,7 @@ internal class HistoryAcceptanceCapture(private val compose: ComposeTestRule) {
         val source = fixture.owner.historySnapshots.value
         val entries = source.storage?.entries.orEmpty()
         val data = JSONObject().put("name", name).put("synthetic", true).put("productionEntry", true)
+            .put("visibleRoots", JSONArray(listOf("connection-screen")))
             .put("activity", MainActivity::class.java.name).put("api", Build.VERSION.SDK_INT)
             .put("width", bitmap.width).put("height", bitmap.height).put("visibleControls", JSONArray(visible))
             .put("scope", "production MainActivity, single default owner, isolated real SQLite/Keystore, synthetic transport/admissions; not live provider")

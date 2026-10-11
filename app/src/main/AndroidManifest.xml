@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Infrastructure only: offline previews do not initiate provider traffic. -->
+    <!-- Only selected authenticated routes use the network; cleartext stays disabled. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:usesCleartextTraffic="false"

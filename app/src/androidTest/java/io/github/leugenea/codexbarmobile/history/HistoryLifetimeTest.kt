@@ -3,8 +3,6 @@ package io.github.leugenea.codexbarmobile.history
 import android.content.Context
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -81,6 +79,7 @@ class HistoryLifetimeTest {
     private fun gate() = Gate().also { gates += it }
     private fun login(): ConnectionController = owner().also { phase(it, ConnectionPhase.IDLE); it.connect(); phase(it, ConnectionPhase.OBSERVED) }
     private fun phase(owner: ConnectionController, expected: ConnectionPhase) = runBlocking {
+        withTimeout(5_000) { owner.commandsSettled() }
         try { withTimeout(5_000) { owner.state.first {
             it.phase == expected && (expected != ConnectionPhase.OBSERVED || !it.refresh.refreshing)
         } } } catch (_: TimeoutCancellationException) { throw AssertionError("native lifetime $expected: last state=${owner.state.value}") }
@@ -169,8 +168,7 @@ class HistoryLifetimeTest {
         try {
             compose.waitForIdle()
             scenario.onActivity { assertSame(first, it.connection) }
-            compose.onNodeWithTag("connection-tab").performClick()
-            compose.waitForIdle()
+            awaitConnectionScreen(compose, first)
 
             // Positive attachment/retirement proof: availability before launch alone cannot
             // establish that the Activity's LaunchedEffect actually registered its observer.

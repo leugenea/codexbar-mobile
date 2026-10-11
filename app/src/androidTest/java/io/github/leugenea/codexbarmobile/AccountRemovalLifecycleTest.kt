@@ -221,7 +221,7 @@ class AccountRemovalLifecycleTest {
         await("seed observation stored") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
         fixture.freshRuntime(); phase(ConnectionPhase.RESTORED)
     }
-    private fun openConnection() { compose.waitForIdle(); click("connection-tab") }
+    private fun openConnection() { awaitConnectionScreen(compose, fixture.owner) }
     private fun saveName(value: String) {
         click("account-name-edit")
         compose.onNodeWithTag("account-name-input").performTextReplacement(value)
@@ -300,8 +300,11 @@ class AccountRemovalLifecycleTest {
         for (name in listOf("history.db", "history.db-journal", "history.db-wal", "history.db-shm",
             AccountNameFile.FILE_NAME, AccountNameFile.PENDING_NAME)) assertFalse(File(fixture.root, "usage-history/$name").exists())
     }
-    private fun phase(expected: ConnectionPhase) = await("phase $expected") {
-        owner.state.value.let { it.phase == expected && !it.refresh.refreshing }
+    private fun phase(expected: ConnectionPhase) {
+        settleConnectionCommands(compose, owner, "phase $expected owner receipt")
+        await("phase $expected") {
+            owner.state.value.let { it.phase == expected && !it.refresh.refreshing }
+        }
     }
     private fun await(step: String, lastState: () -> Any? = { owner.state.value }, predicate: () -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 8_000, condition = predicate) }

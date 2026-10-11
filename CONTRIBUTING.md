@@ -70,8 +70,10 @@ The app source requests INTERNET only. Merged manifests, APKs and installed app
 packages must request exactly INTERNET plus the existing AndroidX Core signature-only
 receiver permission; no extra permission is accepted. Cleartext is explicitly off
 in every app build, with no debug/test override. JVM local-server fixtures do not
-need device cleartext access. The permission is infrastructure, not a live-provider
-feature: offline previews still initiate no requests until auth/usage features land.
+need device cleartext access. The permission enables only the selected auth/usage routes. A fresh process owner
+restores credentials without requests; an explicit action activates foreground reads.
+The real connection/live flow is the default launcher and recreation destination.
+An already activated owner may resume a bounded read cycle on Activity STARTED.
 
 Both hosted graphs generate `processReleaseManifest` as well as the debug manifest;
 the shared gate requires both generated policies. Release assembly is not otherwise

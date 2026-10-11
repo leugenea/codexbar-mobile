@@ -1,15 +1,14 @@
 # CodexBar Mobile
 
 An independent, unofficial Android phone project. It is not affiliated with or
-endorsed by OpenAI or CodexBar. **The app retains an offline preview and includes
-an opt-in native connection screen, not supported provider access.**
+endorsed by OpenAI or CodexBar. **The app starts in the native connection/live usage screen. Provider access remains
+unofficial and identity unverified.**
 
 ## What works today
 
-- Disconnected, frozen loading, simulated error and demo-usage previews.
-- Hand-authored sample percentages, clearly labeled as samples.
-- Preview selection restored across Activity recreation; preview actions never request provider data.
-- A separate connection screen: connect/cancel, fixed system-browser device login,
+- Default connection/live screen with truthful disconnected, loading, reauthorization,
+  error and unknown states; recreation keeps the same process owner.
+- Connection controls: connect/cancel, fixed system-browser device login,
   Keystore-backed local storage and sign-out, and only the two selected read-only routes.
 - Serialized session refresh/rotation with durable save before publication, bounded
   401 recovery, re-auth on terminal/write failures, and generation-isolated local logout.
@@ -44,7 +43,9 @@ Refresh/rotation/local-logout verification on the exact candidate remains a sepa
 owner gate; CI uses only fake transport and synthetic data. Pending login lives only in memory: Activity
 recreation and finish/relaunch share one process-owned bounded attempt; no Activity
 owns or cancels it. Process death requires restarting login.
-Restored credentials remain unresolved and cause no automatic provider requests.
+Fresh-owner restored credentials remain unresolved and cause no automatic provider requests.
+Launch registers the existing STARTED observer directly. An already activated process
+owner may resume one bounded cycle on launch/recreation; concurrent triggers coalesce.
 
 Banked resets are count-only: no separate amount/unit is established or needed under
 the owner decision. Purchased credit balances are not banked resets. Missing/null or
@@ -98,8 +99,8 @@ verified-account history, background refresh service, widget
 or signed production release. CI debug APKs are test outputs, not signed release
 deliverables. Minimum Android version is Android 8.0 (API 26).
 
-The app declares INTERNET, with cleartext traffic explicitly disabled. Offline
-previews make no provider traffic. Explicit connection is the only entry into the
+The app declares INTERNET, with cleartext traffic explicitly disabled.
+Explicit connection is the only entry into the
 selected auth flow and two quota/reset GET endpoints; no activation/purchase, account
 header, desktop impersonation or extra route is used.
 

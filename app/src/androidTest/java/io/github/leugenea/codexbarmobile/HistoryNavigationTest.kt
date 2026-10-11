@@ -52,12 +52,13 @@ class HistoryNavigationTest {
         }
     }
 
-    @Test fun dormantRestoredHistoryAndOfflinePreviewsNeverActivateTransportOrAddAdmissions() {
+    @Test fun defaultRestoredScreenAndHistoryNavigationNeverActivateTransportOrAddAdmissions() {
         seedDormant()
         ActivityScenario.launch(MainActivity::class.java).use {
-            compose.waitForIdle()
-            for (preview in listOf("disconnected", "loading", "error", "demo")) click("preview-$preview")
-            click("reset-preview")
+            awaitConnectionScreen(compose, fixture.owner)
+            compose.onNodeWithTag("live-status").assertExists()
+            compose.onNodeWithTag("offline-tab").assertDoesNotExist()
+            compose.onNodeWithTag("preview-demo").assertDoesNotExist()
             assertDormantCounts()
             openHistory()
             page(WindowKind.FIVE_HOUR, 0, 32)
@@ -68,8 +69,9 @@ class HistoryNavigationTest {
             assertEquals(35L, fixture.owner.historySnapshots.value.storage!!.lastAdmitted!!.ordinal)
             assertEquals(ConnectionPhase.RESTORED, fixture.owner.state.value.phase)
             assertDormantCounts()
-            click("offline-tab")
-            await("offline view retires history") { fixture.owner.historySnapshots.value.generation == null }
+            click("history-toggle")
+            compose.onNodeWithTag("connection-history").assertDoesNotExist()
+            compose.onNodeWithTag("live-usage").assertExists()
             assertDormantCounts()
         }
     }
@@ -145,7 +147,7 @@ class HistoryNavigationTest {
         fixture.transport.inventoryStatus = 403
         ActivityScenario.launch(MainActivity::class.java).use {
             compose.waitForIdle()
-            click("connection-tab")
+            awaitConnectionScreen(compose, fixture.owner)
             phase(ConnectionPhase.IDLE)
             click("connect")
             phase(ConnectionPhase.OBSERVED)
@@ -187,10 +189,10 @@ class HistoryNavigationTest {
         assertDormantCounts()
     }
 
-    private fun openHistory() { compose.waitForIdle(); click("connection-tab"); click("history-toggle") }
+    private fun openHistory() { awaitConnectionScreen(compose, fixture.owner); click("history-toggle") }
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
-        if (tag !in setOf("connection-tab", "offline-tab")) node.performScrollTo()
+        node.performScrollTo()
         node.performClick()
         compose.waitForIdle()
     }
@@ -212,8 +214,11 @@ class HistoryNavigationTest {
         compose.onNodeWithTag("history-page-ordinals").assertTextEquals("Retained page ordinals: $first to $last")
     }
 
-    private fun phase(expected: ConnectionPhase) = await("phase $expected") {
-        fixture.owner.state.value.let { it.phase == expected && !it.refresh.refreshing }
+    private fun phase(expected: ConnectionPhase) {
+        settleConnectionCommands(compose, fixture.owner, "phase $expected owner receipt")
+        await("phase $expected") {
+            fixture.owner.state.value.let { it.phase == expected && !it.refresh.refreshing }
+        }
     }
 
     private fun await(step: String, predicate: () -> Boolean) {
@@ -237,13 +242,13 @@ class HistoryNavigationTest {
         listOf("history-navigation-title", "history-page-cursor", "history-page-ordinals").forEach(capture::assertLabel)
         compose.onNodeWithTag("history-navigation-title").performScrollTo()
         capture.capture("history-integrated-navigation-portrait-light", scenario, fixture,
-            listOf("connection-tab", "history-select-FIVE_HOUR", "history-select-WEEKLY", "history-first-page", "history-next-page"))
+            listOf("history-select-FIVE_HOUR", "history-select-WEEKLY", "history-first-page", "history-next-page"))
     }
 
     private fun captureChart(scenario: ActivityScenario<MainActivity>) {
         capture.assertLabel("history-chart-five-hour-title")
         compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         capture.capture("history-integrated-chart-portrait-light", scenario, fixture,
-            listOf("connection-tab"), canvas = "history-chart-five-hour-canvas")
+            emptyList(), canvas = "history-chart-five-hour-canvas")
     }
 }

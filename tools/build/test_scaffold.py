@@ -324,7 +324,7 @@ class ToolchainContract(unittest.TestCase):
     def test_app_manifest_overlays_cannot_broaden_network_policy(self):
         check_source_manifests(ROOT)
 
-    def test_internet_only_cleartext_off_and_honest_four_state_shell(self):
+    def test_internet_only_cleartext_off_and_default_real_connection_screen(self):
         ns = "{http://schemas.android.com/apk/res/android}"
         manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
         permissions = {node.get(ns + "name") for node in manifest
@@ -339,18 +339,23 @@ class ToolchainContract(unittest.TestCase):
         self.assertEqual(activity.find("intent-filter/category").get(ns + "name"), "android.intent.category.LAUNCHER")
         strings = ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()
         text = " ".join(e.text or "" for e in strings)
-        self.assertIn("Not authenticated", text)
-        self.assertIn("not connected", text)
-        self.assertIn("offline demo", text)
+        self.assertIn("Disconnected", text)
+        self.assertIn("Identity unverified", text)
+        self.assertNotIn("offline demo", text)
         self.assertIn("Unofficial", text)
         self.assertNotIn("not implemented yet", text)
         ET.parse(ROOT / "app/src/main/res/values/themes.xml")
         source = (ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile/MainActivity.kt").read_text()
-        for snippet in ("ComponentActivity()", "setContent", "MaterialTheme", "heading()",
-                        "padding(insets)", "WindowInsets.safeDrawing", "isSystemInDarkTheme()",
-                        "rememberSaveable", "verticalScroll", "Preview.Disconnected", "Preview.Loading",
-                        "Preview.Error", "Preview.Demo"):
+        for snippet in ("ComponentActivity()", "setContent", "MaterialTheme", "Surface(",
+                        "WindowInsets.safeDrawing", "isSystemInDarkTheme()", "FLAG_SECURE",
+                        "ObserveUsageLifecycle(connection, lifecycle)", "ConnectionScreen(connectionState, connection"):
             self.assertIn(snippet, source)
+        self.assertEqual(source.count("ObserveUsageLifecycle(connection, lifecycle)"), 1)
+        self.assertNotRegex(source, r"rememberSaveable|savedPreview|connectionTab|OfflineShell|Preview\.")
+        self.assertFalse((ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile/OfflineShellState.kt").exists())
+        self.assertFalse((ROOT / "app/src/test/java/io/github/leugenea/codexbarmobile/OfflineShellStateTest.kt").exists())
+        names = {element.get("name") for element in strings}
+        self.assertFalse(names & {"offline_tab", "connection_tab", "preview_heading", "show_fixture", "reset_preview"})
         self.assertNotRegex(source, r"https?://|Socket|HttpClient|URLConnection|SharedPreferences")
 
 

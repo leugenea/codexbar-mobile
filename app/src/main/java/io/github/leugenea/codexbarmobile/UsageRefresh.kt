@@ -36,7 +36,7 @@ internal data class UsageRefreshState(
 /**
  * Subordinate scheduler on ConnectionController's lane/scope, never a session owner.
  * Authenticated reads and generation admission remain the owner's responsibility.
- * A restored session is dormant until Connect/manual read; offline previews stay silent.
+ * A fresh restored session is dormant until Connect/manual read, including on Activity launch.
  */
 internal class UsageRefresh(
     private val scope: CoroutineScope,

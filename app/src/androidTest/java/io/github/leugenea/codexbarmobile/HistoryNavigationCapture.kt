@@ -37,6 +37,7 @@ internal class HistoryNavigationCapture(private val compose: ComposeTestRule) {
 
     fun capture(name: String, scenario: androidx.test.core.app.ActivityScenario<MainActivity>, fixture: HistoryNavigationFixture,
         visible: List<String>, canvas: String? = null) {
+        compose.onNodeWithTag("connection-screen").assertIsDisplayed()
         visible.forEach { compose.onNodeWithTag(it).assertIsDisplayed() }
         val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         try {
@@ -54,6 +55,7 @@ internal class HistoryNavigationCapture(private val compose: ComposeTestRule) {
         val source = fixture.owner.historySnapshots.value
         val metadata = JSONObject().put("synthetic", true).put("name", name).put("api", Build.VERSION.SDK_INT)
             .put("width", bitmap.width).put("height", bitmap.height).put("productionEntry", true)
+            .put("visibleRoots", JSONArray(listOf("connection-screen")))
             .put("activity", MainActivity::class.java.name).put("visibleControls", JSONArray(visible))
             .put("scope", "production MainActivity navigation with synthetic persisted admissions; no live-provider evidence")
             .put("phase", fixture.owner.state.value.phase.name).put("queryLimit", source.query.limit)

@@ -4,8 +4,6 @@ import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -203,8 +201,7 @@ class UsageHistoryIntegrationTest {
         lateinit var afterRecreation: HistoryRuntimeAccess
         try {
             compose.waitForIdle()
-            compose.onNodeWithTag("connection-tab").performClick()
-            compose.waitForIdle()
+            awaitConnectionScreen(compose, current)
             current.connect(); phase(current, ConnectionPhase.OBSERVED)
             composeHistory(current, "Compose observer records connect usage") { it.points.size == 1 }
             val initial = capability(current)
@@ -258,6 +255,7 @@ class UsageHistoryIntegrationTest {
         return current.historyCapability(ready.envelope.generation) ?: throw AssertionError("native sampling access: ${current.historyAvailability}")
     }
     private fun phase(current: ConnectionController, expected: ConnectionPhase) = runBlocking {
+        withTimeout(5_000) { current.commandsSettled() }
         try { withTimeout(5_000) { current.state.first { it.phase == expected && !it.refresh.refreshing } } }
         catch (_: TimeoutCancellationException) { throw AssertionError("sampling phase $expected: last state=${current.state.value}") }
     }

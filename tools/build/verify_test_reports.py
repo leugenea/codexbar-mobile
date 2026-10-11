@@ -7,24 +7,42 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = {
     "jvm": {
-        "newLaunchHasNoUsageAndIsDisconnected",
-        "everySelectionIsExplicitAndOnlyDemoExposesSyntheticUsage",
-        "retryMovesOnlyAnErrorToFrozenLoadingWithoutExposingUsage",
-        "fixtureActionIsAdmittedOnlyFromDisconnectedOrLoading",
-        "resetAlwaysRemovesTheSampleAndReturnsToDisconnected",
-        "savedSelectionRoundTripsWithoutIntroducingAnAuthenticatedState",
-        "absentCorruptOrFutureSavedSelectionFailsClosed",
-        "syntheticUsageRejectsInvalidPercentagesInsteadOfClampingThem",
+        "restoredOwnerRemainsDormantWithForegroundObserversUntilExplicitRead",
+        "manualAndResumeCoalesceIntoOneInFlightCycle",
+        "visiblePollingStartsNoEarlierThanSixtySeconds",
+        "thirtySecondOperationDeadlineCancelsTransportAndPreservesSuccess",
+        "inventoryHasItsOwnThirtySecondDeadlineAndUsagePublishesBeforeItSettles",
+        "retryAfterDefersManualResumeAndPollUntilTheAdvertisedBoundary",
+        "usageRetryWaitSurvivesForegroundCancellationAndDefersResumeAndManual",
+        "inventoryRetryWaitSurvivesForegroundCancellationAndDefersResumeAndManual",
+        "replacingGenerationClearsAnUnfinishedRetryAfterBoundary",
+        "deferredManualReadWithoutLifecycleObserversStillRunsAtTheBoundary",
+        "deferredManualReadReplacesTheLaterAutomaticPollWakeup",
+        "usageAndInventoryBecomeStaleIndependentlyAtFifteenMinutes",
+        "mixedEndpointOutcomesPreserveEachLastSuccessfulObservation",
+        "replacementRejectsLateOldGenerationPublication",
+        "foregroundLossCancelsReadAndResumeStartsOneBoundedCycle",
+        "removingOneOfTwoVisibleObserversDoesNotCancelTheirSharedRead",
+        "countdownTicksMakeNoRequestsAndPassedResetRetainsPercent",
+        "connectCompletedInBackgroundWaitsForTheLiveSurface",
+        "cancellationBeforeCycleEntryCannotWedgeResumeOrAccountReplacement",
+        "failedQuarantineRemovalClearsRetainedSuccessAndStopsAutomaticWork",
+        "automaticPollAndResumeDoNotUnlockTransientTokenRefreshFailures",
+        "repeatedUnauthorizedReadRetiresRetainedSuccessAfterRotation",
+        "successfulQuarantineSettlementSurvivesForegroundCancellation",
+        "failedQuarantineSettlementSurvivesForegroundCancellation",
+        "independentTerminalRefreshAfterWaiterCancellationRetiresUsage",
     },
     "native": {
-        "launcherIsOfflineAndAllFourPreviewsRemainHonestThroughActions",
-        "everyPreviewSurvivesActivityRecreationWithoutAnAccount",
-        "landscapeKeepsDisclaimerVisibleAndSampleActionsReachable",
+        "launcherReachesRealDisconnectedScreenWithInstalledSecurityPolicy",
+        "recreationIgnoresLegacySelectionAndKeepsRealDisconnectedOwner",
+        "landscapeKeepsRealIdentityAndConnectionHistoryControlsReachable",
+        "defaultRelaunchResumesActivatedOwnerOnceAndDuplicateTriggersCoalesce",
     },
 }
 CLASS = {
-    "jvm": "io.github.leugenea.codexbarmobile.OfflineShellStateTest",
-    "native": "io.github.leugenea.codexbarmobile.OfflineShellSmokeTest",
+    "jvm": "io.github.leugenea.codexbarmobile.UsageRefreshTest",
+    "native": "io.github.leugenea.codexbarmobile.ConnectionLaunchSmokeTest",
 }
 
 
@@ -72,7 +90,7 @@ LIVE_USAGE_CASES = {
     "exhaustedBarDoesNotOverrideAllowedAndMalformedSiblingsRemainVisible",
     "knownResetShowsSimultaneousLabelsAndRepeatedHourOffset",
     "landscapeLongCopyHasNoNativeTextOverflow",
-    "recreationRestoresLiveTabAndOwnerAndOfflinePreviewStaysSeparate",
+    "recreationKeepsRealScreenAndOwnerAndStoppedActivityAdmitsNoReads",
     "disconnectedAndReauthorizationHaveAccessibleStatusAndNoInventedUsage",
 }
 
@@ -179,7 +197,7 @@ HISTORY_AUTHORITY_CASES = {
 HISTORY_NAVIGATION_CLASS = "io.github.leugenea.codexbarmobile.HistoryNavigationTest"
 HISTORY_NAVIGATION_CASES = {
     "productionEntrySelectsWindowsAndNavigatesBoundedOrdinalPagesWithNativeCaptures",
-    "dormantRestoredHistoryAndOfflinePreviewsNeverActivateTransportOrAddAdmissions",
+    "defaultRestoredScreenAndHistoryNavigationNeverActivateTransportOrAddAdmissions",
     "logoutClearsVisibleHistoryAndReloginNeverDisplaysPreviousPartition",
     "recreationAndForegroundLossUseTheSameDormantOwnerButFreshHistoryAuthority",
     "integratedHistoryRetainsIndependentEndpointFailuresAndNoNewSamplesFromLocalNavigation",
@@ -255,7 +273,7 @@ def verify_reports(directory: Path, kind: str) -> dict:
     actual = {case["name"] for case in cases if case["class"] == CLASS[kind]}
     missing = EXPECTED[kind] - actual
     if missing:
-        raise ValueError(f"Missing real {kind} offline-shell tests: {sorted(missing)}")
+        raise ValueError(f"Missing real {kind} launch/refresh tests: {sorted(missing)}")
     if kind == "native":
         for label, classname, required in (
             ("credential", CREDENTIAL_CLASS, CREDENTIAL_CASES),
