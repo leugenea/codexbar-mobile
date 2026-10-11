@@ -146,7 +146,9 @@ class HistoryIsolationTest {
                 click("history-details-toggle")
                 text("Measured used percent (exact %): 42.125").performScrollTo().assertIsDisplayed()
                 absent("Measured used percent (exact %): 12.375")
-                absent(old.live.usage.sourceObservedAt!!.toString(), substring = true)
+                absent(requireNotNull(TimePresentation.timestamp(old.live.usage.sourceObservedAt, java.time.ZoneId.systemDefault(),
+                    androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.resources.configuration.locales[0])),
+                    substring = true)
                 val gets = if (operation == ReadOperation.USAGE) 1L else 2L
                 assertReadAndLoginDelta(before, gets)
                 owner.signOut(); phase(ConnectionPhase.SIGNED_OUT); assertDeleted()
@@ -229,8 +231,8 @@ class HistoryIsolationTest {
             text("Latest endpoint error: forbidden").assertExists()
             text("Retention truncated history: observation cap").assertExists()
             text("Evicted through admission ordinal: 32").assertExists()
-            text("Last successful source observation (exact UTC): ${Instant.ofEpochSecond(1_800_000_001)}").assertExists()
-            text("Last successful source observation (exact UTC): ${Instant.ofEpochSecond(1_800_000_901)}").assertExists()
+            text("Last successful source observation (second precision): Jan 15, 2027, 8:00:01 AM").assertExists()
+            text("Last successful source observation (second precision): Jan 15, 2027, 8:15:01 AM").assertExists()
             compose.onNodeWithTag("history-loss").assertTextEquals("Samples lost or unconfirmed: 1; history is incomplete.")
             absent("History page empty")
             absent("No entries in this admitted page")

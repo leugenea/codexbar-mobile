@@ -102,8 +102,8 @@
     <string name="banked_stale">Inventory has not succeeded for at least 15 minutes. Retained entitlements may be out of date.</string>
     <string name="banked_summary">Usage summary for inventory comparison: %1$s</string>
     <string name="banked_inventory">Inventory reports: %1$s</string>
-    <string name="banked_summary_clock">Summary observed at (UTC): %1$s</string>
-    <string name="banked_inventory_clock">Inventory observed at (UTC): %1$s</string>
+    <string name="banked_summary_clock">Summary observed at (second precision): %1$s</string>
+    <string name="banked_inventory_clock">Inventory observed at (second precision): %1$s</string>
     <string name="banked_container">Inventory rows: %1$s</string>
     <string name="banked_item">Banked reset %1$d</string>
     <string name="banked_row">Row data: %1$s</string>
@@ -154,7 +154,7 @@
     <string name="history_unknown">unknown · not zero</string>
     <string name="history_fact">%1$s: %2$s</string>
     <string name="history_observation">Admission ordinal</string>
-    <string name="history_observed">Source observed at (exact UTC)</string>
+    <string name="history_observed">Source observed at (second precision)</string>
     <string name="history_gap">Gap reason (unknown means no recorded reason)</string>
     <string name="history_allowed">Provider allowed</string>
     <string name="history_limit">Provider limit reached</string>
@@ -166,10 +166,10 @@
     <string name="history_measured">Measured used percent (exact %)</string>
     <string name="history_selection">Window selection</string>
     <string name="history_reset_provenance">Reset provenance</string>
-    <string name="history_reset_exact">Absolute reset source (exact UTC)</string>
+    <string name="history_reset_exact">Absolute reset source (second precision)</string>
     <string name="history_reset_seconds">Relative reset source (seconds)</string>
-    <string name="history_reset_derived">Source-derived reset (exact UTC)</string>
-    <string name="history_point_time">Measurement observed at (exact UTC)</string>
+    <string name="history_reset_derived">Source-derived reset (second precision)</string>
+    <string name="history_point_time">Measurement observed at (second precision)</string>
     <string name="history_segment">Segment first admission ordinal</string>
     <string name="history_nominal_confidence">Nominal-start confidence</string>
     <string name="history_eligibility">Baseline eligibility</string>
@@ -177,8 +177,8 @@
     <string name="history_break">Segment break</string>
     <string name="history_baseline_value">Nominal baseline at observation (analytical %)</string>
     <string name="history_delta">Observed-only delta (percentage points)</string>
-    <string name="history_nominal_start">Nominal assumption start (exact UTC)</string>
-    <string name="history_nominal_end">Nominal assumption end (reset, exact UTC)</string>
+    <string name="history_nominal_start">Nominal assumption start (second precision)</string>
+    <string name="history_nominal_end">Nominal assumption end (reset, second precision)</string>
     <string name="history_baseline_unavailable">Baseline and delta unavailable</string>
     <string name="history_series_counts">Timestamped measurements: %1$d · Nominal analytical reference segments: %2$d</string>
     <string name="history_problem">History recorder problem</string>
@@ -190,8 +190,8 @@
     <string name="history_filter">A window selection is active. Details retain page gaps and source slot status even when a window is filtered out.</string>
     <string name="history_usage_endpoint">Usage endpoint metadata</string>
     <string name="history_inventory_endpoint">Inventory endpoint metadata (separate observation)</string>
-    <string name="history_endpoint_observed">Last successful source observation (exact UTC)</string>
-    <string name="history_endpoint_attempt">Latest attempt observed at (exact UTC)</string>
+    <string name="history_endpoint_observed">Last successful source observation (second precision)</string>
+    <string name="history_endpoint_attempt">Latest attempt observed at (second precision)</string>
     <string name="history_http_status">Latest HTTP status</string>
     <string name="history_endpoint_error">Latest endpoint error</string>
     <string name="history_stale">Retained endpoint facts are stale.</string>

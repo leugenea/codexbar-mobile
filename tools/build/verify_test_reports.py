@@ -196,7 +196,11 @@ HISTORY_AUTHORITY_CASES = {
 }
 
 HISTORY_NAVIGATION_CLASS = "io.github.leugenea.codexbarmobile.HistoryNavigationTest"
-HISTORY_NAVIGATION_CASES = {
+PHONE_TIME_CASES = {
+    "productionLiveAndBankedClocksFollowSystemZoneResourceLocaleAndRecreationWithoutReads",
+    "productionHistoryClocksFollowSystemZoneResourceLocaleAndRecreationWithoutReads",
+}
+HISTORY_NAVIGATION_CASES = PHONE_TIME_CASES | {
     "productionEntrySelectsWindowsAndNavigatesBoundedOrdinalPagesWithNativeCaptures",
     "defaultRestoredScreenAndHistoryNavigationNeverActivateTransportOrAddAdmissions",
     "logoutClearsVisibleHistoryAndReloginNeverDisplaysPreviousPartition",
@@ -299,6 +303,11 @@ def verify_reports(directory: Path, kind: str) -> dict:
             missing_names = required - actual_names
             if missing_names:
                 raise ValueError(f"Missing real native {label} tests: {sorted(missing_names)}")
+    if kind == "native":
+        for name in PHONE_TIME_CASES:
+            matches = [case for case in cases if case["class"] == HISTORY_NAVIGATION_CLASS and case["name"] == name]
+            if len(matches) != 1:
+                raise ValueError(f"Expected exactly one real native phone-time case: {name}")
     if not cases:
         raise ValueError(f"No executed {kind} tests")
     return {"kind": kind, "testCount": len(cases), "reports": [str(p) for p in reports], "testcases": cases}

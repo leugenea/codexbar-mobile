@@ -96,7 +96,7 @@ class HistoryTextComponentTest {
             click("history-next")
             text("Admission ordinal: 2")
             text("Gap reason (unknown means no recorded reason): background")
-            text("Source observed at (exact UTC): unknown · not zero")
+            text("Source observed at (second precision): unknown · not zero")
             compose.onNodeWithTag("history-next").assertIsNotEnabled()
             click("history-previous")
             text("Admission ordinal: 1")
@@ -129,7 +129,7 @@ class HistoryTextComponentTest {
             openDetails()
             text("Reset: Oct 9, 2026, 01:00 (hour precision)", 2)
             text("Reset: <1h remaining", 2)
-            text("Absolute reset source (exact UTC): 2026-10-09T01:00:00Z", 2)
+            text("Absolute reset source (second precision): Oct 9, 2026, 1:00:00 AM", 2)
         }
     }
 
@@ -150,7 +150,8 @@ class HistoryTextComponentTest {
     }
 
     @Test fun portraitLightMeasuredScreenshotHasReachableUnclippedLabels() {
-        launch(HistoryTextFixture.plot()).use {
+        val plot = HistoryTextFixture.plot()
+        launch(plot).use {
             text("Five-hour window", 1)
             text("Weekly window", 1)
             compose.onNodeWithTag("history-five-hour-counts").assertTextEquals(
@@ -164,7 +165,10 @@ class HistoryTextComponentTest {
             text("Measured used percent (exact %): 12.345678901234567890")
             text("Measured used percent (exact %): 87.50")
             text("Observed-only delta (percentage points): -67.655006969815432110")
-            text("Measurement observed at (exact UTC): 2026-10-09T00:00:00.123456789Z", 2)
+            text("Measurement observed at (second precision): Oct 9, 2026, 12:00:00 AM", 2)
+            val original = plot.source.entries.single().source
+            assertEquals(java.time.Instant.parse("2026-10-09T00:00:00.123456789Z"), original.observedAt)
+            assertEquals(123456789, original.windows.first().point!!.observedAt.nano)
             text("Provider allowed: false")
             text("Provider limit reached: true")
             assertNoChatterOrMergedDescription()

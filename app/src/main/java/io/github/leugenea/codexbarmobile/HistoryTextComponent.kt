@@ -44,7 +44,7 @@ internal fun HistoryTextComponent(
         Text(stringResource(R.string.history_sparse), Modifier.testTag("history-sparse"))
         if (kind == null || kind == WindowKind.FIVE_HOUR) HistorySeriesSummary(plot.fiveHour, "history-five-hour")
         if (kind == null || kind == WindowKind.WEEKLY) HistorySeriesSummary(plot.weekly, "history-weekly")
-        HistoryPageStatus(plot)
+        HistoryPageStatus(plot, zone, locale)
         HistoryDetails(plot, now, zone, locale)
     }
 }
@@ -62,7 +62,7 @@ private fun HistorySeriesSummary(series: HistoryPlotSeries, tag: String) {
 }
 
 @Composable
-private fun HistoryPageStatus(plot: HistoryPlotSnapshot) {
+private fun HistoryPageStatus(plot: HistoryPlotSnapshot, zone: ZoneId, locale: Locale) {
     val source = plot.source
     source.problem?.let { HistoryFact(HistoryTextFact(R.string.history_problem, state = it)) }
     source.storageReason?.let { HistoryFact(HistoryTextFact(R.string.history_storage, state = it)) }
@@ -73,16 +73,16 @@ private fun HistoryPageStatus(plot: HistoryPlotSnapshot) {
     }
     if (source.hasMore) Text(stringResource(R.string.history_more), Modifier.testTag("history-more"))
     if (source.query.kind != null || source.query.window != null) Text(stringResource(R.string.history_filter))
-    HistoryEndpoint(source.live.usage, R.string.history_usage_endpoint)
-    HistoryEndpoint(source.live.inventory, R.string.history_inventory_endpoint)
+    HistoryEndpoint(source.live.usage, R.string.history_usage_endpoint, zone, locale)
+    HistoryEndpoint(source.live.inventory, R.string.history_inventory_endpoint, zone, locale)
     if (source.live.refreshing) Text(stringResource(R.string.history_refreshing))
 }
 
 @Composable
-private fun HistoryEndpoint(source: HistoryEndpointMetadata, label: Int) {
+private fun HistoryEndpoint(source: HistoryEndpointMetadata, label: Int, zone: ZoneId, locale: Locale) {
     HistoryHeading(label, "history-endpoint-$label")
-    HistoryFact(HistoryTextFact(R.string.history_endpoint_observed, source.sourceObservedAt?.toString()))
-    HistoryFact(HistoryTextFact(R.string.history_endpoint_attempt, source.latestAttemptObservedAt?.toString()))
+    HistoryFact(HistoryTextFact(R.string.history_endpoint_observed, TimePresentation.timestamp(source.sourceObservedAt, zone, locale)))
+    HistoryFact(HistoryTextFact(R.string.history_endpoint_attempt, TimePresentation.timestamp(source.latestAttemptObservedAt, zone, locale)))
     source.status?.let { HistoryFact(HistoryTextFact(R.string.history_http_status, it.toString())) }
     source.error?.let { HistoryFact(HistoryTextFact(R.string.history_endpoint_error, state = it)) }
     if (source.stale) Text(stringResource(R.string.history_stale))

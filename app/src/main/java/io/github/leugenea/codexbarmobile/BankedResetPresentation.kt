@@ -16,6 +16,8 @@ internal data class PresentedBankedResetSection(
     val refreshing: Boolean,
     val stale: Boolean,
     val errorResource: Int?,
+    val summaryObservedLabel: String?,
+    val inventoryObservedLabel: String?,
 )
 
 /** UI adapter only. B2 owns retained observations/isolation, C1 owns states/counts, B1 owns time. */
@@ -28,7 +30,9 @@ internal object BankedResetPresentation {
         val snapshot = generation?.let { owner -> state.refresh.observations?.let { EntitlementSnapshot(owner, it) } }
         val entitlements = EntitlementPresentation.present(snapshot, generation, state.refresh.evaluatedAt, zone, locale)
         return PresentedBankedResetSection(entitlements, connected && state.refresh.refreshing,
-            connected && state.refresh.inventory.stale, entitlements.inventoryError?.let(::errorResource))
+            connected && state.refresh.inventory.stale, entitlements.inventoryError?.let(::errorResource),
+            TimePresentation.timestamp(entitlements.summaryObservedAt, zone, locale),
+            TimePresentation.timestamp(entitlements.inventoryObservedAt, zone, locale))
     }
 
     fun fieldLabel(field: Field<*>?): BankedFieldLabel = BankedFieldLabel(

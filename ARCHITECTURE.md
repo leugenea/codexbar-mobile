@@ -752,7 +752,9 @@ exact measured percent, observed-only percentage-point delta, typed baseline
 absence, recorder/storage/loss/retention/page metadata, and independent endpoint
 clocks. Nominal full-quota reference copy explicitly says assumption, not measured
 usage or exhaustion prediction. Reset labels reuse B1 with caller-supplied time,
-zone and locale; this component owns no timer, query, quota math or network call.
+zone and locale; observation/detail clocks use its localized second-precision projection,
+while original nanoseconds and exact identity fields remain in the domain. This
+component owns no timer, query, quota math or network call.
 
 The host supplies scrolling. A collapsed entry selector retains the complete
 admitted page, including filtered-entry slot status and timestamp-less gaps; previous
@@ -784,8 +786,8 @@ Shape/line-style labels do not rely on color alone. No smoothing, clamping, fake
 measured start/reset point, sorting, quota calculation or cross-page cache is added.
 
 The fixed percent axis and B1 hour-precision time-domain labels wrap outside the
-Canvas; exact UTC timestamps, reset context, original measurements and observed-only
-percentage-point delta remain in reachable existing details. Typed decimal-capacity/
+Canvas; localized source timestamps, reset context, original measurements and
+observed-only percentage-point delta remain in reachable existing details. Typed decimal-capacity/
 out-of-domain geometry and nonzero approximate underflow have explicit resource copy.
 Missing time geometry shows no invented axes or zero. The decorative Canvas is hidden
 from accessibility; plain labels and existing bounded text retain their own semantics,
@@ -985,8 +987,19 @@ API 36 and gallery-wide density constraints remain in force, with separate live
 screen/locale identities. Native execution, lint, compatible whole-handwritten
 >=90% INSTRUCTION union, independent exact-source review and individual actual-PNG
 inspection remain hosted/delivery gates; source/compile/parser checks do not prove
-runtime paint or visual acceptance. The actual reported phone reset cause remains
-unknown; phone-local formatting of remaining timestamps remains separate work.
+runtime paint or visual acceptance. The actual reported phone reset cause remains unknown.
+
+All reachable absolute clocks use the shared pure `TimePresentation` with the current
+phone zone and effective resource locale. Reset/expiry/axis labels retain containing-hour
+precision and original-instant countdowns; independent source/detail clocks explicitly
+state second precision without changing source nanoseconds. Conflicting absolute and
+derived source facts remain separately labeled, while the effective reset stays
+unavailable. Unrepresentable local dates show unknown, never raw ISO or epoch fallback.
+`phoneTimeConfiguration` observes system zone broadcasts and resamples on resume; the
+resource configuration invalidates locale rendering. Both observers are disposed with
+the visible UI and issue no owner command, request or timer. Production Activity native
+cases exercise live/banked/history zone, locale and recreation with fixed source facts
+and actual transport counts; all existing image identities and guards remain required.
 
 ## Default-launch regression contract
 
