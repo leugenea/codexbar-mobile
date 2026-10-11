@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791715680394,
+  "lastUpdate": 1791718944966,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1757,6 +1757,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/25a09726e806c7bfbfe8f90452a8839ec817c8ad"
         },
         "date": 1791715677458,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e504f017d37ef520cea794bab62f2740ea81ebed",
+          "message": "test(tooling): remove approved duplicate and low-value checks (#129)\n\nApply exactly the minimal T01–T05/T07–T09 cuts for issue 126. Preserve retained literal/cardinality, checksum, producer and shipped pipeline proofs; omit only the explicitly accepted diagnostics.",
+          "timestamp": "2026-10-11T14:42:02+03:00",
+          "tree_id": "5b8b00c46c5ca3f278cc222245e6c93c36da8984",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/e504f017d37ef520cea794bab62f2740ea81ebed"
+        },
+        "date": 1791718944426,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
