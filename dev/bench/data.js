@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791726203896,
+  "lastUpdate": 1791726205885,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -3629,6 +3629,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/e504f017d37ef520cea794bab62f2740ea81ebed"
         },
         "date": 1791718946798,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6efde84fa708687d0f5c5fb7da1f393bc3e5b57f",
+          "message": "fix(ui): align live usage with preview in light and dark themes (#135)\n\n* fix(ui): align live usage with preview and paint the selected theme\n\n* test: correct default filled-card paint expectation",
+          "timestamp": "2026-10-11T16:42:57+03:00",
+          "tree_id": "371b742a5efc2c9e73f4afec402575e043a8a24f",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/6efde84fa708687d0f5c5fb7da1f393bc3e5b57f"
+        },
+        "date": 1791726205657,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
