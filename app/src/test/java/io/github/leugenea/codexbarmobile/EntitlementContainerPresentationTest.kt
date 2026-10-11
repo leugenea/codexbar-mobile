@@ -33,15 +33,18 @@ class EntitlementContainerPresentationTest {
             """{"available_count":0}""" to Field<Int>(Knowledge.UNAVAILABLE, reason = Reason.MISSING),
             """{"available_count":0,"credits":null}""" to Field<Int>(Knowledge.UNAVAILABLE, reason = Reason.PROVIDER_NULL),
         )) {
-            val result = present(parse(text))
-            assertEquals(EntitlementState.UNKNOWN, result.state)
-            assertEquals(expected, result.inventoryRowContainer)
-            assertNull(result.inventoryRowCount)
-            assertEquals(Completeness.UNKNOWN, result.completeness)
-            assertEquals(Field(Knowledge.KNOWN, 0L), result.reportedAvailableCount)
-            assertEquals(Field(Knowledge.KNOWN, 0L), result.summaryAvailableCount)
-            assertTrue(result.items.isEmpty())
-            assertTrue(result.issues.isEmpty())
+            val decoded = parse(text)
+            assertEquals("$text decoded summaryAvailableCount", Field(Knowledge.KNOWN, 0L), decoded.summaryAvailableCount)
+            assertTrue("$text decoded issues", decoded.issues.isEmpty())
+            val result = present(decoded)
+            assertEquals("$text presented state", EntitlementState.UNKNOWN, result.state)
+            assertEquals("$text presented inventoryRowContainer", expected, result.inventoryRowContainer)
+            assertNull("$text presented inventoryRowCount", result.inventoryRowCount)
+            assertEquals("$text presented completeness", Completeness.UNKNOWN, result.completeness)
+            assertEquals("$text presented reportedAvailableCount", Field(Knowledge.KNOWN, 0L), result.reportedAvailableCount)
+            assertEquals("$text presented summaryAvailableCount", Field(Knowledge.KNOWN, 0L), result.summaryAvailableCount)
+            assertTrue("$text presented items", result.items.isEmpty())
+            assertTrue("$text presented issues", result.issues.isEmpty())
         }
     }
 
@@ -61,26 +64,34 @@ class EntitlementContainerPresentationTest {
     }
 
     @Test fun explicitEmptyContainerAndProviderZeroAreEmptyWithoutRecomputingCounts() {
-        val result = present(parse("""{"available_count":0,"credits":[]}"""))
-        assertEquals(EntitlementState.EMPTY, result.state)
-        assertEquals(Field(Knowledge.KNOWN, 0), result.inventoryRowContainer)
-        assertEquals(0, result.inventoryRowCount)
-        assertEquals(Completeness.COMPLETE, result.completeness)
-        assertEquals(Field(Knowledge.KNOWN, 0L), result.reportedAvailableCount)
-        assertTrue(result.items.isEmpty())
-        assertTrue(result.issues.isEmpty())
+        val text = """{"available_count":0,"credits":[]}"""
+        val decoded = parse(text)
+        assertTrue("$text decoded issues", decoded.issues.isEmpty())
+        val result = present(decoded)
+        assertEquals("$text presented state", EntitlementState.EMPTY, result.state)
+        assertEquals("$text presented inventoryRowContainer", Field(Knowledge.KNOWN, 0), result.inventoryRowContainer)
+        assertEquals("$text presented inventoryRowCount", 0, result.inventoryRowCount)
+        assertEquals("$text presented completeness", Completeness.COMPLETE, result.completeness)
+        assertEquals("$text presented reportedAvailableCount", Field(Knowledge.KNOWN, 0L), result.reportedAvailableCount)
+        assertTrue("$text presented items", result.items.isEmpty())
+        assertTrue("$text presented issues", result.issues.isEmpty())
     }
 
     @Test fun malformedArrayRowStaysVisibleWithoutChangingContainerKnowledge() {
-        val result = present(parse("""{"available_count":0,"credits":[true]}"""))
-        assertEquals(EntitlementState.MALFORMED, result.state)
-        assertEquals(Field(Knowledge.KNOWN, 1), result.inventoryRowContainer)
-        assertEquals(1, result.inventoryRowCount)
-        assertEquals(Completeness.PARTIAL, result.completeness)
-        assertEquals(EntitlementState.MALFORMED, result.items.single().state)
-        assertEquals(Reason.WRONG_TYPE, result.items.single().source.reason)
-        assertEquals(Field(Knowledge.KNOWN, 0L), result.reportedAvailableCount)
-        assertTrue(result.issues.isEmpty())
+        val text = """{"available_count":0,"credits":[true]}"""
+        val decoded = parse(text)
+        assertTrue("$text decoded issues", decoded.issues.isEmpty())
+        val result = present(decoded)
+        assertEquals("$text presented state", EntitlementState.MALFORMED, result.state)
+        assertEquals("$text presented inventoryRowContainer", Field(Knowledge.KNOWN, 1), result.inventoryRowContainer)
+        assertEquals("$text presented inventoryRowCount", 1, result.inventoryRowCount)
+        assertEquals("$text presented completeness", Completeness.PARTIAL, result.completeness)
+        assertEquals("$text presented item state", EntitlementState.MALFORMED, result.items.single().state)
+        assertEquals("$text presented item source", Field<BankedResetItem>(Knowledge.MALFORMED, reason = Reason.WRONG_TYPE),
+            result.items.single().source)
+        assertEquals("$text presented item source reason", Reason.WRONG_TYPE, result.items.single().source.reason)
+        assertEquals("$text presented reportedAvailableCount", Field(Knowledge.KNOWN, 0L), result.reportedAvailableCount)
+        assertTrue("$text presented issues", result.issues.isEmpty())
     }
 
     @Test fun malformedJsonFailureIsProjectedAsMalformedWithoutManufacturingContainerFacts() {
