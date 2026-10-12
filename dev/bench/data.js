@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791754991115,
+  "lastUpdate": 1791769486623,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1927,6 +1927,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/4fe0ebd167a42c887605fc330f1f7abc78fd1d59"
         },
         "date": 1791754987285,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e0f1390bc7048dede620f5557c1aea21c024a405",
+          "message": "fix: show graphs only for currently active usage windows (#139)\n\n* feat(history): show charts for active usage periods\n\n* fix(history): resolve current-period acceptance findings",
+          "timestamp": "2026-10-12T01:44:24Z",
+          "tree_id": "7b577f78d82dcab48cf6e972c09498f1f334e3de",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/e0f1390bc7048dede620f5557c1aea21c024a405"
+        },
+        "date": 1791769486292,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
