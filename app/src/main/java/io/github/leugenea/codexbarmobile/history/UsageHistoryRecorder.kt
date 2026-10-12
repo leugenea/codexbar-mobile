@@ -72,6 +72,9 @@ internal class UsageHistoryRecorder(
 
     init { require(capacity > 0) }
 
+    /** Reads the actual revocation slot even before a collector receives its first permission. */
+    fun currentDisplayContext(): HistoryDisplayContext? = displayAuthority.current()
+
     fun foreground(visible: Boolean) {
         if (foreground == visible) return
         foreground = visible

@@ -1,6 +1,7 @@
 package io.github.leugenea.codexbarmobile
 
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
@@ -95,7 +96,7 @@ class HistoryIsolationTest {
             awaitConnectionScreen(compose, owner); phase(ConnectionPhase.IDLE)
             click("connect"); phase(ConnectionPhase.OBSERVED)
             await("initial login recorded") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
-            click("history-toggle"); page(query(), 1)
+            click("history-toggle"); enterStoredText(); page(query(), 1)
             val old = owner.historySnapshots.value
             val oldAccess = fixture.capability()
             val before = transport.counts()
@@ -131,7 +132,7 @@ class HistoryIsolationTest {
                 assertTrue(successorAccess.read(HistoryReadQuery(successorAccess.partition, 1)) is HistoryReadOutcome.Ready)
                 gate.release()
                 await("successor only ordinal one recorded") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
-                click("history-toggle"); page(query(), 1)
+                click("history-toggle"); enterStoredText(); page(query(), 1)
                 val successor = owner.historySnapshots.value
                 val counts = transport.counts()
                 transport.advance(1000) // A stale completion would acquire this different receipt clock.
@@ -193,7 +194,8 @@ class HistoryIsolationTest {
             assertTrue(fresh.read(HistoryReadQuery(fresh.partition, 1)) is HistoryReadOutcome.Ready)
             assertRevoked(access) // Deliberately after the positive successor proof, not an already-dead-port oracle.
             assertNotSame(old.displayPermission!!.context, old.displayPermission.current())
-            if (recreate) { click("history-toggle"); click("history-stored-text") }
+            if (recreate) click("history-toggle")
+            enterStoredText()
             assertNoPage()
             gate.release(); page(query(), 32)
             val current = owner.historySnapshots.value.generation
@@ -219,7 +221,7 @@ class HistoryIsolationTest {
                 val live = owner.historySnapshots.value.live
                 live.usage.stale && !live.inventory.stale && live.usage.error == ReadError.FORBIDDEN && !live.refreshing
             }
-            click("history-toggle"); page(query(), 3, HistoryReadiness.ERROR)
+            click("history-toggle"); enterStoredText(); page(query(), 3, HistoryReadiness.ERROR)
             val source = owner.historySnapshots.value
             assertEquals((33L..35L).toList(), source.storage!!.entries.map { it.id.ordinal })
             assertEquals(35L, source.storage.lastAdmitted!!.ordinal)
@@ -257,7 +259,21 @@ class HistoryIsolationTest {
         assertDormant()
     }
 
-    private fun openHistory() { awaitConnectionScreen(compose, owner); click("history-toggle"); click("history-stored-text") }
+    private fun openHistory() { awaitConnectionScreen(compose, owner); click("history-toggle"); enterStoredText() }
+
+    private fun enterStoredText() {
+        val button = compose.onNodeWithTag("history-stored-text")
+        button.performScrollTo()
+        var label = button.fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
+        assertTrue("History mode button: $label", label in listOf(listOf("Browse stored text history"), listOf("View current charts")))
+        if (label == listOf("Browse stored text history")) click("history-stored-text")
+        await("stored text selected in the live UI", lastObserved = { "mode button=$label" }) {
+            label = button.fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
+            label == listOf("View current charts")
+        }
+        button.assertTextEquals("View current charts")
+        settleConnectionCommands(compose, owner, "stored text effect submitted owner receipt")
+    }
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
         if (tag != "remove-account-confirm") node.performScrollTo()
@@ -287,7 +303,6 @@ class HistoryIsolationTest {
     }
 
     private fun page(expected: HistoryGraphQuery, count: Int, readiness: HistoryReadiness = HistoryReadiness.READY) {
-        if (owner.historySnapshots.value.query.currentOnly) click("history-stored-text")
         await("actual page $expected count=$count readiness=$readiness") {
             owner.historySnapshots.value.let { it.query == expected && it.generation != null && it.storage?.entries?.size == count && it.readiness == readiness }
         }
@@ -341,10 +356,10 @@ class HistoryIsolationTest {
         }
     }
 
-    private fun await(step: String, condition: () -> Boolean) {
+    private fun await(step: String, lastObserved: () -> String = { "" }, condition: () -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 8_000, condition = condition) }
         catch (error: ComposeTimeoutException) {
-            throw AssertionError("$step: phase=${owner.state.value.phase}, history=${owner.historySnapshots.value.readiness}, query=${owner.historySnapshots.value.query}, reads=${fixture.reads.size}, requests=${transport.counts()}", error)
+            throw AssertionError("$step: ${lastObserved()} phase=${owner.state.value.phase}, history=${owner.historySnapshots.value.readiness}, query=${owner.historySnapshots.value.query}, reads=${fixture.reads.size}, requests=${transport.counts()}", error)
         }
     }
 

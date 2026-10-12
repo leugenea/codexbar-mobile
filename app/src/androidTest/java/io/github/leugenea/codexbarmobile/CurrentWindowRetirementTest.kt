@@ -5,9 +5,12 @@ import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.leugenea.codexbarmobile.history.*
+import io.github.leugenea.codexbarmobile.usage.WindowKind
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
+import java.math.BigDecimal
+import java.time.Instant
 
 @RunWith(AndroidJUnit4::class)
 class CurrentWindowRetirementTest {
@@ -151,12 +154,29 @@ class CurrentWindowRetirementTest {
             compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertDoesNotExist()
             compose.onNodeWithTag("history-chart-five-hour-counts").assertTextEquals(
                 "Drawn markers: 0 · Within-run connections: 0 · Nominal reference lines: 0")
+            val window = WindowIdentity(requireNotNull(owner.historySnapshots.value.partition), WindowKind.FIVE_HOUR,
+                18_000, Instant.ofEpochSecond(1_800_003_600L))
+            val query = HistoryGraphQuery(32, kind = WindowKind.FIVE_HOUR, window = window, currentOnly = true)
+            assertEquals(query, owner.historySnapshots.value.query)
+            assertNull(owner.historySnapshots.value.storage!!.lastAdmitted)
             assertEquals(1L, owner.historySnapshots.value.lostSamples)
             val requests = fixture.transport.requests.get()
             fixture.transport.advance(1000); owner.readUsage()
+            // The successful read-only empty query consumed workerGap without admitting a row.
+            // This first actual durable observation therefore has ordinal one, not two.
             await("one new actual admitted observation supplies a single marker") {
-                owner.historySnapshots.value.let { it.query.currentOnly && it.points.map { point -> point.observation.ordinal } == listOf(2L) }
+                owner.historySnapshots.value.let { it.query == query && !it.live.refreshing &&
+                    it.points.map { point -> point.observation.ordinal } == listOf(1L) }
             }
+            val source = owner.historySnapshots.value
+            assertEquals(listOf(1L), source.storage!!.entries.map { it.id.ordinal })
+            assertNull(source.storage.entries.single().gap)
+            assertEquals(Instant.ofEpochSecond(1_800_000_001L), source.storage.entries.single().observedAt)
+            assertEquals(1L, source.storage.lastAdmitted!!.ordinal)
+            assertEquals(listOf(BigDecimal("12.375")), source.points.map { it.usedPercent })
+            assertEquals(window, source.points.single().segment.window)
+            assertEquals(HistoryReadiness.ERROR, source.readiness)
+            assertEquals(HistoryRecorderProblem.READ_FAILURE, source.problem)
             compose.onNodeWithTag("history-chart-five-hour-counts").assertTextEquals(
                 "Drawn markers: 1 · Within-run connections: 0 · Nominal reference lines: 1")
             assertEquals(requests + 2, fixture.transport.requests.get())

@@ -26,8 +26,8 @@ internal fun ConnectionHistory(controller: ConnectionController, now: Instant?, 
     val generation = source.generation
     var kind by remember(controller, generation) { mutableStateOf(WindowKind.FIVE_HOUR) }
     var storedText by remember(controller) { mutableStateOf(false) }
-    // This read is deliberately independent of delayed history snapshot delivery.
-    val authority = controller.historySnapshots.value.displayPermission?.current()
+    // Collected snapshots trigger updates; the actual slot fences delayed or absent permissions.
+    val authority = controller.currentHistoryDisplayContext()
     val period = authority?.periods?.forKind(kind) ?: CurrentHistoryPeriod(unavailable = BaselineEligibility.WINDOW_UNAVAILABLE)
     var after by remember(controller, generation, storedText, if (storedText) null else period.window) { mutableStateOf<ObservationId?>(null) }
     val navigation = HistoryNavigation(kind, after, if (storedText) null else period.window, !storedText)
