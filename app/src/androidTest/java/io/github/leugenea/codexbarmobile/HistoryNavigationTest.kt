@@ -1,6 +1,7 @@
 package io.github.leugenea.codexbarmobile
 
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
@@ -26,14 +27,20 @@ class HistoryNavigationTest {
     @After fun cleanup() { fixture.cleanup() }
 
     @Test fun productionEntrySelectsWindowsAndNavigatesBoundedOrdinalPagesWithNativeCaptures() {
-        seedDormant()
+        seedDormant(fresh = false)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             openHistory()
             page(WindowKind.FIVE_HOUR, 0, 32)
             assertPage(1, 32, more = true)
             compose.onNodeWithTag("history-chart-weekly").assertDoesNotExist()
             captureNavigation(scenario)
+            click("history-stored-text")
+            await("current graph identity admitted") {
+                fixture.owner.historySnapshots.value.let { it.query.currentOnly && it.query.window != null && it.storage?.entries?.size == 32 }
+            }
             captureChart(scenario)
+            enterStoredText()
+            page(WindowKind.FIVE_HOUR, 0, 32)
             click("history-select-WEEKLY")
             page(WindowKind.WEEKLY, 0, 32)
             compose.onNodeWithTag("history-chart-five-hour").assertDoesNotExist()
@@ -95,6 +102,7 @@ class HistoryNavigationTest {
             phase(ConnectionPhase.OBSERVED)
             await("new login records only its own admission") { fixture.owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
             click("history-toggle")
+            enterStoredText()
             page(WindowKind.FIVE_HOUR, 0, 1)
             assertNotEquals(previous, fixture.owner.historySnapshots.value.partition)
             assertPage(1, 1, more = false)
@@ -125,6 +133,7 @@ class HistoryNavigationTest {
             scenario.onActivity { assertSame(current, it.connection) }
             compose.onNodeWithTag("history-toggle").assertTextEquals("View local history")
             click("history-toggle")
+            enterStoredText()
             page(WindowKind.FIVE_HOUR, 0, 32)
             val resumed = current.historySnapshots.value.generation
             scenario.moveToState(Lifecycle.State.CREATED)
@@ -135,6 +144,7 @@ class HistoryNavigationTest {
                 val generation = current.historySnapshots.value.generation
                 generation != null && generation !== resumed
             }
+            enterStoredText()
             page(WindowKind.FIVE_HOUR, 0, 32)
             assertDormantCounts()
         }
@@ -161,6 +171,7 @@ class HistoryNavigationTest {
                 source.live.usage.error == ReadError.FORBIDDEN && source.live.inventory.status == 200 && !source.live.refreshing
             }
             click("history-toggle")
+            enterStoredText()
             page(WindowKind.FIVE_HOUR, 0, 1)
             val source = fixture.owner.historySnapshots.value
             assertEquals(1L, source.storage!!.lastAdmitted!!.ordinal)
@@ -187,19 +198,32 @@ class HistoryNavigationTest {
         if (android.os.Build.VERSION.SDK_INT >= 33) PhoneTimeEvidence(compose, fixture).run(history = true)
     }
 
-    private fun seedDormant() {
+    private fun seedDormant(fresh: Boolean = true) {
         phase(ConnectionPhase.IDLE)
         fixture.owner.usageForeground(fixture.observer, true)
         fixture.owner.connect()
         phase(ConnectionPhase.OBSERVED)
         await("synthetic seed's original accepted endpoint settled") { fixture.owner.historySnapshots.value.storage?.entries?.size == 1 }
         fixture.seedLocalPage()
-        fixture.freshRuntime()
-        phase(ConnectionPhase.RESTORED)
+        if (fresh) { fixture.freshRuntime(); phase(ConnectionPhase.RESTORED) }
         assertDormantCounts()
     }
 
-    private fun openHistory() { awaitConnectionScreen(compose, fixture.owner); click("history-toggle") }
+    private fun openHistory() { awaitConnectionScreen(compose, fixture.owner); click("history-toggle"); enterStoredText() }
+
+    private fun enterStoredText() {
+        val button = compose.onNodeWithTag("history-stored-text")
+        button.performScrollTo()
+        var label = button.fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
+        assertTrue("History mode button: $label", label in listOf(listOf("Browse stored text history"), listOf("View current charts")))
+        if (label == listOf("Browse stored text history")) click("history-stored-text")
+        await("stored text selected in the live UI", lastObserved = { "mode button=$label" }) {
+            label = button.fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
+            label == listOf("View current charts")
+        }
+        button.assertTextEquals("View current charts")
+        settleConnectionCommands(compose, fixture.owner, "stored text effect submitted owner receipt")
+    }
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
         node.performScrollTo()
@@ -231,10 +255,10 @@ class HistoryNavigationTest {
         }
     }
 
-    private fun await(step: String, predicate: () -> Boolean) {
+    private fun await(step: String, lastObserved: () -> String = { "" }, predicate: () -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 8_000, condition = predicate) }
         catch (error: ComposeTimeoutException) {
-            throw AssertionError("$step: last phase=${fixture.owner.state.value.phase}, readiness=${fixture.owner.historySnapshots.value.readiness}, query=${fixture.owner.historySnapshots.value.query}", error)
+            throw AssertionError("$step: ${lastObserved()} last phase=${fixture.owner.state.value.phase}, readiness=${fixture.owner.historySnapshots.value.readiness}, query=${fixture.owner.historySnapshots.value.query}", error)
         }
     }
 

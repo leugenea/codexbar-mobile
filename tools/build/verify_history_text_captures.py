@@ -60,25 +60,31 @@ ASSEMBLED_CAPTURES = {
     "history-assembled-breaks-landscape-dark": (2, True, 1.0),
     "history-assembled-unknown-large-font": (1, False, 2.0),
     "history-assembled-page-landscape-light": (2, False, 1.0),
+    "history-current-light-portrait": (1, False, 1.0),
+    "history-current-dark-portrait": (1, True, 1.0),
 }
 ASSEMBLED_PAGES = {
     "history-assembled-fresh-portrait-light": ("IDLE", "UNAVAILABLE", "NONE", 256, 0, 0, 0, 0, 0, 0),
-    "history-assembled-single-portrait-dark": ("RESTORED", "READY", "FIVE_HOUR", 32, 0, 1, 1, 1, 5, 2),
+    "history-assembled-single-portrait-dark": ("OBSERVED", "READY", "FIVE_HOUR", 32, 0, 1, 1, 1, 5, 2),
     "history-assembled-breaks-landscape-dark": ("RESTORED", "READY", "FIVE_HOUR", 32, 0, 1, 7, 7, 5, 2),
     "history-assembled-unknown-large-font": ("RESTORED", "READY", "FIVE_HOUR", 32, 0, 1, 1, 1, 5, 2),
     "history-assembled-page-landscape-light": ("RESTORED", "READY", "FIVE_HOUR", 32, 32, 33, 35, 3, 5, 2),
+    "history-current-light-portrait": ("OBSERVED", "READY", "FIVE_HOUR", 32, 0, 301, 306, 5, 7, 4),
+    "history-current-dark-portrait": ("OBSERVED", "READY", "FIVE_HOUR", 32, 0, 301, 306, 5, 7, 4),
 }
 ASSEMBLED_CONTROLS = {
     "history-assembled-fresh-portrait-light": ["history-select-FIVE_HOUR", "history-select-WEEKLY"],
     "history-assembled-single-portrait-dark": [],
-    "history-assembled-breaks-landscape-dark": [],
-    "history-assembled-unknown-large-font": [],
+    "history-assembled-breaks-landscape-dark": ["history-select-FIVE_HOUR", "history-select-WEEKLY"],
+    "history-assembled-unknown-large-font": ["history-select-FIVE_HOUR", "history-select-WEEKLY"],
     "history-assembled-page-landscape-light": ["history-first-page", "history-next-page"],
+    "history-current-light-portrait": [],
+    "history-current-dark-portrait": [],
 }
 ASSEMBLED_COUNTS = {
     "history-assembled-single-portrait-dark": (1, 0, 1, 0),
-    "history-assembled-breaks-landscape-dark": (6, 2, 0, 3),
-    "history-assembled-unknown-large-font": (1, 0, 0, 0),
+    "history-current-light-portrait": (5, 2, 2, 2),
+    "history-current-dark-portrait": (5, 2, 2, 2),
 }
 CAPTURES.update(ASSEMBLED_CAPTURES)
 
@@ -257,7 +263,7 @@ def verify_integrated_metadata(metadata: dict, name: str, size: tuple[int, int])
     if metadata.get("productionEntry") is not True or metadata.get("hasMore") is not True:
         raise ValueError("Integrated capture is not a production entry with more retained data")
     identity = (metadata.get("activity"), metadata.get("phase"), metadata.get("queryKind"), metadata.get("visibleControls"))
-    if identity != ("io.github.leugenea.codexbarmobile.MainActivity", "RESTORED", "FIVE_HOUR", INTEGRATED_CONTROLS[name]):
+    if identity != ("io.github.leugenea.codexbarmobile.MainActivity", "OBSERVED", "FIVE_HOUR", INTEGRATED_CONTROLS[name]):
         raise ValueError("Integrated navigation/owner identity changed")
     if name == "history-integrated-chart-portrait-light":
         verify_integrated_canvas(metadata, size)
@@ -351,12 +357,27 @@ def verify_assembled_pixels(metadata: dict, name: str, image: bytes) -> None:
         if type(x) is not int or type(y) is not int or not (metadata["canvasLeft"] <= x < metadata["canvasRight"] and
                                                                          metadata["canvasTop"] <= y < metadata["canvasBottom"]):
             raise ValueError("Assembled pixel sample is outside its full Canvas")
+    if name.startswith("history-current-"):
+        verify_current_targets(metadata, samples)
     for item, actual in zip(samples, decoded_samples(image, samples)):
         verify_sample(item, actual)
     dashes = [item["matched"] for item in samples if item["kind"] == "dash"]
     if dashes and (dashes.count(True) < 10 or dashes.count(False) < 10):
         raise ValueError("Analytical reference lacks actual painted pixels or dash gaps")
 
+
+
+def verify_current_targets(metadata: dict, samples: list[dict]) -> None:
+    # Material3 1.4.0 default palette: Primary40/80 and NeutralVariant30/80.
+    primary, reference = ((-10006364, -11975345) if not metadata["dark"] else (-3097345, -3488560))
+    for item in samples:
+        expected = reference if item.get("kind") == "dash" else primary
+        if item.get("targetArgb") != expected:
+            raise ValueError("Current graph paint target differs from registered measured/reference role")
+    expected = dict(currentOnly=True, currentReset="2027-01-15T09:00:00Z", currentDuration=18000,
+                    selectedOrdinals=[301, 302, 304, 305, 306], lastAdmitted=307)
+    if any(type(metadata.get(key)) is not type(value) or metadata[key] != value for key, value in expected.items()):
+        raise ValueError("Current graph authoritative identity/selected history changed")
 
 def verify_assembled_metadata(metadata: dict, name: str, size: tuple[int, int], image: bytes) -> None:
     verify_production_root(metadata)

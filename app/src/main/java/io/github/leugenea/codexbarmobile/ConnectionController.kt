@@ -230,6 +230,8 @@ internal class ConnectionController(
 
     internal fun queryHistory(query: HistoryGraphQuery) = command { historyRecorder.query(query) }
 
+    internal fun currentHistoryDisplayContext() = historyRecorder.currentDisplayContext()
+
     private fun publishName() {
         mutableName.value = history?.nameState ?: AccountNameState(storageFailed = true)
     }
