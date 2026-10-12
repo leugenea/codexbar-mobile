@@ -1,5 +1,6 @@
 """Cheap build source/workflow contracts and explicitly synthetic report-parser tests."""
-from verify_test_reports import DASHBOARD_JVM, DASHBOARD_NATIVE, DASHBOARD_NATIVE_COUNT, DASHBOARD_JVM_COUNT
+from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DASHBOARD_NATIVE,
+                                             EXPECTED_CURRENT_READ_JVM, SCANNER_CLASS)
 from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT
 import hashlib
 import json
@@ -670,7 +671,7 @@ class SyntheticReportTests(unittest.TestCase):
                                      (LIVE_USAGE_CLASS, LIVE_USAGE_CASES), (BANKED_RESET_CLASS, BANKED_RESET_CASES), (HISTORY_CLASS, HISTORY_CASES), (HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES), (HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES), (HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES), (HISTORY_CHART_CLASS, HISTORY_CHART_CASES), (HISTORY_NAVIGATION_CLASS, HISTORY_NAVIGATION_CASES), (HISTORY_AUTHORITY_CLASS, HISTORY_AUTHORITY_CASES), (HISTORY_ISOLATION_CLASS, HISTORY_ISOLATION_CASES), (HISTORY_ASSEMBLED_CLASS, HISTORY_ASSEMBLED_CASES), (ACCOUNT_NAME_CLASS, ACCOUNT_NAME_CASES), (ACCOUNT_REMOVAL_CLASS, ACCOUNT_REMOVAL_CASES), (DEVICE_CODE_COPY_CLASS, DEVICE_CODE_COPY_CASES)):
                 for name in sorted(names - ({missing} if missing else set())):
                     ET.SubElement(suite, "testcase", classname=classname, name=name)
-        current = (CURRENT_HISTORY_JVM | DASHBOARD_JVM) if kind == "jvm" else (CURRENT_HISTORY_NATIVE | DASHBOARD_NATIVE)
+        current = (CURRENT_HISTORY_JVM | {SCANNER_CLASS: EXPECTED_CURRENT_READ_JVM} | EXPECTED_DASHBOARD_JVM) if kind == "jvm" else (CURRENT_HISTORY_NATIVE | EXPECTED_DASHBOARD_NATIVE)
         for classname, names in current.items():
             for name in sorted(names):
                 if name != missing:
@@ -692,8 +693,7 @@ class SyntheticReportTests(unittest.TestCase):
                 with self.subTest(kind=kind, container_depth=depth):
                     self.write_report(kind, container_depth=depth)
                     result = verify_reports(self.directory, kind)
-                    self.assertEqual(result["testCount"], len(EXPECTED[kind]) + (DASHBOARD_NATIVE_COUNT if kind == "native" else DASHBOARD_JVM_COUNT) + sum(map(len, (CURRENT_HISTORY_NATIVE if kind == "native" else CURRENT_HISTORY_JVM).values())) +
-                                     (len(CREDENTIAL_CASES) + len(CONNECTION_CASES) + len(USAGE_REFRESH_CASES) + len(LIVE_USAGE_CASES) + len(BANKED_RESET_CASES) + len(HISTORY_CASES) + len(HISTORY_LIFETIME_CASES) + len(HISTORY_SAMPLING_CASES) + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) if kind == "native" else 0))
+                    self.assertEqual(result["testCount"], 147 if kind == "native" else 49)
 
     def test_rejects_missing_tests(self):
         for kind in EXPECTED:

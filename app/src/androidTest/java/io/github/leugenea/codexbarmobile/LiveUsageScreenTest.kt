@@ -294,6 +294,7 @@ class LiveUsageScreenTest {
             waitFor("landscape resumed refresh settled") {
                 owner.state.value.refresh.usage.attempt !== previous && !owner.state.value.refresh.refreshing
             }
+            reconstructedConnectionDetails()
             listOf("live-identity", "live-rounding", "live-five-hour-status", "live-five-hour-percent",
                 "live-five-hour-reset-relative", "live-five-hour-reset-absolute").forEach(::noOverflow)
             fake.usage = response("{}", 403)
@@ -591,6 +592,7 @@ class LiveUsageScreenTest {
                 scenario.onActivity { orientation = it.resources.configuration.orientation }
                 orientation == Configuration.ORIENTATION_LANDSCAPE && !owner.state.value.refresh.refreshing
             }
+            reconstructedConnectionDetails()
             listOf("banked-title", "banked-status", "banked-summary-text", "banked-inventory-text", "banked-limitations",
                 "banked-item-0-provider", "banked-item-0-absolute", "banked-item-0-relative", "banked-issue-AVAILABLE_ROW_COUNT_MISMATCH").forEach(::noOverflow)
             text("banked-item-0-relative", "Banked entitlement expiry: 1 day 14 hours remaining")
@@ -598,9 +600,10 @@ class LiveUsageScreenTest {
             scenario.recreate()
             waitFor("banked recreated root and resumed inventory settle") {
                 owner.state.value.refresh.inventory.attempt !== previous && !owner.state.value.refresh.refreshing &&
-                    compose.onAllNodes(hasTestTag("banked-section")).fetchSemanticsNodes().isNotEmpty()
+                    compose.onAllNodes(hasTestTag("dashboard")).fetchSemanticsNodes().isNotEmpty()
             }
             scenario.onActivity { assertSame(shared, it.connection) }
+            reconstructedConnectionDetails()
             text("banked-inventory-text", "Inventory reports: 9223372036854775807 available banked resets")
             assertViewOnlyBanked()
         }
@@ -647,10 +650,18 @@ class LiveUsageScreenTest {
         waitFor("restored dormant synthetic session") { owner.state.value.phase == ConnectionPhase.RESTORED }
         assertEquals(0, fake.gets.get())
         awaitConnectionScreen(compose, owner)
-            openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
         openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
         text("live-status", "Usage unavailable · refresh to request an observation")
         return scenario
+    }
+
+    private fun reconstructedConnectionDetails() {
+        awaitConnectionScreen(compose, owner)
+        waitFor("reconstructed dashboard before full connection details") {
+            compose.onAllNodes(hasTestTag("dashboard")).fetchSemanticsNodes().size == 1
+        }
+        openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
+        compose.onNodeWithTag("connection-details").assertExists()
     }
 
     private fun read() {

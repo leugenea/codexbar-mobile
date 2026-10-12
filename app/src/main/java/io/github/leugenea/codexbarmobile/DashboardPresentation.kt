@@ -10,7 +10,10 @@ internal object DashboardPresentation {
 
     fun hasChart(series: HistoryPlotSeries) = series.samples.any { it.measured?.position is PlotPosition.Available }
 
-    fun noInformation(source: HistoryGraphSnapshot, status: UsageWindowStatus = UsageWindowStatus.UNAVAILABLE): Int = when {
+    fun noInformation(source: HistoryGraphSnapshot, status: UsageWindowStatus = UsageWindowStatus.UNAVAILABLE, malformed: Boolean = false): Int = when {
+        malformed && source.problem != null -> R.string.dashboard_no_history_malformed_error
+        malformed && source.readiness == HistoryReadiness.LOADING -> R.string.dashboard_no_history_malformed_loading
+        malformed -> R.string.dashboard_no_history_malformed
         source.problem != null -> R.string.dashboard_no_history_error
         source.readiness == HistoryReadiness.LOADING -> R.string.dashboard_no_history_loading
         else -> missingWindow(status)
@@ -23,9 +26,9 @@ internal object DashboardPresentation {
         else -> R.string.dashboard_no_history
     }
 
-    fun windowWarning(status: UsageWindowStatus): Int? = when (status) {
-        UsageWindowStatus.MALFORMED -> R.string.dashboard_window_malformed
-        UsageWindowStatus.UNSUPPORTED -> R.string.dashboard_window_unsupported
+    fun windowWarning(status: UsageWindowStatus, malformed: Boolean = false): Int? = when {
+        malformed || status == UsageWindowStatus.MALFORMED -> R.string.dashboard_window_malformed
+        status == UsageWindowStatus.UNSUPPORTED -> R.string.dashboard_window_unsupported
         else -> null
     }
 

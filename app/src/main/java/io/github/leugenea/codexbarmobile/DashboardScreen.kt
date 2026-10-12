@@ -72,9 +72,11 @@ private fun DashboardWindow(window: PresentedUsageWindow, display: HistoryGraphS
                 modifier = Modifier.testTag("${window.tag}-percent")) }
             DashboardReset(window.reset, window.tag)
             if (DashboardPresentation.hasChart(series)) {
-                DashboardPresentation.windowWarning(window.status)?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+                DashboardPresentation.windowWarning(window.status, window.malformed)?.let {
+                    Text(stringResource(it), Modifier.testTag("dashboard-window-warning-${series.kind.name}"), color = MaterialTheme.colorScheme.error)
+                }
                 CompactHistoryChart(series, display, time, now)
-            } else Text(stringResource(DashboardPresentation.noInformation(display, window.status)), Modifier.testTag("dashboard-no-info-${series.kind.name}"))
+            } else Text(stringResource(DashboardPresentation.noInformation(display, window.status, window.malformed)), Modifier.testTag("dashboard-no-info-${series.kind.name}"))
         }
     }
 }

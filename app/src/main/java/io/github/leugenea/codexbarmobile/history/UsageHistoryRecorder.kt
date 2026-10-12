@@ -244,7 +244,8 @@ internal class UsageHistoryRecorder(
         readPending = false
         val requested = selection
         val revision = queryRevision
-        val gap = workerGap.also { workerGap = null }
+        // Presentation-only drains must leave actual admission loss for the next Work.
+        val gap = if (next != null) workerGap.also { workerGap = null } else null
         worker = scope.launch(start = CoroutineStart.LAZY) {
             val result = withContext(storageDispatcher) { perform(current, next, requested, gap) }
             finish(current, revision, requested, result)

@@ -88,12 +88,13 @@ class CurrentWindowRetirementTest {
                 gate.release()
                 await("new current weekly measurements selected after held reset returns") {
                     recordedHistory(owner).let { it.query.window?.resetAt?.epochSecond == 1_800_007_200L &&
-                        it.points.map { point -> point.observation.ordinal } == listOf(2L) }
+                        it.points.map { point -> point.observation.ordinal } == listOf(2L) } &&
+                        recordedHistory(owner, WindowKind.WEEKLY).points.map { it.observation.ordinal } == listOf(2L)
                 }
                 assertEquals(partition, recordedHistory(owner).partition)
                 assertSame(generation, recordedHistory(owner).generation)
                 assertTrue(fixture.publications.drop(publication).none { it.storage === oldPage })
-                assertNoEarlierReset(publication)
+                assertNoEarlierReset(publication, requireNotNull(partition))
                 assertEquals(7L, fixture.transport.requests.get())
                 assertEquals(4L, fixture.transport.gets.get())
             } finally { gate.release() }
@@ -166,22 +167,30 @@ class CurrentWindowRetirementTest {
             assertEquals(1L, recordedHistory(owner).lostSamples)
             val requests = fixture.transport.requests.get()
             fixture.transport.advance(1000); owner.readUsage()
-            // The successful read-only empty query consumed workerGap without admitting a row.
-            // This first actual durable observation therefore has ordinal one, not two.
+            // A read-only query leaves the real admission gap pending. The first successful
+            // durable append is gap ordinal one; only the following measurement has ordinal two.
             await("one new actual admitted observation supplies a single marker") {
                 recordedHistory(owner).let { it.query == query && !it.live.refreshing &&
-                    it.points.map { point -> point.observation.ordinal } == listOf(1L) }
+                    it.points.map { point -> point.observation.ordinal } == listOf(2L) }
             }
             val source = recordedHistory(owner)
-            assertEquals(listOf(1L), source.storage!!.entries.map { it.id.ordinal })
+            assertEquals(listOf(2L), source.storage!!.entries.map { it.id.ordinal })
             assertNull(source.storage.entries.single().gap)
             assertEquals(Instant.ofEpochSecond(1_800_000_001L), source.storage.entries.single().observedAt)
-            assertEquals(1L, source.storage.lastAdmitted!!.ordinal)
+            assertEquals(2L, source.storage.lastAdmitted!!.ordinal)
             assertEquals(listOf(BigDecimal("12.375")), source.points.map { it.usedPercent })
             assertEquals(window, source.points.single().segment.window)
             assertEquals(HistoryReadiness.ERROR, source.readiness)
             assertEquals(HistoryRecorderProblem.READ_FAILURE, source.problem)
             assertCurrentDrawing(recordedHistory(owner), 1, 0, 1)
+            assertEquals(requests + 2, fixture.transport.requests.get())
+            openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
+            await("real first successful gap and measurement appends remain contiguous") {
+                owner.historySnapshots.value.storage?.entries?.map { it.id.ordinal } == listOf(1L, 2L)
+            }
+            assertEquals(HistoryGap.READ_ERROR, owner.historySnapshots.value.storage!!.entries.first().gap)
+            assertNull(owner.historySnapshots.value.storage!!.entries.last().gap)
+            assertEquals(2L, owner.historySnapshots.value.storage!!.lastAdmitted!!.ordinal)
             assertEquals(requests + 2, fixture.transport.requests.get())
             assertEquals(1L, recordedHistory(owner).lostSamples)
         }
@@ -196,17 +205,24 @@ class CurrentWindowRetirementTest {
         }
     }
 
-    private fun assertNoEarlierReset(boundary: Int) {
-        val published = fixture.publications.drop(boundary).filter { it.request is HistoryPresentationRequest.Current && it.currentPages != null }
+    private fun assertNoEarlierReset(boundary: Int, partition: HistoryPartition) {
+        val expected = mapOf(WindowKind.FIVE_HOUR to WindowIdentity(partition, WindowKind.FIVE_HOUR, 18_000, Instant.ofEpochSecond(1_800_007_200L)),
+            WindowKind.WEEKLY to WindowIdentity(partition, WindowKind.WEEKLY, 604_800, Instant.ofEpochSecond(1_800_007_200L)))
+        val published = fixture.publications.drop(boundary)
+            .flatMap { listOfNotNull(it.storage, it.currentPages?.fiveHour, it.currentPages?.weekly) }
         assertTrue("successor reset must publish actual selected history", published.isNotEmpty())
-        published.forEach { source ->
-            val request = source.request as HistoryPresentationRequest.Current
-            assertEquals(1_800_007_200L, request.fiveHour!!.resetAt.epochSecond)
-            assertEquals(listOf(2L), source.currentPages!!.fiveHour!!.entries.map { it.id.ordinal })
-            assertTrue("every raw published selected point belongs to the fresh current key", source.currentPages.fiveHour.entries.all { entry ->
-                entry.windows.filter { it.kind == WindowKind.FIVE_HOUR }.all { it.point?.segment?.window == request.fiveHour }
-            })
+        published.forEach { page ->
+            assertEquals(partition, page.query.partition)
+            assertEquals(listOf(2L), page.entries.map { it.id.ordinal })
+            page.entries.forEach { entry ->
+                entry.windows.filter { it.kind in expected }.forEach { window ->
+                    assertEquals("every raw Page/pair window uses independently expected fresh key", expected[window.kind],
+                        WindowHistory.identity(partition, window))
+                    window.point?.let { assertEquals(expected[window.kind], it.segment.window) }
+                }
+            }
         }
+        for ((kind, key) in expected) assertEquals(key, recordedHistory(owner, kind).query.window)
     }
 
     private fun currentText(value: String) = compose.onNode(hasAnyAncestor(hasTestTag("connection-history")) and hasText(value), useUnmergedTree = true)

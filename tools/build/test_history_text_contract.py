@@ -1,5 +1,6 @@
 """Synthetic report/capture parser controls only; never execute application code."""
-from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT, DASHBOARD_NATIVE_COUNT
+from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT
+from dashboard_contract_expectations import EXPECTED_DASHBOARD_NATIVE_COUNT
 import json
 import os
 from pathlib import Path
@@ -53,7 +54,7 @@ class HistoryTextContracts(unittest.TestCase):
         self.assertEqual(HISTORY_TEXT_CASES, RETAINED_TEXT_CASES)
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), RETAINED_TEXT_CASES)
         self.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 80 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + DASHBOARD_NATIVE_COUNT)
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 80 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT)
         for name in RETAINED_TEXT_CASES:
             self.report(name)
             with self.assertRaisesRegex(ValueError, "Missing real native history text"):

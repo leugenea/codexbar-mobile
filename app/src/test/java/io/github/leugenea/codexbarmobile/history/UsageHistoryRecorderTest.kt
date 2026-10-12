@@ -380,6 +380,8 @@ class UsageHistoryRecorderTest {
         assertNotSame(held, snapshot.selection)
         storage.release(); settle()
         assertEquals(page, snapshot.query); assertNull(snapshot.currentPages); assertEquals(1, snapshot.points.size)
+        assertEquals(0L, snapshot.lostSamples)
+        assertTrue("healthy supersession does not fabricate a recording gap", journal.entries.all { it.gap == null })
         storage.held = true
         owner.observeHistory(current, context); settle()
         owner.signOut(); settle()
@@ -407,6 +409,55 @@ class UsageHistoryRecorderTest {
         assertEquals(listOf(1L, 2L, 3L, 4L, 5L), journal.entries.map { it.id.ordinal })
         assertEquals(1L, snapshot.lostSamples)
         assertEquals(10, gets.size)
+    } }
+
+    @Test fun admittedPreappendFailureUnderChangedSelectionRetainsActualLossAndNextGap() = runTest { fixture {
+        visible(true); read()
+        val context = owner.currentHistoryDisplayContext()!!
+        val admitted = journal.admissions.size
+        storage.held = true
+        advance(1000); read()
+        val oldToken = snapshot.selection
+        assertEquals("admitted worker held before preappend", 1, storage.pending)
+        owner.observeHistory(HistoryPresentationRequest.Idle, context); settle()
+        assertNotSame(oldToken, snapshot.selection)
+        journal.readFailure = HistoryReadOutcome.Unavailable(HistoryUnavailable.IO_FAILURE)
+        storage.release(); settle()
+        assertEquals(1L, snapshot.lostSamples)
+        assertEquals(HistoryRecorderProblem.READ_FAILURE, snapshot.problem)
+        assertEquals(admitted, journal.admissions.size)
+        assertEquals(listOf(1L), journal.entries.map { it.id.ordinal })
+        assertNull(snapshot.storage); assertNull(snapshot.currentPages)
+        journal.readFailure = null
+        advance(1000); read()
+        assertEquals(listOf(1L, 2L, 3L), journal.entries.map { it.id.ordinal })
+        assertEquals(HistoryGap.READ_ERROR, journal.entries[1].gap)
+        assertEquals(1L, snapshot.lostSamples)
+        assertEquals(6, gets.size)
+    } }
+
+    @Test fun admittedAppendFailureUnderChangedSelectionRetainsActualLossWithoutPresentationLoss() = runTest { fixture {
+        visible(true); read()
+        val context = owner.currentHistoryDisplayContext()!!
+        storage.held = true
+        advance(1000); read()
+        val oldToken = snapshot.selection
+        assertEquals("admitted worker held before append", 1, storage.pending)
+        owner.observeHistory(HistoryPresentationRequest.Idle, context); settle()
+        assertNotSame(oldToken, snapshot.selection)
+        journal.appendFailure = HistoryAppendOutcome.Unavailable(HistoryUnavailable.STORAGE_FULL)
+        storage.release(); settle()
+        assertEquals(1L, snapshot.lostSamples)
+        assertEquals(HistoryRecorderProblem.WRITE_FAILURE, snapshot.problem)
+        assertEquals(listOf(1L, 2L), journal.admissions.map { it.id.ordinal })
+        assertEquals(listOf(1L), journal.entries.map { it.id.ordinal })
+        assertNull(snapshot.storage); assertNull(snapshot.currentPages)
+        journal.appendFailure = null
+        advance(1000); read()
+        assertEquals(listOf(1L, 2L, 3L), journal.entries.map { it.id.ordinal })
+        assertEquals(HistoryGap.READ_ERROR, journal.entries[1].gap)
+        assertEquals(1L, snapshot.lostSamples)
+        assertEquals(6, gets.size)
     } }
 
     private suspend fun TestScope.fixture(capacity: Int = 16, block: RecordingFixture.() -> Unit) {

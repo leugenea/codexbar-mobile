@@ -76,8 +76,14 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
                 assertSame("recreation keeps original usage facts", usage, fixture.owner.state.value.refresh.usage.success)
                 assertSame("recreation keeps original inventory facts", inventory, fixture.owner.state.value.refresh.inventory.success)
                 assertEquals("local formatting/configuration/recreation adds no provider requests", routes, fixture.transport.counts())
-                assertEquals("no formatting admissions", listOf(entry.id), recordedHistory(fixture.owner).storage!!.entries.map { it.id })
                 noRawTime(if (dashboard) "dashboard" else if (history) "connection-history" else "live-usage")
+                openDetailRoute(compose, fixture.owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
+                await("bounded stored Page for unchanged formatting admissions") {
+                    fixture.owner.historySnapshots.value.request is io.github.leugenea.codexbarmobile.history.HistoryPresentationRequest.Page &&
+                        fixture.owner.historySnapshots.value.storage?.entries?.size == 1
+                }
+                assertEquals("no formatting admissions", listOf(entry.id), recordedHistory(fixture.owner).storage!!.entries.map { it.id })
+                assertEquals("stored verification adds no provider requests", routes, fixture.transport.counts())
             }
         } finally {
             try { locales.applicationLocales = originalLocales }

@@ -110,6 +110,16 @@ DASHBOARD_CAPTURES = {
     "dashboard-local-history-details-large-font": (1, False, 2.0, "LOCAL_HISTORY_DETAILS", "PAGE", "NONE"),
 }
 
+DASHBOARD_LAYOUTS = {
+    "dashboard-main-portrait-light": ("history-chart-five-hour-equivalent", ["connection-screen", "dashboard"]),
+    "dashboard-weekly-portrait-light": ("history-chart-weekly-equivalent", ["connection-screen", "dashboard"]),
+    "dashboard-banked-expanded-portrait-light": ("banked-disclosure-status", ["connection-screen", "dashboard"]),
+    "dashboard-drawer-portrait-dark": ("drawer-LOCAL_HISTORY_DETAILS", ["connection-screen", "dashboard", "details-drawer"]),
+    "dashboard-main-landscape-dark-large-font": ("history-chart-five-hour-equivalent", ["connection-screen", "dashboard"]),
+    "dashboard-connection-details-landscape-dark": ("banked-container", ["connection-screen", "connection-details"]),
+    "dashboard-local-history-details-large-font": ("history-page-cursor", ["connection-screen", "connection-history"]),
+}
+
 
 # Bitmap.compress uses Skia's non-interlaced direct-color PNG encoder. Support
 # its grayscale/RGB/gray-alpha/RGBA 8/16-bit output, not palette or Adam7 files.
@@ -270,10 +280,10 @@ def verify_integrated_canvas(metadata: dict, size: tuple[int, int]) -> None:
         raise ValueError("Integrated Canvas is partially clipped in its captured root")
 
 
-def verify_production_root(metadata: dict) -> None:
+def verify_production_root(metadata: dict, expected_roots: tuple[str, ...] = ("connection-screen",)) -> None:
     # Tabs are retired. An observed real screen root remains mandatory even when
     # the chart viewport has no visible clickable controls.
-    if metadata.get("visibleRoots") != ["connection-screen"]:
+    if metadata.get("visibleRoots") != list(expected_roots):
         raise ValueError("Production capture lacks the observed connection screen root")
 
 
@@ -468,9 +478,9 @@ LIVE_CAPTURES = {"live-usage-portrait-light": False, "live-usage-portrait-dark":
 LIVE_FACTS = {
     "live-five-hour-percent": "12.5% used",
     "live-weekly-percent": "76.25% used",
-    "live-five-hour-reset-absolute": "Reset: Oct 8, 2026, 01:00 (hour precision)",
+    "live-five-hour-reset-absolute": "Reset: Oct 8, 2026, 01:00",
     "live-five-hour-reset-relative": "Reset: 0 days 1 hour remaining",
-    "live-weekly-reset-absolute": "Reset: Oct 10, 2026, 01:00 (hour precision)",
+    "live-weekly-reset-absolute": "Reset: Oct 10, 2026, 01:00",
     "live-weekly-reset-relative": "Reset: 2 days 1 hour remaining",
 }
 
@@ -539,10 +549,14 @@ def dashboard_capture_receipt(path: Path) -> dict:
                     activity="io.github.leugenea.codexbarmobile.MainActivity", requests=5, gets=2)
     if not valid_configuration(metadata, expected, size) or ((orientation == 1) != (size[0] < size[1])):
         raise ValueError("Dashboard capture route/configuration/request provenance changed")
-    verify_production_root(metadata)
+    verify_production_root(metadata, tuple(DASHBOARD_LAYOUTS[path.stem][1]))
     verify_live_layout(metadata)
-    if "uiCursor" in metadata or not metadata.get("layoutLabel"):
-        raise ValueError("Dashboard capture lacks a real native layout label")
+    label, roots = DASHBOARD_LAYOUTS[path.stem]
+    if "uiCursor" in metadata or metadata.get("layoutLabel") != label or metadata.get("visibleRoots") != roots:
+        raise ValueError("Dashboard actual child/drawer roots or native layout label identity changed")
+    host = {"context": "MATCH", "selection": "MATCH", "periods": "MATCH", "projection": "MATCH"} if mode == "CURRENT" else None
+    if "currentHost" not in metadata or metadata["currentHost"] != host:
+        raise ValueError("Dashboard lacks an actual matching current host/authority/selection receipt")
     verify_dashboard_windows(metadata)
     if path.stem == "dashboard-drawer-portrait-dark" and metadata.get("drawerLabels") != ["full local history details", "full love connection details"]:
         raise ValueError("Owner drawer rows changed")

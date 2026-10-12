@@ -306,6 +306,8 @@ DASHBOARD_JVM = {
         'heldJointRequestRejectsRouteQueryAndAccountSuccessors',
         'jointRequestPreservesQueueLossGapAndContiguousDurableOrdinals',
         'jointRequestUsesOneWorkerAndCoalescesLatestSelectionWithoutAdmissions',
+        'admittedPreappendFailureUnderChangedSelectionRetainsActualLossAndNextGap',
+        'admittedAppendFailureUnderChangedSelectionRetainsActualLossWithoutPresentationLoss',
     },
 }
 DASHBOARD_NATIVE = {
@@ -326,6 +328,7 @@ DASHBOARD_NATIVE = {
         'dashboardMissingEmptySingleAndFailedHistoryHaveOneHonestLinePerWindow',
         'dashboardShowsBothCurrentWindowsWithoutHistoryNavigationAndRetainsMeasuredReferencePixels',
         'drawerHasExactTwoLabelsBackPrecedenceAndDetailsReturnToDashboard',
+        'dashboardKnownPercentPreservesMalformedResetAndIndependentCurrentSiblingWarning',
     },
 }
 DASHBOARD_NATIVE_COUNT = sum(map(len, DASHBOARD_NATIVE.values()))

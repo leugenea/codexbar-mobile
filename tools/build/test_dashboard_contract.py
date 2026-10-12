@@ -1,12 +1,19 @@
 """Synthetic/source controls for issue142; no application/native execution or visual approval."""
+import copy
 import json
 from pathlib import Path
 import re
 import unittest
 import xml.etree.ElementTree as ET
 
-from verify_test_reports import DASHBOARD_JVM, DASHBOARD_NATIVE, verify_reports
-from verify_history_text_captures import DASHBOARD_CAPTURES, dashboard_capture_receipt
+from tree_sitter import Language, Parser
+import tree_sitter_kotlin
+from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DASHBOARD_NATIVE,
+    EXPECTED_SCANNER_ADDITIONS, EXPECTED_CURRENT_READ_JVM, PROTECTED_MIXED_SOURCE, SCANNER_CLASS,
+    EXPECTED_DASHBOARD_CAPTURE_SPECS, EXPECTED_DASHBOARD_LAYOUTS, EXPECTED_CURRENT_HOST,
+    EXPECTED_DASHBOARD_NATIVE_COUNT, EXPECTED_DASHBOARD_JVM_COUNT)
+from verify_test_reports import DASHBOARD_JVM, DASHBOARD_NATIVE, DASHBOARD_NATIVE_COUNT, DASHBOARD_JVM_COUNT, CURRENT_HISTORY_JVM, verify_reports
+from verify_history_text_captures import DASHBOARD_CAPTURES, DASHBOARD_LAYOUTS, dashboard_capture_receipt
 import test_history_text_contract as history_fixture
 import test_workflow_contract
 
@@ -14,13 +21,15 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def dashboard_captures(directory, fixture):
-    for name, (orientation, dark, font, route, mode, kind) in DASHBOARD_CAPTURES.items():
+    for name, (orientation, dark, font, route, mode, kind) in EXPECTED_DASHBOARD_CAPTURE_SPECS.items():
+        label, roots = EXPECTED_DASHBOARD_LAYOUTS[name]
         size = (4, 5) if orientation == 1 else (5, 4)
         data = dict(name=name, synthetic=True, productionEntry=True, api=36, orientation=orientation,
                     dark=dark, fontScale=font, density=1, renderedLocale="en-US", width=size[0], height=size[1],
                     route=route, requestMode=mode, sourceKind=kind, requests=5, gets=2,
-                    activity="io.github.leugenea.codexbarmobile.MainActivity", visibleRoots=["connection-screen"],
-                    layoutLabel="SYNTHETIC-layout", layoutFontScale=font, layoutDensity=1, windows=[])
+                    activity="io.github.leugenea.codexbarmobile.MainActivity", visibleRoots=roots,
+                    layoutLabel=label, layoutFontScale=font, layoutDensity=1, windows=[],
+                    currentHost=EXPECTED_CURRENT_HOST if mode == "CURRENT" else None)
         if mode == "CURRENT":
             data["windows"] = [dict(kind=k, limit=32, after=0, reset="2027-01-15T09:00:00Z", duration=d,
                                     selectedOrdinals=[1], lastAdmitted=1) for k, d in (("FIVE_HOUR", 18000), ("WEEKLY", 604800))]
@@ -48,6 +57,31 @@ def dashboard_captures(directory, fixture):
         (directory / (name + ".png")).write_bytes(image)
 
 
+def annotated_methods(text, classname):
+    """Only @Test methods directly owned by the intended Kotlin class/package."""
+    data = text.encode()
+    tree = Parser(Language(tree_sitter_kotlin.language())).parse(data)
+    package = next(node for node in tree.root_node.named_children if node.type == "package_header")
+    actual_package = data[package.start_byte:package.end_byte].decode().removeprefix("package ").strip()
+    methods = set()
+    for declaration in tree.root_node.named_children:
+        if declaration.type != "class_declaration":
+            continue
+        name = next(node for node in declaration.named_children if node.type == "identifier")
+        if actual_package + "." + data[name.start_byte:name.end_byte].decode() != classname:
+            continue
+        body = next(node for node in declaration.named_children if node.type == "class_body")
+        for function in body.named_children:
+            if function.type != "function_declaration":
+                continue
+            modifiers = next((node for node in function.named_children if node.type == "modifiers"), None)
+            if modifiers is None or not re.search(r"@(?:org\.junit\.)?Test\b", data[modifiers.start_byte:modifiers.end_byte].decode()):
+                continue
+            name = function.child_by_field_name("name")
+            methods.add(data[name.start_byte:name.end_byte].decode())
+    return methods
+
+
 class DashboardContracts(unittest.TestCase):
     def setUp(self):
         self.fixture = history_fixture.HistoryTextContracts()
@@ -58,11 +92,22 @@ class DashboardContracts(unittest.TestCase):
     def test_exact_additive_dashboard_identities_fail_closed_without_removing_inherited_cases(self):
         writer = test_workflow_contract.SyntheticReportTests()
         writer.directory = self.directory
-        for kind, registry, source_set in (("jvm", DASHBOARD_JVM, "test"), ("native", DASHBOARD_NATIVE, "androidTest")):
+        self.assertEqual(DASHBOARD_JVM, EXPECTED_DASHBOARD_JVM)
+        self.assertEqual(DASHBOARD_NATIVE, EXPECTED_DASHBOARD_NATIVE)
+        self.assertEqual(DASHBOARD_NATIVE_COUNT, EXPECTED_DASHBOARD_NATIVE_COUNT)
+        self.assertEqual(DASHBOARD_JVM_COUNT, EXPECTED_DASHBOARD_JVM_COUNT)
+        self.assertEqual(CURRENT_HISTORY_JVM[SCANNER_CLASS], EXPECTED_CURRENT_READ_JVM)
+        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_NATIVE.values())), 13)
+        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 14)
+        for kind, registry, source_set in (("jvm", EXPECTED_DASHBOARD_JVM, "test"), ("native", EXPECTED_DASHBOARD_NATIVE, "androidTest")):
             for classname, required in registry.items():
                 source = ROOT / f"app/src/{source_set}/java/{classname.replace('.', '/')}.kt"
-                actual = set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text()))
-                self.assertTrue(required <= actual)
+                actual = annotated_methods(source.read_text(), classname)
+                protected = PROTECTED_MIXED_SOURCE.get(classname)
+                if protected is None:
+                    self.assertEqual(required, actual)
+                else:
+                    self.assertTrue((protected | required) <= actual)
                 for name in required:
                     for mutation in ("missing", "wrong-class", "duplicate", "failure", "error", "skipped"):
                         path = writer.write_report(kind)
@@ -82,7 +127,10 @@ class DashboardContracts(unittest.TestCase):
                             verify_reports(self.directory, kind)
 
     def test_each_dashboard_image_requires_exact_route_configuration_and_native_owner_receipts(self):
-        for name in DASHBOARD_CAPTURES:
+        self.assertEqual(DASHBOARD_CAPTURES, EXPECTED_DASHBOARD_CAPTURE_SPECS)
+        self.assertEqual(DASHBOARD_LAYOUTS, EXPECTED_DASHBOARD_LAYOUTS)
+        self.assertEqual(len(EXPECTED_DASHBOARD_CAPTURE_SPECS), 7)
+        for name in EXPECTED_DASHBOARD_CAPTURE_SPECS:
             dashboard_captures(self.directory, self.fixture)
             path = self.directory / (name + ".png")
             self.assertEqual(dashboard_capture_receipt(path)["name"], name)
@@ -90,12 +138,25 @@ class DashboardContracts(unittest.TestCase):
             mutations = (("route", "SYNTHETIC-wrong-route"), ("requestMode", "NONE"), ("api", 35),
                          ("layoutFontScale", True), ("density", float("nan")), ("visibleRoots", []),
                          ("requests", 99), ("sourceKind", "INVALID"), ("windows", [{}]),
-                         ("uiCursor", "SYNTHETIC-hidden-cursor"))
+                         ("uiCursor", "SYNTHETIC-hidden-cursor"), ("layoutLabel", "SYNTHETIC-arbitrary"),
+                         ("visibleRoots", ["connection-screen"]), ("visibleRoots", ["connection-screen", "SYNTHETIC-wrong-child"]),
+                         ("currentHost", {}))
             for key, value in mutations:
                 data = dict(original); data[key] = value
                 path.with_suffix(".json").write_text(json.dumps(data))
                 with self.subTest(name=name, key=key), self.assertRaises(ValueError):
                     dashboard_capture_receipt(path)
+            for key in ("visibleRoots", "layoutLabel", "currentHost"):
+                data = dict(original); data.pop(key)
+                path.with_suffix(".json").write_text(json.dumps(data))
+                with self.subTest(name=name, missing=key), self.assertRaises(ValueError):
+                    dashboard_capture_receipt(path)
+            if original["currentHost"] is not None:
+                for key in EXPECTED_CURRENT_HOST:
+                    data = copy.deepcopy(original); data["currentHost"][key] = "MISMATCH"
+                    path.with_suffix(".json").write_text(json.dumps(data))
+                    with self.subTest(name=name, wrongHost=key), self.assertRaises(ValueError):
+                        dashboard_capture_receipt(path)
             path.with_suffix(".json").write_text(json.dumps(original))
             if original["sourceKind"] != "NONE":
                 for key, value in (("markerCount", 0), ("connectionCount", 1), ("canvasClippedLeft", .5), ("pixelSamples", [])):
@@ -107,6 +168,18 @@ class DashboardContracts(unittest.TestCase):
                 path.write_bytes(self.fixture.png(4, 5))
                 with self.assertRaises(ValueError):
                     dashboard_capture_receipt(path)
+
+    def test_source_annotations_and_class_identity_cannot_be_spoofed_by_names(self):
+        classname = "io.github.leugenea.codexbarmobile.DashboardUiTest"
+        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/DashboardUiTest.kt").read_text()
+        expected = EXPECTED_DASHBOARD_NATIVE[classname]
+        for name in expected:
+            without_annotation = source.replace(f"@Test fun {name}", f"fun {name}")
+            self.assertNotIn(name, annotated_methods(without_annotation, classname))
+        wrong_class = source.replace("class DashboardUiTest", "class UnrelatedTest")
+        self.assertEqual(annotated_methods(wrong_class, classname), set())
+        scanner = ROOT / f"app/src/test/java/{SCANNER_CLASS.replace('.', '/')}.kt"
+        self.assertEqual(annotated_methods(scanner.read_text(), SCANNER_CLASS), EXPECTED_CURRENT_READ_JVM)
 
     def test_request_boundary_keeps_single_owner_exact_cursor_and_explicit_reread_distinction(self):
         main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"

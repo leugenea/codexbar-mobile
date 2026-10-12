@@ -1,5 +1,6 @@
 """Offline, explicitly synthetic native-coverage retry/runner regressions; no emulator/Gradle."""
-from verify_test_reports import DASHBOARD_JVM, DASHBOARD_NATIVE, DASHBOARD_NATIVE_COUNT, DASHBOARD_JVM_COUNT
+from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DASHBOARD_NATIVE,
+                                             EXPECTED_CURRENT_READ_JVM, SCANNER_CLASS)
 from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT
 import copy
 import json
@@ -53,7 +54,7 @@ def synthetic_reports(build, failed=False):
                                         (LIVE_USAGE_CLASS, LIVE_USAGE_CASES), (BANKED_RESET_CLASS, BANKED_RESET_CASES), (HISTORY_CLASS, HISTORY_CASES), (HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES), (HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES), (HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES), (HISTORY_CHART_CLASS, HISTORY_CHART_CASES), (HISTORY_NAVIGATION_CLASS, HISTORY_NAVIGATION_CASES), (HISTORY_AUTHORITY_CLASS, HISTORY_AUTHORITY_CASES), (HISTORY_ISOLATION_CLASS, HISTORY_ISOLATION_CASES), (HISTORY_ASSEMBLED_CLASS, HISTORY_ASSEMBLED_CASES), (ACCOUNT_NAME_CLASS, ACCOUNT_NAME_CASES), (ACCOUNT_REMOVAL_CLASS, ACCOUNT_REMOVAL_CASES), (DEVICE_CODE_COPY_CLASS, DEVICE_CODE_COPY_CASES)):
                 for name in sorted(required):
                     ET.SubElement(suite, "testcase", classname=classname, name=name)
-        current = (CURRENT_HISTORY_JVM | DASHBOARD_JVM) if kind == "jvm" else (CURRENT_HISTORY_NATIVE | DASHBOARD_NATIVE)
+        current = (CURRENT_HISTORY_JVM | {SCANNER_CLASS: EXPECTED_CURRENT_READ_JVM} | EXPECTED_DASHBOARD_JVM) if kind == "jvm" else (CURRENT_HISTORY_NATIVE | EXPECTED_DASHBOARD_NATIVE)
         for classname, names in current.items():
             for name in sorted(names):
                 ET.SubElement(suite, "testcase", classname=classname, name=name)
@@ -283,7 +284,7 @@ class RetryContracts(unittest.TestCase):
         self.assertEqual(HISTORY_CHART_CASES, RETAINED_CHART_CASES)
         path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
         cases = list(ET.parse(path).getroot().iter("testcase"))
-        self.assertEqual(len(cases), 124 + len(PHONE_TIME_CASES) + CURRENT_HISTORY_NATIVE_COUNT + DASHBOARD_NATIVE_COUNT)
+        self.assertEqual(len(cases), 147)
         for classname, expected in ((HISTORY_TEXT_CLASS, RETAINED_TEXT_CASES),
                                     (HISTORY_CHART_CLASS, RETAINED_CHART_CASES)):
             self.assertEqual({case.get("name") for case in cases if case.get("classname") == classname}, expected)

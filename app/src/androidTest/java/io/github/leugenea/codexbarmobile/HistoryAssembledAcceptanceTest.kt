@@ -40,7 +40,9 @@ class HistoryAssembledAcceptanceTest {
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assertDoesNotExist()
             compose.onNodeWithTag("history-details-toggle").assertDoesNotExist()
             assertCurrentDrawing(recordedHistory(fixture.owner), 0, 0, 0)
-            noFact("Measured used percent (exact %): 0")
+            noFact("Measured used percent (exact %): 0", "dashboard")
+            compose.onNodeWithTag("live-five-hour-percent").assertDoesNotExist()
+            compose.onNodeWithTag("live-weekly-percent").assertDoesNotExist()
             capture.label("dashboard-no-info-FIVE_HOUR")
             compose.onNodeWithTag("open-drawer").performScrollTo()
             capture.capture("history-assembled-fresh-portrait-light", scenario, fixture, listOf("open-drawer", "connect"))
@@ -50,7 +52,7 @@ class HistoryAssembledAcceptanceTest {
         launch(dark = true).use { scenario ->
             returnDashboard(compose, fixture.owner)
             await("single current pair recorded") { recordedHistory(fixture.owner).storage?.entries?.size == 1 }
-            chartLabels("Drawn markers: 1 · Within-run connections: 0 · Nominal reference lines: 1")
+            chartLabels()
             captureCanvas("history-assembled-single-portrait-dark", scenario)
             openHistory(); page(WindowKind.FIVE_HOUR, 0, 1)
             click("history-details-toggle")
@@ -214,8 +216,8 @@ class HistoryAssembledAcceptanceTest {
         compose.onNodeWithTag("history-page-cursor").assertTextEquals("Exclusive admission cursor: $after · Page limit: 32")
     }
 
-    private fun chartLabels(counts: String) {
-        assertEquals("Drawn markers: 1 · Within-run connections: 0 · Nominal reference lines: 1", counts)
+    private fun chartLabels() {
+        compose.onNodeWithTag("$five-equivalent").assertTextEquals("One recorded observation · no observed trend")
         assertCurrentDrawing(recordedHistory(fixture.owner), 1, 0, 1)
         listOf("$five-title", "$five-legend", "$five-equivalent", "$five-first", "$five-last").forEach(capture::label)
         compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assert(
@@ -244,8 +246,9 @@ class HistoryAssembledAcceptanceTest {
     private fun singleFact(value: String) {
         compose.onAllNodes(historyScope() and hasText(value), useUnmergedTree = true).assertCountEquals(1)
     }
-    private fun noFact(value: String) {
-        compose.onAllNodes(historyScope() and hasText(value), useUnmergedTree = true).assertCountEquals(0)
+    private fun noFact(value: String, root: String = "connection-history") {
+        compose.onNodeWithTag(root).assertExists()
+        compose.onAllNodes((hasTestTag(root) or hasAnyAncestor(hasTestTag(root))) and hasText(value), useUnmergedTree = true).assertCountEquals(0)
     }
 
     private fun dormant() {

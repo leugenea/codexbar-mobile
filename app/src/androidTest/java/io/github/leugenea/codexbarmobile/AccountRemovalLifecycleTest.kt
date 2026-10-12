@@ -12,6 +12,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.leugenea.codexbarmobile.account.AccountNameFile
 import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
 import io.github.leugenea.codexbarmobile.history.HistoryReadiness
+import io.github.leugenea.codexbarmobile.history.HistoryPresentationRequest
 import io.github.leugenea.codexbarmobile.transport.ReadOperation
 import kotlinx.coroutines.*
 import org.junit.*
@@ -33,12 +34,14 @@ class AccountRemovalLifecycleTest {
         seedDormant()
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             openConnection(); saveName("Synthetic retained account")
+            openStoredPage()
             await("restored history page") { recordedHistory(owner).storage?.entries?.isNotEmpty() == true }
             val name = nameFile().readBytes()
             val credentials = credentialFile().readBytes()
             val partition = owner.historySnapshots.value.partition
             val highWater = recordedHistory(owner).storage!!.lastAdmitted
             val requests = fixture.transport.counts()
+            returnDashboard(compose, owner)
             click("remove-account")
             dialogScope()
             click("remove-account-cancel")
@@ -49,6 +52,9 @@ class AccountRemovalLifecycleTest {
             scenario.recreate(); compose.waitForIdle()
             awaitDialogDismissed("recreation dismisses restored account confirmation")
             phase(ConnectionPhase.RESTORED)
+            awaitConnectionScreen(compose, owner)
+            compose.onNodeWithTag("dashboard").assertExists()
+            openStoredPage()
             await("recreated local history adopted") { recordedHistory(owner).storage != null }
             assertArrayEquals(name, nameFile().readBytes())
             assertArrayEquals(credentials, credentialFile().readBytes())
@@ -64,8 +70,10 @@ class AccountRemovalLifecycleTest {
         seedDormant()
         ActivityScenario.launch(MainActivity::class.java).use {
             openConnection(); saveName("Synthetic predecessor")
+            openStoredPage()
             await("predecessor history available") { recordedHistory(owner).storage != null }
             val oldPartition = owner.historySnapshots.value.partition
+            returnDashboard(compose, owner)
             fixture.transport.heldPath = ReadOperation.USAGE.path
             owner.readUsage()
             await("usage request held") { fixture.transport.heldCall(ReadOperation.USAGE.path) != null }
@@ -84,7 +92,8 @@ class AccountRemovalLifecycleTest {
             fixture.transport.heldPath = null
             fixture.transport.usageBody = NavigationTransport.USAGE.replace("12.375", "42.125")
             click("connect"); phase(ConnectionPhase.OBSERVED)
-            await("successor history recorded") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L }
+            await("successor current pair recorded") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L &&
+                recordedHistory(owner, io.github.leugenea.codexbarmobile.usage.WindowKind.WEEKLY).storage?.lastAdmitted?.ordinal == 1L }
             saveName("Synthetic successor")
             val partition = owner.historySnapshots.value.partition
             val credentials = credentialFile().readBytes()
@@ -98,7 +107,9 @@ class AccountRemovalLifecycleTest {
             assertTrue(keyExists())
             assertEquals(partition, owner.historySnapshots.value.partition)
             assertEquals(1L, recordedHistory(owner).storage!!.lastAdmitted!!.ordinal)
-            assertEquals(setOf("42.125", "87.5"), owner.historySnapshots.value.points.map { it.usedPercent.toPlainString() }.toSet())
+            assertEquals(setOf("42.125", "87.5"), listOf(io.github.leugenea.codexbarmobile.usage.WindowKind.FIVE_HOUR,
+                io.github.leugenea.codexbarmobile.usage.WindowKind.WEEKLY).flatMap { recordedHistory(owner, it).points }
+                .map { it.usedPercent.toPlainString() }.toSet())
             assertEquals(requests, fixture.transport.counts())
             compose.onNodeWithTag("account-name").performScrollTo().assertTextEquals("Synthetic successor")
         }
@@ -222,6 +233,11 @@ class AccountRemovalLifecycleTest {
         fixture.freshRuntime(); phase(ConnectionPhase.RESTORED)
     }
     private fun openConnection() { awaitConnectionScreen(compose, fixture.owner) }
+    private fun openStoredPage() {
+        openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
+        await("actual bounded stored Page adopted") { owner.historySnapshots.value.request is HistoryPresentationRequest.Page &&
+            owner.historySnapshots.value.storage != null }
+    }
     private fun saveName(value: String) {
         click("account-name-edit")
         compose.onNodeWithTag("account-name-input").performTextReplacement(value)

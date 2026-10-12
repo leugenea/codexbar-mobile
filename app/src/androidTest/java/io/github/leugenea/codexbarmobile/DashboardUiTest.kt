@@ -1,11 +1,13 @@
 package io.github.leugenea.codexbarmobile
 
+import android.os.Looper
+import android.view.KeyEvent
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.espresso.Espresso.pressBack
+import androidx.test.platform.app.InstrumentationRegistry
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.usage.WindowKind
 import org.junit.*
@@ -20,9 +22,9 @@ class DashboardUiTest {
     private val fixture get() = isolation.native
     private val settings = HistoryAcceptanceSettings()
     private val owner get() = fixture.owner
-    private val capture get() = DashboardCapture(compose)
-    @Before fun prepare() { isolation.prepare(); owner.usageForeground(fixture.observer, true); settleConnectionCommands(compose, owner, "dashboard fixture foreground") }
-    @After fun cleanup() { try { isolation.cleanup() } finally { settings.restore() } }
+    private val capture = DashboardCapture(compose)
+    @Before fun prepare() { capture.install(); isolation.prepare(); owner.usageForeground(fixture.observer, true); settleConnectionCommands(compose, owner, "dashboard fixture foreground") }
+    @After fun cleanup() { try { isolation.cleanup() } finally { try { capture.restore() } finally { settings.restore() } } }
 
     @Test fun dashboardShowsBothCurrentWindowsWithoutHistoryNavigationAndRetainsMeasuredReferencePixels() {
         launch().use { scenario ->
@@ -31,8 +33,8 @@ class DashboardUiTest {
             compose.onNodeWithTag("history-select-FIVE_HOUR").assertDoesNotExist()
             compose.onNodeWithTag("history-page-cursor").assertDoesNotExist()
             val before = fixture.transport.counts()
-            capture.capture("dashboard-main-portrait-light", scenario, fixture, DashboardRoute.DASHBOARD, "history-chart-five-hour-equivalent", WindowKind.FIVE_HOUR)
-            capture.capture("dashboard-weekly-portrait-light", scenario, fixture, DashboardRoute.DASHBOARD, "history-chart-weekly-equivalent", WindowKind.WEEKLY)
+            capture.capture("dashboard-main-portrait-light", scenario, fixture, "history-chart-five-hour-equivalent", WindowKind.FIVE_HOUR)
+            capture.capture("dashboard-weekly-portrait-light", scenario, fixture, "history-chart-weekly-equivalent", WindowKind.WEEKLY)
             val weekly = compose.onNodeWithTag("history-chart-weekly-canvas", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
             compose.onNodeWithTag("banked-disclosure-toggle").performScrollTo().assertIsDisplayed()
             assertTrue(weekly.height > 0)
@@ -60,9 +62,16 @@ class DashboardUiTest {
             compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertDoesNotExist()
             assertCurrentDrawing(recordedHistory(owner), 0, 0, 0)
             fixture.transport.advance(1000); owner.readUsage()
-            await("first actual successful measurement") { recordedHistory(owner).points.map { it.observation.ordinal } == listOf(1L) && !owner.state.value.refresh.refreshing }
+            await("first actual successful measurement after durable loss gap") { recordedHistory(owner).points.map { it.observation.ordinal } == listOf(2L) && !owner.state.value.refresh.refreshing }
             compose.onNodeWithTag("history-chart-five-hour-equivalent").assertTextEquals("One recorded observation · no observed trend")
             assertCurrentDrawing(recordedHistory(owner), 1, 0, 1)
+            openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
+            await("actual initial gap and subsequent measurement retained in Page") {
+                owner.historySnapshots.value.storage?.entries?.map { it.id.ordinal } == listOf(1L, 2L)
+            }
+            assertEquals(HistoryGap.READ_ERROR, owner.historySnapshots.value.storage!!.entries.first().gap)
+            assertNull(owner.historySnapshots.value.storage!!.entries.last().gap)
+            returnDashboard(compose, owner)
             fixture.transport.usageBody = HistoryAcceptanceAdmissions.UNKNOWN_USAGE
             fixture.transport.advance(1000); owner.readUsage()
             await("unknown reset cannot fall back to previous graph") { owner.currentHistoryDisplayContext()?.periods?.fiveHour?.window == null && !owner.state.value.refresh.refreshing }
@@ -98,6 +107,32 @@ class DashboardUiTest {
         }
     }
 
+    @Test fun dashboardKnownPercentPreservesMalformedResetAndIndependentCurrentSiblingWarning() {
+        fixture.transport.usageBody = """{"rate_limit":{"primary_window":{"limit_window_seconds":18000,"used_percent":7.25,"reset_at":false}}}"""
+        launch().use {
+            click("connect")
+            await("known percent with malformed reset admitted") { owner.state.value.phase == ConnectionPhase.OBSERVED && !owner.state.value.refresh.refreshing }
+            compose.onNodeWithTag("live-five-hour-percent").assertTextEquals("7.25% used")
+            compose.onAllNodesWithTag("dashboard-no-info-FIVE_HOUR").assertCountEquals(1)
+            compose.onNodeWithTag("dashboard-no-info-FIVE_HOUR").assertTextEquals("No current information · latest usage malformed.")
+            compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertDoesNotExist()
+            compose.onNodeWithTag("dashboard-window-warning-FIVE_HOUR").assertDoesNotExist()
+            assertNull(owner.currentHistoryDisplayContext()!!.periods.fiveHour.window)
+            fixture.transport.usageBody = """{"rate_limit":{"primary_window":{"limit_window_seconds":18000,"used_percent":7.25,"reset_at":1800003600,"reset_after_seconds":false}}}"""
+            fixture.transport.advance(1000); owner.readUsage()
+            await("independent known current reset and actual malformed-sibling measurement") {
+                recordedHistory(owner).points.map { it.observation.ordinal } == listOf(2L) && !owner.state.value.refresh.refreshing
+            }
+            assertEquals(java.time.Instant.parse("2027-01-15T09:00:00Z"), owner.currentHistoryDisplayContext()!!.periods.fiveHour.window!!.resetAt)
+            compose.onNodeWithTag("live-five-hour-percent").assertTextEquals("7.25% used")
+            compose.onNodeWithTag("live-five-hour-reset-absolute").assertTextEquals("Reset: Jan 15, 2027, 09:00")
+            compose.onNodeWithTag("dashboard-window-warning-FIVE_HOUR").assertTextEquals("Some latest usage fields are malformed.")
+            compose.onNodeWithTag("dashboard-no-info-FIVE_HOUR").assertDoesNotExist()
+            compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertExists()
+            compose.onNodeWithTag("history-chart-five-hour-equivalent").assertTextEquals("One recorded observation · no observed trend")
+        }
+    }
+
     @Test fun bankedDisclosureUsesReportedCountAndRetainsEveryExpiryAndUnknownRow() {
         fixture.transport.inventoryBody = INVENTORY
         launch().use { scenario ->
@@ -110,12 +145,11 @@ class DashboardUiTest {
             for (index in 0..2) compose.onNodeWithTag("banked-disclosure-item-$index").performScrollTo().assertIsDisplayed()
             compose.onNodeWithTag("banked-disclosure-expiry-0", useUnmergedTree = true).performScrollTo().assertTextEquals("Jan 15, 2027, 09:00")
             compose.onNodeWithTag("banked-disclosure-remaining-1", useUnmergedTree = true).performScrollTo().assertTextEquals("Entitlement expired")
-            capture.capture("dashboard-banked-expanded-portrait-light", scenario, fixture, DashboardRoute.DASHBOARD, "banked-disclosure-status")
+            capture.capture("dashboard-banked-expanded-portrait-light", scenario, fixture, "banked-disclosure-status")
             openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             compose.onNodeWithTag("banked-inventory-text", useUnmergedTree = true).performScrollTo().assertTextEquals("Inventory reports: 7 available banked resets")
             compose.onNodeWithTag("banked-container").performScrollTo().assertExists()
-            capture.capture("dashboard-connection-details-landscape-dark", landscapeDark(scenario), fixture,
-                DashboardRoute.CONNECTION_DETAILS, "banked-container")
+            capture.capture("dashboard-connection-details-landscape-dark", landscapeDark(scenario), fixture, "banked-container")
             assertEquals(before, fixture.transport.counts())
         }
     }
@@ -128,11 +162,15 @@ class DashboardUiTest {
             compose.onNodeWithTag("drawer-LOCAL_HISTORY_DETAILS").assertTextEquals("full local history details")
             compose.onNodeWithTag("drawer-CONNECTION_DETAILS").assertTextEquals("full love connection details")
             compose.onAllNodes(hasTestTag("drawer-LOCAL_HISTORY_DETAILS") or hasTestTag("drawer-CONNECTION_DETAILS")).assertCountEquals(2)
-            capture.capture("dashboard-drawer-portrait-dark", scenario, fixture, DashboardRoute.DASHBOARD, "drawer-LOCAL_HISTORY_DETAILS")
-            pressBack(); compose.waitForIdle()
+            capture.capture("dashboard-drawer-portrait-dark", scenario, fixture, "drawer-LOCAL_HISTORY_DETAILS")
+            pressActivityBack(scenario, "open drawer Back")
+            awaitDrawerClosed()
             compose.onNodeWithTag("dashboard").assertExists()
             openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
-            pressBack(); compose.waitForIdle(); compose.onNodeWithTag("dashboard").assertExists()
+            pressActivityBack(scenario, "local history details Back")
+            await("details Back returns dashboard") { compose.onAllNodesWithTag("dashboard").fetchSemanticsNodes().size == 1 }
+            compose.onNodeWithTag("connection-history").assertDoesNotExist()
+            compose.onNodeWithTag("dashboard").assertExists()
             openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             click("details-back"); compose.onNodeWithTag("dashboard").assertExists()
             openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
@@ -152,13 +190,13 @@ class DashboardUiTest {
                 val node = compose.onNodeWithTag(it).performScrollTo().assertHasClickAction().fetchSemanticsNode()
                 assertTrue(node.size.height >= 48 * scenarioDensity(scenario))
             }
-            capture.capture("dashboard-main-landscape-dark-large-font", scenario, fixture, DashboardRoute.DASHBOARD, "history-chart-five-hour-equivalent", WindowKind.FIVE_HOUR)
+            capture.capture("dashboard-main-landscape-dark-large-font", scenario, fixture, "history-chart-five-hour-equivalent", WindowKind.FIVE_HOUR)
         }
         settings.apply(false, 2f)
         launch(font = 2f).use { scenario ->
             openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
             await("large-font stored page") { recordedHistory(owner).storage != null }
-            capture.capture("dashboard-local-history-details-large-font", scenario, fixture, DashboardRoute.LOCAL_HISTORY_DETAILS, "history-page-cursor")
+            capture.capture("dashboard-local-history-details-large-font", scenario, fixture, "history-page-cursor")
         }
     }
 
@@ -183,9 +221,30 @@ class DashboardUiTest {
             !owner.state.value.refresh.refreshing && recordedHistory(owner).points.size == 1 }
     }
     private fun click(tag: String) { compose.onNodeWithTag(tag).performScrollTo().performClick(); compose.waitForIdle() }
-    private fun await(step: String, predicate: () -> Boolean) {
+    private fun pressActivityBack(scenario: ActivityScenario<MainActivity>, step: String) {
+        var focused = false
+        await("$step: Activity window focused", { "focused=$focused; ${owner.state.value}" }) {
+            scenario.onActivity { focused = it.window.decorView.hasWindowFocus() }
+            focused
+        }
+        // Read View state on Main, then inject real system Back on the instrumentation thread.
+        assertNotSame(Looper.getMainLooper(), Looper.myLooper())
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        compose.waitForIdle()
+    }
+    private fun awaitDrawerClosed() {
+        var lastAssertion: AssertionError? = null
+        await("Back closes drawer before leaving dashboard", { "drawer=$lastAssertion; ${owner.state.value}" }) {
+            try { compose.onNodeWithTag("details-drawer").assertIsNotDisplayed(); true }
+            catch (error: AssertionError) { lastAssertion = error; false }
+        }
+        compose.onNodeWithTag("details-drawer").assertIsNotDisplayed()
+    }
+    private fun await(step: String, lastState: () -> Any? = {
+        "${owner.state.value}, request=${owner.historySnapshots.value.request}, ready=${owner.historySnapshots.value.readiness}"
+    }, predicate: () -> Boolean) {
         try { compose.waitUntil(10_000, predicate) }
-        catch (error: ComposeTimeoutException) { throw AssertionError("$step: last=${owner.state.value}, request=${owner.historySnapshots.value.request}, ready=${owner.historySnapshots.value.readiness}", error) }
+        catch (error: ComposeTimeoutException) { throw AssertionError("$step: last=${lastState()}", error) }
     }
     companion object {
         const val INVENTORY = """{"available_count":7,"credits":[{"reset_type":"codex_rate_limits","status":"available","expires_at":"2027-01-15T09:00:00Z"},{"reset_type":"codex_rate_limits","status":"available","expires_at":"2027-01-15T07:00:00Z"},null]}"""

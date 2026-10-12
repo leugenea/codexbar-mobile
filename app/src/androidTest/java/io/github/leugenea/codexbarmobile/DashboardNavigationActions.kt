@@ -10,7 +10,8 @@ internal fun openDetailRoute(compose: ComposeTestRule, owner: ConnectionControll
     val root = if (route == DashboardRoute.LOCAL_HISTORY_DETAILS) "connection-history" else "connection-details"
     if (compose.onAllNodesWithTag(root).fetchSemanticsNodes().isEmpty()) {
         compose.onNodeWithTag("open-drawer").performScrollTo().performClick()
-        compose.onNodeWithTag("drawer-${route.name}").performClick()
+        val label = if (route == DashboardRoute.LOCAL_HISTORY_DETAILS) "full local history details" else "full love connection details"
+        compose.onNodeWithTag("drawer-${route.name}").assertTextEquals(label).performClick()
         try { compose.waitUntil(8_000) { compose.onAllNodesWithTag(root).fetchSemanticsNodes().size == 1 } }
         catch (error: ComposeTimeoutException) { throw AssertionError("Drawer route $route: last=${owner.state.value}, request=${owner.historySnapshots.value.request}", error) }
         compose.waitForIdle()

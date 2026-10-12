@@ -1,5 +1,6 @@
 """Explicitly synthetic #83 parser/source controls; no application/native execution."""
-from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT, DASHBOARD_NATIVE_COUNT
+from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT
+from dashboard_contract_expectations import EXPECTED_DASHBOARD_NATIVE_COUNT
 import copy
 import json
 from pathlib import Path
@@ -31,7 +32,7 @@ class HistoryAssembledContracts(unittest.TestCase):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryAssembledAcceptanceTest.kt").read_text()
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_ASSEMBLED_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 108 + len(PHONE_TIME_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + DASHBOARD_NATIVE_COUNT)
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 108 + len(PHONE_TIME_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT)
         for name in HISTORY_ASSEMBLED_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history assembled acceptance"):

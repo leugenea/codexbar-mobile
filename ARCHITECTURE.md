@@ -812,7 +812,10 @@ The Connection screen defaults to the compact dashboard; the modal drawer contai
 exactly **full local history details** and **full love connection details**. The
 owner's literal second label is intentional. Back closes an open drawer first;
 Back/up from details returns dashboard. Recreation resets these ephemeral UI
-choices to dashboard/closed, without replacing the process owner. Stored history
+choices to dashboard/closed, without replacing the process owner. A route
+may remain within the same Activity across account revocation;
+it is only ephemeral presentation state, and actual authority fences all facts.
+This does not promise an account-change navigation reset. Stored history
 retains exact text, kind selection and real exclusive-cursor pagination; full
 connection details retains the sanitized live/banked/status/clock facts and
 advanced controls. No credentials, payloads or permissions enter saved state.
