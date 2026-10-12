@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground) {
                     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-                        ConnectionScreen(connectionState, connection, ::openVerificationBrowser)
+                        ConnectionScreen(connectionState, connection, ::openVerificationBrowser, historyUiObserver)
                     }
                 }
             }
@@ -67,6 +67,8 @@ class MainActivity : ComponentActivity() {
     }
 
     internal companion object {
+        @set:androidx.annotation.VisibleForTesting(otherwise = androidx.annotation.VisibleForTesting.NONE)
+        internal var historyUiObserver: HistoryUiObserver? = null
         var browserLauncher: (MainActivity, Intent) -> Unit = { activity, intent -> activity.startActivity(intent) }
     }
 }

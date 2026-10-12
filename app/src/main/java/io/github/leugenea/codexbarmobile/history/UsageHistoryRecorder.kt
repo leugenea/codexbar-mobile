@@ -44,7 +44,10 @@ internal class UsageHistoryRecorder(
     private data class Work(val binding: Binding, val clock: HistoryClock, val event: HistoryEvent, val gap: HistoryGap?)
     private data class Waiting(val session: SessionGeneration, val partition: HistoryPartition, val clock: HistoryClock,
         val event: HistoryEvent, val gap: HistoryGap?)
-    private data class Result(val page: HistoryReadOutcome, val problem: HistoryRecorderProblem? = null,
+    private data class Presentation(val readiness: HistoryReadiness = HistoryReadiness.UNAVAILABLE,
+        val page: HistoryReadSnapshot? = null, val currentPages: CurrentHistoryPages? = null,
+        val failure: HistoryReadOutcome? = null)
+    private data class Result(val presentation: Presentation? = null, val problem: HistoryRecorderProblem? = null,
         val reason: HistoryUnavailable? = null)
     private val mutableState = MutableStateFlow(HistoryGraphSnapshot())
     private val displayAuthority = DisplayAuthority()
@@ -61,11 +64,14 @@ internal class UsageHistoryRecorder(
     private var workerGap: HistoryGap? = null
     private var worker: Job? = null
     private var readPending = false
-    private var query = HistoryGraphQuery()
+    private var request: HistoryPresentationRequest = HistoryPresentationRequest.Page(HistoryGraphQuery())
+    private var selection = HistoryDisplaySelection(request)
+    private val query get() = (request as? HistoryPresentationRequest.Page)?.query ?: HistoryGraphQuery()
     private var queryRevision = 0L
     private var refresh = UsageRefreshState()
     private var live = HistoryLiveMetadata()
     private var page: HistoryReadSnapshot? = null
+    private var currentPages: CurrentHistoryPages? = null
     private var problem: HistoryRecorderProblem? = null
     private var reason: HistoryUnavailable? = null
     private var lost = 0L
@@ -87,7 +93,7 @@ internal class UsageHistoryRecorder(
         if (access == null) {
             // Preserve an existing Binding. With no Binding, even null-generation diagnostics
             // need a distinct current context so retirement cannot replay their loss accounting.
-            if (displayAuthority.current() == null) displayAuthority.install(null)
+            if (displayAuthority.current() == null) installContext(null)
             if (!pending) discardWaiting()
             problem = problem ?: if (pending) null else HistoryRecorderProblem.STORAGE_UNAVAILABLE
             publish(if (pending && problem == null) HistoryReadiness.LOADING else HistoryReadiness.ERROR)
@@ -95,7 +101,7 @@ internal class UsageHistoryRecorder(
         }
         if (binding?.access === access) return
         // The single replacement revokes predecessor workers before successor publication.
-        displayAuthority.install(HistoryGeneration())
+        installContext(HistoryGeneration())
         val current = Binding(session, access, requireNotNull(displayAuthority.permission()))
         binding = current
         current.permission.context.periods = currentHistoryPeriods(current.access.partition, refresh)
@@ -103,7 +109,7 @@ internal class UsageHistoryRecorder(
         adoptWaiting(current)
         problem = null
         reason = null
-        page = null
+        clearPages()
         readPending = true
         publish(HistoryReadiness.LOADING)
         drain()
@@ -162,21 +168,42 @@ internal class UsageHistoryRecorder(
         if (binding != null) publish(mutableState.value.readiness)
     }
 
-    fun query(next: HistoryGraphQuery) {
-        query = next
+    /** UI interest is idempotent only after checking the actual context and current periods. */
+    fun observe(next: HistoryPresentationRequest, expected: HistoryDisplayContext) {
+        if (displayAuthority.current() !== expected || !next.matches(expected.periods)) return
+        if (request == next) return
+        select(next)
+    }
+
+    /** Explicit local reread, including equal Page values. No provider work or admission. */
+    fun query(next: HistoryGraphQuery) = select(HistoryPresentationRequest.Page(next))
+
+    private fun select(next: HistoryPresentationRequest) {
+        request = next
         queryRevision++
-        page = null
+        selection = HistoryDisplaySelection(next)
+        displayAuthority.current()?.selection = selection
+        clearPages()
         if (binding == null) { publish(HistoryReadiness.UNAVAILABLE); return }
-        readPending = true
-        publish(HistoryReadiness.LOADING)
+        readPending = next != HistoryPresentationRequest.Idle
+        publish(if (readPending) HistoryReadiness.LOADING else HistoryReadiness.UNAVAILABLE)
         drain()
     }
+
+    private fun installContext(generation: HistoryGeneration?) {
+        displayAuthority.install(generation)
+        selection = HistoryDisplaySelection(request)
+        displayAuthority.current()?.selection = selection
+    }
+
+    private fun clearPages() { page = null; currentPages = null }
 
     /** Cancel/logout/new login discard queued old facts. No later worker can publish them. */
     fun retire() {
         refresh = UsageRefreshState()
         live = HistoryLiveMetadata()
-        query = HistoryGraphQuery()
+        request = HistoryPresentationRequest.Page(HistoryGraphQuery())
+        selection = HistoryDisplaySelection(request)
         queryRevision++
         invalidate(null)
         pendingGap = null
@@ -196,7 +223,7 @@ internal class UsageHistoryRecorder(
         queue.clear()
         waiting.clear()
         readPending = false
-        page = null
+        clearPages()
         pendingGap = gap
         publish(HistoryReadiness.UNAVAILABLE)
     }
@@ -215,75 +242,75 @@ internal class UsageHistoryRecorder(
         val next = queue.removeFirstOrNull()
         if (next == null && !readPending) return
         readPending = false
-        val requested = query
+        val requested = selection
         val revision = queryRevision
         val gap = workerGap.also { workerGap = null }
         worker = scope.launch(start = CoroutineStart.LAZY) {
-            val result = withContext(storageDispatcher) {
-                perform(current, next, requested, gap)
-            }
-            finish(current, next, revision, result)
+            val result = withContext(storageDispatcher) { perform(current, next, requested, gap) }
+            finish(current, revision, requested, result)
         }.also { it.start() }
     }
 
-    private fun perform(current: Binding, work: Work?, requested: HistoryGraphQuery, gap: HistoryGap?): Result = try {
-        if (work == null) Result(read(current, requested)) else write(work, requested, gap)
-    } catch (_: Exception) {
-        Result(HistoryReadOutcome.Unavailable(HistoryUnavailable.IO_FAILURE),
-            if (work == null) HistoryRecorderProblem.READ_FAILURE else HistoryRecorderProblem.WRITE_FAILURE, HistoryUnavailable.IO_FAILURE)
+    private fun perform(current: Binding, work: Work?, requested: HistoryDisplaySelection, gap: HistoryGap?): Result {
+        if (work != null) {
+            val admission = admit(work, gap)
+            if (admission != null) return admission
+        }
+        return Result(presentation = readPresentation(current, requested))
     }
 
-    private fun finish(current: Binding, work: Work?, revision: Long, result: Result) {
+    private fun admit(work: Work, gap: HistoryGap?): Result? = try {
+        write(work, gap)
+    } catch (_: Exception) {
+        Result(problem = HistoryRecorderProblem.WRITE_FAILURE, reason = HistoryUnavailable.IO_FAILURE)
+    }
+
+    private fun activePresentation(current: Binding, requested: HistoryDisplaySelection): Boolean =
+        !current.revoked && current.permission.context.selection === requested && requested.request.matches(current.permission.context.periods)
+
+    private fun finish(current: Binding, revision: Long, requested: HistoryDisplaySelection, result: Result) {
         worker = null
         if (binding !== current || current.revoked) { drain(); return }
-        if (result.problem != null) {
-            if (work != null) { if (lost < Long.MAX_VALUE) lost++; workerGap = HistoryGap.READ_ERROR }
-            problem = result.problem
-            reason = result.reason
-        }
-        if (revision == queryRevision) apply(result.page)
+        if (result.problem != null) admissionFailed(result)
+        if (revision == queryRevision && activePresentation(current, requested)) result.presentation?.let(::apply)
         drain()
     }
 
-    private fun apply(outcome: HistoryReadOutcome) {
-        when (outcome) {
-            is HistoryReadOutcome.Ready -> {
-                if (query.currentOnly && query.window == null) {
-                    page = null
-                    publish(if (problem == null) HistoryReadiness.UNAVAILABLE else HistoryReadiness.ERROR)
-                    return
-                }
-                page = outcome.snapshot
-                publish(if (problem != null) HistoryReadiness.ERROR else if (page!!.content == HistoryContent.EMPTY)
-                    HistoryReadiness.EMPTY else HistoryReadiness.READY)
-            }
-            is HistoryReadOutcome.Unavailable -> {
-                workerGap = HistoryGap.READ_ERROR
-                problem = problem ?: HistoryRecorderProblem.READ_FAILURE
-                reason = outcome.reason
-                publish(HistoryReadiness.ERROR)
-            }
-            HistoryReadOutcome.Corrupt -> {
-                workerGap = HistoryGap.READ_ERROR
-                problem = HistoryRecorderProblem.CORRUPT
-                publish(HistoryReadiness.ERROR)
-            }
-        }
+    private fun admissionFailed(result: Result) {
+        if (lost < Long.MAX_VALUE) lost++
+        workerGap = HistoryGap.READ_ERROR
+        problem = result.problem
+        reason = result.reason
+        publish(HistoryReadiness.ERROR)
     }
 
-    private fun write(work: Work, requested: HistoryGraphQuery, failedGap: HistoryGap?): Result {
+    private fun apply(result: Presentation) {
+        val failure = result.failure
+        if (failure != null) { presentationFailed(failure); return }
+        page = result.page
+        currentPages = result.currentPages
+        publish(if (problem != null) HistoryReadiness.ERROR else result.readiness)
+    }
+
+    private fun presentationFailed(failure: HistoryReadOutcome) {
+        workerGap = HistoryGap.READ_ERROR
+        if (failure == HistoryReadOutcome.Corrupt) problem = HistoryRecorderProblem.CORRUPT
+        else problem = problem ?: HistoryRecorderProblem.READ_FAILURE
+        reason = (failure as? HistoryReadOutcome.Unavailable)?.reason
+        publish(HistoryReadiness.ERROR)
+    }
+
+    private fun write(work: Work, failedGap: HistoryGap?): Result? {
         val initial = read(work.binding, HistoryGraphQuery(limit = 1))
-        if (initial !is HistoryReadOutcome.Ready) return Result(initial, HistoryRecorderProblem.READ_FAILURE)
+        if (initial !is HistoryReadOutcome.Ready) return Result(problem = HistoryRecorderProblem.READ_FAILURE,
+            reason = (initial as? HistoryReadOutcome.Unavailable)?.reason)
         var ordinal = initial.snapshot.lastAdmitted?.ordinal ?: 0
         val gap = work.gap ?: failedGap
         if (gap != null) {
-            val result = append(work, ordinal, HistoryEvent.Gap(gap))
-            failure(result)?.let { return it }
+            failure(append(work, ordinal, HistoryEvent.Gap(gap)))?.let { return it }
             ordinal++
         }
-        val result = append(work, ordinal, work.event)
-        failure(result)?.let { return it }
-        return Result(read(work.binding, requested))
+        return failure(append(work, ordinal, work.event))
     }
 
     private fun append(work: Work, ordinal: Long, event: HistoryEvent): HistoryAppendOutcome {
@@ -294,10 +321,42 @@ internal class UsageHistoryRecorder(
 
     private fun failure(outcome: HistoryAppendOutcome): Result? = when (outcome) {
         is HistoryAppendOutcome.Stored, is HistoryAppendOutcome.AlreadyAdmitted -> null
-        is HistoryAppendOutcome.Unavailable -> Result(HistoryReadOutcome.Unavailable(outcome.reason),
-            if (outcome.reason == HistoryUnavailable.CAPACITY) HistoryRecorderProblem.ORDINAL_CAPACITY else HistoryRecorderProblem.WRITE_FAILURE, outcome.reason)
-        is HistoryAppendOutcome.Rejected -> Result(HistoryReadOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE), HistoryRecorderProblem.WRITE_FAILURE)
-        HistoryAppendOutcome.Corrupt -> Result(HistoryReadOutcome.Corrupt, HistoryRecorderProblem.CORRUPT)
+        is HistoryAppendOutcome.Unavailable -> Result(problem =
+            if (outcome.reason == HistoryUnavailable.CAPACITY) HistoryRecorderProblem.ORDINAL_CAPACITY else HistoryRecorderProblem.WRITE_FAILURE,
+            reason = outcome.reason)
+        is HistoryAppendOutcome.Rejected -> Result(problem = HistoryRecorderProblem.WRITE_FAILURE, reason = HistoryUnavailable.WRITE_FAILURE)
+        HistoryAppendOutcome.Corrupt -> Result(problem = HistoryRecorderProblem.CORRUPT)
+    }
+
+    private fun readPresentation(current: Binding, requested: HistoryDisplaySelection): Presentation = try {
+        if (!activePresentation(current, requested)) Presentation()
+        else when (val interest = requested.request) {
+            HistoryPresentationRequest.Idle -> Presentation()
+            is HistoryPresentationRequest.Page -> pagePresentation(read(current, interest.query), interest.query)
+            is HistoryPresentationRequest.Current -> pairPresentation(CurrentHistoryRead.readCurrent(current.access, interest) {
+                !activePresentation(current, requested)
+            })
+        }
+    } catch (_: Exception) { Presentation(failure = HistoryReadOutcome.Unavailable(HistoryUnavailable.IO_FAILURE)) }
+
+    private fun pagePresentation(outcome: HistoryReadOutcome, requested: HistoryGraphQuery): Presentation = when (outcome) {
+        is HistoryReadOutcome.Ready -> {
+            if (requested.currentOnly && requested.window == null) Presentation()
+            else Presentation(if (outcome.snapshot.content == HistoryContent.EMPTY) HistoryReadiness.EMPTY else HistoryReadiness.READY, page = outcome.snapshot)
+        }
+        else -> Presentation(failure = outcome)
+    }
+
+    private fun pairPresentation(outcome: CurrentHistoryReadOutcome): Presentation = when (outcome) {
+        is CurrentHistoryReadOutcome.Ready -> Presentation(pairReadiness(outcome.pages), currentPages = outcome.pages)
+        is CurrentHistoryReadOutcome.Unavailable -> Presentation(failure = HistoryReadOutcome.Unavailable(outcome.reason))
+        CurrentHistoryReadOutcome.Corrupt -> Presentation(failure = HistoryReadOutcome.Corrupt)
+    }
+
+    private fun pairReadiness(pages: CurrentHistoryPages): HistoryReadiness {
+        val retained = listOfNotNull(pages.fiveHour, pages.weekly)
+        if (retained.isEmpty()) return HistoryReadiness.UNAVAILABLE
+        return if (retained.all { it.content == HistoryContent.EMPTY }) HistoryReadiness.EMPTY else HistoryReadiness.READY
     }
 
     private fun read(current: Binding, requested: HistoryGraphQuery): HistoryReadOutcome {
@@ -311,7 +370,7 @@ internal class UsageHistoryRecorder(
     private fun publish(readiness: HistoryReadiness) {
         val current = binding
         mutableState.value = HistoryGraphSnapshot(readiness, current?.generation, current?.access?.partition,
-            query, page, problem, reason, lost, live, displayAuthority.permission())
+            query, page, problem, reason, lost, live, displayAuthority.permission(), request, selection, currentPages)
     }
 
     /** Process shutdown joins blocking work off the owner lane before the storage adapter closes. */

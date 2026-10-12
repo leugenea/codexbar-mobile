@@ -40,8 +40,8 @@ class ConnectionLaunchSmokeTest {
     @Test fun launcherReachesRealDisconnectedScreenWithInstalledSecurityPolicy() {
         launch().use { scenario ->
             ready(ConnectionPhase.IDLE)
-            compose.onNodeWithTag("live-status").assertTextEquals("Disconnected · use the connection controls below to sign in")
-            compose.onNodeWithTag("live-refresh").assertIsNotEnabled()
+            compose.onNodeWithTag("dashboard-status").assertTextEquals("Sign in to see your usage")
+            compose.onNodeWithTag("live-refresh").assertDoesNotExist()
             compose.onNodeWithTag("live-five-hour-progress").assertDoesNotExist()
             compose.onNodeWithTag("live-weekly-progress").assertDoesNotExist()
             assertRetiredSurfaceAbsent()
@@ -67,7 +67,7 @@ class ConnectionLaunchSmokeTest {
                     scenario.onActivity { assertSame(shared, it.connection) }
                     assertSecureWindow(scenario)
                     assertRetiredSurfaceAbsent()
-                    compose.onNodeWithTag("live-status").assertTextEquals("Disconnected · use the connection controls below to sign in")
+                    compose.onNodeWithTag("dashboard-status").assertTextEquals("Sign in to see your usage")
                     assertEquals(0L, fixture.transport.requests.get())
                 }
                 assertEquals(5, legacy.saved)
@@ -85,13 +85,14 @@ class ConnectionLaunchSmokeTest {
                 orientation == Configuration.ORIENTATION_LANDSCAPE
             }
             ready(ConnectionPhase.IDLE)
+            openDetailRoute(compose, fixture.owner, DashboardRoute.CONNECTION_DETAILS)
             assertTextNotClipped("Unofficial · local connection")
             assertTextNotClipped("Identity unverified · one local session. Token receipt and HTTP 200 do not establish an account or workspace. No account identity is inferred.")
             compose.onNodeWithTag("connect").performScrollTo().assertIsDisplayed().assertHasClickAction()
-            compose.onNodeWithTag("history-toggle").performScrollTo().assertIsDisplayed().performClick()
+            openDetailRoute(compose, fixture.owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
             compose.onNodeWithTag("connection-history").assertExists()
             compose.onNodeWithTag("history-readiness").performScrollTo().assertTextEquals("unavailable")
-            compose.onNodeWithTag("history-toggle").performScrollTo().performClick()
+            openDetailRoute(compose, fixture.owner, DashboardRoute.CONNECTION_DETAILS)
             compose.onNodeWithTag("live-usage").assertExists()
             assertSecureWindow(scenario)
             assertEquals(0L, fixture.transport.requests.get())
@@ -112,7 +113,7 @@ class ConnectionLaunchSmokeTest {
             settleConnectionCommands(compose, shared, "connect admission")
             boundedWait("initial authenticated cycle and history admission finish") {
                 shared.state.value.let { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing } &&
-                    shared.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L
+                    recordedHistory(shared).storage?.lastAdmitted?.ordinal == 1L
             }
             assertEquals(5L, fixture.transport.requests.get())
             assertEquals(2L, fixture.transport.gets.get())
@@ -163,7 +164,7 @@ class ConnectionLaunchSmokeTest {
                                 // Keep usage held: a sabotaged pending duplicate cannot escape as
                                 // a fast completed pair before this positive settled checkpoint.
                                 assertTrue("Returned observation records the BACKGROUND break",
-                                    BreakReason.BACKGROUND in shared.historySnapshots.value.points.last().segment.breaks)
+                                    BreakReason.BACKGROUND in recordedHistory(shared).points.last().segment.breaks)
                                 checkpoint.assertCampaignCounts(epoch, 7L, 4L)
                                 assertEquals(1L, fixture.transport.counts().getValue("/oauth/token"))
                                 checkpoint.completed(epoch)

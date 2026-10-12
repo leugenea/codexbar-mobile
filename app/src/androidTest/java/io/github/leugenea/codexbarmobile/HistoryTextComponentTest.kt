@@ -127,7 +127,7 @@ class HistoryTextComponentTest {
         }
         launch(HistoryTextFixture.plot()).use {
             openDetails()
-            text("Reset: Oct 9, 2026, 01:00 (hour precision)", 2)
+            text("Reset: Oct 9, 2026, 01:00", 2)
             text("Reset: <1h remaining", 2)
             text("Absolute reset source (second precision): Oct 9, 2026, 1:00:00\u202fAM", 2)
         }

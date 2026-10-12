@@ -35,6 +35,7 @@ internal class LifetimeJournal {
     var nameGate: ControlledGate? = null
     var nameWrites = 0
     val admissions = mutableListOf<HistoryAdmission>()
+    val reads = mutableListOf<HistoryReadQuery>()
 
     fun storage(): HistoryLifetimeStorage = object : HistoryLifetimeStorage {
         override fun stage(): HistoryPartitionOutcome {
@@ -105,6 +106,7 @@ internal class LifetimeJournal {
             }
         }
         override fun read(query: HistoryReadQuery): HistoryReadOutcome {
+            reads += query
             if (revoked) return HistoryReadOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
             if (throwRead) throw IllegalStateException("synthetic read category")
             readFailure?.let { return it }

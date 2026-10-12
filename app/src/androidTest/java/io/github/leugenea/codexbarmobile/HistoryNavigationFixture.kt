@@ -72,7 +72,7 @@ internal class HistoryNavigationFixture {
         val current = owner
         val ready = current.session.snapshot() as SessionResult.Ready
         val access = requireNotNull(current.historyCapability(ready.envelope.generation))
-        val first = current.historySnapshots.value.storage!!.entries.single()
+        val first = recordedHistory(current).storage!!.entries.single()
         val usage = current.state.value.refresh.usage.success!!.usage!!
         for (ordinal in 2L..35L) {
             val seconds = ordinal - 1

@@ -18,45 +18,47 @@ import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
-/** Uses the connection screen's existing foreground registration, never activates a provider read. */
+/** Standalone stored host for the observation seam; production hoists one source at its root. */
 @Composable
 internal fun ConnectionHistory(controller: ConnectionController, now: Instant?, observer: HistoryUiObserver? = null) {
+    val source = collectedHistory(controller, observer)
+    val authority = controller.currentHistoryDisplayContext()
+    var kind by remember(controller, authority?.generation) { mutableStateOf(WindowKind.FIVE_HOUR) }
+    var after by remember(controller, authority?.generation) { mutableStateOf<ObservationId?>(null) }
+    val navigation = HistoryNavigation(kind, after)
+    val request = HistoryPresentationRequest.Page(navigation.query)
+    ObserveHistoryRequest(controller, authority, request, source.request)
+    val display = historyForDisplay(source, navigation.query, authority)
+    SideEffect { observer?.projected(source, display, now) }
+    StoredHistoryContent(navigation, display, now, { kind = it.kind }, { after = it })
+}
+
+@Composable
+internal fun collectedHistory(controller: ConnectionController, observer: HistoryUiObserver?): HistoryGraphSnapshot {
     val source by if (observer == null) controller.historySnapshots.collectAsState() else
         remember(controller, observer) { observer.snapshots(controller.historySnapshots) }.collectAsState(HistoryGraphSnapshot())
-    val generation = source.generation
-    var kind by remember(controller, generation) { mutableStateOf(WindowKind.FIVE_HOUR) }
-    var storedText by remember(controller) { mutableStateOf(false) }
-    // Collected snapshots trigger updates; the actual slot fences delayed or absent permissions.
-    val authority = controller.currentHistoryDisplayContext()
-    val period = authority?.periods?.forKind(kind) ?: CurrentHistoryPeriod(unavailable = BaselineEligibility.WINDOW_UNAVAILABLE)
-    var after by remember(controller, generation, storedText, if (storedText) null else period.window) { mutableStateOf<ObservationId?>(null) }
-    val navigation = HistoryNavigation(kind, after, if (storedText) null else period.window, !storedText)
-    val query = navigation.query
-    LaunchedEffect(controller, generation, query) {
-        if (generation != null && controller.historySnapshots.value.generation === generation) controller.queryHistory(query)
+    return source
+}
+
+@Composable
+internal fun ObserveHistoryRequest(controller: ConnectionController, authority: HistoryDisplayContext?, request: HistoryPresentationRequest, observed: HistoryPresentationRequest) {
+    LaunchedEffect(controller, authority, request, observed) {
+        authority?.let { controller.observeHistory(request, it) }
     }
-    val display = historyForDisplay(source, query)
-    SideEffect { observer?.projected(source, display, now) }
-    val plot = remember(display) { HistoryPlotInputs.project(display) }
+}
+
+@Composable
+internal fun StoredHistoryContent(navigation: HistoryNavigation, display: HistoryGraphSnapshot, now: Instant?,
+    changeKind: (HistoryNavigation) -> Unit, changePage: (ObservationId?) -> Unit) {
     val time = phoneTimeConfiguration()
+    val plot = remember(display) { HistoryPlotInputs.project(display) }
     Column(Modifier.fillMaxWidth().testTag("connection-history"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.history_navigation_title), style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.testTag("history-navigation-title").semantics { heading() })
-        HistoryWindowSelection(navigation) { kind = it.kind }
-        OutlinedButton(onClick = { storedText = !storedText }, modifier = Modifier.testTag("history-stored-text")) {
-            Text(stringResource(if (storedText) R.string.history_current_charts else R.string.history_stored_text))
-        }
-        if (!storedText) {
-            Text(stringResource(R.string.history_current_policy), Modifier.testTag("history-current-policy"))
-            period.unavailable?.let {
-                Text(stringResource(R.string.history_current_unavailable, stringResource(historyStateResource(it))),
-                    Modifier.testTag("history-current-unavailable"))
-            }
-        }
+        HistoryWindowSelection(navigation, changeKind)
         Text(stringResource(R.string.history_navigation_policy))
-        HistoryPageControls(navigation, display) { after = it }
-        if (storedText) HistoryTextComponent(plot, now, time.zone, time.locale, kind = navigation.kind)
-        else HistoryChartComponent(plot, authority?.periods?.evaluatedAt, time.zone, time.locale, kind = navigation.kind)
+        HistoryPageControls(navigation, display, changePage)
+        HistoryTextComponent(plot, now, time.zone, time.locale, kind = navigation.kind)
     }
 }
 
@@ -64,6 +66,9 @@ internal fun ConnectionHistory(controller: ConnectionController, now: Instant?, 
 internal interface HistoryUiObserver {
     fun snapshots(source: StateFlow<HistoryGraphSnapshot>): Flow<HistoryGraphSnapshot>
     fun projected(source: HistoryGraphSnapshot, display: HistoryGraphSnapshot, now: Instant?)
+    fun projectedCurrent(source: HistoryGraphSnapshot, fiveHour: HistoryGraphSnapshot, weekly: HistoryGraphSnapshot, now: Instant?) {
+        projected(source, fiveHour, now)
+    }
 }
 
 @Composable

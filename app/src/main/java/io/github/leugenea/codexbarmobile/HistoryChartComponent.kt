@@ -80,14 +80,14 @@ private fun HistoryGeometryNotes(series: HistoryPlotSeries, tag: String) {
 }
 
 @Composable
-private fun HistoryAxisTime(at: Instant, resource: Int, zone: ZoneId, locale: Locale, tag: String) {
+internal fun HistoryAxisTime(at: Instant, resource: Int, zone: ZoneId, locale: Locale, tag: String) {
     val time = TimePresentation.present(Field(io.github.leugenea.codexbarmobile.usage.Knowledge.KNOWN, at), TimeKind.PERIODIC_RESET, null, null, zone, locale)
     val label = time.absolute?.let { absoluteTimeLabel(it) } ?: stringResource(R.string.time_unknown_target)
     Text(stringResource(resource, label), Modifier.testTag(tag))
 }
 
 @Composable
-private fun HistoryPercentPlot(drawing: HistoryChartDrawing, tag: String) {
+internal fun HistoryPercentPlot(drawing: HistoryChartDrawing, tag: String) {
     val colors = MaterialTheme.colorScheme
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.height(176.dp).padding(vertical = 8.dp), verticalArrangement = Arrangement.SpaceBetween) {

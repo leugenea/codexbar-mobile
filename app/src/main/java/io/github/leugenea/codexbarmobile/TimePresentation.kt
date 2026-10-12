@@ -55,8 +55,8 @@ data class PresentedTime(
 /**
  * Shared, time-only reset/expiry projection; no global clocks/locales/zones or I/O.
  *
- * Absolute hour labels truncate minutes/seconds for display only (resources explicitly
- * say "hour precision"). Relative time uses the ORIGINAL epoch instant: floor positive
+ * Absolute hour labels truncate minutes/seconds for display only; the labels carry no
+ * precision suffix. Relative time uses the ORIGINAL epoch instant: floor positive
  * elapsed duration to whole hours, then divide by 24. 0 < duration < 1h is LESS_THAN_HOUR;
  * equality is already passed. Never infer another reset, change usage or provider counts.
  *

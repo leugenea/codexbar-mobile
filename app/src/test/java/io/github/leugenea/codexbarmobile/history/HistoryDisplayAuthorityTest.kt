@@ -3,6 +3,10 @@ package io.github.leugenea.codexbarmobile.history
 import io.github.leugenea.codexbarmobile.EndpointObservation
 import io.github.leugenea.codexbarmobile.HistoryNavigation
 import io.github.leugenea.codexbarmobile.historyForDisplay
+import io.github.leugenea.codexbarmobile.currentHistoryForDisplay
+import io.github.leugenea.codexbarmobile.RefreshedEndpoint
+import io.github.leugenea.codexbarmobile.UsageRefreshState
+import io.github.leugenea.codexbarmobile.usage.WindowKind
 import io.github.leugenea.codexbarmobile.credentials.LocalCredentialNamespace
 import io.github.leugenea.codexbarmobile.credentials.SessionGeneration
 import io.github.leugenea.codexbarmobile.transport.ReadOperation
@@ -114,6 +118,72 @@ class HistoryDisplayAuthorityTest {
             assertEquals(HistoryReadiness.EMPTY, recorder.state.value.readiness)
             assertSame(recorder.state.value, historyForDisplay(recorder.state.value, recorder.state.value.query))
         } finally { storage.release() }
+    }
+
+    @Test fun heldJointFactsRejectEqualRequestAfterRouteRoundTrip() = runTest {
+        val recorder = boundCurrent()
+        val context = recorder.currentDisplayContext()!!
+        val request = recorder.state.value.request as HistoryPresentationRequest.Current
+        val old = recorder.state.value
+        assertEquals(1, currentHistoryForDisplay(old, request, WindowKind.FIVE_HOUR, context).points.size)
+        recorder.query(HistoryGraphQuery(32, kind = WindowKind.WEEKLY)); runCurrent()
+        recorder.observe(request, context); runCurrent()
+        assertNotSame(old.selection, recorder.state.value.selection)
+        val challenged = currentHistoryForDisplay(old, request, WindowKind.FIVE_HOUR, context)
+        assertNull(challenged.storage); assertTrue(challenged.points.isEmpty())
+        assertEquals(1, currentHistoryForDisplay(recorder.state.value, request, WindowKind.FIVE_HOUR, context).points.size)
+        val token = recorder.state.value.selection
+        recorder.observe(request, context); runCurrent()
+        assertSame(token, recorder.state.value.selection)
+    }
+
+    @Test fun heldJointFactsRejectResetExpiryClockLossAndRetiredContexts() = runTest {
+        val recorder = boundCurrent()
+        val context = recorder.currentDisplayContext()!!
+        val old = recorder.state.value
+        val request = old.request as HistoryPresentationRequest.Current
+        val observed = observation()
+        val invalidTimes = listOf(request.fiveHour!!.resetAt, null, SyntheticHistory.at.minusNanos(1))
+        for (now in invalidTimes) {
+            recorder.metadata(UsageRefreshState(usage = RefreshedEndpoint(success = observed), evaluatedAt = now))
+            assertNull(currentHistoryForDisplay(old, request, WindowKind.FIVE_HOUR, context).storage)
+        }
+        val changed = EndpointObservation(ReadOperation.USAGE, observedAt = SyntheticHistory.at, receivedAtMillis = 1000,
+            usage = SyntheticHistory.usage(SyntheticHistory.window(absolute = io.github.leugenea.codexbarmobile.usage.Input.Value(1_800_007_200L))))
+        recorder.metadata(UsageRefreshState(usage = RefreshedEndpoint(success = changed), evaluatedAt = SyntheticHistory.at))
+        assertNull(currentHistoryForDisplay(old, request, WindowKind.FIVE_HOUR, context).storage)
+        recorder.retire()
+        assertNull(currentHistoryForDisplay(old, request, WindowKind.FIVE_HOUR, recorder.currentDisplayContext()).storage)
+    }
+
+    @Test fun currentNullDiagnosticSelectionCannotReplaySuccessorOrRetiredLoss() = runTest {
+        val recorder = recorder()
+        val session = session()
+        recorder.foreground(true); recorder.bind(session, null)
+        admit(recorder, session)
+        val old = recorder.state.value
+        recorder.query(HistoryGraphQuery(32, kind = WindowKind.WEEKLY))
+        assertEquals(HistoryReadiness.UNAVAILABLE, recorder.state.value.readiness)
+        assertNotSame(old.selection, recorder.state.value.selection)
+        assertEquals(1L, shown(old).lostSamples)
+        recorder.retire(); assertHidden(old, HistoryReadiness.UNAVAILABLE)
+        recorder.bind(session(), LifetimeJournal().Access(SyntheticHistory.partition)); runCurrent()
+        assertHidden(old, HistoryReadiness.LOADING)
+        recorder.retire(); recorder.bind(session(), null)
+        assertHidden(old, HistoryReadiness.UNAVAILABLE)
+    }
+
+    private fun TestScope.boundCurrent(): UsageHistoryRecorder {
+        val recorder = recorder()
+        val session = session()
+        val journal = LifetimeJournal()
+        recorder.foreground(true); recorder.bind(session, journal.Access(journal.partition)); runCurrent()
+        recorder.metadata(UsageRefreshState(usage = RefreshedEndpoint(success = observation()), evaluatedAt = SyntheticHistory.at))
+        admit(recorder, session); runCurrent()
+        val context = recorder.currentDisplayContext()!!
+        recorder.observe(HistoryPresentationRequest.Current(context.periods.fiveHour.window, context.periods.weekly.window), context)
+        runCurrent()
+        return recorder
     }
 
     private fun TestScope.recorder() = UsageHistoryRecorder(backgroundScope, StandardTestDispatcher(testScheduler))

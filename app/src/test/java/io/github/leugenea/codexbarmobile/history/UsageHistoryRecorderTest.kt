@@ -333,6 +333,82 @@ class UsageHistoryRecorderTest {
         assertEquals(4, gets.size)
     } }
 
+    @Test fun jointRequestUsesOneWorkerAndCoalescesLatestSelectionWithoutAdmissions() = runTest { fixture {
+        visible(true); read()
+        val context = owner.currentHistoryDisplayContext()!!
+        val current = HistoryPresentationRequest.Current(context.periods.fiveHour.window, context.periods.weekly.window)
+        owner.observeHistory(current, context); settle()
+        val token = snapshot.selection
+        val reads = journal.reads.size
+        val requests = fake.calls.size
+        val admitted = journal.admissions.size
+        owner.observeHistory(current, context); settle()
+        assertSame(token, snapshot.selection); assertEquals(reads, journal.reads.size)
+        val query = HistoryGraphQuery(32, kind = WindowKind.FIVE_HOUR)
+        owner.queryHistory(query); settle()
+        val firstToken = snapshot.selection
+        // Real synthetic stored change, independent of the recorder/provider admission.
+        val access = journal.active!!
+        assertTrue(access.append(SyntheticHistory.admission(journal.cursor, SyntheticHistory.usage(observedAt = SyntheticHistory.at.plusSeconds(1)), 1000)) is HistoryAppendOutcome.Stored)
+        val beforeExplicit = journal.admissions.size
+        owner.queryHistory(query); settle()
+        assertNotSame(firstToken, snapshot.selection)
+        assertEquals(listOf(1L, 2L), snapshot.storage!!.entries.map { it.id.ordinal })
+        assertEquals(beforeExplicit, journal.admissions.size); assertEquals(requests, fake.calls.size)
+        assertEquals(admitted + 1, journal.admissions.size)
+        val stable = snapshot.selection; val count = journal.reads.size
+        owner.observeHistory(HistoryPresentationRequest.Page(query), context); settle()
+        assertSame(stable, snapshot.selection); assertEquals(count, journal.reads.size)
+        storage.held = true
+        owner.queryHistory(query); settle()
+        repeat(4) { owner.queryHistory(query); settle() }
+        assertEquals(1, storage.pending)
+        val latest = snapshot.selection
+        storage.release(); settle()
+        assertSame(latest, snapshot.selection); assertEquals(0L, snapshot.lostSamples)
+    } }
+
+    @Test fun heldJointRequestRejectsRouteQueryAndAccountSuccessors() = runTest { fixture {
+        visible(true); read()
+        val context = owner.currentHistoryDisplayContext()!!
+        val current = HistoryPresentationRequest.Current(context.periods.fiveHour.window, null)
+        storage.held = true
+        owner.observeHistory(current, context); settle()
+        val held = snapshot.selection
+        val page = HistoryGraphQuery(1, kind = WindowKind.FIVE_HOUR)
+        owner.queryHistory(page); settle()
+        assertNotSame(held, snapshot.selection)
+        storage.release(); settle()
+        assertEquals(page, snapshot.query); assertNull(snapshot.currentPages); assertEquals(1, snapshot.points.size)
+        storage.held = true
+        owner.observeHistory(current, context); settle()
+        owner.signOut(); settle()
+        assertNull(context.let { snapshot.displayPermission?.current() })
+        storage.release(); settle()
+        assertEquals(ConnectionPhase.SIGNED_OUT, owner.state.value.phase)
+        assertNull(snapshot.currentPages); assertNull(snapshot.storage)
+        owner.observeHistory(current, context); settle()
+        assertNull(owner.currentHistoryDisplayContext())
+    } }
+
+    @Test fun jointRequestPreservesQueueLossGapAndContiguousDurableOrdinals() = runTest { fixture(capacity = 1) {
+        visible(true); read()
+        val context = owner.currentHistoryDisplayContext()!!
+        owner.observeHistory(HistoryPresentationRequest.Current(context.periods.fiveHour.window, null), context); settle()
+        storage.held = true
+        advance(1000); read(); read(); read()
+        owner.observeHistory(HistoryPresentationRequest.Idle, context); settle()
+        assertEquals(1, storage.pending); assertEquals(1L, snapshot.lostSamples)
+        storage.release(); settle()
+        assertEquals(listOf(1L, 2L, 3L), journal.entries.map { it.id.ordinal })
+        assertNull(snapshot.storage); assertNull(snapshot.currentPages)
+        advance(1000); read()
+        assertEquals(HistoryGap.READ_ERROR, journal.entries[3].gap)
+        assertEquals(listOf(1L, 2L, 3L, 4L, 5L), journal.entries.map { it.id.ordinal })
+        assertEquals(1L, snapshot.lostSamples)
+        assertEquals(10, gets.size)
+    } }
+
     private suspend fun TestScope.fixture(capacity: Int = 16, block: RecordingFixture.() -> Unit) {
         val h = RecordingFixture(this, capacity)
         runCurrent()

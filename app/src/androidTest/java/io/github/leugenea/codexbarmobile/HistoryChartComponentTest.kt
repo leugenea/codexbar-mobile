@@ -64,8 +64,8 @@ class HistoryChartComponentTest {
             compose.onNodeWithTag("history-chart-weekly-counts").assertTextEquals(
                 "Drawn markers: 1 · Within-run connections: 0 · Nominal reference lines: 1")
             verifyLabels("$five-title", "$five-legend", "$five-first", "$five-last")
-            compose.onNodeWithTag("$five-first").assertTextEquals("Time axis start: Oct 8, 2026, 20:00 (hour precision)")
-            compose.onNodeWithTag("$five-last").assertTextEquals("Time axis end: Oct 9, 2026, 01:00 (hour precision)")
+            compose.onNodeWithTag("$five-first").assertTextEquals("Time axis start: Oct 8, 2026, 20:00")
+            compose.onNodeWithTag("$five-last").assertTextEquals("Time axis end: Oct 9, 2026, 01:00")
             withCanvas { bitmap ->
                 markerPixels(bitmap, plot.fiveHour)
                 // Independent sampled diagonal: a solid reference fails the required gaps.
@@ -76,7 +76,7 @@ class HistoryChartComponentTest {
             withCanvas("history-chart-weekly") { bitmap -> markerPixels(bitmap, plot.weekly) }
             verifyLabels("history-chart-weekly-title", "history-chart-weekly-first", "history-chart-weekly-last")
             compose.onNodeWithTag("history-chart-weekly-first").assertTextEquals(
-                "Time axis start: Oct 2, 2026, 01:00 (hour precision)")
+                "Time axis start: Oct 2, 2026, 01:00")
             capture("history-chart-reference-portrait-light", plot, dark = false)
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assert(
                 SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
@@ -90,7 +90,7 @@ class HistoryChartComponentTest {
                 useUnmergedTree = true).assertCountEquals(0)
             compose.onAllNodes(scope and SemanticsMatcher.keyIsDefined(SemanticsProperties.ContentDescription),
                 useUnmergedTree = true).assertCountEquals(0)
-            compose.onAllNodesWithText("Reset: Oct 9, 2026, 01:00 (hour precision)").assertCountEquals(2)
+            compose.onAllNodesWithText("Reset: Oct 9, 2026, 01:00").assertCountEquals(2)
         }
     }
 

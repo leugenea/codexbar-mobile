@@ -230,6 +230,10 @@ internal class ConnectionController(
 
     internal fun queryHistory(query: HistoryGraphQuery) = command { historyRecorder.query(query) }
 
+    internal fun observeHistory(request: HistoryPresentationRequest, expected: HistoryDisplayContext) = command {
+        historyRecorder.observe(request, expected)
+    }
+
     internal fun currentHistoryDisplayContext() = historyRecorder.currentDisplayContext()
 
     private fun publishName() {

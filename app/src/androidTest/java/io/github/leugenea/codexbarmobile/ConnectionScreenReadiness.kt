@@ -17,13 +17,15 @@ internal fun awaitConnectionScreen(compose: ComposeTestRule, controller: Connect
     try {
         compose.waitUntil(timeoutMillis = 10_000) {
             compose.onAllNodes(hasTestTag("connection-screen")).fetchSemanticsNodes().size == 1 &&
-                compose.onAllNodes(hasTestTag("gate-state")).fetchSemanticsNodes().size == 1 &&
+                (compose.onAllNodes(hasTestTag("dashboard-status")).fetchSemanticsNodes().size == 1 ||
+                    compose.onAllNodes(hasTestTag("connection-history")).fetchSemanticsNodes().size == 1 ||
+                    compose.onAllNodes(hasTestTag("connection-details")).fetchSemanticsNodes().size == 1) &&
                 controller.state.value.phase != ConnectionPhase.RESTORING
         }
         compose.waitForIdle()
         settleConnectionCommands(compose, controller, "default screen foreground registration")
         compose.onNodeWithTag("connection-screen").assertIsDisplayed()
-        compose.onNodeWithTag("gate-state").assertExists()
+
     } catch (error: ComposeTimeoutException) {
         throw AssertionError("Default connection screen: last state=${controller.state.value}", error)
     }

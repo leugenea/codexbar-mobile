@@ -3,13 +3,13 @@
 ## Implemented application
 
 One Android phone app module, `io.github.leugenea.codexbarmobile`, launches
-`MainActivity` via MAIN/LAUNCHER directly into the real `ConnectionScreen`.
+`MainActivity` via MAIN/LAUNCHER directly into the real `ConnectionScreen` dashboard.
 Disconnected, restoring/loading, reauthorization, error and unknown usage remain
 honest projections of the one process owner; no sample model or preview route is shipped.
 
 ```text
 MainActivity / StateFlow observer + identity-tagged STARTED lifecycle observer
-    -> ConnectionScreen / live usage, authentication and local history controls
+    -> ConnectionScreen / dashboard plus two drawer detail routes
     -> NativeConnection.get(applicationContext) / one lazy process owner
 ```
 
@@ -786,7 +786,7 @@ analytical endpoints produce dashed lines, never measured markers or forecasts.
 Shape/line-style labels do not rely on color alone. No smoothing, clamping, fake
 measured start/reset point, sorting, quota calculation or cross-page cache is added.
 
-The fixed percent axis and B1 hour-precision time-domain labels wrap outside the
+The fixed percent axis and B1 containing-hour time-domain labels wrap outside the
 Canvas; localized source timestamps, reset context, original measurements and
 observed-only percentage-point delta remain in reachable existing details. Typed decimal-capacity/
 out-of-domain geometry and nonzero approximate underflow have explicit resource copy.
@@ -808,13 +808,24 @@ and the conditional assembled acceptance contract are described below.
 
 ## Production bounded history navigation (M4b-3a)
 
-The existing Connection screen exposes **View local history** and a return control
-for the live usage and authentication controls. `ConnectionHistory`
-collects the same process owner's `historySnapshots` and sends only
-`queryHistory(HistoryGraphQuery)`. It adds no observer registration, controller,
-storage port, network action or sampling timer. The Activity's directly attached
-STARTED lifecycle remains the only UI registration; opening dormant restored
-history does not activate B2.
+The Connection screen defaults to the compact dashboard; the modal drawer contains
+exactly **full local history details** and **full love connection details**. The
+owner's literal second label is intentional. Back closes an open drawer first;
+Back/up from details returns dashboard. Recreation resets these ephemeral UI
+choices to dashboard/closed, without replacing the process owner. Stored history
+retains exact text, kind selection and real exclusive-cursor pagination; full
+connection details retains the sanitized live/banked/status/clock facts and
+advanced controls. No credentials, payloads or permissions enter saved state.
+
+Production hoists one collected `historySnapshots` source and one local request
+effect in `ConnectionRoute`. `observeHistory(request, expectedContext)` checks the
+actual recorder context and exact current periods on the owner lane. Equal UI
+observation retains the token/page and does not scan. Explicit legacy
+`queryHistory(HistoryGraphQuery)` always requests a local Page reread, including
+equal values: new revision/token, cleared payload and one coalesced pending bit.
+With no binding it retains the request and publishes unavailable without a store
+read or invented authority. No navigation/disclosure command activates B2; the
+Activity's existing directly attached STARTED observer is unchanged.
 
 The production entry defaults to current-only five-hour/weekly charts. The bound
 recorder projects normalized live `UsageRefreshState` into safe period keys and
@@ -1074,6 +1085,56 @@ or control receipts fail closed. Independent geometry, expected colors, +/-12 ch
 tolerance and actual saved-PNG sample equality remain unchanged. Removal changes the
 integrated layout, so individual actual-image inspection remains a hosted acceptance
 gate, alongside runtime/lint/coverage and independent full-candidate review.
+
+## Dashboard presentation and joint observation (issue 142)
+
+The dashboard renders both exact current five-hour and weekly sections without a
+kind selector. Known percentages and B1 phone-local reset/remaining labels precede
+the compact charts. Missing current identity or actual renderable retained history
+has one concise no-information line per window, no empty Canvas or analytical-only
+substitute. A single observation remains one marker and is labeled as no observed
+trend. `CompactHistoryChart` reuses the existing plot/drawing/axis/paint primitives
+and existing exact fact projection for its compact accessible equivalent; detailed
+admission/clock/cursor/counter text stays in stored details. No alternative math,
+normalization, inferred zero, old-period fallback or accumulated archive is added.
+
+`HistoryPresentationRequest` has fixed Idle/Page/Current cases; Current contains
+only two nullable exact window keys and a bounded limit (production32). The joint
+`CurrentHistoryRead` scan starts at null; the compatible single-current delegate
+starts at query.after and retains the original query in its returned storage page.
+Both share ascending batches<=256, an initial high-water and a total100000 examined
+ceiling. Independent32+1 selected buffers prevent a dense first window from
+starving a sparse sibling. A later failed batch fails the joint result rather than
+publishing a healthy partial success. The native storage port/schema/retention,
+16 waiting observations, one worker and provider cadence are unchanged.
+
+The existing volatile display context now holds one identity-bearing request
+selection. Binding/context, revision/token and fresh exact period checks reject
+held reads and held collected snapshots, including a route round-trip to an equal
+query. Collected state triggers the host pass; the actual revocation-slot accessor
+is its permission. No StateFlow.value read in composition grants authority. This
+is host-pass publication safety, not atomic removal of already-drawn pixels. Real
+accepted Work retains preappend/high-water/gap/append ordering across route changes;
+admission failure accounting is separate from superseded presentation outcomes.
+Idle drops page interest while keeping actual recording and shared diagnostics.
+
+The banked-reset disclosure is collapsed below both graph sections. Its title uses
+only known inventory reportedAvailableCount; unknown is not zero and summary or
+row counts never substitute. Every retained item, including malformed/expired rows,
+keeps C1 state and B1 expiry/relative labels. Independent summary/count/container/
+issues/clocks stay in full connection details. Expanding, local ticks and phone
+zone/locale effects issue no provider request or admission. Absolute labels remove
+the precision suffix only; original instants, containing-hour formatting, elapsed
+countdown math and recognized weekly inclusive60-second conflict policy remain.
+
+New mandatory dashboard JVM/native identities extend all existing campaigns;
+seven actual dashboard/disclosure/drawer/detail capture identities extend the
+21 prior gallery identities. Existing exact facts, pixels, clipping, security,
+privacy, lifetime, admission and pagination assertions remain required through
+the new routes. Native collection/appearance, hosted lint/JVM/instrumented execution,
+compatible whole-handwritten>=90% INSTRUCTION union and APK acceptance are pending
+until their exact candidate evidence is independently reviewed. No signed-release,
+live-provider or merge approval follows from source/static tooling.
 
 ## Verification boundaries
 

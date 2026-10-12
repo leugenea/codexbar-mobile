@@ -33,11 +33,11 @@ class AccountRemovalLifecycleTest {
         seedDormant()
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             openConnection(); saveName("Synthetic retained account")
-            await("restored history page") { owner.historySnapshots.value.storage?.entries?.isNotEmpty() == true }
+            await("restored history page") { recordedHistory(owner).storage?.entries?.isNotEmpty() == true }
             val name = nameFile().readBytes()
             val credentials = credentialFile().readBytes()
             val partition = owner.historySnapshots.value.partition
-            val highWater = owner.historySnapshots.value.storage!!.lastAdmitted
+            val highWater = recordedHistory(owner).storage!!.lastAdmitted
             val requests = fixture.transport.counts()
             click("remove-account")
             dialogScope()
@@ -49,12 +49,12 @@ class AccountRemovalLifecycleTest {
             scenario.recreate(); compose.waitForIdle()
             awaitDialogDismissed("recreation dismisses restored account confirmation")
             phase(ConnectionPhase.RESTORED)
-            await("recreated local history adopted") { owner.historySnapshots.value.storage != null }
+            await("recreated local history adopted") { recordedHistory(owner).storage != null }
             assertArrayEquals(name, nameFile().readBytes())
             assertArrayEquals(credentials, credentialFile().readBytes())
             assertTrue(keyExists())
             assertEquals(partition, owner.historySnapshots.value.partition)
-            assertEquals(highWater, owner.historySnapshots.value.storage!!.lastAdmitted)
+            assertEquals(highWater, recordedHistory(owner).storage!!.lastAdmitted)
             assertEquals(requests, fixture.transport.counts())
             compose.onNodeWithTag("account-name").performScrollTo().assertTextEquals("Synthetic retained account")
         }
@@ -64,7 +64,7 @@ class AccountRemovalLifecycleTest {
         seedDormant()
         ActivityScenario.launch(MainActivity::class.java).use {
             openConnection(); saveName("Synthetic predecessor")
-            await("predecessor history available") { owner.historySnapshots.value.storage != null }
+            await("predecessor history available") { recordedHistory(owner).storage != null }
             val oldPartition = owner.historySnapshots.value.partition
             fixture.transport.heldPath = ReadOperation.USAGE.path
             owner.readUsage()
@@ -76,15 +76,15 @@ class AccountRemovalLifecycleTest {
             assertDeleted()
             awaitDialogDismissed("confirmed removal dismisses predecessor confirmation")
             compose.onNodeWithTag("account-name").assertDoesNotExist()
-            click("history-toggle")
+            toggleHistoryDetails(compose, owner)
             compose.onNodeWithTag("connection-history").assertExists()
             compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertDoesNotExist()
-            assertNull(owner.historySnapshots.value.storage)
-            click("history-toggle")
+            assertNull(recordedHistory(owner).storage)
+            toggleHistoryDetails(compose, owner)
             fixture.transport.heldPath = null
             fixture.transport.usageBody = NavigationTransport.USAGE.replace("12.375", "42.125")
             click("connect"); phase(ConnectionPhase.OBSERVED)
-            await("successor history recorded") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
+            await("successor history recorded") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L }
             saveName("Synthetic successor")
             val partition = owner.historySnapshots.value.partition
             val credentials = credentialFile().readBytes()
@@ -97,7 +97,7 @@ class AccountRemovalLifecycleTest {
             assertArrayEquals(name, nameFile().readBytes())
             assertTrue(keyExists())
             assertEquals(partition, owner.historySnapshots.value.partition)
-            assertEquals(1L, owner.historySnapshots.value.storage!!.lastAdmitted!!.ordinal)
+            assertEquals(1L, recordedHistory(owner).storage!!.lastAdmitted!!.ordinal)
             assertEquals(setOf("42.125", "87.5"), owner.historySnapshots.value.points.map { it.usedPercent.toPlainString() }.toSet())
             assertEquals(requests, fixture.transport.counts())
             compose.onNodeWithTag("account-name").performScrollTo().assertTextEquals("Synthetic successor")
@@ -117,7 +117,7 @@ class AccountRemovalLifecycleTest {
                     && owner.accountRemoval !== predecessor && owner.accountName.value?.edit != null
             }
             awaitDialogDismissed("replacement dismisses predecessor confirmation")
-            await("replacement history recorded") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
+            await("replacement history recorded") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L }
             saveName("Synthetic replacement successor")
             val credentials = credentialFile().readBytes()
             val name = nameFile().readBytes()
@@ -188,7 +188,7 @@ class AccountRemovalLifecycleTest {
                 assertFalse(keyExists())
                 assertTrue(obstacle.isFile)
                 assertNull(owner.accountName.value)
-                assertNull(owner.historySnapshots.value.storage)
+                assertNull(recordedHistory(owner).storage)
                 compose.onNodeWithTag("remove-account").performScrollTo().assertIsEnabled()
                 val requests = fixture.transport.counts()
                 replay(stale, "old failed confirmation cannot silently retry")
@@ -218,7 +218,7 @@ class AccountRemovalLifecycleTest {
         phase(ConnectionPhase.IDLE)
         owner.usageForeground(fixture.observer, true)
         owner.connect(); phase(ConnectionPhase.OBSERVED)
-        await("seed observation stored") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
+        await("seed observation stored") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L }
         fixture.freshRuntime(); phase(ConnectionPhase.RESTORED)
     }
     private fun openConnection() { awaitConnectionScreen(compose, fixture.owner) }
@@ -287,7 +287,7 @@ class AccountRemovalLifecycleTest {
     }
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
-        if (tag in setOf("remove-account", "account-name-edit", "history-toggle", "connect")) node.performScrollTo()
+        if (tag in setOf("remove-account", "account-name-edit", "connect")) node.performScrollTo()
         node.performClick(); compose.waitForIdle()
     }
     private fun credentialFile() = KeystoreCredentialStore.file(fixture.context, NativeConnection.session(fixture.context))

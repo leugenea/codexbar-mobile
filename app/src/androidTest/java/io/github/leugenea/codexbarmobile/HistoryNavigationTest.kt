@@ -34,9 +34,9 @@ class HistoryNavigationTest {
             assertPage(1, 32, more = true)
             compose.onNodeWithTag("history-chart-weekly").assertDoesNotExist()
             captureNavigation(scenario)
-            click("history-stored-text")
-            await("current graph identity admitted") {
-                fixture.owner.historySnapshots.value.let { it.query.currentOnly && it.query.window != null && it.storage?.entries?.size == 32 }
+            returnDashboard(compose, fixture.owner)
+            await("current pair graph identity admitted") {
+                recordedHistory(fixture.owner).let { it.query.currentOnly && it.query.window != null && it.storage?.entries?.size == 32 }
             }
             captureChart(scenario)
             enterStoredText()
@@ -53,7 +53,8 @@ class HistoryNavigationTest {
             click("history-first-page")
             page(WindowKind.WEEKLY, 0, 32)
             compose.onNodeWithTag("history-first-page").assertIsNotEnabled()
-            click("history-toggle")
+            toggleHistoryDetails(compose, fixture.owner)
+            openDetailRoute(compose, fixture.owner, DashboardRoute.CONNECTION_DETAILS)
             compose.onNodeWithTag("read-usage").performScrollTo().assertIsEnabled()
             assertDormantCounts()
         }
@@ -63,7 +64,7 @@ class HistoryNavigationTest {
         seedDormant()
         ActivityScenario.launch(MainActivity::class.java).use {
             awaitConnectionScreen(compose, fixture.owner)
-            compose.onNodeWithTag("live-status").assertExists()
+            compose.onNodeWithTag("dashboard-status").assertExists()
             compose.onNodeWithTag("offline-tab").assertDoesNotExist()
             compose.onNodeWithTag("preview-demo").assertDoesNotExist()
             assertDormantCounts()
@@ -73,12 +74,12 @@ class HistoryNavigationTest {
             page(WindowKind.FIVE_HOUR, 32, 3)
             click("history-select-WEEKLY")
             page(WindowKind.WEEKLY, 32, 3)
-            assertEquals(35L, fixture.owner.historySnapshots.value.storage!!.lastAdmitted!!.ordinal)
+            assertEquals(35L, recordedHistory(fixture.owner).storage!!.lastAdmitted!!.ordinal)
             assertEquals(ConnectionPhase.RESTORED, fixture.owner.state.value.phase)
             assertDormantCounts()
-            click("history-toggle")
+            toggleHistoryDetails(compose, fixture.owner)
             compose.onNodeWithTag("connection-history").assertDoesNotExist()
-            compose.onNodeWithTag("live-usage").assertExists()
+            compose.onNodeWithTag("dashboard").assertExists()
             assertDormantCounts()
         }
     }
@@ -97,11 +98,11 @@ class HistoryNavigationTest {
             compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertDoesNotExist()
             compose.onNodeWithTag("history-details-toggle").assertDoesNotExist()
             assertDeleted()
-            click("history-toggle")
+            toggleHistoryDetails(compose, fixture.owner)
             click("connect")
             phase(ConnectionPhase.OBSERVED)
-            await("new login records only its own admission") { fixture.owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
-            click("history-toggle")
+            await("new login records only its own admission") { recordedHistory(fixture.owner).storage?.lastAdmitted?.ordinal == 1L }
+            toggleHistoryDetails(compose, fixture.owner)
             enterStoredText()
             page(WindowKind.FIVE_HOUR, 0, 1)
             assertNotEquals(previous, fixture.owner.historySnapshots.value.partition)
@@ -131,8 +132,8 @@ class HistoryNavigationTest {
                 generation != null && generation !== before
             }
             scenario.onActivity { assertSame(current, it.connection) }
-            compose.onNodeWithTag("history-toggle").assertTextEquals("View local history")
-            click("history-toggle")
+            compose.onNodeWithTag("dashboard").assertExists()
+            toggleHistoryDetails(compose, fixture.owner)
             enterStoredText()
             page(WindowKind.FIVE_HOUR, 0, 32)
             val resumed = current.historySnapshots.value.generation
@@ -161,7 +162,7 @@ class HistoryNavigationTest {
             phase(ConnectionPhase.IDLE)
             click("connect")
             phase(ConnectionPhase.OBSERVED)
-            await("initial usage persisted independently") { fixture.owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
+            await("initial usage persisted independently") { recordedHistory(fixture.owner).storage?.lastAdmitted?.ordinal == 1L }
             fixture.transport.usageStatus = 403
             fixture.transport.inventoryStatus = 200
             fixture.transport.advance(1000)
@@ -170,7 +171,7 @@ class HistoryNavigationTest {
                 val source = fixture.owner.historySnapshots.value
                 source.live.usage.error == ReadError.FORBIDDEN && source.live.inventory.status == 200 && !source.live.refreshing
             }
-            click("history-toggle")
+            toggleHistoryDetails(compose, fixture.owner)
             enterStoredText()
             page(WindowKind.FIVE_HOUR, 0, 1)
             val source = fixture.owner.historySnapshots.value
@@ -183,7 +184,7 @@ class HistoryNavigationTest {
             page(WindowKind.WEEKLY, 0, 1)
             assertEquals(7L, fixture.transport.requests.get())
             assertEquals(4L, fixture.transport.gets.get())
-            click("history-toggle")
+            toggleHistoryDetails(compose, fixture.owner)
             compose.onNodeWithTag("live-refresh").performScrollTo().assertIsEnabled()
         }
     }
@@ -203,27 +204,19 @@ class HistoryNavigationTest {
         fixture.owner.usageForeground(fixture.observer, true)
         fixture.owner.connect()
         phase(ConnectionPhase.OBSERVED)
-        await("synthetic seed's original accepted endpoint settled") { fixture.owner.historySnapshots.value.storage?.entries?.size == 1 }
+        await("synthetic seed's original accepted endpoint settled") { recordedHistory(fixture.owner).storage?.entries?.size == 1 }
         fixture.seedLocalPage()
         if (fresh) { fixture.freshRuntime(); phase(ConnectionPhase.RESTORED) }
         assertDormantCounts()
     }
 
-    private fun openHistory() { awaitConnectionScreen(compose, fixture.owner); click("history-toggle"); enterStoredText() }
+    private fun openHistory() { awaitConnectionScreen(compose, fixture.owner); toggleHistoryDetails(compose, fixture.owner); enterStoredText() }
 
     private fun enterStoredText() {
-        val button = compose.onNodeWithTag("history-stored-text")
-        button.performScrollTo()
-        var label = button.fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
-        assertTrue("History mode button: $label", label in listOf(listOf("Browse stored text history"), listOf("View current charts")))
-        if (label == listOf("Browse stored text history")) click("history-stored-text")
-        await("stored text selected in the live UI", lastObserved = { "mode button=$label" }) {
-            label = button.fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
-            label == listOf("View current charts")
-        }
-        button.assertTextEquals("View current charts")
-        settleConnectionCommands(compose, fixture.owner, "stored text effect submitted owner receipt")
+        openDetailRoute(compose, fixture.owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
+        compose.onNodeWithTag("connection-history").assertExists()
     }
+
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
         node.performScrollTo()

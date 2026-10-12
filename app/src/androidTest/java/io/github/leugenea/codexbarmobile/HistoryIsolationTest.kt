@@ -77,7 +77,7 @@ class HistoryIsolationTest {
             if (published) assertTrue("$step must accept its own successor result", subsequent.any { it.storage === captured })
             else assertTrue("$step must reject the exact held predecessor result even when window reads share a storage cursor",
                 subsequent.none { it.storage === captured })
-            assertEquals((1L..32L).toList(), owner.historySnapshots.value.storage!!.entries.map { it.id.ordinal })
+            assertEquals((1L..32L).toList(), recordedHistory(owner).storage!!.entries.map { it.id.ordinal })
         } finally { gate.release() }
     }
 
@@ -95,8 +95,8 @@ class HistoryIsolationTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             awaitConnectionScreen(compose, owner); phase(ConnectionPhase.IDLE)
             click("connect"); phase(ConnectionPhase.OBSERVED)
-            await("initial login recorded") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
-            click("history-toggle"); enterStoredText(); page(query(), 1)
+            await("initial login recorded") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L }
+            toggleHistoryDetails(compose, owner); enterStoredText(); page(query(), 1)
             val old = owner.historySnapshots.value
             val oldAccess = fixture.capability()
             val before = transport.counts()
@@ -108,9 +108,9 @@ class HistoryIsolationTest {
                 owner.readUsage()
                 await("${operation.name} request actually admitted") { transport.heldCall(operation.path) != null }
                 val late = transport.heldCall(operation.path)!!
-                click("history-toggle"); click("remove-account"); click("remove-account-confirm")
+                toggleHistoryDetails(compose, owner); click("remove-account"); click("remove-account-confirm")
                 phase(ConnectionPhase.SIGNED_OUT)
-                click("history-toggle")
+                toggleHistoryDetails(compose, owner)
                 fixture.settled("logout ${operation.name} processed")
                 assertTrue(late.cancelled)
                 assertNull(old.displayPermission!!.current())
@@ -123,7 +123,7 @@ class HistoryIsolationTest {
                 transport.usageBody = NavigationTransport.USAGE.replace("12.375", "42.125").replace("87.5", "66.75")
                 transport.inventoryBody = """{"available_count":2,"credits":[]}"""
                 transport.advance(1000)
-                click("history-toggle"); click("connect"); phase(ConnectionPhase.OBSERVED)
+                toggleHistoryDetails(compose, owner); click("connect"); phase(ConnectionPhase.OBSERVED)
                 await("successor capability is positively adopted before releasing old read") {
                     owner.historySnapshots.value.generation != null && owner.historySnapshots.value.generation !== old.generation
                 }
@@ -131,8 +131,8 @@ class HistoryIsolationTest {
                 assertNotEquals(old.partition, successorAccess.partition)
                 assertTrue(successorAccess.read(HistoryReadQuery(successorAccess.partition, 1)) is HistoryReadOutcome.Ready)
                 gate.release()
-                await("successor only ordinal one recorded") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
-                click("history-toggle"); enterStoredText(); page(query(), 1)
+                await("successor only ordinal one recorded") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L }
+                toggleHistoryDetails(compose, owner); enterStoredText(); page(query(), 1)
                 val successor = owner.historySnapshots.value
                 val counts = transport.counts()
                 transport.advance(1000) // A stale completion would acquire this different receipt clock.
@@ -194,7 +194,7 @@ class HistoryIsolationTest {
             assertTrue(fresh.read(HistoryReadQuery(fresh.partition, 1)) is HistoryReadOutcome.Ready)
             assertRevoked(access) // Deliberately after the positive successor proof, not an already-dead-port oracle.
             assertNotSame(old.displayPermission!!.context, old.displayPermission.current())
-            if (recreate) click("history-toggle")
+            if (recreate) toggleHistoryDetails(compose, owner)
             enterStoredText()
             assertNoPage()
             gate.release(); page(query(), 32)
@@ -209,7 +209,7 @@ class HistoryIsolationTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             awaitConnectionScreen(compose, owner); phase(ConnectionPhase.IDLE)
             click("connect"); phase(ConnectionPhase.OBSERVED)
-            await("original accepted usage persisted") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
+            await("original accepted usage persisted") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L }
             fixture.native.seedLocalPage()
             fixture.failRead = true
             transport.advance(1000); owner.readUsage(); phase(ConnectionPhase.OBSERVED)
@@ -221,7 +221,7 @@ class HistoryIsolationTest {
                 val live = owner.historySnapshots.value.live
                 live.usage.stale && !live.inventory.stale && live.usage.error == ReadError.FORBIDDEN && !live.refreshing
             }
-            click("history-toggle"); enterStoredText(); page(query(), 3, HistoryReadiness.ERROR)
+            toggleHistoryDetails(compose, owner); enterStoredText(); page(query(), 3, HistoryReadiness.ERROR)
             val source = owner.historySnapshots.value
             assertEquals((33L..35L).toList(), source.storage!!.entries.map { it.id.ordinal })
             assertEquals(35L, source.storage.lastAdmitted!!.ordinal)
@@ -251,7 +251,7 @@ class HistoryIsolationTest {
         phase(ConnectionPhase.IDLE)
         owner.usageForeground(fixture.native.observer, true); fixture.settled("seed foreground registered")
         owner.connect(); phase(ConnectionPhase.OBSERVED)
-        await("seed endpoint persisted") { owner.historySnapshots.value.storage?.entries?.size == 1 }
+        await("seed endpoint persisted") { recordedHistory(owner).storage?.entries?.size == 1 }
         fixture.native.seedLocalPage()
         val counts = transport.counts()
         fixture.native.freshRuntime(); phase(ConnectionPhase.RESTORED)
@@ -259,21 +259,13 @@ class HistoryIsolationTest {
         assertDormant()
     }
 
-    private fun openHistory() { awaitConnectionScreen(compose, owner); click("history-toggle"); enterStoredText() }
+    private fun openHistory() { awaitConnectionScreen(compose, owner); toggleHistoryDetails(compose, owner); enterStoredText() }
 
     private fun enterStoredText() {
-        val button = compose.onNodeWithTag("history-stored-text")
-        button.performScrollTo()
-        var label = button.fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
-        assertTrue("History mode button: $label", label in listOf(listOf("Browse stored text history"), listOf("View current charts")))
-        if (label == listOf("Browse stored text history")) click("history-stored-text")
-        await("stored text selected in the live UI", lastObserved = { "mode button=$label" }) {
-            label = button.fetchSemanticsNode().config[SemanticsProperties.Text].map { it.text }
-            label == listOf("View current charts")
-        }
-        button.assertTextEquals("View current charts")
-        settleConnectionCommands(compose, owner, "stored text effect submitted owner receipt")
+        openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
+        compose.onNodeWithTag("connection-history").assertExists()
     }
+
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
         if (tag != "remove-account-confirm") node.performScrollTo()
@@ -336,7 +328,7 @@ class HistoryIsolationTest {
         assertEquals(5L, transport.requests.get()); assertEquals(2L, transport.gets.get())
         assertEquals(mapOf("/api/accounts/deviceauth/usercode" to 1L, "/api/accounts/deviceauth/token" to 1L,
             "/oauth/token" to 1L, ReadOperation.USAGE.path to 1L, ReadOperation.RESET_INVENTORY.path to 1L), transport.counts())
-        owner.historySnapshots.value.storage?.let { assertEquals(35L, it.lastAdmitted!!.ordinal) }
+        recordedHistory(owner).storage?.let { assertEquals(35L, it.lastAdmitted!!.ordinal) }
     }
 
     private fun assertReadAndLoginDelta(before: Map<String, Long>, heldGets: Long) {
