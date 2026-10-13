@@ -34,7 +34,7 @@ def dashboard_captures(directory, fixture):
             data["windows"] = [dict(kind=k, limit=32, after=0, reset="2027-01-15T09:00:00Z", duration=d,
                                     selectedOrdinals=[1], lastAdmitted=1) for k, d in (("FIVE_HOUR", 18000), ("WEEKLY", 604800))]
         if name == "dashboard-drawer-portrait-dark":
-            data["drawerLabels"] = ["full local history details", "full love connection details"]
+            data["drawerLabels"] = ["Full local history details", "Full live connection details"]
         if name in {"dashboard-banked-expanded-portrait-light", "dashboard-connection-details-landscape-dark"}:
             data.update(inventoryCount=7, inventoryRows=3)
         image = fixture.png(*size)
@@ -157,6 +157,20 @@ class DashboardContracts(unittest.TestCase):
                     path.with_suffix(".json").write_text(json.dumps(data))
                     with self.subTest(name=name, wrongHost=key), self.assertRaises(ValueError):
                         dashboard_capture_receipt(path)
+            if name == "dashboard-drawer-portrait-dark":
+                labels = ["Full local history details", "Full live connection details"]
+                self.assertEqual(original["drawerLabels"], labels)
+                for wrong_labels in ([label.lower() for label in labels],
+                                     [labels[0], labels[1].replace("live", "love")],
+                                     labels[::-1], labels[:1], labels + ["SYNTHETIC-extra-row"], None):
+                    data = dict(original); data["drawerLabels"] = wrong_labels
+                    path.with_suffix(".json").write_text(json.dumps(data))
+                    with self.subTest(name=name, drawerLabels=wrong_labels), self.assertRaises(ValueError):
+                        dashboard_capture_receipt(path)
+                data = dict(original); data.pop("drawerLabels")
+                path.with_suffix(".json").write_text(json.dumps(data))
+                with self.subTest(name=name, missing="drawerLabels"), self.assertRaises(ValueError):
+                    dashboard_capture_receipt(path)
             path.with_suffix(".json").write_text(json.dumps(original))
             if original["sourceKind"] != "NONE":
                 for key, value in (("markerCount", 0), ("connectionCount", 1), ("canvasClippedLeft", .5), ("pixelSamples", [])):
@@ -244,6 +258,6 @@ class DashboardContracts(unittest.TestCase):
             self.assertNotIn("recordedHistory(owner", helper)
         strings = {
             x.get("name"): x.text or "" for x in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
-        self.assertEqual(strings["drawer_history"], "full local history details")
-        self.assertEqual(strings["drawer_connection"], "full love connection details")
+        self.assertEqual(strings["drawer_history"], "Full local history details")
+        self.assertEqual(strings["drawer_connection"], "Full live connection details")
         self.assertFalse(any("hour precision" in x for x in strings.values()))

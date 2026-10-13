@@ -558,7 +558,7 @@ def dashboard_capture_receipt(path: Path) -> dict:
     if "currentHost" not in metadata or metadata["currentHost"] != host:
         raise ValueError("Dashboard lacks an actual matching current host/authority/selection receipt")
     verify_dashboard_windows(metadata)
-    if path.stem == "dashboard-drawer-portrait-dark" and metadata.get("drawerLabels") != ["full local history details", "full love connection details"]:
+    if path.stem == "dashboard-drawer-portrait-dark" and metadata.get("drawerLabels") != ["Full local history details", "Full live connection details"]:
         raise ValueError("Owner drawer rows changed")
     if path.stem in {"dashboard-banked-expanded-portrait-light", "dashboard-connection-details-landscape-dark"}:
         if metadata.get("inventoryCount") != 7 or metadata.get("inventoryRows") != 3:

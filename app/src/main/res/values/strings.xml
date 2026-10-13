@@ -337,8 +337,8 @@
     <string name="dashboard_title">Usage</string>
     <string name="dashboard_menu">Open details menu</string>
     <string name="dashboard_back">Back to dashboard</string>
-    <string name="drawer_history">full local history details</string>
-    <string name="drawer_connection">full love connection details</string>
+    <string name="drawer_history">Full local history details</string>
+    <string name="drawer_connection">Full live connection details</string>
     <string name="dashboard_login">Login</string>
     <string name="dashboard_reauthorize_action">Reauthorize</string>
     <string name="dashboard_disconnected">Sign in to see your usage</string>

@@ -159,8 +159,8 @@ class DashboardUiTest {
         launch(dark = true).use { scenario ->
             login()
             click("open-drawer")
-            compose.onNodeWithTag("drawer-LOCAL_HISTORY_DETAILS").assertTextEquals("full local history details")
-            compose.onNodeWithTag("drawer-CONNECTION_DETAILS").assertTextEquals("full love connection details")
+            compose.onNodeWithTag("drawer-LOCAL_HISTORY_DETAILS").assertTextEquals("Full local history details")
+            compose.onNodeWithTag("drawer-CONNECTION_DETAILS").assertTextEquals("Full live connection details")
             compose.onAllNodes(hasTestTag("drawer-LOCAL_HISTORY_DETAILS") or hasTestTag("drawer-CONNECTION_DETAILS")).assertCountEquals(2)
             capture.capture("dashboard-drawer-portrait-dark", scenario, fixture, "drawer-LOCAL_HISTORY_DETAILS")
             pressActivityBack(scenario, "open drawer Back")

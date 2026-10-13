@@ -809,8 +809,8 @@ and the conditional assembled acceptance contract are described below.
 ## Production bounded history navigation (M4b-3a)
 
 The Connection screen defaults to the compact dashboard; the modal drawer contains
-exactly **full local history details** and **full love connection details**. The
-owner's literal second label is intentional. Back closes an open drawer first;
+exactly **Full local history details** and **Full live connection details**.
+Back closes an open drawer first;
 Back/up from details returns dashboard. Recreation resets these ephemeral UI
 choices to dashboard/closed, without replacing the process owner. A route
 may remain within the same Activity across account revocation;
