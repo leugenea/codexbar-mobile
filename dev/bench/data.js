@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791769488496,
+  "lastUpdate": 1791871724807,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1961,6 +1961,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/e0f1390bc7048dede620f5557c1aea21c024a405"
         },
         "date": 1791769486292,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "978eaa6ee9cceeaca517d05326b5d6bafec97884",
+          "message": "feat(android): compact dashboard, dual graphs and full-details drawer (#144)\n\n## Candidate4 — accepted exact owner correction; authorized squash\n\nThe drawer now has exactly two entries: `Full local history details` and `Full live connection details`. This is the owner's final correction to the reviewed candidate3 debug APK. The owner explicitly permits merge after correction and fresh gates; earlier feedback-only holds are superseded.\n\nExact head `267ea27c16a19920e448f9ea19356426683de60f`, tree `afc489b0dea6675300b96f5281a97354c967d7c4`, complete patch SHA256 `0ab64a69b81d7e2d4308c0084e83dfe8fff31277434d3cbf45054f291a336dcf`. Base `e0f1390bc7048dede620f5557c1aea21c024a405` is unchanged. [Canonical issue142](https://github.com/leugenea/codexbar-mobile/issues/142) owns the complete compact-dashboard, both current-window graphs, truthful banked disclosure and safe two-route detail contract.\n\n### Independently approved acceptance\n- Fresh complete-candidate **APPROVE_SOURCE**, 6 fresh paths + 65 hash/mode-bound previously approved feature paths, 71 complete feature paths; all277 sources/index preserved. No production Kotlin/data/security/pins/gate changes in the final copy correction.\n- **APPROVE_HOSTED_ARTIFACTS**, complete, no blockers. [Exact Android run38351175810 attempt1](https://github.com/leugenea/codexbar-mobile/actions/runs/38351175810); checkout `13d892b98da389e34aafe14b09b058f396e4db0b` resolves to the reviewed tree. All applicable exact-head required checks pass, current ruleset required contexts refreshed.\n-147/147 native cases,548 JVM cases per job separately, zero failures/errors/skips; protected native/JVM/capture registries and all24 previously failed native identities pass. Build, strict dependency verification, lint and configured CodeQL actions/python/java-kotlin findings/errors are zero.\n-Whole handwritten INSTRUCTION union **52,383 /54,247 =96.563865282873%**, unchanged90% threshold and generated-only exclusions.534 actual production class bytes independently SHA256/CRC64/internal-name checked and exact complete class/instruction inventory unchanged from acceptedcandidate3; fresh nativeec/native-job JVMexec compatible. No local tests/lint/probes/emulator or JaCoCo Analyzer execution.\n-All28 actual PNG/metadata pairs freshly objectively validated.23 originalPNG+scene/configmetadata-identical acceptedcandidate3 pairs inherited by bothhashes; all5 changed originalPNG pairs freshly individually full-frame viewed by separate reviewer, **APPROVE_VISUAL_SUBSET**, no visible blockers. Parent joins **APPROVE_VISUAL_GALLERY** for28unique pairs; exact two drawer labels readable without truncation.\n-Native debug APK:16,803,474 bytes, SHA256 `830ce5d18c9cabfa8a38a8258e232b8ac80b45cdfc6d5a0f6617d076854fc804`; exact native inspected checksum and successful preinstall path:OK agree; all11 install/manifest/permission status fields zero. Build-job APK not substituted.\n\n### Evidence report SHA256\n-Source JSON `561bef5cb1baea82773534bf71d44874a41745a394b0a0959c194298a83bc3f6`\n-Hosted JSON `2d15f3c61e44bc41c9fa33f9ff54ab161db5e6be0e56683eb44fe9aba2eb355c`\n-Fresh visual JSON `7fd3fab88ecd6b0bd5cf50235e494e75366bfb8252ff3b0ba1b43127bb489d35`\n-All1,601 archived files and both archive digests validated;277source/index and3,325 original audit inputs preserved.\n\n### Scope and remaining post-merge boundary\nDebug/synthetic hosted API36 acceptance only: no signed-release/live-account/physical/API37-runtime/SBOM/license-complete claim. SBOM endpoint returnedHTTP404; distribution licensing remains release-scope work. CodeQL autobuild's full-database fallback warning retained, not a finding. Historical [candidate3 owner-feedback evidence](https://github.com/leugenea/codexbar-mobile/pull/144#issuecomment-6136223266) and prior resolved time-caption findings remain preserved. No new time precision requirement or changed instants.\n\nParent will squash exactly this reviewed head, then independently verify every applicable main workflow/native artifact at the actual merge SHA and same reviewed tree before final issue/Project checklist/journal/lock cleanup. Issue142 remains open/In review until that gate. No release or next task is authorized.",
+          "timestamp": "2026-10-13T06:08:14Z",
+          "tree_id": "afc489b0dea6675300b96f5281a97354c967d7c4",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/978eaa6ee9cceeaca517d05326b5d6bafec97884"
+        },
+        "date": 1791871724207,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
