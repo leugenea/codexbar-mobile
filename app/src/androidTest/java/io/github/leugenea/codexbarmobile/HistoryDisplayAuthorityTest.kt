@@ -382,6 +382,8 @@ class HistoryDisplayAuthorityTest {
 
 internal class HeldHistoryObserver : HistoryUiObserver {
     data class Pass(val source: HistoryGraphSnapshot, val display: HistoryGraphSnapshot, val now: Instant?)
+    data class CurrentPass(val source: HistoryGraphSnapshot, val fiveHour: HistoryGraphSnapshot,
+        val weekly: HistoryGraphSnapshot, val now: Instant?)
     private val passes = CopyOnWriteArrayList<Pass>()
     private val deliveryLock = Any()
     private var gate: CompletableDeferred<Unit>? = null
@@ -393,7 +395,10 @@ internal class HeldHistoryObserver : HistoryUiObserver {
     val last get() = passes.lastOrNull()
     @Volatile var currentPair: Triple<HistoryGraphSnapshot, HistoryGraphSnapshot, HistoryGraphSnapshot>? = null
         private set
+    @Volatile var currentFrame: CurrentPass? = null
+        private set
     override fun projectedCurrent(source: HistoryGraphSnapshot, fiveHour: HistoryGraphSnapshot, weekly: HistoryGraphSnapshot, now: Instant?) {
+        currentFrame = CurrentPass(source, fiveHour, weekly, now)
         currentPair = Triple(source, fiveHour, weekly)
         projected(source, fiveHour, now)
     }

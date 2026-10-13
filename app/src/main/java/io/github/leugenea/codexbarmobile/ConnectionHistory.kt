@@ -23,8 +23,8 @@ import kotlinx.coroutines.flow.StateFlow
 internal fun ConnectionHistory(controller: ConnectionController, now: Instant?, observer: HistoryUiObserver? = null) {
     val source = collectedHistory(controller, observer)
     val authority = controller.currentHistoryDisplayContext()
-    var kind by remember(controller, authority?.generation) { mutableStateOf(WindowKind.FIVE_HOUR) }
-    var after by remember(controller, authority?.generation) { mutableStateOf<ObservationId?>(null) }
+    var kind by remember(controller, source.generation) { mutableStateOf(WindowKind.FIVE_HOUR) }
+    var after by remember(controller, source.generation) { mutableStateOf<ObservationId?>(null) }
     val navigation = HistoryNavigation(kind, after)
     val request = HistoryPresentationRequest.Page(navigation.query)
     ObserveHistoryRequest(controller, authority, request, source.request)

@@ -60,8 +60,8 @@ private fun ConnectionRoute(state: ConnectionState, controller: ConnectionContro
     // Collection triggers a pass; this actual volatile slot is the permission on that pass.
     val authority = controller.currentHistoryDisplayContext()
     val periods = authority?.periods ?: CurrentHistoryPeriods()
-    var kind by remember(controller, authority?.generation) { mutableStateOf(WindowKind.FIVE_HOUR) }
-    var after by remember(controller, authority?.generation, route) { mutableStateOf<ObservationId?>(null) }
+    var kind by remember(controller, source.generation) { mutableStateOf(WindowKind.FIVE_HOUR) }
+    var after by remember(controller, source.generation, route) { mutableStateOf<ObservationId?>(null) }
     val navigation = HistoryNavigation(kind, after)
     val current = HistoryPresentationRequest.Current(periods.fiveHour.window, periods.weekly.window)
     val request = routeRequest(route, current, navigation)

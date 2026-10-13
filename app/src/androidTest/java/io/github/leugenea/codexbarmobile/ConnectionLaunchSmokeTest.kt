@@ -128,15 +128,19 @@ class ConnectionLaunchSmokeTest {
                 awaitConnectionScreen(compose, shared)
                 lateinit var activity: MainActivity
                 scenario.onActivity { activity = it; assertSame(shared, it.connection) }
-                boundedWait("default launch reaches a live, owner-attributed return checkpoint") {
+                var checkpointPredicate = "no selected-call evaluation"
+                boundedWait("default launch reaches a live, owner-attributed return checkpoint",
+                    { "$checkpointPredicate; ${checkpoint.diagnostics()}" }) {
                     var completed = false
                     // Fence actual lifecycle delivery only during the checkpoint. Earlier fast
                     // STOP/STARTs remain real events, with independent owner-lane provenance.
                     InstrumentationRegistry.getInstrumentation().runOnMainSync {
                         checkpoint.awaitOwner("foreground commands before launch checkpoint", shared) { shared.commandsSettled() }
                         val selected = fixture.transport.liveHeldCall(ReadOperation.USAGE.path)
-                        if (selected != null && activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) &&
-                            checkpoint.isCurrent(selected.epoch)) {
+                        val started = activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+                        val currentEpoch = checkpoint.isCurrent(selected?.epoch)
+                        checkpointPredicate = "selected=${selected != null}, selectedEpoch=${selected?.epoch}, selectedLive=${selected?.live()}, started=$started, currentEpoch=$currentEpoch"
+                        if (selected != null && started && currentEpoch) {
                             val epoch = requireNotNull(selected.epoch)
                             try {
                                 assertSame(shared, fixture.owner)
@@ -154,7 +158,8 @@ class ConnectionLaunchSmokeTest {
                                     combine(shared.state, shared.historySnapshots) { state, history ->
                                         state.phase == ConnectionPhase.OBSERVED && !state.refresh.refreshing &&
                                             state.refresh.usage.success !== success &&
-                                            history.storage?.lastAdmitted?.ordinal == 3L
+                                            history.request is io.github.leugenea.codexbarmobile.history.HistoryPresentationRequest.Current &&
+                                            recordedHistory(history).storage?.lastAdmitted?.ordinal == 3L
                                     }.first { it }
                                 }
                                 // State publication can precede finished()'s drain. The serial
@@ -232,9 +237,9 @@ class ConnectionLaunchSmokeTest {
         }
     }
 
-    private fun boundedWait(step: String, condition: () -> Boolean) {
+    private fun boundedWait(step: String, receipt: () -> String = { "no launch checkpoint" }, condition: () -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 10_000, condition = condition) }
-        catch (error: ComposeTimeoutException) { throw AssertionError("$step: last state=${fixture.owner.state.value}", error) }
+        catch (error: ComposeTimeoutException) { throw AssertionError("$step: last state=${fixture.owner.state.value}; ${receipt()}", error) }
     }
 
     /** Unconsumed obsolete selections cannot route the recreated production composition. */

@@ -1,6 +1,7 @@
 package io.github.leugenea.codexbarmobile
 
 import android.graphics.Bitmap
+import android.content.res.Configuration
 import android.os.Build
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -19,55 +20,61 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
 import java.io.File
-import java.time.Instant
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
 
 /** Actual production-root PNG, exact pair keys and registered measured/reference pixel roles. */
 internal class DashboardCapture(private val compose: ComposeTestRule) {
-    private val observer = DashboardCaptureObserver()
+    private val observer = HeldHistoryObserver()
     private var previousObserver: HistoryUiObserver? = null
     fun install() { previousObserver = MainActivity.historyUiObserver; MainActivity.historyUiObserver = observer }
-    fun restore() { MainActivity.historyUiObserver = previousObserver }
+    fun restore() { observer.release(); MainActivity.historyUiObserver = previousObserver }
 
     fun capture(name: String, scenario: ActivityScenario<MainActivity>, fixture: HistoryNavigationFixture,
         label: String, kind: WindowKind? = null) {
-        awaitRenderedCurrent(fixture.owner)
-        val observed = compose.onNodeWithTag(label)
-        val layouts = HistoryAcceptanceCapture(compose).layout(if (name == "dashboard-drawer-portrait-dark") observed else observed.performScrollTo())
-        val observedLabel = observed.fetchSemanticsNode().config[SemanticsProperties.TestTag]
-        val tag = if (kind == WindowKind.WEEKLY) "history-chart-weekly-canvas" else "history-chart-five-hour-canvas"
-        if (kind != null) compose.onNodeWithTag(tag, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
-        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        // Let the selected route finish its real delivery before installing a hold;
+        // no predecessor is captured until after the hold's host acknowledgement.
+        awaitRenderedSource(fixture.owner)
+        // Freeze only UI delivery before selecting its predecessor. The owner, local
+        // clock and actual revocation slot remain live throughout this capture.
+        observer.hold()
         try {
-            val source = fixture.owner.historySnapshots.value
-            val roots = mountedRoots()
-            val route = mountedRoute(roots)
-            val data = JSONObject().put("name", name).put("synthetic", true).put("productionEntry", true)
-                .put("activity", MainActivity::class.java.name).put("api", Build.VERSION.SDK_INT)
-                .put("width", bitmap.width).put("height", bitmap.height).put("route", route.name)
-                .put("visibleRoots", JSONArray(roots)).put("requestMode", requestMode(source.request))
-                .put("currentHost", currentHost(source, fixture.owner))
-                .put("requests", fixture.transport.requests.get()).put("gets", fixture.transport.gets.get())
-                .put("layoutLabel", observedLabel).put("layoutFontScale", layouts.layoutInput.density.fontScale)
-                .put("layoutDensity", layouts.layoutInput.density.density)
-                .put("sourceKind", kind?.name ?: "NONE")
-            scenario.onActivity {
-                assertSame(fixture.owner, it.connection)
-                val config = it.resources.configuration
+            awaitRenderedSource(fixture.owner)
+            val observed = compose.onNodeWithTag(label)
+            val layouts = HistoryAcceptanceCapture(compose).layout(if (name == "dashboard-drawer-portrait-dark") observed else observed.performScrollTo())
+            val observedLabel = observed.fetchSemanticsNode().config[SemanticsProperties.TestTag]
+            val tag = if (kind == WindowKind.WEEKLY) "history-chart-weekly-canvas" else "history-chart-five-hour-canvas"
+            if (kind != null) compose.onNodeWithTag(tag, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+            val frame = frame(scenario, fixture.owner)
+            val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+            try {
+                val source = frame.source
+                val roots = mountedRoots()
+                val route = mountedRoute(roots)
+                val data = JSONObject().put("name", name).put("synthetic", true).put("productionEntry", true)
+                    .put("activity", MainActivity::class.java.name).put("api", Build.VERSION.SDK_INT)
+                    .put("width", bitmap.width).put("height", bitmap.height).put("route", route.name)
+                    .put("visibleRoots", JSONArray(roots)).put("requestMode", requestMode(source.request))
+                    .put("currentHost", currentHost(frame, fixture.owner))
+                    .put("requests", fixture.transport.requests.get()).put("gets", fixture.transport.gets.get())
+                    .put("layoutLabel", observedLabel).put("layoutFontScale", layouts.layoutInput.density.fontScale)
+                    .put("layoutDensity", layouts.layoutInput.density.density)
+                    .put("sourceKind", kind?.name ?: "NONE")
+                val config = frame.configuration
                 data.put("orientation", config.orientation).put("fontScale", config.fontScale)
-                    .put("density", it.resources.displayMetrics.density).put("renderedLocale", config.locales[0].toLanguageTag())
-                    .put("dark", config.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES)
-            }
-            data.put("windows", if (source.request is HistoryPresentationRequest.Current)
-                JSONArray(listOf(window(fixture.owner, WindowKind.FIVE_HOUR), window(fixture.owner, WindowKind.WEEKLY))) else JSONArray())
-            data.put("inventoryCount", fixture.owner.state.value.refresh.inventory.success?.inventory?.reportedAvailableCount?.value ?: JSONObject.NULL)
-            data.put("inventoryRows", fixture.owner.state.value.refresh.inventory.success?.inventory?.items?.size ?: 0)
-            if (kind != null) chart(data, bitmap, fixture.owner, kind, tag)
-            if (name == "dashboard-drawer-portrait-dark") data.put("drawerLabels", JSONArray(listOf(
-                text("drawer-LOCAL_HISTORY_DETAILS"), text("drawer-CONNECTION_DETAILS"))))
-            save(name, bitmap, data)
-        } finally { bitmap.recycle() }
+                    .put("density", frame.density).put("renderedLocale", config.locales[0].toLanguageTag())
+                    .put("dark", config.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES)
+                assertEquals(frame.density, layouts.layoutInput.density.density)
+                assertEquals(config.fontScale, layouts.layoutInput.density.fontScale)
+                data.put("windows", if (source.request is HistoryPresentationRequest.Current)
+                    JSONArray(listOf(window(frame, WindowKind.FIVE_HOUR), window(frame, WindowKind.WEEKLY))) else JSONArray())
+                data.put("inventoryCount", frame.state.refresh.inventory.success?.inventory?.reportedAvailableCount?.value ?: JSONObject.NULL)
+                data.put("inventoryRows", frame.state.refresh.inventory.success?.inventory?.items?.size ?: 0)
+                if (kind != null) chart(data, bitmap, frame, kind, tag)
+                if (name == "dashboard-drawer-portrait-dark") data.put("drawerLabels", JSONArray(listOf(
+                    text("drawer-LOCAL_HISTORY_DETAILS"), text("drawer-CONNECTION_DETAILS"))))
+                revalidate(frame, scenario, fixture.owner)
+                save(name, bitmap, data)
+            } finally { bitmap.recycle() }
+        } finally { observer.release() }
     }
 
     private fun mountedRoots(): List<String> {
@@ -90,26 +97,72 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
         }
     }
 
-    private fun awaitRenderedCurrent(owner: ConnectionController) {
+    private data class Frame(val source: HistoryGraphSnapshot, val current: HeldHistoryObserver.CurrentPass?,
+        val state: ConnectionState, val configuration: Configuration, val density: Float)
+
+    private fun awaitRenderedSource(owner: ConnectionController) {
         try { compose.waitUntil(5_000) {
-            val source = owner.historySnapshots.value
-            source.request !is HistoryPresentationRequest.Current || observer.pair?.first === source
+            val source = observer.deliverySource
+            source != null && when (source.request) {
+                is HistoryPresentationRequest.Current -> observer.currentFrame?.source === source &&
+                    compose.onAllNodesWithTag("dashboard").fetchSemanticsNodes().size == 1
+                is HistoryPresentationRequest.Page -> observer.last?.source === source &&
+                    compose.onAllNodesWithTag("connection-history").fetchSemanticsNodes().size == 1
+                HistoryPresentationRequest.Idle -> compose.onAllNodesWithTag("connection-details").fetchSemanticsNodes().size == 1
+            }
         } } catch (error: ComposeTimeoutException) {
-            throw AssertionError("Capture waits for actual host pair: last request=${owner.historySnapshots.value.request}, readiness=${owner.historySnapshots.value.readiness}, rendered=${observer.pair?.first?.request}", error)
+            throw AssertionError("Capture frozen delivery acknowledged by actual host: last request=${owner.historySnapshots.value.request}, readiness=${owner.historySnapshots.value.readiness}, delivered=${observer.deliverySource?.request}, rendered=${observer.currentFrame?.source?.request}", error)
         }
     }
 
-    private fun currentHost(source: HistoryGraphSnapshot, owner: ConnectionController): Any {
+    private fun frame(scenario: ActivityScenario<MainActivity>, owner: ConnectionController): Frame {
+        lateinit var captured: Frame
+        scenario.onActivity {
+            assertSame(owner, it.connection)
+            val source = requireNotNull(observer.deliverySource)
+            val current = if (source.request is HistoryPresentationRequest.Current) requireNotNull(observer.currentFrame) else null
+            current?.let { rendered ->
+                assertSame("Frame uses the frozen source acknowledged by the rendered host", source, rendered.source)
+            }
+            captured = Frame(source, current, it.connection.state.value,
+                Configuration(it.resources.configuration), it.resources.displayMetrics.density)
+        }
+        return captured
+    }
+
+    private fun revalidate(frame: Frame, scenario: ActivityScenario<MainActivity>, owner: ConnectionController) {
+        scenario.onActivity {
+            assertSame("Frozen delivery cannot change mid-capture", frame.source, observer.deliverySource)
+            frame.current?.let { captured ->
+                val rendered = requireNotNull(observer.currentFrame)
+                assertSame("PNG and both children use the exact rendered source", captured.source, rendered.source)
+                assertEquals("Changed evaluation frame must fail capture", captured.now, rendered.now)
+                assertSame(captured.fiveHour.storage, rendered.fiveHour.storage)
+                assertSame(captured.weekly.storage, rendered.weekly.storage)
+            }
+            assertEquals(frame.configuration.orientation, it.resources.configuration.orientation)
+            assertEquals(frame.configuration.uiMode, it.resources.configuration.uiMode)
+            assertEquals(frame.configuration.fontScale, it.resources.configuration.fontScale)
+            assertEquals(frame.configuration.locales, it.resources.configuration.locales)
+            assertEquals(frame.density, it.resources.displayMetrics.density)
+            assertSame("Inventory source cannot change mid-capture", frame.state.refresh.inventory.success,
+                it.connection.state.value.refresh.inventory.success)
+            currentHost(frame, owner) // Actual permission is re-read; UI hold never grants authority.
+        }
+    }
+
+    private fun currentHost(frame: Frame, owner: ConnectionController): Any {
+        val source = frame.source
         val request = source.request as? HistoryPresentationRequest.Current ?: return JSONObject.NULL
         val context = owner.currentHistoryDisplayContext()
-        val pair = observer.pair
+        val pair = frame.current
         val contextMatches = context != null && source.displayPermission?.context === context && source.displayPermission?.current() === context
         val selectionMatches = context != null && source.selection != null && source.selection === context.selection &&
             source.generation != null && source.generation === context.generation && source.request == context.selection?.request
         val periodsMatch = context != null && request.matches(context.periods)
-        val projected = pair?.first === source && pair?.second?.selection === source.selection && pair?.third?.selection === source.selection &&
-            pair?.second?.storage === source.currentPages?.fiveHour && pair?.third?.storage === source.currentPages?.weekly &&
-            pair?.second?.query == request.query(WindowKind.FIVE_HOUR) && pair?.third?.query == request.query(WindowKind.WEEKLY)
+        val projected = pair?.source === source && pair?.fiveHour?.selection === source.selection && pair?.weekly?.selection === source.selection &&
+            pair?.fiveHour?.storage === source.currentPages?.fiveHour && pair?.weekly?.storage === source.currentPages?.weekly &&
+            pair?.fiveHour?.query == request.query(WindowKind.FIVE_HOUR) && pair?.weekly?.query == request.query(WindowKind.WEEKLY)
         val receipt = JSONObject()
         for ((key, matches) in listOf("context" to contextMatches, "selection" to selectionMatches, "periods" to periodsMatch, "projection" to projected)) {
             receipt.put(key, if (matches) "MATCH" else "MISMATCH")
@@ -126,10 +179,10 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
 
     private fun text(tag: String): String = compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
 
-    private fun window(owner: ConnectionController, kind: WindowKind): JSONObject {
-        val pair = requireNotNull(observer.pair)
-        assertSame("Window receipts use actual rendered source", owner.historySnapshots.value, pair.first)
-        val source = if (kind == WindowKind.FIVE_HOUR) pair.second else pair.third
+    private fun window(frame: Frame, kind: WindowKind): JSONObject {
+        val pair = requireNotNull(frame.current)
+        assertSame("Window receipts use the exact captured rendered source", frame.source, pair.source)
+        val source = if (kind == WindowKind.FIVE_HOUR) pair.fiveHour else pair.weekly
         return JSONObject().put("kind", kind.name).put("limit", source.query.limit)
             .put("after", source.query.after?.ordinal ?: 0).put("reset", source.query.window?.resetAt?.toString() ?: "NONE")
             .put("duration", source.query.window?.durationSeconds ?: 0)
@@ -137,7 +190,7 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
             .put("lastAdmitted", source.storage?.lastAdmitted?.ordinal ?: 0)
     }
 
-    private fun chart(data: JSONObject, bitmap: Bitmap, owner: ConnectionController, kind: WindowKind, tag: String) {
+    private fun chart(data: JSONObject, bitmap: Bitmap, frame: Frame, kind: WindowKind, tag: String) {
         val node = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode()
         assertTrue(node.config.contains(SemanticsProperties.HideFromAccessibility))
         val full = Rect(node.positionInRoot, node.size.toSize())
@@ -150,7 +203,8 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
         for ((side, value) in listOf("Left" to clipped.left, "Top" to clipped.top, "Right" to clipped.right, "Bottom" to clipped.bottom)) {
             data.put("canvasClipped$side", value)
         }
-        val plot = HistoryPlotInputs.project(recordedHistory(owner, kind))
+        val current = requireNotNull(frame.current)
+        val plot = HistoryPlotInputs.project(if (kind == WindowKind.FIVE_HOUR) current.fiveHour else current.weekly)
         val series = if (kind == WindowKind.WEEKLY) plot.weekly else plot.fiveHour
         val drawing = historyChartDrawing(series)
         val colors = if (data.getBoolean("dark")) darkColorScheme() else lightColorScheme()
@@ -170,16 +224,5 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
         assertTrue(directory.isDirectory || directory.mkdirs())
         File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         File(directory, "$name.json").writeText(data.toString(2))
-    }
-}
-
-/** Latest actual host projection only; no held owner lane, detached cache or persisted permission. */
-private class DashboardCaptureObserver : HistoryUiObserver {
-    @Volatile var pair: Triple<HistoryGraphSnapshot, HistoryGraphSnapshot, HistoryGraphSnapshot>? = null
-        private set
-    override fun snapshots(source: StateFlow<HistoryGraphSnapshot>): Flow<HistoryGraphSnapshot> = source
-    override fun projected(source: HistoryGraphSnapshot, display: HistoryGraphSnapshot, now: Instant?) = Unit
-    override fun projectedCurrent(source: HistoryGraphSnapshot, fiveHour: HistoryGraphSnapshot, weekly: HistoryGraphSnapshot, now: Instant?) {
-        pair = Triple(source, fiveHour, weekly)
     }
 }

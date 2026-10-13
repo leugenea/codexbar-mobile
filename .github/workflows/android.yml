@@ -29,8 +29,33 @@ jobs:
           fetch-depth: 2
       - name: Initialize build diagnostics
         run: mkdir -p evidence
+      - name: Prepare hash-pinned offline parser environment
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          set +e
+          {
+            python3 --version &&
+            python3 -m venv "$RUNNER_TEMP/android-build-contract-venv" &&
+            timeout --signal=TERM --kill-after=10s 3m "$RUNNER_TEMP/android-build-contract-venv/bin/python" -m pip install \
+              --require-hashes --no-deps --no-cache-dir --disable-pip-version-check --timeout 30 --retries 1 \
+              -r .github/requirements-metrics.txt
+          } 2>&1 | tee evidence/offline-parser-setup.log
+          setup_status=("${PIPESTATUS[@]}")
+          set -e
+          if (( setup_status[0] != 0 )); then exit "${setup_status[0]}"; fi
+          (( setup_status[1] == 0 ))
       - name: Validate offline build and workflow contracts
-        run: python3 -B -m unittest discover -s tools/build -p 'test_*.py' -v
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          set +e
+          "$RUNNER_TEMP/android-build-contract-venv/bin/python" -B -m unittest discover -s tools/build -p 'test_*.py' -v \
+            2>&1 | tee evidence/offline-build-contracts.log
+          contracts_status=("${PIPESTATUS[@]}")
+          set -e
+          if (( contracts_status[0] != 0 )); then exit "${contracts_status[0]}"; fi
+          (( contracts_status[1] == 0 ))
       - name: Set up Temurin JDK 17
         id: java
         timeout-minutes: 5

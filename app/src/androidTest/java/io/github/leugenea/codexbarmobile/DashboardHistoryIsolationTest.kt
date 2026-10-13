@@ -42,9 +42,18 @@ class DashboardHistoryIsolationTest {
                 returnDashboard(compose, owner)
                 owner.connect()
                 await("successor live account while old read held") { owner.state.value.phase == ConnectionPhase.OBSERVED && !owner.state.value.refresh.refreshing }
+                val formerlyUsable = fixture.capability()
+                assertTrue("Successor native port is usable before STOP",
+                    formerlyUsable.read(HistoryReadQuery(formerlyUsable.partition, 1)) is HistoryReadOutcome.Ready)
                 scenario.moveToState(Lifecycle.State.CREATED)
-                fixture.settled("last observer retirement while pair held")
+                await("Compose STOP revokes authority and native access while predecessor pair remains held") {
+                    owner.currentHistoryDisplayContext() == null && owner.historyAvailability == HistoryAvailability.UNAVAILABLE
+                }
+                settleConnectionCommands(compose, owner, "last observer retirement while pair held")
+                assertTrue("Detached predecessor gate still owns its result at STOP", gate.isHeld())
                 assertNull(owner.currentHistoryDisplayContext())
+                assertTrue("STOP revokes the exact formerly usable successor port",
+                    formerlyUsable.read(HistoryReadQuery(formerlyUsable.partition, 1)) is HistoryReadOutcome.Unavailable)
                 scenario.moveToState(Lifecycle.State.RESUMED)
                 val boundary = fixture.publications.size
                 gate.release()
@@ -106,7 +115,9 @@ class DashboardHistoryIsolationTest {
     }
 
     @Test fun pairReadsRemainBoundedBehindArchivesAndCoalesceWithoutExtraAdmissions() {
+        await("archive owner restoration completes before the single connect") { owner.state.value.phase == ConnectionPhase.IDLE }
         owner.usageForeground(fixture.native.observer, true)
+        settleConnectionCommands(compose, owner, "archive foreground registration acknowledged before connect")
         fixture.transport.usageBody = NavigationTransport.USAGE.replace("1800003600", "1799999000")
         owner.connect(); fixture.settled("archive seed connect")
         await("archive seed recorded") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L }
@@ -173,6 +184,6 @@ class DashboardHistoryIsolationTest {
     }
     private fun await(step: String, predicate: () -> Boolean) {
         try { compose.waitUntil(10_000, predicate) }
-        catch (error: ComposeTimeoutException) { throw AssertionError("$step: phase=${owner.state.value.phase}, request=${owner.historySnapshots.value.request}, ready=${owner.historySnapshots.value.readiness}, pair=${observer.currentPair?.second?.readiness}", error) }
+        catch (error: ComposeTimeoutException) { throw AssertionError("$step: phase=${owner.state.value.phase}, request=${owner.historySnapshots.value.request}, ready=${owner.historySnapshots.value.readiness}, authority=${owner.currentHistoryDisplayContext() != null}, availability=${owner.historyAvailability}, pair=${observer.currentPair?.second?.readiness}", error) }
     }
 }

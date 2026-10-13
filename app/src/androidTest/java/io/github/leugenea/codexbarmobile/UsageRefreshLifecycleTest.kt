@@ -337,12 +337,17 @@ class UsageRefreshLifecycleTest {
         private val submissions = IdentityHashMap<Any, Int>()
         fun ingressCounts(): List<Int> = synchronized(fake.gate) { submissions.values.toList() }
 
-        // Only ObserveUsageLifecycle submits owner commands from a Compose effect in this fixture:
-        // history stays closed. Its block submits true then false with the same copied context ticket.
-        fun command(caller: ForegroundCaller): ForegroundCommand = synchronized(fake.gate) {
+        private val submittedObservers = IdentityHashMap<Any, Any>()
+        // Inspect the exact public ingress ticket. Dashboard history effects still execute
+        // on this lane, but never create a foreground receipt or change its epoch.
+        fun command(caller: ForegroundCaller, ticket: UsageForegroundCommand): ForegroundCommand = synchronized(fake.gate) {
             val count = (submissions[caller.origin] ?: 0) + 1
+            assertTrue("Foreground ingress has only true then false: ${diagnostics()}", count in 1..2)
+            assertEquals("Actual ingress boolean: ${diagnostics()}", count == 1, ticket.foreground)
+            if (count == 1) submittedObservers[caller.origin] = ticket.observer
+            else assertSame("START/STOP observer identity", submittedObservers[caller.origin], ticket.observer)
             submissions[caller.origin] = count
-            ForegroundCommand(caller.epoch, count == 1)
+            ForegroundCommand(caller.epoch, ticket.foreground)
         }
 
         fun enter(command: ForegroundCommand) = synchronized(fake.gate) {
@@ -414,7 +419,8 @@ class UsageRefreshLifecycleTest {
         private val serial = Dispatchers.IO.limitedParallelism(1)
         override fun dispatch(context: CoroutineContext, block: Runnable) {
             val tracker = epochs
-            val command = foregroundCaller.get()?.let { tracker?.command(it) }
+            val ticket = context[UsageForegroundCommand]
+            val command = foregroundCaller.get()?.let { origin -> ticket?.let { tracker?.command(origin, it) } }
             serial.dispatch(context, Runnable {
                 command?.let { tracker?.enter(it) }
                 block.run()

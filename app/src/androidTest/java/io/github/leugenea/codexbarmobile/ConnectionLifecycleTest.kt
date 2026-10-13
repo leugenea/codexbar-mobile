@@ -715,7 +715,7 @@ class ConnectionLifecycleTest {
         assertConnectionHasNoDiagnosticDump(compose)
     }
     private fun click(tag: String, expectTransition: Boolean = true) {
-        if (tag in setOf("read-usage", "refresh-session")) openDetailRoute(compose, NativeConnection.get(context), DashboardRoute.CONNECTION_DETAILS)
+        if (tag in setOf("connect", "read-usage", "refresh-session", "open-browser", "copy-device-code", "cancel-connect")) openDetailRoute(compose, NativeConnection.get(context), DashboardRoute.CONNECTION_DETAILS)
         val changesState = tag in setOf("connect", "read-usage", "refresh-session", "remove-account-confirm", "cancel-connect")
         val before = if (changesState) NativeConnection.get(context).state.value else null
         val node = compose.onNodeWithTag(tag)
@@ -749,7 +749,13 @@ class ConnectionLifecycleTest {
             matches
         }
         // A stopped Activity has no registered Compose root; query only the real resumed UI.
-        if (scenario.state.isAtLeast(Lifecycle.State.STARTED)) assertConnectionHasNoDiagnosticDump(compose)
+        if (scenario.state.isAtLeast(Lifecycle.State.STARTED)) {
+            val owner = NativeConnection.get(context)
+            awaitConnectionScreen(compose, owner)
+            assertConnectionHasNoDiagnosticDump(compose)
+            openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
+            assertConnectionHasNoDiagnosticDump(compose)
+        }
     }
     private fun bounded(step: String, last: () -> String = { "no diagnostic" }, test: () -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 10_000, condition = test) }

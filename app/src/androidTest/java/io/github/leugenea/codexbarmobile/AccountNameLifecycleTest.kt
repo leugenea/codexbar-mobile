@@ -121,7 +121,8 @@ class AccountNameLifecycleTest {
             assertArrayEquals(unchanged, nameFile().readBytes())
             label("Synthetic successor")
             assertEquals(counts, fixture.transport.counts())
-            // Explicit replacement also settles predecessor removal before a new login.
+            // Explicit replacement is an advanced connection-details action.
+            openDetailRoute(compose, fixture.owner, DashboardRoute.CONNECTION_DETAILS)
             click("connect")
             await("replacement adopts a fresh unnamed account") {
                 fixture.owner.state.value.let { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing }
@@ -169,6 +170,8 @@ class AccountNameLifecycleTest {
     }
     private fun label(text: String) = compose.onNodeWithTag("account-name").performScrollTo().assertTextEquals(text).assertIsDisplayed()
     private fun click(tag: String) {
+        if (tag == "connect" && fixture.owner.state.value.phase in setOf(ConnectionPhase.OBSERVED, ConnectionPhase.RESTORED, ConnectionPhase.READING))
+            compose.onNodeWithTag("connection-details").assertExists()
         val node = compose.onNodeWithTag(tag)
         if (tag in setOf("account-name-edit", "connect")) node.performScrollTo()
         node.performClick(); compose.waitForIdle()

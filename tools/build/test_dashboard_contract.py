@@ -107,7 +107,7 @@ class DashboardContracts(unittest.TestCase):
                 if protected is None:
                     self.assertEqual(required, actual)
                 else:
-                    self.assertTrue((protected | required) <= actual)
+                    self.assertEqual(protected | required, actual)
                 for name in required:
                     for mutation in ("missing", "wrong-class", "duplicate", "failure", "error", "skipped"):
                         path = writer.write_report(kind)
@@ -181,6 +181,29 @@ class DashboardContracts(unittest.TestCase):
         scanner = ROOT / f"app/src/test/java/{SCANNER_CLASS.replace('.', '/')}.kt"
         self.assertEqual(annotated_methods(scanner.read_text(), SCANNER_CLASS), EXPECTED_CURRENT_READ_JVM)
 
+    def test_mixed_source_census_rejects_extra_annotated_methods_without_expanding_report_targets(self):
+        for classname in (
+                "io.github.leugenea.codexbarmobile.history.HistoryDisplayAuthorityTest",
+                "io.github.leugenea.codexbarmobile.history.UsageHistoryRecorderTest"):
+            protected = PROTECTED_MIXED_SOURCE[classname]
+            source = ROOT / f"app/src/test/java/{classname.replace('.', '/')}.kt"
+            text = source.read_text()
+            expected = protected | EXPECTED_DASHBOARD_JVM[classname]
+            self.assertEqual(expected, annotated_methods(text, classname))
+            declaration = f"class {classname.rsplit('.', 1)[1]}"
+            body = text.index("{", text.index(declaration)) + 1
+            extra = text[:body] + "\n    @Test fun unregisteredSyntheticRegression() {}\n" + text[body:]
+            with self.subTest(classname=classname), self.assertRaises(AssertionError):
+                self.assertEqual(expected, annotated_methods(extra, classname))
+            for name in expected:
+                without_annotation = re.sub(rf"@Test\s+(?=fun {re.escape(name)}\b)", "", text)
+                self.assertNotIn(name, annotated_methods(without_annotation, classname))
+            wrong_class = text.replace(declaration, "class UnrelatedTest", 1)
+            self.assertEqual(set(), annotated_methods(wrong_class, classname))
+            # Whole annotated source equality protects old methods without registering
+            # them as additional mandatory report identities.
+            self.assertTrue(protected.isdisjoint(EXPECTED_DASHBOARD_JVM[classname]))
+
     def test_request_boundary_keeps_single_owner_exact_cursor_and_explicit_reread_distinction(self):
         main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
         scan = (main / "history/CurrentHistoryRead.kt").read_text()
@@ -197,6 +220,28 @@ class DashboardContracts(unittest.TestCase):
         self.assertIn("controller.historySnapshots.collectAsState()", stored)
         self.assertNotRegex(root + stored, r"rememberSaveable|SQLiteHistory|usageForeground|Instant\.now")
         self.assertNotIn("historySnapshots.value", root + stored)
+        for host in (root, stored):
+            self.assertIn("remember(controller, source.generation)", host)
+            self.assertNotIn("remember(controller, authority?.generation", host)
+        controller = (main / "ConnectionController.kt").read_text()
+        self.assertIn("command(UsageForegroundCommand(observer, foreground))", controller)
+        self.assertIn("context: CoroutineContext = EmptyCoroutineContext", controller)
+        self.assertIn("AbstractCoroutineContextElement(Key)", controller)
+        for name in ("LaunchForegroundCheckpoint.kt", "UsageRefreshLifecycleTest.kt"):
+            ledger = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile" / name).read_text()
+            self.assertIn("context[UsageForegroundCommand]", ledger)
+            self.assertIn("typed.foreground" if name.startswith("Launch") else "ticket.foreground", ledger)
+            self.assertIn("submittedObservers", ledger)
+        capture = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/DashboardCapture.kt").read_text()
+        self.assertIn("observer.hold()", capture)
+        self.assertIn("finally { observer.release() }", capture)
+        self.assertIn("revalidate(frame, scenario, fixture.owner)", capture)
+        for begin, end in (("private fun window(", "private fun chart("), ("private fun chart(", "private fun save(")):
+            helper = capture[capture.index(begin):capture.index(end)]
+            self.assertIn("frame.current", helper)
+            self.assertNotIn("historySnapshots.value", helper)
+            self.assertNotIn("observer.currentFrame", helper)
+            self.assertNotIn("recordedHistory(owner", helper)
         strings = {
             x.get("name"): x.text or "" for x in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
         self.assertEqual(strings["drawer_history"], "full local history details")

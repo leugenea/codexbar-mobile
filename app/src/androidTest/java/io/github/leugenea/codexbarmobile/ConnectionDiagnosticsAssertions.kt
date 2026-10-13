@@ -12,7 +12,12 @@ import androidx.compose.ui.test.onNodeWithTag
 /** Match the retired dump's formats, not facts legitimately owned by live/banked/history UI. */
 internal fun assertConnectionHasNoDiagnosticDump(compose: ComposeTestRule) {
     compose.onNodeWithTag("connection-screen").assertExists()
-    compose.onNodeWithTag("live-usage").assertExists()
+    val routes = listOf("dashboard", "connection-history", "connection-details").filter {
+        compose.onAllNodes(hasTestTag(it), useUnmergedTree = true).fetchSemanticsNodes().size == 1
+    }
+    org.junit.Assert.assertEquals("Exactly one actual connection route is mounted", 1, routes.size)
+    compose.onNodeWithTag(routes.single(), useUnmergedTree = true).assertExists()
+    if (routes.single() == "connection-details") compose.onNodeWithTag("live-usage").assertExists()
     val connection = hasAnyAncestor(hasTestTag("connection-screen"))
     val dump = SemanticsMatcher("Retired feasibility diagnostic format") { node ->
         val labels = listOfNotNull(
