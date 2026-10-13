@@ -2,7 +2,9 @@
 
 ## Implemented application
 
-One Android phone app module, `io.github.leugenea.codexbarmobile`, launches
+One Android phone app module retains namespace `io.github.leugenea.codexbarmobile`.
+Debug installs as `io.github.leugenea.codexbarmobile.dev`; release retains the base
+applicationId. The unchanged full Activity class launches
 `MainActivity` via MAIN/LAUNCHER directly into the real `ConnectionScreen` dashboard.
 Disconnected, restoring/loading, reauthorization, error and unknown usage remain
 honest projections of the one process owner; no sample model or preview route is shipped.
@@ -19,7 +21,8 @@ No storage migration is needed for the retired ephemeral UI choices.
 
 The source manifest requests INTERNET only, with `usesCleartextTraffic="false"`.
 The exact merged/APK/installed allowlist also includes the existing AndroidX Core
-signature-only `io.github.leugenea.codexbarmobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`;
+signature-only `<reviewed applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`;
+closed debug/release expectations ground that name independently of inspected APKs;
 it is not another platform/network permission. Gates reject any missing or extra
 permission and any Network Security Config override. The manifest flag is sufficient
 for the current API 26 minimum / API 37 target; moving to target API 38 or adding
@@ -1239,3 +1242,9 @@ assembled acceptance retains the conditional gates above. Further providers, sig
 distribution remain separate future scope; sparse sampling is not verified-account or
 continuous background history.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
+
+Version/source identity comes from one VERSION target and a verified complete
+producer checkout/tag snapshot. Normal CI stays explicitly dev even at tagged HEAD.
+Unsigned release inventory binds actual compiled checkout/tree separately from PR
+source head, producer and exact bytes; it cannot authorize signing/publication.
+[Release boundaries](docs/release.md) describe the isolated development lineage.

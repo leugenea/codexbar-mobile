@@ -55,10 +55,28 @@ class ExecutionEvidenceTests(unittest.TestCase):
             log = Path(temporary) / 'SYNTHETIC-gradle.log'
             for graph in REQUIRED:
                 for state in ('SUCCESS', 'UP_TO_DATE'):
-                    log.write_text(successful_log(graph).replace('testDebugUnitTest SUCCESS', f'testDebugUnitTest {state}'))
+                    log.write_text(successful_log(graph).replace(f'{REQUIRED[graph][0]} SUCCESS', f'{REQUIRED[graph][0]} {state}'))
                     result = subprocess.run([sys.executable, '-B', str(ROOT / 'tools/build/verify_gradle_execution.py'),
                                              graph, str(log)], text=True, capture_output=True, timeout=5)
                     self.assertEqual(result.returncode == 0, state == 'SUCCESS', result.stdout + result.stderr)
+
+    def test_only_guarded_release_vital_pairs_allow_skip_with_real_matching_full_lint(self):
+        for vital, full in (('lintVitalRelease', 'lintRelease'), ('lintVitalReportRelease', 'lintReportRelease')):
+            extra = f'\nGATE_TASK_OUTCOME :app:{vital} SKIPPED\n> Task :app:{vital} SKIPPED'
+            self.assertEqual(validate(successful_log('release') + extra, 'release')[':app:' + vital], 'SKIPPED')
+            for state in ('FAILED', 'UP_TO_DATE', 'FROM_CACHE', 'SKIPPED', 'NO_SOURCE'):
+                with self.subTest(vital=vital, full=state), self.assertRaises(ValueError):
+                    validate(successful_log('release').replace(f'{full} SUCCESS', f'{full} {state}') + extra, 'release')
+            with self.assertRaises(ValueError):
+                validate(successful_log('native') + extra, 'native')
+            with self.assertRaises(ValueError):
+                validate(successful_log('release') + extra, 'release', 1)
+            for state in ('UP_TO_DATE', 'FROM_CACHE', 'NO_SOURCE'):
+                with self.assertRaises(ValueError):
+                    validate(successful_log('release') + extra.replace('SKIPPED', state), 'release')
+        for vital in ('lintVitalAnalyzeRelease', 'lintVitalDebug', 'lintVitalReportDebug'):
+            with self.assertRaises(ValueError):
+                validate(successful_log('release') + f'\nGATE_TASK_OUTCOME :app:{vital} SKIPPED', 'release')
 
     def test_duplicate_malformed_and_unknown_receipts_fail_closed(self):
         for extra in ('GATE_TASK_OUTCOME :app:testDebugUnitTest SUCCESS',
@@ -96,7 +114,7 @@ class LocalExecutionPolicyTests(unittest.TestCase):
         self.assertIn("apply from: rootProject.file('tools/build/always-execute.gradle')", app)
         self.assertIn('org.gradle.caching=true', properties.splitlines())
         for name in set(sum(REQUIRED.values(), ())):
-            if name not in ('lintAnalyzeDebug', 'lintAnalyzeDebugUnitTest', 'lintAnalyzeDebugAndroidTest', 'lintReportDebug', 'lintDebug'):
+            if not name.startswith('lint'):
                 self.assertIn("'" + name + "'", policy)
         for contract in ("task.name.startsWith('lint')", 'tasks.configureEach { task ->',
                          'task.outputs.upToDateWhen { false }',
@@ -197,11 +215,10 @@ class LocalExecutionPolicyTests(unittest.TestCase):
     def assert_codeql_cache_policy(self, settings):
         # Static source contract, not an executable Gradle or extractor-marker proof.
         source = re.sub(r'(?m)//[^\n]*', '', settings)
-        self.assertRegex(source, (
-            r"(?m)^if \(providers\.environmentVariable\('CODEQL_EXTRACTOR_JAVA_TRAP_DIR'\)"
-            r"\.isPresent\(\)\) \{\s*buildCache \{\s*local \{\s*enabled = false\s*\}\s*\}\s*\}"
-            r"\s*rootProject\.name"
-        ))
+        self.assertRegex(source, r"if \(providers\.environmentVariable\('CODEQL_EXTRACTOR_JAVA_TRAP_DIR'\)\.orElse\(''\)\.get\(\)\.trim\(\)\) \{")
+        self.assertIn("'tools/build/complete_codeql_checkout.py', '--mode', 'managed'", source)
+        self.assertLess(source.index('complete_codeql_checkout.py'), source.index('buildCache'))
+        self.assertRegex(source, r"buildCache \{\s*local \{\s*enabled = false\s*\}\s*\}\s*\}\s*rootProject\.name")
         self.assertEqual(re.findall(r'\b(buildCache|local)\s*\{', source), ['buildCache', 'local'])
         self.assertEqual(re.findall(r'\benabled\s*=\s*\w+', source), ['enabled = false'])
         self.assertNotIn('startParameter', source)
@@ -214,7 +231,7 @@ class LocalExecutionPolicyTests(unittest.TestCase):
 
     def test_codeql_cache_guard_removal_or_reversal_fails_contract(self):
         settings = (ROOT / 'settings.gradle').read_text()
-        guard = "if (providers.environmentVariable('CODEQL_EXTRACTOR_JAVA_TRAP_DIR').isPresent()) {"
+        guard = "if (providers.environmentVariable('CODEQL_EXTRACTOR_JAVA_TRAP_DIR').orElse('').get().trim()) {"
         for old, new in ((guard, 'if (true) {'),
                          (guard, guard.replace('if (', 'if (!', 1)),
                          ('CODEQL_EXTRACTOR_JAVA_TRAP_DIR', 'GITHUB_ACTIONS'),

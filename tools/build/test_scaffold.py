@@ -267,7 +267,7 @@ class ToolchainContract(unittest.TestCase):
             self.assertIn(flag, strict)
         self.assertNotIn("--rerun-tasks", strict)
         self.assertNotIn("--no-build-cache", strict)
-        for task in ("lintDebug", "assembleDebug", "compileDebugUnitTestKotlin",
+        for task in ("writeBuildIdentity", "lintRelease", "assembleRelease", "lintDebug", "assembleDebug", "compileDebugUnitTestKotlin",
                      "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest"):
             self.assertIn(":app:" + task, strict)
         self.assertIn("verify_manifests.py", strict)
@@ -276,7 +276,10 @@ class ToolchainContract(unittest.TestCase):
 
     def assert_real_output_uploads(self, workflow):
         build, native = workflow.split("  instrumented:\n", 1)
-        self.assertIn("fetch-depth: 2", build)
+        self.assertIn("fetch-depth: 0", build)
+        self.assertIn("fetch-tags: true", build)
+        self.assertIn("fetch-depth: 0", native)
+        self.assertIn("fetch-tags: true", native)
         for body, name in ((build, "android-build"), (native, "android-instrumented")):
             steps = re.split(r"(?m)^      - ", body)[1:]
             uploads = [step for step in steps if "uses: actions/upload-artifact@" in step]
@@ -303,7 +306,7 @@ class ToolchainContract(unittest.TestCase):
         for old, new in (("app/build/reports/", "unused/reports/"),
                          ("app/build/outputs/code_coverage/", "unused/coverage/"),
                          ("        if: always()", "        if: success()"),
-                         ("fetch-depth: 2", "fetch-depth: 1")):
+                         ("fetch-depth: 0", "fetch-depth: 1")):
             with self.subTest(mutation=old), self.assertRaises(AssertionError):
                 self.assert_real_output_uploads(workflow.replace(old, new, 1))
 

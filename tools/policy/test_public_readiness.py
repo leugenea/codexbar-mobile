@@ -10,7 +10,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 GUIDES = ("README.md", "CONTRIBUTING.md", "SECURITY.md", "THIRD_PARTY_NOTICES.md",
-          "AGENTS.md", "ARCHITECTURE.md", "docs/repository-protection.md")
+          "AGENTS.md", "ARCHITECTURE.md", "docs/repository-protection.md", "docs/release.md")
 FORMS = (".github/ISSUE_TEMPLATE/bug.yml", ".github/ISSUE_TEMPLATE/feature.yml")
 PR_TEMPLATE = ".github/PULL_REQUEST_TEMPLATE.md"
 CONFIG = ".github/ISSUE_TEMPLATE/config.yml"
@@ -18,7 +18,7 @@ REQUIRED_FILES = GUIDES + FORMS + (PR_TEMPLATE, CONFIG, ".gitignore", "LICENSE")
 LINK = re.compile(r"\[[^\]\n]+\]\(([^)\s]+)\)")
 SECRET = re.compile(r"\b(?:tokens?|passwords?|device[ _-]?codes?|raw[ _-]?account[ _-]?data)\b", re.I)
 # AGP-provided tasks are declared via the Android plugin/variant, not tasks.register.
-ANDROID_TASKS = {"assembleDebug", "lintDebug", "testDebugUnitTest", "processReleaseManifest",
+ANDROID_TASKS = {"assembleRelease", "lintRelease", "assembleDebug", "lintDebug", "testDebugUnitTest", "processReleaseManifest",
                  "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
                  "assembleDebugAndroidTest", "connectedDebugAndroidTest"}
 REQUIRED_CHECK_CONTEXTS = {("android.yml", "Android CI result"),

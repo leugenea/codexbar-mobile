@@ -14,7 +14,12 @@ dependencyResolutionManagement {
 }
 
 // CodeQL must observe compilation, not restore compiled outputs.
-if (providers.environmentVariable('CODEQL_EXTRACTOR_JAVA_TRAP_DIR').isPresent()) {
+if (providers.environmentVariable('CODEQL_EXTRACTOR_JAVA_TRAP_DIR').orElse('').get().trim()) {
+    // Explicit preparation precedes app identity; repeated clean/assemble rechecks local evidence.
+    providers.exec {
+        workingDir settingsDir
+        commandLine 'python3', '-B', 'tools/build/complete_codeql_checkout.py', '--mode', 'managed'
+    }.result.get().assertNormalExitValue()
     buildCache {
         local {
             enabled = false

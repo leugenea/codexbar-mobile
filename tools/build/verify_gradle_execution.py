@@ -3,12 +3,13 @@ import argparse
 from pathlib import Path
 import re
 
-COMMON = ('verifyResolvedToolchain', 'prepareDebugCoverage', 'testDebugUnitTest')
+COMMON = ('writeBuildIdentity', 'verifyResolvedToolchain', 'prepareDebugCoverage', 'testDebugUnitTest')
 LINT = ('lintAnalyzeDebug', 'lintAnalyzeDebugUnitTest', 'lintAnalyzeDebugAndroidTest',
         'lintReportDebug', 'lintDebug')
 NATIVE = ('connectedDebugAndroidTest', 'collectDebugCoverageInputs', 'jacocoDebugReport',
           'jacocoDebugCoverageVerification')
-REQUIRED = {'build': COMMON + LINT, 'native': COMMON + NATIVE}
+RELEASE = ('writeBuildIdentity', 'verifyResolvedToolchain', 'lintAnalyzeRelease', 'lintReportRelease', 'lintRelease')
+REQUIRED = {'build': COMMON + LINT + RELEASE[2:], 'native': COMMON + NATIVE, 'release': RELEASE}
 STATES = {'SUCCESS', 'FAILED', 'FROM_CACHE', 'UP_TO_DATE', 'SKIPPED', 'NO_SOURCE'}
 
 
@@ -27,9 +28,11 @@ def outcomes(log):
     return observed
 
 
-def reject_reused_headers(log, protected):
+def reject_reused_headers(log, protected, suppressed=frozenset()):
     # A stale/success receipt cannot hide a reuse banner in the full --info log.
     for path, state in re.findall(r'^> Task (:\S+) (FROM-CACHE|UP-TO-DATE|SKIPPED|NO-SOURCE)$', log, re.M):
+        if state == 'SKIPPED' and path in suppressed:
+            continue
         if path in protected or path.startswith(':app:lint'):
             raise ValueError(f'Gate task header shows reuse/skip: {path} {state}')
 
@@ -44,10 +47,21 @@ def validate(log, graph, graph_exit=0):
     missing = required - observed.keys()
     if missing:
         raise ValueError(f'Missing gate outcomes: {sorted(missing)}')
+    suppressed = set()
+    # The applied listener enforces disabled AGP report/text runtime types and
+    # same-graph enabled full lint before permitting these terminal outcomes.
+    # Full-log success must additionally prove that matching full lint executed.
+    if graph_exit == 0:
+        for vital, full in (('lintVitalRelease', 'lintRelease'), ('lintVitalReportRelease', 'lintReportRelease')):
+            path = ':app:' + vital
+            if observed.get(path) == 'SKIPPED' and observed.get(':app:' + full) == 'SUCCESS':
+                suppressed.add(path)
     for path, state in observed.items():
+        if path in suppressed:
+            continue
         if state != 'SUCCESS' and not (graph_exit != 0 and state == 'FAILED'):
             raise ValueError(f'Gate did not execute successfully: {path} {state}')
-    reject_reused_headers(log, required | observed.keys())
+    reject_reused_headers(log, required | observed.keys(), suppressed)
     return observed
 
 

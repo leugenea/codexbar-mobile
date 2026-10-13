@@ -13,7 +13,7 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-from verify_manifests import (APP_PERMISSIONS, PACKAGE, RECEIVER_PERMISSION, SOURCE_PERMISSIONS, check_apk_dump,
+from verify_manifests import (APP_PERMISSIONS, PACKAGE, NAMESPACE, MAIN_ACTIVITY, RECEIVER_PERMISSION, SOURCE_PERMISSIONS, check_apk_dump,
                               check_installed_dump, check_installed_path, check_manifest, check_permissions,
                               check_source_manifests)
 from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
@@ -383,7 +383,7 @@ class WorkflowContracts(unittest.TestCase):
                          "diagnostic-screen.png", "logcat-live.txt", "project-sdk-before.sha256",
                          "system-images;android-36;google_apis;x86_64", "--channel=0",
                          "aapt\" dump permissions", "aapt\" dump xmltree",
-                         "shell dumpsys package io.github.leugenea.codexbarmobile",
+                         "shell dumpsys package io.github.leugenea.codexbarmobile.dev",
                          "verify_manifests.py --apk-permissions", "--apk-xmltree", "--installed-package"):
             self.assertIn(contract, script)
         for unsafe in ("--dependency-verification off", "--write-verification-metadata", "testInstrumentationRunnerArguments",
@@ -476,11 +476,11 @@ class WorkflowContracts(unittest.TestCase):
                            "--gradle-user-home", " -g "):
                 self.assertNotIn(unsafe, command)
         self.assertEqual(re.findall(r":app:(\w+)", strict), [
-            "verifyResolvedToolchain", "lintDebug", "assembleDebug", "processReleaseManifest", "compileDebugUnitTestKotlin",
+            "verifyResolvedToolchain", "writeBuildIdentity", "lintRelease", "assembleRelease", "lintDebug", "assembleDebug", "processReleaseManifest", "compileDebugUnitTestKotlin",
             "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest",
         ])
         self.assertEqual(re.findall(r":app:(\w+)", connected), [
-            "verifyResolvedToolchain", "processReleaseManifest", "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
+            "verifyResolvedToolchain", "writeBuildIdentity", "processReleaseManifest", "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
             "testDebugUnitTest", "connectedDebugAndroidTest", "jacocoDebugCoverageVerification",
         ])
         self.assertIn('${GRADLE_USER_HOME:?}', script)
@@ -1010,7 +1010,7 @@ class SyntheticReportTests(unittest.TestCase):
                 '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
                 '</application></manifest>')
 
-    def synthetic_apk_activity(self, name=PACKAGE + ".MainActivity"):
+    def synthetic_apk_activity(self, name=MAIN_ACTIVITY):
         return ('    E: activity (line=5)\n'
                 f'      A: android:name(0x01010003)="{name}"\n'
                 '      A: android:launchMode(0x0101001d)=(type 0x10)0x2\n')
@@ -1020,7 +1020,7 @@ class SyntheticReportTests(unittest.TestCase):
         for permissions in (SOURCE_PERMISSIONS, APP_PERMISSIONS):
             valid = self.synthetic_manifest(permissions)
             activity = '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
-            for name in ('.MainActivity', 'MainActivity', PACKAGE + '.MainActivity'):
+            for name in ('.MainActivity', 'MainActivity', MAIN_ACTIVITY):
                 manifest.write_text(valid.replace('.MainActivity', name))
                 self.assertEqual(check_manifest(manifest, permissions)['mainActivityLaunchMode'], 'singleTask')
             mutations = [
@@ -1051,7 +1051,7 @@ class SyntheticReportTests(unittest.TestCase):
                   '  E: application (line=4)\n'
                   '    A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0x0\n')
         activity = self.synthetic_apk_activity()
-        for name in ('.MainActivity', 'MainActivity', PACKAGE + '.MainActivity'):
+        for name in ('.MainActivity', 'MainActivity', MAIN_ACTIVITY):
             self.assertEqual(check_apk_dump(permissions, prefix + self.synthetic_apk_activity(name)), sorted(APP_PERMISSIONS))
         for tree, error in (
             (prefix, 'singleTask'),
@@ -1069,11 +1069,28 @@ class SyntheticReportTests(unittest.TestCase):
                 check_apk_dump(permissions, tree)
 
     def write_synthetic_manifest_tree(self):
+        from test_release_identity import fixture_identity
+        identity = fixture_identity()
+        (self.directory / 'identity.json').write_text(json.dumps(identity))
+        def generated(variant):
+            package = PACKAGE if variant == 'debug' else NAMESPACE
+            permission = package + '.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+            text = self.synthetic_manifest().replace(RECEIVER_PERMISSION, permission)
+            text = text.replace('<manifest ', f'<manifest package="{package}" android:versionName="{identity["versionName"]}" android:versionCode="41" ', 1)
+            text = text.replace('android:usesCleartextTraffic="false"',
+                'android:usesCleartextTraffic="false" android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:debuggable="' + ('true' if variant == 'debug' else 'false') + '"')
+            text = text.replace('<activity android:name=".MainActivity" android:launchMode="singleTask"/>',
+                '<activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>')
+            for key, value in (('SOURCE_REVISION', identity['sourceSha']), ('SOURCE_TREE', identity['sourceTree']), ('BUILD_CHANNEL', 'dev')):
+                text = text.replace('</application>', f'<meta-data android:name="{NAMESPACE}.{key}" android:value="{value}"/></application>')
+            return text
         files = {
             'app/src/main/AndroidManifest.xml': self.synthetic_manifest(SOURCE_PERMISSIONS),
-            'app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml': self.synthetic_manifest(),
-            'app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml': self.synthetic_manifest(),
+            'app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml': generated('debug'),
+            'app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml': generated('release'),
             'tools/build/verify_manifests.py': (ROOT / 'tools/build/verify_manifests.py').read_text(),
+            'tools/build/release_identity.py': (ROOT / 'tools/build/release_identity.py').read_text(),
+            'tools/build/complete_codeql_checkout.py': (ROOT / 'tools/build/complete_codeql_checkout.py').read_text(),
         }
         for name, text in files.items():
             path = self.directory / name
@@ -1081,7 +1098,7 @@ class SyntheticReportTests(unittest.TestCase):
             path.write_text(text)
 
     def run_manifest_cli(self):
-        return subprocess.run([sys.executable, '-B', 'tools/build/verify_manifests.py'],
+        return subprocess.run([sys.executable, '-B', 'tools/build/verify_manifests.py', '--identity', 'identity.json'],
                               cwd=self.directory, text=True, capture_output=True, timeout=5)
 
     def test_normal_manifest_cli_requires_and_checks_release(self):
@@ -1170,7 +1187,13 @@ class SyntheticReportTests(unittest.TestCase):
                 '    A: android:protectionLevel(0x01010009)=(type 0x11)0x2\n'
                 '  E: application (line=2)\n    A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0x0\n'
                 + self.synthetic_apk_activity())
-        dump = f'  Package [{PACKAGE}] (synthetic):\n    requested permissions:\n' + ''.join(
+        tree = ('E: manifest (line=0)\n  A: package=\"' + PACKAGE + '\"\n  A: android:versionName(0x0101021c)=\"0.1.0-dev.7+g' + 'a' * 12 + '\"\n  A: android:versionCode(0x0101021b)=(type 0x10)0x29\n' + tree)
+        tree = tree.replace('    A: android:usesCleartextTraffic', '    A: android:allowBackup(0x01010280)=(type 0x12)0x0\n    A: android:debuggable(0x0101000f)=(type 0x12)0xffffffff\n    A: android:fullBackupContent(0x010104eb)=@0x7f010001\n    A: android:dataExtractionRules(0x0101064e)=@0x7f010002\n    A: android:usesCleartextTraffic')
+        tree = tree.replace('      A: android:launchMode', '      A: android:exported(0x01010010)=(type 0x12)0xffffffff\n      A: android:launchMode')
+        tree += '      E: intent-filter (line=6)\n        E: action (line=7)\n          A: android:name(0x01010003)=\"android.intent.action.MAIN\"\n        E: category (line=8)\n          A: android:name(0x01010003)=\"android.intent.category.LAUNCHER\"\n'
+        for index, (key, value) in enumerate((('SOURCE_REVISION', 'a' * 40), ('SOURCE_TREE', 'b' * 40), ('BUILD_CHANNEL', 'dev')), 9):
+            tree += f'    E: meta-data (line={index})\n      A: android:name(0x01010003)=\"{NAMESPACE}.{key}\"\n      A: android:value(0x01010024)=\"{value}\"\n'
+        dump = f'  Package [{PACKAGE}] (synthetic):\n    versionName=0.1.0-dev.7+g' + 'a' * 12 + '\n    versionCode=41 minSdk=26\n    requested permissions:\n' + ''.join(
             f'      {name}\n' for name in sorted(APP_PERMISSIONS)) + '    install permissions:\n'
         if mutation == 'extra-installed-permission':
             dump = dump.replace('    install permissions:', '      android.permission.CAMERA\n    install permissions:')
@@ -1212,7 +1235,7 @@ elif args[0] == 'uninstall':
 else:
     sys.exit(99)
 ''',
-            'bin/python3': common + f'os.execv({sys.executable!r}, [{sys.executable!r}] + args)\n',
+            'bin/python3': common + f'if args[0] == "tools/build/verify_manifests.py": args += ["--identity", "identity.json"]\nos.execv({sys.executable!r}, [{sys.executable!r}] + args)\n',
         }
         for name, text in tools.items():
             path = sdk / name
@@ -1251,7 +1274,7 @@ else:
         digest = (self.directory / 'evidence/native/inspected-apk.sha256').read_text().split()[0]
         apk = self.directory / 'app/build/outputs/apk/debug/app-debug.apk'
         self.assertEqual(digest, hashlib.sha256(apk.read_bytes()).hexdigest())
-        self.assertEqual(events[5], 'tools/build/verify_manifests.py --installed-path evidence/native/installed-package-path.txt')
+        self.assertEqual(events[5], 'tools/build/verify_manifests.py --installed-path evidence/native/installed-package-path.txt --variant debug')
         self.assertIn('--installed-package evidence/native/installed-package.txt', events[7])
 
     def test_installed_observation_fails_closed_and_preserves_graph_error(self):

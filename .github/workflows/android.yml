@@ -17,7 +17,7 @@ jobs:
   build:
     name: Build, lint and unit tests (strict dependency verification)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       # runner.temp is unavailable in job env; keep the cache outside checkout.
       GRADLE_USER_HOME: ${{ github.workspace }}/../android-gradle-build
@@ -26,9 +26,13 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 0
+          fetch-tags: true
       - name: Initialize build diagnostics
         run: mkdir -p evidence
+      - name: Acquire exact hosted source and tag snapshot
+        timeout-minutes: 5
+        run: python3 -B tools/build/complete_codeql_checkout.py --mode normal
       - name: Prepare hash-pinned offline parser environment
         timeout-minutes: 5
         run: |
@@ -112,8 +116,9 @@ jobs:
           set -o pipefail
           set +e
           ./gradlew --no-daemon --dependency-verification strict --build-cache --no-configuration-cache \
-            --stacktrace --info --console=plain --continue \
+            --stacktrace --info --console=plain --continue -PreleaseChannel=dev \
             -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
+            :app:writeBuildIdentity :app:lintRelease :app:assembleRelease \
             :app:lintDebug :app:assembleDebug :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
             :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
             2>&1 | tee evidence/strict.log | bash tools/build/filter-gradle-console.sh
@@ -126,6 +131,13 @@ jobs:
           python3 tools/build/verify_gradle_execution.py build evidence/strict.log
           python3 tools/build/verify_manifests.py
           python3 tools/build/verify_test_reports.py jvm
+      - name: Upload preparation for verified unsigned release fixtures
+        timeout-minutes: 45
+        run: |
+          set -euo pipefail
+          python3 -B tools/build/verify_release_payload.py create --identity evidence/build-identity.json \
+            --apk app/build/outputs/apk/release/app-release-unsigned.apk --output evidence/unsigned-release
+          timeout --signal=TERM --kill-after=30s 42m bash tools/build/run-hosted-release-fixtures.sh
       - name: Upload build logs and outputs (all outcomes)
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -155,6 +167,11 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Acquire exact native source and tag snapshot
+        timeout-minutes: 5
+        run: python3 -B tools/build/complete_codeql_checkout.py --mode normal
       - name: Initialize native diagnostics
         run: |
           mkdir -p evidence/native

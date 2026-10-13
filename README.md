@@ -6,6 +6,8 @@ unofficial and identity unverified.**
 
 ## What works today
 
+- Compact dashboard with both current usage windows, collapsed banked-reset disclosure,
+  and a drawer for full local-history and live-connection details.
 - Default connection/live screen with truthful disconnected, loading, reauthorization,
   error and unknown states; recreation keeps the same process owner.
 - Connection controls: connect/cancel, fixed system-browser device login,
@@ -97,7 +99,10 @@ contract exercises actual Keystore/SQLite with synthetic transport and fresh-run
 restoration, not literal process death or verified provider identity. There is no
 verified-account history, background refresh service, widget
 or signed production release. CI debug APKs are test outputs, not signed release
-deliverables. Minimum Android version is Android 8.0 (API 26).
+deliverables. CI also builds a verified unsigned release packaging fixture; it is
+non-distributable and has no official counter or signing admission. See
+[release identity and installation boundaries](docs/release.md). Minimum Android
+version is Android 8.0 (API 26).
 
 The app declares INTERNET, with cleartext traffic explicitly disabled.
 Explicit connection is the only entry into the
@@ -112,12 +117,10 @@ not grant service access or promise that a mobile integration will be supported.
 ## Build and contribute
 
 Start with [CONTRIBUTING](CONTRIBUTING.md) for toolchain setup, quick checks,
-strict dependency updates and hosted acceptance. With the documented JDK/SDK
-prerequisites, a local debug build is:
-
-```sh
-./gradlew --no-daemon --dependency-verification strict :app:assembleDebug
-```
+strict dependency updates and hosted acceptance. Versioned builds require committed
+source and a verified producer acquisition of complete history/tags. CI explicitly
+uses development identity for both debug and unsigned release packaging. An
+ordinary resolver never fetches history or invents identity on failure.
 
 Use GitHub Actions for emulator/instrumented tests; do not run them on the NAS.
 Documentation-only changes still receive all declared PR gates.

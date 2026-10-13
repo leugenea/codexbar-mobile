@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import com.android.build.api.artifact.ScopedArtifact
 import com.android.build.api.variant.ScopedArtifacts
 import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import java.security.MessageDigest
 import java.util.zip.ZipFile
 import javax.inject.Inject
@@ -171,6 +172,33 @@ abstract class DebugCoverageInputs extends DefaultTask {
 }
 
 
+// One read-only resolver consumes the explicit producer acquisition. No tag auto-channel.
+def identityChannel = providers.gradleProperty('releaseChannel').orElse('dev').get()
+def identityCommand = ['python3', '-B', 'tools/build/release_identity.py', 'resolve',
+    '--channel', identityChannel]
+['releaseTag': '--tag', 'releaseSourceSha': '--source-sha', 'releaseCounter': '--release-counter',
+ 'releasePriorIdentity': '--prior-identity'].each { property, option ->
+    if (providers.gradleProperty(property).isPresent()) {
+        identityCommand.addAll([option, providers.gradleProperty(property).get()])
+    }
+}
+def identityRerun = providers.gradleProperty('releaseRerun').orElse('false').get()
+if (!(identityRerun in ['true', 'false'])) throw new GradleException('Invalid explicit releaseRerun flag')
+if (identityRerun == 'true') identityCommand.add('--rerun')
+def identityOutput = providers.exec {
+    workingDir rootProject.projectDir
+    commandLine identityCommand
+}
+def buildIdentity = new JsonSlurper().parseText(identityOutput.standardOutput.asText.get())
+identityOutput.result.get().assertNormalExitValue()
+def writeIdentity = tasks.register('writeBuildIdentity') {
+    doLast {
+        def output = rootProject.file('evidence/build-identity.json')
+        output.parentFile.mkdirs()
+        output.text = JsonOutput.toJson(buildIdentity) + '\n'
+    }
+}
+
 android {
     namespace 'io.github.leugenea.codexbarmobile'
     compileSdk {
@@ -182,15 +210,22 @@ android {
         applicationId 'io.github.leugenea.codexbarmobile'
         minSdk 26
         targetSdk 37
-        versionCode 1
-        versionName '0.1.0'
+        versionCode (buildIdentity.versionCode as int)
+        versionName buildIdentity.versionName
+        manifestPlaceholders = [sourceRevision: buildIdentity.sourceSha, sourceTree: buildIdentity.sourceTree,
+            buildChannel: buildIdentity.channel]
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     testCoverage { jacocoVersion = '0.8.15' }
     buildTypes {
         debug {
+            applicationIdSuffix '.dev'
             enableUnitTestCoverage = true
             enableAndroidTestCoverage = true
+        }
+        release {
+            debuggable false
+            signingConfig = null
         }
     }
     buildFeatures {
@@ -335,5 +370,12 @@ gradle.taskGraph.afterTask { task, state ->
         def outcome = state.failure ? 'FAILED' : state.noSource ? 'NO_SOURCE' :
             state.upToDate ? 'UP_TO_DATE' : state.skipped ? 'SKIPPED' : 'SUCCESS'
         logger.lifecycle("COVERAGE_TASK_OUTCOME ${task.path} ${outcome}")
+    }
+}
+
+// Tagged A1 builds are isolated release fixtures, never debug/test identities.
+gradle.taskGraph.whenReady { graph ->
+    if (identityChannel != 'dev' && graph.allTasks.any { it.project == project && it.name.contains('Debug') }) {
+        throw new GradleException('RC/stable fixture identity is release-only')
     }
 }

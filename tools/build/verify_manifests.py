@@ -8,8 +8,10 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 ANDROID = "{http://schemas.android.com/apk/res/android}"
 TOOLS = "{http://schemas.android.com/tools}"
-PACKAGE = "io.github.leugenea.codexbarmobile"
-MAIN_ACTIVITY = PACKAGE + ".MainActivity"
+NAMESPACE = "io.github.leugenea.codexbarmobile"
+PACKAGE = NAMESPACE + ".dev"  # Default synthetic/debug API expectation, never APK-derived.
+MAIN_ACTIVITY = NAMESPACE + ".MainActivity"
+VARIANTS = {"debug": PACKAGE, "release": NAMESPACE}
 RECEIVER_PERMISSION = PACKAGE + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
 SOURCE_PERMISSIONS = frozenset({"android.permission.INTERNET"})
 # androidx.core 1.18.0 already contributes this signature-only receiver permission.
@@ -51,8 +53,8 @@ def check_source_manifests(root: Path) -> dict:
 
 def activity_name(name: str) -> str:
     if name.startswith("."):
-        return PACKAGE + name
-    return name if "." in name else PACKAGE + "." + name
+        return NAMESPACE + name
+    return name if "." in name else NAMESPACE + "." + name
 
 
 def check_process_owner(application, path: Path) -> None:
@@ -64,7 +66,11 @@ def check_process_owner(application, path: Path) -> None:
         raise ValueError(f"MainActivity must declare singleTask launch mode: {path}")
 
 
-def check_manifest(path: Path, expected=APP_PERMISSIONS) -> dict:
+def check_manifest(path: Path, expected=None, *, variant="debug", identity=None) -> dict:
+    package, receiver, variant_permissions = variant_policy(variant)
+    expected = variant_permissions if expected is None else expected
+    if expected not in (SOURCE_PERMISSIONS, variant_permissions):
+        raise ValueError("Permissions must come from reviewed source/variant")
     manifest = ET.parse(path).getroot()
     if manifest.tag != "manifest":
         raise ValueError(f"Not an Android manifest: {path}")
@@ -74,7 +80,7 @@ def check_manifest(path: Path, expected=APP_PERMISSIONS) -> dict:
         raise ValueError(f"Conditional manifest permission: {path}")
     permissions = check_permissions((node.get(ANDROID + "name") for node in nodes), expected)
     declarations = manifest.findall("permission")
-    expected_declarations = {RECEIVER_PERMISSION} if expected == APP_PERMISSIONS else set()
+    expected_declarations = {receiver} if expected != SOURCE_PERMISSIONS else set()
     if ({node.get(ANDROID + "name") for node in declarations} != expected_declarations
             or any(node.get(ANDROID + "protectionLevel") != "signature" for node in declarations)):
         raise ValueError(f"Permission declarations must preserve the signature-only receiver: {path}")
@@ -83,6 +89,8 @@ def check_manifest(path: Path, expected=APP_PERMISSIONS) -> dict:
             or applications[0].get(ANDROID + "networkSecurityConfig") is not None):
         raise ValueError(f"Cleartext must be explicitly disabled without a policy override: {path}")
     check_process_owner(applications[0], path)
+    if identity is not None:
+        check_generated_policy(manifest, variant, identity)
     return {"manifest": str(path), "requestedPermissions": permissions, "cleartextPermitted": False,
             "mainActivityLaunchMode": "singleTask", "defaultProcessOnly": True}
 
@@ -119,8 +127,9 @@ def check_apk_process_owner(xmltree: str) -> None:
         raise ValueError("APK MainActivity must declare singleTask launch mode")
 
 
-def check_apk_dump(permissions: str, xmltree: str) -> list[str]:
-    if not re.search(r"(?m)^package: " + re.escape(PACKAGE) + r"\s*$", permissions):
+def check_apk_dump(permissions: str, xmltree: str, *, variant="debug", identity=None) -> list[str]:
+    package, receiver, expected = variant_policy(variant)
+    if not re.search(r"(?m)^package: " + re.escape(package) + r"\s*$", permissions):
         raise ValueError("Missing APK package identity")
     names = []
     for line in permissions.splitlines():
@@ -129,7 +138,7 @@ def check_apk_dump(permissions: str, xmltree: str) -> list[str]:
             if not match or "maxSdkVersion" in line:
                 raise ValueError("Malformed or conditional APK permission")
             names.append(match[1])
-    result = check_permissions(names)
+    result = check_permissions(names, expected)
     declarations = []
     # aapt XML-tree elements are nested by indentation; read only each declaration.
     lines = xmltree.splitlines()
@@ -146,21 +155,24 @@ def check_apk_dump(permissions: str, xmltree: str) -> list[str]:
         block = "\n".join(attributes)
         name = re.findall(r'android:name\([^\n]*?\)="([^"]+)"', block)
         signature = re.findall(r"android:protectionLevel\([^\n]*?\)=\(type 0x11\)0x2[ \t]*$", block, re.M)
-        if name != [RECEIVER_PERMISSION] or len(signature) != 1:
+        if name != [receiver] or len(signature) != 1:
             raise ValueError("APK receiver permission must remain signature-only")
         declarations.append(name[0])
-    if declarations != [RECEIVER_PERMISSION]:
+    if declarations != [receiver]:
         raise ValueError("APK receiver permission declaration missing or unexpected")
     cleartext = re.findall(r"(?m)^\s*A: android:usesCleartextTraffic\([^\n]*", xmltree)
     if (len(cleartext) != 1 or not re.search(r"=\(type 0x12\)0x0\s*$", cleartext[0])
             or "android:networkSecurityConfig(" in xmltree):
         raise ValueError("APK cleartext policy must be explicitly false without an override")
     check_apk_process_owner(xmltree)
+    if identity is not None:
+        check_apk_identity(xmltree, variant, identity)
     return result
 
 
-def check_installed_dump(text: str) -> list[str]:
-    if len(re.findall(r"(?m)^\s*Package \[" + re.escape(PACKAGE) + r"\]", text)) != 1:
+def check_installed_dump(text: str, *, variant="debug", identity=None) -> list[str]:
+    package, _, expected = variant_policy(variant)
+    if len(re.findall(r"(?m)^\s*Package \[" + re.escape(package) + r"\]", text)) != 1:
         raise ValueError("Missing installed package identity")
     sections = re.findall(r"(?m)^([ \t]*)requested permissions:[ \t]*$", text)
     if len(sections) != 1:
@@ -175,18 +187,174 @@ def check_installed_dump(text: str) -> list[str]:
         if len(line) - len(line.lstrip()) <= indent:
             break
         names.append(line.strip())
-    result = check_permissions(names)
+    result = check_permissions(names, expected)
+    if identity is not None:
+        names = re.findall(r"(?m)^\s*versionName=(\S+)\s*$", text)
+        codes = re.findall(r"(?m)^\s*versionCode=(\d+)\b", text)
+        if names != [identity["versionName"]] or codes != [str(identity["versionCode"])]:
+            raise ValueError("Installed version/source identity mismatch")
     # dumpsys does not expose FLAG_USES_CLEARTEXT_TRAFFIC in its flag-name table.
     # Installed cleartext/protection-level observations are asserted by androidTest.
     return result
 
 
-def check_installed_path(text: str) -> None:
+def check_installed_path(text: str, *, variant="debug") -> None:
+    package, _, _ = variant_policy(variant)
     paths = text.splitlines()
-    pattern = (r"package:/data/app/(?:[^/\s]+/)*" + re.escape(PACKAGE)
+    pattern = (r"package:/data/app/(?:[^/\s]+/)*" + re.escape(package)
                + r"-[^/\s]+/(?:base|split_[^/\s]+)\.apk")
     if not paths or any(not re.fullmatch(pattern, path) for path in paths):
         raise ValueError("Missing or wrong installed package path")
+
+
+
+def variant_policy(variant):
+    if variant not in VARIANTS:
+        raise ValueError("Unknown reviewed variant")
+    package = VARIANTS[variant]
+    receiver = package + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+    return package, receiver, SOURCE_PERMISSIONS | {receiver}
+
+
+def source_metadata(identity):
+    return {NAMESPACE + ".SOURCE_REVISION": identity["sourceSha"],
+            NAMESPACE + ".SOURCE_TREE": identity["sourceTree"],
+            NAMESPACE + ".BUILD_CHANNEL": identity["channel"]}
+
+
+def check_generated_policy(manifest, variant, identity):
+    package, _, _ = variant_policy(variant)
+    if (manifest.get("package") != package or manifest.get(ANDROID + "versionName") != identity["versionName"]
+            or manifest.get(ANDROID + "versionCode") != str(identity["versionCode"])):
+        raise ValueError("Generated package/version identity mismatch")
+    app = manifest.find("application")
+    if app.get(ANDROID + "allowBackup") != "false":
+        raise ValueError("Backup must remain disabled")
+    for key, value in (("fullBackupContent", "@xml/backup_rules"), ("dataExtractionRules", "@xml/data_extraction_rules")):
+        if app.get(ANDROID + key) != value:
+            raise ValueError("Backup policy resource reference mismatch")
+    if app.get(ANDROID + "debuggable", "false") != ("true" if variant == "debug" else "false"):
+        raise ValueError("Wrong variant debuggability")
+    if app.get(ANDROID + "testOnly", "false") != "false" or manifest.findall("instrumentation"):
+        raise ValueError("App must exclude instrumentation/testOnly")
+    metadata = [(node.get(ANDROID + "name"), node.get(ANDROID + "value")) for node in app.findall("meta-data")]
+    for key, value in source_metadata(identity).items():
+        if [item[1] for item in metadata if item[0] == key] != [value]:
+            raise ValueError("Generated source/channel metadata mismatch")
+    check_release_components([(node.tag, node.get(ANDROID + "name", "")) for node in app], variant)
+    activities = [node for node in app.findall("activity") if activity_name(node.get(ANDROID + "name", "")) == MAIN_ACTIVITY]
+    if len(activities) != 1 or activities[0].get(ANDROID + "exported") != "true":
+        raise ValueError("Production launcher must remain exported")
+    filters = activities[0].findall("intent-filter")
+    launcher = [node for node in filters if any(c.get(ANDROID + "name") == "android.intent.category.LAUNCHER" for c in node.findall("category"))]
+    if len(launcher) != 1 or [n.get(ANDROID + "name") for n in launcher[0].findall("action")] != ["android.intent.action.MAIN"]:
+        raise ValueError("Production MAIN/LAUNCHER mismatch")
+
+
+def check_release_components(components, variant):
+    if variant == "release":
+        activities = [activity_name(name) for tag, name in components if tag in ("activity", "activity-alias")]
+        if activities != [MAIN_ACTIVITY]:
+            raise ValueError("Release excludes debug/test Activity components")
+        if any(name.startswith(("androidx.test.", "androidx.compose.ui.test.")) for _, name in components):
+            raise ValueError("Release excludes test components")
+
+
+def tree_attribute(block, key, *, string=False, optional=False):
+    # aapt uses raw strings beside typed integers/references. Never accept the
+    # first value when duplicate attributes disagree.
+    lines = [line.strip() for line in block.splitlines() if re.match(r"A: " + re.escape(key) + r"(?:\(|=)", line.strip())]
+    if not lines and optional:
+        return None
+    if len(lines) != 1:
+        raise ValueError("Missing/duplicate APK attribute: " + key)
+    text = lines[0].split("=", 1)[1]
+    if string:
+        match = re.match(r'"([^"\n]*)"(?: \(Raw: "[^"\n]*"\))?$', text)
+        if not match:
+            raise ValueError("Malformed APK string attribute: " + key)
+        return match[1]
+    match = re.fullmatch(r"\(type 0x(?:10|11|12)\)0x([0-9a-f]+)", text)
+    if not match:
+        raise ValueError("Malformed APK typed attribute: " + key)
+    return int(match[1], 16)
+
+
+def check_apk_identity(xmltree, variant, identity):
+    package, _, _ = variant_policy(variant)
+    manifests, apps = xmltree_elements(xmltree, "manifest"), xmltree_elements(xmltree, "application")
+    if len(manifests) != 1 or len(apps) != 1:
+        raise ValueError("Missing/ambiguous APK manifest/application")
+    manifest, app = manifests[0], apps[0]
+    if (tree_attribute(manifest, "package", string=True) != package
+            or tree_attribute(manifest, "android:versionName", string=True) != identity["versionName"]
+            or tree_attribute(manifest, "android:versionCode") != identity["versionCode"]):
+        raise ValueError("APK package/version identity mismatch")
+    if tree_attribute(app, "android:allowBackup") != 0:
+        raise ValueError("APK backup must remain disabled")
+    debuggable = tree_attribute(app, "android:debuggable", optional=True) or 0
+    if bool(debuggable) != (variant == "debug"):
+        raise ValueError("APK variant debuggability mismatch")
+    if tree_attribute(app, "android:testOnly", optional=True) not in (None, 0) or xmltree_elements(xmltree, "instrumentation"):
+        raise ValueError("APK contains testOnly/instrumentation")
+    for key in ("android:fullBackupContent", "android:dataExtractionRules"):
+        if len(re.findall(r"(?m)^\s*A: " + re.escape(key) + r"\([^\n]*\)=@0x[0-9a-f]+\s*$", app)) != 1:
+            raise ValueError("Missing APK backup resource reference")
+    for key, value in source_metadata(identity).items():
+        matches = [block for block in xmltree_elements(xmltree, "meta-data")
+                   if tree_attribute(block, "android:name", string=True) == key]
+        if len(matches) != 1 or tree_attribute(matches[0], "android:value", string=True) != value:
+            raise ValueError("APK source/channel metadata mismatch")
+    components = [(tag, tree_attribute(block, "android:name", string=True))
+                  for tag in ("activity", "activity-alias", "service", "receiver", "provider")
+                  for block in xmltree_elements(xmltree, tag)]
+    check_release_components(components, variant)
+    main = [block for block in xmltree_elements(xmltree, "activity")
+            if activity_name(tree_attribute(block, "android:name", string=True)) == MAIN_ACTIVITY]
+    if len(main) != 1 or tree_attribute(main[0], "android:exported") != 0xffffffff:
+        raise ValueError("APK launcher must remain exported")
+    # MAIN and LAUNCHER must occur exactly once in the APK's launcher intent.
+    for tag, name in (("action", "android.intent.action.MAIN"), ("category", "android.intent.category.LAUNCHER")):
+        if sum(tree_attribute(block, "android:name", string=True) == name for block in xmltree_elements(xmltree, tag)) != 1:
+            raise ValueError("APK MAIN/LAUNCHER identity mismatch")
+
+
+def tree_subtrees(text, element):
+    lines = text.splitlines()
+    blocks = []
+    for index, line in enumerate(lines):
+        match = re.fullmatch(r"([ \t]*)E: " + re.escape(element) + r" \(line=\d+\)", line)
+        if not match:
+            continue
+        indent = len(match[1])
+        following = []
+        for child in lines[index + 1:]:
+            if child.strip() and len(child) - len(child.lstrip()) <= indent:
+                break
+            following.append(child)
+        blocks.append("\n".join(following))
+    return blocks
+
+
+def check_backup_dump(text, extraction=False):
+    domains = {"root", "file", "database", "sharedpref", "external", "device_root", "device_file", "device_database", "device_sharedpref"}
+    root = "data-extraction-rules" if extraction else "full-backup-content"
+    if len(xmltree_elements(text, root)) != 1 or xmltree_elements(text, "include"):
+        raise ValueError("Packaged backup exclusion structure mismatch")
+    sections = []
+    if extraction:
+        for section in ("cloud-backup", "device-transfer"):
+            blocks = tree_subtrees(text, section)
+            if len(blocks) != 1:
+                raise ValueError("Packaged backup section missing/duplicate")
+            sections += blocks
+    else:
+        sections = [text]
+    for section in sections:
+        blocks = xmltree_elements(section, "exclude")
+        actual = [tree_attribute(block, "domain", string=True) for block in blocks]
+        if len(actual) != len(domains) or set(actual) != domains or any(tree_attribute(block, "path", string=True) != "." for block in blocks):
+            raise ValueError("Packaged backup exclusions weakened")
 
 
 def main() -> None:
@@ -195,18 +363,24 @@ def main() -> None:
     parser.add_argument("--apk-xmltree", type=Path)
     parser.add_argument("--installed-path", type=Path)
     parser.add_argument("--installed-package", type=Path)
+    parser.add_argument("--variant", choices=VARIANTS)
+    parser.add_argument("--identity", type=Path)
     args = parser.parse_args()
+    from release_identity import resolve_identity, validate_identity
+    identity = validate_identity(json.loads(args.identity.read_text())) if args.identity else resolve_identity(ROOT)
     if args.apk_permissions or args.apk_xmltree or args.installed_path or args.installed_package:
+        if args.variant is None:
+            parser.error("Explicit reviewed --variant required for supplied observations")
         if bool(args.apk_permissions) != bool(args.apk_xmltree):
             parser.error("APK permissions and XML tree are required together")
         if args.installed_package and not (args.apk_permissions and args.installed_path):
             parser.error("Installed dump requires the APK observations and installed path")
         if args.apk_permissions:
-            check_apk_dump(args.apk_permissions.read_text(), args.apk_xmltree.read_text())
+            check_apk_dump(args.apk_permissions.read_text(), args.apk_xmltree.read_text(), variant=args.variant, identity=identity)
         if args.installed_path:
-            check_installed_path(args.installed_path.read_text())
+            check_installed_path(args.installed_path.read_text(), variant=args.variant)
         if args.installed_package:
-            check_installed_dump(args.installed_package.read_text())
+            check_installed_dump(args.installed_package.read_text(), variant=args.variant, identity=identity)
         print("Supplied APK/path/installed observations verified; installed cleartext policy "
               "is asserted by native tests")
         return
@@ -214,7 +388,7 @@ def main() -> None:
     for variant in ("debug", "release"):
         path = (ROOT / "app/build/intermediates/merged_manifests" / variant
                 / f"process{variant.title()}Manifest/AndroidManifest.xml")
-        receipt.append(check_manifest(path))
+        receipt.append(check_manifest(path, variant=variant, identity=identity))
     destination = ROOT / "evidence/verified-manifests.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(receipt, indent=2) + "\n")

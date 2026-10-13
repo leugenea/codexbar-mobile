@@ -79,7 +79,7 @@ internal object NativeConnection {
     }
 
     private fun productionTransport(context: Context): AuthTransport {
-        val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.1.0"
+        val version = requireNotNull(context.packageManager.getPackageInfo(context.packageName, 0).versionName)
         // Explicit GET requests carry a captured bearer; adapter.read is never used by this gate.
         val adapter = HttpTransportAdapter(NativeFeasibilityReader::url, { error("Bearer owner required") }, version)
         return AuthTransport(adapter::execute)

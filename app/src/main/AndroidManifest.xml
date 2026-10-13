@@ -11,7 +11,10 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.CodexBarMobile">
-        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask">
+        <meta-data android:name="io.github.leugenea.codexbarmobile.SOURCE_REVISION" android:value="${sourceRevision}" />
+        <meta-data android:name="io.github.leugenea.codexbarmobile.SOURCE_TREE" android:value="${sourceTree}" />
+        <meta-data android:name="io.github.leugenea.codexbarmobile.BUILD_CHANNEL" android:value="${buildChannel}" />
+        <activity android:name="io.github.leugenea.codexbarmobile.MainActivity" android:exported="true" android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

@@ -275,17 +275,25 @@ class ConnectionLaunchSmokeTest {
 
     private fun assertInstalledNetworkPolicy() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        assertEquals("Reviewed debug lineage", "io.github.leugenea.codexbarmobile.dev", context.packageName)
         val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
         assertNotNull(info)
+        assertTrue(requireNotNull(info.versionName).matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+-dev\\.[0-9]+\\+g[0-9a-f]{12,40}")))
+        assertTrue(info.longVersionCode > 0)
+        assertEquals(0, context.applicationInfo.flags and ApplicationInfo.FLAG_ALLOW_BACKUP)
+        val metadata = context.packageManager.getApplicationInfo(context.packageName, PackageManager.GET_META_DATA).metaData
+        assertTrue(requireNotNull(metadata.getString("io.github.leugenea.codexbarmobile.SOURCE_REVISION")).matches(Regex("[0-9a-f]{40}")))
+        assertEquals("dev", metadata.getString("io.github.leugenea.codexbarmobile.BUILD_CHANNEL"))
         assertEquals(
             "Installed APK must request exactly the approved permission set",
             setOf("android.permission.INTERNET",
-                "io.github.leugenea.codexbarmobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"),
+                "io.github.leugenea.codexbarmobile.dev.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"),
             info.requestedPermissions.orEmpty().toSet(),
         )
         val receiver = context.packageManager.getPermissionInfo(
-            "io.github.leugenea.codexbarmobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION", 0,
+            "io.github.leugenea.codexbarmobile.dev.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION", 0,
         )
+        assertEquals("io.github.leugenea.codexbarmobile.dev", receiver.packageName)
         assertEquals("Installed receiver permission must remain signature-only",
             PermissionInfo.PROTECTION_SIGNATURE, receiver.protectionLevel)
         assertEquals("Installed APK must disable cleartext", 0,

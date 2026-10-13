@@ -81,7 +81,7 @@ provider/account identity, plan text or raw response. History is framework SQLit
 `noBackupFilesDir/usage-history`, excluded by the existing cloud/D2D rules; the owner
 accepted sandbox-private history without Keystore encryption. Its subordinate lifetime
 coordinator and bounded foreground recorder are wired to the one process session owner;
-no graph presentation is implemented. Only accepted USAGE deliveries may supply samples;
+the already implemented local graph is a read-only projection of those facts. Only accepted USAGE deliveries may supply samples;
 cache/tick/inventory/baseline publications do not. Queue loss and read/write failures are
 categorical, not raw exceptions; late durable work cannot publish a retired generation.
 The ceilings are 30-day trusted
@@ -117,3 +117,9 @@ physical-device deletion behavior.
 
 Private-interface/terms risks in
 [research](docs/research/m0.md) remain unresolved integration constraints.
+
+Development `.dev` installs use a separate Android UID/sandbox and existing
+package-derived Keystore alias. No credential/history export, cross-package copy
+or automatic uninstall is implemented. Old pre-isolation production-ID debug
+feedback is not a production-signed upgrade. Unsigned release fixtures have no
+official admission and cannot be distributed as signed candidates.

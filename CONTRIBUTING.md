@@ -52,9 +52,12 @@ ShellCheck and actionlint. It does not build Android or install an SDK/emulator.
 It fetches the pinned schema unless `DEPENDABOT_SCHEMA` supplies a checksum-valid
 offline copy. Hash locks cover the supported wheel platform, not every platform.
 
-CI-first is the default. Gradle build, lint and JVM tests are allowed locally when
-useful; do not repeat a heavy local ladder merely to publish a draft. With the
-JDK/SDK installed, this non-emulator invocation is available:
+The release-delivery owner policy permits local compilation/assembly and quick
+static/tooling contracts only. Android/JVM tests, lint, JaCoCo and real Git/SDK/app
+probes run in hosted CI. Versioned Gradle configuration requires committed source
+and the verified producer history/tag acquisition described in
+[release identity](docs/release.md); no dirty-source or shallow fallback is provided.
+The hosted strict graph retains these existing tasks:
 
 ```sh
 ./gradlew --no-daemon --dependency-verification strict \
@@ -68,7 +71,7 @@ Do not run [run-hosted-native-smoke.sh](tools/build/run-hosted-native-smoke.sh) 
 
 The app source requests INTERNET only. Merged manifests, APKs and installed app
 packages must request exactly INTERNET plus the existing AndroidX Core signature-only
-receiver permission; no extra permission is accepted. Cleartext is explicitly off
+receiver permission for the reviewed variant applicationId; no extra permission is accepted. Cleartext is explicitly off
 in every app build, with no debug/test override. JVM local-server fixtures do not
 need device cleartext access. The permission enables only the selected auth/usage routes. A fresh process owner
 restores credentials without requests; an explicit action activates foreground reads.
@@ -76,8 +79,10 @@ The real connection/live flow is the default launcher and recreation destination
 An already activated owner may resume a bounded read cycle on Activity STARTED.
 
 Both hosted graphs generate `processReleaseManifest` as well as the debug manifest;
-the shared gate requires both generated policies. Release assembly is not otherwise
-part of CI, so this adds manifest merging only, not release compilation/signing.
+the shared gate requires both generated policies under their explicit reviewed variants.
+The build job additionally assembles unsigned release and runs full `lintRelease`.
+Its development-valued unsigned output and ephemeral RC/stable identity fixtures
+are non-distributable; neither establishes production signing or official admission.
 App variant manifest overlays and destructive/protected-policy merge directives
 are rejected. The native script checks the debug APK, binds its SHA-256, reinstalls
 that same file after AGP test cleanup, requires a package-specific `pm path`, checks
@@ -120,6 +125,12 @@ compiled task outputs. When `CODEQL_EXTRACTOR_JAVA_TRAP_DIR` is present,
 traced build; ordinary builds keep output reuse. CodeQL dependency/wrapper caching
 remains enabled and is distinct from task-output caching. No remote build cache is
 configured; any future backend must also avoid output reuse during extraction.
+The existing nonempty extractor-marker block first calls the bounded anonymous
+public exact-HEAD checkout preparation, before app identity resolution. It retains
+the output-cache disable. Managed checkout can persist credentials: preparation
+isolates headers/helpers/includes/environment and never fetches a moving tip or
+changes source, index, config or non-tag refs. Later `clean`/`assemble` validates
+the same job-scoped actual local graph/tag snapshot without another network query.
 The marker comes from the released extractor, not a documented GitHub default-setup
 option: extractor changes require hosted warm-cache validation; static source
 contracts cannot prove the marker's continued identity or successful extraction.
@@ -159,6 +170,7 @@ mkdir -p evidence
 ./gradlew --no-daemon --dependency-verification strict --build-cache \
   --no-configuration-cache --stacktrace --info --console=plain --continue \
   -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
+  -PreleaseChannel=dev :app:writeBuildIdentity :app:lintRelease :app:assembleRelease \
   :app:lintDebug :app:assembleDebug :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
   :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
   2>&1 | tee evidence/strict.log | bash tools/build/filter-gradle-console.sh
@@ -204,9 +216,11 @@ and are superseded for current acceptance by the 0.90 rule in [app/build.gradle]
 Both Android jobs upload all-outcome artifacts:
 `android-build-<run_id>-<run_attempt>` and `android-instrumented-<run_id>-<run_attempt>`,
 retained for seven days. Inspect SDK/toolchain/build logs, lint/JUnit reports,
-merged manifests and debug APKs; native artifacts also contain emulator/logcat,
+merged manifests, debug APKs and unsigned release fixtures/inventories; native artifacts also contain emulator/logcat,
 connected-test results, exec/ec data and coverage XML/HTML/inventory/phase outputs.
-Missing reports are not passing tests. A failure before instrumentation is an
+The build job also runs bounded hosted exact-source managed-checkout and isolated
+RC/stable fixtures. Fixture tags/counters never become public refs or official
+release history. Missing reports are not passing tests. A failure before instrumentation is an
 infrastructure boundary, not runtime proof; passing native tests with failing
 coverage is a separate coverage failure. Diagnostics/screenshots are not release
 or live-provider evidence. Outputs stay in CI artifacts or external scratch.

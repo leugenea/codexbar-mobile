@@ -36,6 +36,17 @@ class HttpTransportAdapterTest {
     private fun adapter(server: MockWebServer, timeout: Long = 30_000) = HttpTransportAdapter(
         { server.url(it.path) }, { secret() }, "0.1.0", readTimeoutMillis = timeout)
 
+    @Test fun developmentAndRcVersionsRetainExactHonestHeaderIdentity() = MockWebServer().apply { start() }.use { server ->
+        for (version in listOf("0.1.0-dev.7+g123456789abc", "0.1.0-rc.2")) {
+            val transport = HttpTransportAdapter({ server.url(it.path) }, { secret() }, version)
+            server.enqueue(MockResponse.Builder().body("{}").build())
+            val result = Receipt()
+            transport.read(ReadRequest(ReadOperation.entries.first(), deadline()), result::accept)
+            assertTrue(result.await() is TransportResult.Response)
+            assertEquals("codexbar-mobile/$version", server.takeRequest(5, TimeUnit.SECONDS)!!.headers["User-Agent"])
+        }
+    }
+
     @Test fun selectedReadsHaveCallerRoutesAndHonestHeaders() = MockWebServer().apply { start() }.use { server ->
         val transport = adapter(server)
         ReadOperation.entries.forEach { operation ->

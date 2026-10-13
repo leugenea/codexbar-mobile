@@ -67,6 +67,8 @@ class ConnectionLifecycleTest {
         }
         NativeConnection.resetForTests()
         val installed = context.packageManager.getActivityInfo(ComponentName(context, MainActivity::class.java), 0)
+        assertEquals("io.github.leugenea.codexbarmobile.dev", context.packageName)
+        assertEquals("io.github.leugenea.codexbarmobile.dev", installed.processName)
         assertEquals(ActivityInfo.LAUNCH_SINGLE_TASK, installed.launchMode)
         assertEquals("Launcher uses the default app process", context.packageName, installed.processName)
         cleanStore()

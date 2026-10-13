@@ -163,9 +163,9 @@ while :; do
   (( remaining > 0 )) || exit 124
   set +e
   timeout --signal=TERM --kill-after=30s "${remaining}s" ./gradlew --no-daemon --dependency-verification strict \
-    --build-cache --no-configuration-cache \
+    --build-cache --no-configuration-cache -PreleaseChannel=dev \
     --stacktrace --info --console=plain -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
-    :app:processReleaseManifest :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest \
+    :app:writeBuildIdentity :app:processReleaseManifest :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest \
     :app:connectedDebugAndroidTest :app:jacocoDebugCoverageVerification \
     2>&1 | tee evidence/native/strict-connected.log "$attempt_dir/strict-connected.log" | bash tools/build/filter-gradle-console.sh
   graph_status=("${PIPESTATUS[@]}")
@@ -235,7 +235,7 @@ aapt_status=$?
   > evidence/native/apk-manifest-xmltree.txt
 apk_xmltree_status=$?
 python3 tools/build/verify_manifests.py --apk-permissions evidence/native/apk-permissions.txt \
-  --apk-xmltree evidence/native/apk-manifest-xmltree.txt
+  --apk-xmltree evidence/native/apk-manifest-xmltree.txt --variant debug
 apk_policy_status=$?
 sha256sum --check evidence/native/inspected-apk.sha256 > evidence/native/install-apk-hash-check.txt 2>&1
 install_hash_status=$?
@@ -253,24 +253,24 @@ if (( apk_hash_status == 0 && aapt_status == 0 && apk_xmltree_status == 0 && apk
     install_status=$?
   fi
   if (( install_status == 0 )); then
-    timeout 15 "$adb" -s "$ANDROID_SERIAL" shell pm path io.github.leugenea.codexbarmobile \
+    timeout 15 "$adb" -s "$ANDROID_SERIAL" shell pm path io.github.leugenea.codexbarmobile.dev \
       > evidence/native/installed-package-path.txt
     installed_path_status=$?
-    python3 tools/build/verify_manifests.py --installed-path evidence/native/installed-package-path.txt
+    python3 tools/build/verify_manifests.py --installed-path evidence/native/installed-package-path.txt --variant debug
     installed_path_policy_status=$?
     if (( installed_path_status == 0 && installed_path_policy_status == 0 )); then
-      timeout 15 "$adb" -s "$ANDROID_SERIAL" shell dumpsys package io.github.leugenea.codexbarmobile \
+      timeout 15 "$adb" -s "$ANDROID_SERIAL" shell dumpsys package io.github.leugenea.codexbarmobile.dev \
         > evidence/native/installed-package.txt
       installed_dump_status=$?
       python3 tools/build/verify_manifests.py --apk-permissions evidence/native/apk-permissions.txt \
         --apk-xmltree evidence/native/apk-manifest-xmltree.txt \
-        --installed-path evidence/native/installed-package-path.txt --installed-package evidence/native/installed-package.txt
+        --installed-path evidence/native/installed-package-path.txt --installed-package evidence/native/installed-package.txt --variant debug
       permission_status=$?
     fi
   fi
 fi
 # Always attempt cleanup, including a partial/failed installation or failed observation.
-timeout 15 "$adb" -s "$ANDROID_SERIAL" uninstall io.github.leugenea.codexbarmobile \
+timeout 15 "$adb" -s "$ANDROID_SERIAL" uninstall io.github.leugenea.codexbarmobile.dev \
   > evidence/native/installed-package-uninstall.txt 2>&1
 uninstall_status=$?
 if (( uninstall_status == 0 )); then

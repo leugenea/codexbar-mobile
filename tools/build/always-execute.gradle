@@ -3,7 +3,7 @@
 def gateNames = [
     'prepareDebugCoverage', 'testDebugUnitTest', 'connectedDebugAndroidTest',
     'collectDebugCoverageInputs', 'jacocoDebugReport', 'jacocoDebugCoverageVerification',
-    'verifyResolvedToolchain'
+    'verifyResolvedToolchain', 'writeBuildIdentity'
 ]
 def isGate = { task -> task.project == project &&
     (task.name in gateNames || task.name.startsWith('lint')) }
