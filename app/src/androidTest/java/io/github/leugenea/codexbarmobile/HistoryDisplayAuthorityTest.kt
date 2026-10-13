@@ -229,7 +229,6 @@ class HistoryDisplayAuthorityTest {
             }
         }
         compose.waitForIdle()
-        click("history-stored-text")
     }
 
     private fun retainedBoundPage(): HistoryGraphSnapshot {
@@ -338,7 +337,6 @@ class HistoryDisplayAuthorityTest {
         settled("dormant foreground read admitted")
         compose.runOnUiThread { hostedOwner.value = restored }
         compose.waitForIdle()
-        click("history-stored-text")
         await("dormant local history restored through host") { observer.last?.display?.generation === restored.historySnapshots.value.generation && observer.last?.display?.entries?.size == 1 }
         click("history-select-WEEKLY")
         await("dormant selected page settled through host") { observer.last?.display?.query == HistoryNavigation(kind = WindowKind.WEEKLY).query && observer.last?.display?.entries?.size == 1 }
@@ -382,8 +380,10 @@ class HistoryDisplayAuthorityTest {
     }
 }
 
-private class HeldHistoryObserver : HistoryUiObserver {
+internal class HeldHistoryObserver : HistoryUiObserver {
     data class Pass(val source: HistoryGraphSnapshot, val display: HistoryGraphSnapshot, val now: Instant?)
+    data class CurrentPass(val source: HistoryGraphSnapshot, val fiveHour: HistoryGraphSnapshot,
+        val weekly: HistoryGraphSnapshot, val now: Instant?)
     private val passes = CopyOnWriteArrayList<Pass>()
     private val deliveryLock = Any()
     private var gate: CompletableDeferred<Unit>? = null
@@ -393,6 +393,15 @@ private class HeldHistoryObserver : HistoryUiObserver {
     @Volatile var blocked: HistoryGraphSnapshot? = null
         private set
     val last get() = passes.lastOrNull()
+    @Volatile var currentPair: Triple<HistoryGraphSnapshot, HistoryGraphSnapshot, HistoryGraphSnapshot>? = null
+        private set
+    @Volatile var currentFrame: CurrentPass? = null
+        private set
+    override fun projectedCurrent(source: HistoryGraphSnapshot, fiveHour: HistoryGraphSnapshot, weekly: HistoryGraphSnapshot, now: Instant?) {
+        currentFrame = CurrentPass(source, fiveHour, weekly, now)
+        currentPair = Triple(source, fiveHour, weekly)
+        projected(source, fiveHour, now)
+    }
     fun hold() = synchronized(deliveryLock) {
         check(gate == null)
         blocked = null

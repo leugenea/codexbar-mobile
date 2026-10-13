@@ -22,8 +22,8 @@
     <string name="account_remove_cancel">Cancel</string>
 
     <!-- B1: absolute labels truncate to the containing hour, not an exact reset/expiry. -->
-    <string name="time_absolute">%1$s, %2$s (hour precision)</string>
-    <string name="time_absolute_offset">%1$s, %2$s UTC%3$s (hour precision)</string>
+    <string name="time_absolute">%1$s, %2$s</string>
+    <string name="time_absolute_offset">%1$s, %2$s UTC%3$s</string>
     <string name="time_remaining">%1$s remaining</string>
     <string name="time_less_than_hour">&lt;1h remaining</string>
     <string name="time_awaiting_refresh">Reset passed · awaiting refresh</string>
@@ -317,8 +317,6 @@
     <string name="history_chart_decimal_capacity">Measured geometry unavailable: decimal rendering capacity exceeded. Exact measurements remain in the text below.</string>
     <string name="history_chart_outside_domain">Measured geometry unavailable: outside the 0–100 percent axis. Exact measurements remain in the text below; values are not clamped.</string>
     <string name="history_chart_underflow">A nonzero measurement is too small for approximate drawing precision. Its exact nonzero value remains in the text below.</string>
-    <string name="history_open">View local history</string>
-    <string name="history_return_connection">Return to live connection controls</string>
     <string name="history_navigation_title">Local usage history</string>
     <string name="history_navigation_policy">Bounded pages preserve storage admission order. Current charts select only the authoritative live period; stored text starts with the earliest retained entries. Missing or truncated history remains incomplete.</string>
     <string name="history_page_cursor">Exclusive admission cursor: %1$d · Page limit: %2$d</string>
@@ -335,8 +333,52 @@
     <string name="account_name_clear">Clear name</string>
     <string name="account_name_cancel">Cancel</string>
     <string name="account_name_storage_failed">Local name storage is unavailable or the change could not be saved. Retry editing when available.</string>
-    <string name="history_current_charts">View current charts</string>
-    <string name="history_stored_text">Browse stored text history</string>
-    <string name="history_current_policy">Charts contain only the current live five-hour or weekly period. Stored observations are sparse; the dashed line is an analytical even-use reference, not a prediction.</string>
-    <string name="history_current_unavailable">Current period unavailable: %1$s. Stored history cannot establish a current period.</string>
+
+    <string name="dashboard_title">Usage</string>
+    <string name="dashboard_menu">Open details menu</string>
+    <string name="dashboard_back">Back to dashboard</string>
+    <string name="drawer_history">Full local history details</string>
+    <string name="drawer_connection">Full live connection details</string>
+    <string name="dashboard_login">Login</string>
+    <string name="dashboard_reauthorize_action">Reauthorize</string>
+    <string name="dashboard_disconnected">Sign in to see your usage</string>
+    <string name="dashboard_loading">Connecting…</string>
+    <string name="dashboard_unavailable">Usage information unavailable</string>
+    <string name="dashboard_current">Last reported usage</string>
+    <string name="dashboard_stale">Usage may be out of date</string>
+    <string name="dashboard_error">Unable to update usage</string>
+    <string name="dashboard_reauthorize">Sign in again to continue</string>
+    <string name="dashboard_refreshing">Refreshing…</string>
+    <string name="dashboard_storage_error">Local storage unavailable</string>
+    <string name="dashboard_auth_error">Login failed. Try again.</string>
+    <string name="dashboard_browser_error">Unable to open the browser</string>
+    <string name="dashboard_no_history">No current information.</string>
+    <string name="dashboard_no_history_loading">No current information · loading history.</string>
+    <string name="dashboard_no_history_error">No current information · history unavailable.</string>
+    <string name="dashboard_no_history_malformed">No current information · latest usage malformed.</string>
+    <string name="dashboard_no_history_malformed_error">No current information · malformed usage, history unavailable.</string>
+    <string name="dashboard_no_history_malformed_loading">No current information · malformed usage, history loading.</string>
+    <string name="dashboard_no_history_ambiguous">No current information · window ambiguous.</string>
+    <string name="dashboard_no_history_unsupported">No current information · latest usage unsupported.</string>
+    <string name="dashboard_window_malformed">Some latest usage fields are malformed.</string>
+    <string name="dashboard_window_unsupported">Latest usage percentage unsupported.</string>
+    <string name="dashboard_single_observation">One recorded observation · no observed trend</string>
+    <string name="dashboard_recorded_observations">Recorded observations · gaps are not connected</string>
+    <string name="dashboard_history_incomplete">Recorded history is incomplete. More information is in details.</string>
+    <string name="dashboard_history_warning">History could not be fully updated.</string>
+    <string name="dashboard_geometry_warning">Some recorded values cannot be drawn. Exact values remain in details.</string>
+    <string name="dashboard_banked_count">Banked resets (%1$d)</string>
+    <string name="dashboard_banked_unknown">Banked resets (count unknown)</string>
+    <string name="dashboard_expanded">Expanded</string>
+    <string name="dashboard_collapsed">Collapsed</string>
+    <string name="dashboard_inventory_known">Reported inventory</string>
+    <string name="dashboard_inventory_empty">No retained items</string>
+    <string name="dashboard_inventory_unsupported">Unsupported item information</string>
+    <string name="dashboard_inventory_unknown">Item information unknown</string>
+    <string name="dashboard_inventory_unavailable">Inventory unavailable</string>
+    <string name="dashboard_inventory_malformed">Malformed item information</string>
+    <string name="dashboard_inventory_expired">Expired</string>
+    <string name="dashboard_inventory_discrepant">Inventory differs from reported counts</string>
+    <string name="dashboard_banked_partial">Inventory is partial</string>
+    <string name="dashboard_banked_stale">Inventory may be out of date</string>
 </resources>

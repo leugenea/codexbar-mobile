@@ -9,6 +9,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 internal enum class ConnectionPhase { RESTORING, IDLE, AUTHENTICATING, READING, OBSERVED, RESTORED, CANCELLED, SIGNING_OUT, SIGNED_OUT, REAUTH_REQUIRED, FAILED }
 internal enum class ConnectionProblem { STORAGE, AUTH, READ, BROWSER }
@@ -26,6 +29,12 @@ internal class ConnectionState(
 ) {
     val busy: Boolean get() = phase in setOf(ConnectionPhase.RESTORING, ConnectionPhase.AUTHENTICATING, ConnectionPhase.READING, ConnectionPhase.SIGNING_OUT)
     override fun toString(): String = "ConnectionState(phase=$phase, binding=UNRESOLVED, identity=UNVERIFIED, problem=$problem)"
+}
+
+/** Diagnostic-only dispatch ticket for the exact public foreground ingress; never an authority. */
+@androidx.annotation.VisibleForTesting(otherwise = androidx.annotation.VisibleForTesting.PACKAGE_PRIVATE)
+internal class UsageForegroundCommand(val observer: Any, val foreground: Boolean) : AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<UsageForegroundCommand>
 }
 
 /**
@@ -140,8 +149,8 @@ internal class ConnectionController(
         historyDeletion = ownerScope.async(storageDispatcher) { reserved.complete() }
     }
 
-    private fun command(action: suspend () -> Unit) {
-        ownerScope.launch { if (!closed) action() }
+    private fun command(context: CoroutineContext = EmptyCoroutineContext, action: suspend () -> Unit) {
+        ownerScope.launch(context) { if (!closed) action() }
     }
 
     fun connect() = command {
@@ -200,7 +209,7 @@ internal class ConnectionController(
     }
 
     /** Observer identities keep one Activity from cancelling another visible Activity. */
-    fun usageForeground(observer: Any, foreground: Boolean) = command {
+    fun usageForeground(observer: Any, foreground: Boolean) = command(UsageForegroundCommand(observer, foreground)) {
         usageRefresh.foreground(observer, foreground)
         historyRecorder.foreground(usageRefresh.hasForegroundObservers)
         if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
@@ -229,6 +238,10 @@ internal class ConnectionController(
     }
 
     internal fun queryHistory(query: HistoryGraphQuery) = command { historyRecorder.query(query) }
+
+    internal fun observeHistory(request: HistoryPresentationRequest, expected: HistoryDisplayContext) = command {
+        historyRecorder.observe(request, expected)
+    }
 
     internal fun currentHistoryDisplayContext() = historyRecorder.currentDisplayContext()
 

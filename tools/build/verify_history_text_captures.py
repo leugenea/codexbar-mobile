@@ -73,7 +73,7 @@ ASSEMBLED_PAGES = {
     "history-current-dark-portrait": ("OBSERVED", "READY", "FIVE_HOUR", 32, 0, 301, 306, 5, 7, 4),
 }
 ASSEMBLED_CONTROLS = {
-    "history-assembled-fresh-portrait-light": ["history-select-FIVE_HOUR", "history-select-WEEKLY"],
+    "history-assembled-fresh-portrait-light": ["open-drawer", "connect"],
     "history-assembled-single-portrait-dark": [],
     "history-assembled-breaks-landscape-dark": ["history-select-FIVE_HOUR", "history-select-WEEKLY"],
     "history-assembled-unknown-large-font": ["history-select-FIVE_HOUR", "history-select-WEEKLY"],
@@ -87,6 +87,38 @@ ASSEMBLED_COUNTS = {
     "history-current-dark-portrait": (5, 2, 2, 2),
 }
 CAPTURES.update(ASSEMBLED_CAPTURES)
+
+
+PRODUCTION_ROUTES = {
+    "history-integrated-navigation-portrait-light": "LOCAL_HISTORY_DETAILS",
+    "history-integrated-chart-portrait-light": "DASHBOARD",
+    "history-assembled-fresh-portrait-light": "DASHBOARD",
+    "history-assembled-single-portrait-dark": "DASHBOARD",
+    "history-assembled-breaks-landscape-dark": "LOCAL_HISTORY_DETAILS",
+    "history-assembled-unknown-large-font": "LOCAL_HISTORY_DETAILS",
+    "history-assembled-page-landscape-light": "LOCAL_HISTORY_DETAILS",
+    "history-current-light-portrait": "DASHBOARD",
+    "history-current-dark-portrait": "DASHBOARD",
+}
+DASHBOARD_CAPTURES = {
+    "dashboard-main-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "FIVE_HOUR"),
+    "dashboard-weekly-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "WEEKLY"),
+    "dashboard-banked-expanded-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "NONE"),
+    "dashboard-drawer-portrait-dark": (1, True, 1.0, "DASHBOARD", "CURRENT", "NONE"),
+    "dashboard-main-landscape-dark-large-font": (2, True, 2.0, "DASHBOARD", "CURRENT", "FIVE_HOUR"),
+    "dashboard-connection-details-landscape-dark": (2, True, 1.0, "CONNECTION_DETAILS", "IDLE", "NONE"),
+    "dashboard-local-history-details-large-font": (1, False, 2.0, "LOCAL_HISTORY_DETAILS", "PAGE", "NONE"),
+}
+
+DASHBOARD_LAYOUTS = {
+    "dashboard-main-portrait-light": ("history-chart-five-hour-equivalent", ["connection-screen", "dashboard"]),
+    "dashboard-weekly-portrait-light": ("history-chart-weekly-equivalent", ["connection-screen", "dashboard"]),
+    "dashboard-banked-expanded-portrait-light": ("banked-disclosure-status", ["connection-screen", "dashboard"]),
+    "dashboard-drawer-portrait-dark": ("drawer-LOCAL_HISTORY_DETAILS", ["connection-screen", "dashboard", "details-drawer"]),
+    "dashboard-main-landscape-dark-large-font": ("history-chart-five-hour-equivalent", ["connection-screen", "dashboard"]),
+    "dashboard-connection-details-landscape-dark": ("banked-container", ["connection-screen", "connection-details"]),
+    "dashboard-local-history-details-large-font": ("history-page-cursor", ["connection-screen", "connection-history"]),
+}
 
 
 # Bitmap.compress uses Skia's non-interlaced direct-color PNG encoder. Support
@@ -248,15 +280,17 @@ def verify_integrated_canvas(metadata: dict, size: tuple[int, int]) -> None:
         raise ValueError("Integrated Canvas is partially clipped in its captured root")
 
 
-def verify_production_root(metadata: dict) -> None:
+def verify_production_root(metadata: dict, expected_roots: tuple[str, ...] = ("connection-screen",)) -> None:
     # Tabs are retired. An observed real screen root remains mandatory even when
     # the chart viewport has no visible clickable controls.
-    if metadata.get("visibleRoots") != ["connection-screen"]:
+    if metadata.get("visibleRoots") != list(expected_roots):
         raise ValueError("Production capture lacks the observed connection screen root")
 
 
 def verify_integrated_metadata(metadata: dict, name: str, size: tuple[int, int]) -> None:
     verify_production_root(metadata)
+    if metadata.get("route") != PRODUCTION_ROUTES[name]:
+        raise ValueError("Integrated detail/dashboard route changed")
     expected = dict(queryLimit=32, queryAfter=0, firstOrdinal=1, lastOrdinal=32, pageEntries=32, requests=5, gets=2)
     if any(type(metadata.get(key)) is not int or metadata[key] != value for key, value in expected.items()):
         raise ValueError("Integrated capture lacks bounded dormant page/request identities")
@@ -381,6 +415,8 @@ def verify_current_targets(metadata: dict, samples: list[dict]) -> None:
 
 def verify_assembled_metadata(metadata: dict, name: str, size: tuple[int, int], image: bytes) -> None:
     verify_production_root(metadata)
+    if metadata.get("route") != PRODUCTION_ROUTES[name]:
+        raise ValueError("Assembled detail/dashboard route changed")
     keys = ("phase", "readiness", "queryKind", "queryLimit", "queryAfter", "firstOrdinal", "lastOrdinal", "pageEntries", "requests", "gets")
     expected = dict(zip(keys, ASSEMBLED_PAGES[name]))
     if any(type(metadata.get(key)) is not type(value) or metadata[key] != value for key, value in expected.items()):
@@ -395,8 +431,13 @@ def verify_assembled_metadata(metadata: dict, name: str, size: tuple[int, int], 
     if type(metadata.get("orientation")) is not int or metadata.get("layoutFontScale") != metadata["fontScale"] or metadata.get("layoutDensity") != metadata["density"]:
         raise ValueError("Effective native layout configuration disagrees with resource configuration")
     after = expected["queryAfter"]
-    if metadata.get("uiCursor") != f"Exclusive admission cursor: {after} · Page limit: 32":
-        raise ValueError("Assembled visible UI cursor changed")
+    if metadata["route"] == "LOCAL_HISTORY_DETAILS":
+        if metadata.get("uiCursor") != f"Exclusive admission cursor: {after} · Page limit: 32" or metadata.get("layoutLabel") != "history-page-cursor":
+            raise ValueError("Assembled visible UI cursor changed")
+    else:
+        expected_label = "dashboard-no-info-FIVE_HOUR" if name == "history-assembled-fresh-portrait-light" else "history-chart-five-hour-equivalent"
+        if "uiCursor" in metadata or metadata.get("layoutLabel") != expected_label:
+            raise ValueError("Dashboard must use its real compact label, not a hidden cursor")
     if name in ASSEMBLED_COUNTS:
         verify_integrated_canvas(metadata, size)
         verify_assembled_pixels(metadata, name, image)
@@ -437,9 +478,9 @@ LIVE_CAPTURES = {"live-usage-portrait-light": False, "live-usage-portrait-dark":
 LIVE_FACTS = {
     "live-five-hour-percent": "12.5% used",
     "live-weekly-percent": "76.25% used",
-    "live-five-hour-reset-absolute": "Reset: Oct 8, 2026, 01:00 (hour precision)",
+    "live-five-hour-reset-absolute": "Reset: Oct 8, 2026, 01:00",
     "live-five-hour-reset-relative": "Reset: 0 days 1 hour remaining",
-    "live-weekly-reset-absolute": "Reset: Oct 10, 2026, 01:00 (hour precision)",
+    "live-weekly-reset-absolute": "Reset: Oct 10, 2026, 01:00",
     "live-weekly-reset-relative": "Reset: 2 days 1 hour remaining",
 }
 
@@ -480,6 +521,8 @@ def live_capture_receipt(path: Path) -> dict:
     if not valid_configuration(metadata, expected, size) or size[0] >= size[1]:
         raise ValueError("Invalid observed live configuration or production screen identity")
     verify_production_root(metadata)
+    if metadata.get("route") != "CONNECTION_DETAILS":
+        raise ValueError("Live full facts must be on the connection detail route")
     if metadata.get("visibleFacts") != LIVE_FACTS or metadata.get("visibleControls") != []:
         raise ValueError("Live usage/reset/control identities changed")
     verify_live_layout(metadata)
@@ -496,12 +539,85 @@ def verify_live_layout(metadata: dict) -> None:
         raise ValueError("Live native layout disagrees with resource configuration")
 
 
+def dashboard_capture_receipt(path: Path) -> dict:
+    metadata = json.loads(path.with_suffix(".json").read_text())
+    image = read_png(path)
+    size = png_size(image)
+    orientation, dark, font, route, mode, kind = DASHBOARD_CAPTURES[path.stem]
+    expected = dict(name=path.stem, synthetic=True, productionEntry=True, api=36, orientation=orientation,
+                    dark=dark, fontScale=font, route=route, requestMode=mode, sourceKind=kind,
+                    activity="io.github.leugenea.codexbarmobile.MainActivity", requests=5, gets=2)
+    if not valid_configuration(metadata, expected, size) or ((orientation == 1) != (size[0] < size[1])):
+        raise ValueError("Dashboard capture route/configuration/request provenance changed")
+    verify_production_root(metadata, tuple(DASHBOARD_LAYOUTS[path.stem][1]))
+    verify_live_layout(metadata)
+    label, roots = DASHBOARD_LAYOUTS[path.stem]
+    if "uiCursor" in metadata or metadata.get("layoutLabel") != label or metadata.get("visibleRoots") != roots:
+        raise ValueError("Dashboard actual child/drawer roots or native layout label identity changed")
+    host = {"context": "MATCH", "selection": "MATCH", "periods": "MATCH", "projection": "MATCH"} if mode == "CURRENT" else None
+    if "currentHost" not in metadata or metadata["currentHost"] != host:
+        raise ValueError("Dashboard lacks an actual matching current host/authority/selection receipt")
+    verify_dashboard_windows(metadata)
+    if path.stem == "dashboard-drawer-portrait-dark" and metadata.get("drawerLabels") != ["Full local history details", "Full live connection details"]:
+        raise ValueError("Owner drawer rows changed")
+    if path.stem in {"dashboard-banked-expanded-portrait-light", "dashboard-connection-details-landscape-dark"}:
+        if metadata.get("inventoryCount") != 7 or metadata.get("inventoryRows") != 3:
+            raise ValueError("Reported count/retained inventory rows changed")
+    if kind != "NONE":
+        verify_dashboard_pixels(metadata, size, image)
+    return dict(metadata, path=str(path), pngSha256=hashlib.sha256(image).hexdigest(),
+                metadataSha256=hashlib.sha256(path.with_suffix(".json").read_bytes()).hexdigest())
+
+
+def verify_dashboard_windows(metadata: dict) -> None:
+    if metadata["requestMode"] != "CURRENT":
+        if metadata.get("windows") != []:
+            raise ValueError("Non-current route must not claim current chart selection")
+        return
+    expected = [dict(kind=kind, limit=32, after=0, reset="2027-01-15T09:00:00Z", duration=duration,
+                     selectedOrdinals=[1], lastAdmitted=1) for kind, duration in (("FIVE_HOUR", 18000), ("WEEKLY", 604800))]
+    windows = metadata.get("windows")
+    if windows != expected:
+        raise ValueError("Independent dashboard exact period/selected ordinal/high-water changed")
+    for window, wanted in zip(windows, expected):
+        if any(type(window.get(key)) is not type(value) for key, value in wanted.items()) or any(type(n) is not int for n in window["selectedOrdinals"]):
+            raise ValueError("Dashboard window receipts have invalid field types")
+
+
+def verify_dashboard_pixels(metadata: dict, size: tuple[int, int], image: bytes) -> None:
+    verify_integrated_canvas(metadata, size)
+    samples = metadata.get("pixelSamples")
+    if metadata.get("pixelOraclePassed") is not True or not isinstance(samples, list):
+        raise ValueError("Dashboard lacks actual registered pixel receipts")
+    expected_counts = dict(markerCount=1, connectionCount=0, referenceCount=1, boundaryCount=0)
+    if any(type(metadata.get(k)) is not int or metadata[k] != v for k, v in expected_counts.items()):
+        raise ValueError("Dashboard single-point/reference paint identities changed")
+    if [item.get("kind") for item in samples].count("marker") != 1 or [item.get("kind") for item in samples].count("dash") != 56:
+        raise ValueError("Dashboard marker/dash samples missing or duplicated")
+    if any(item.get("kind") not in {"marker", "dash"} for item in samples):
+        raise ValueError("Dashboard single observation cannot claim measured edges")
+    primary, reference = ((-10006364, -11975345) if not metadata["dark"] else (-3097345, -3488560))
+    for item, actual in zip(samples, decoded_samples(image, samples)):
+        if not (metadata["canvasLeft"] <= item["x"] < metadata["canvasRight"] and metadata["canvasTop"] <= item["y"] < metadata["canvasBottom"]):
+            raise ValueError("Dashboard sample outside its actual Canvas")
+        if item.get("targetArgb") != (reference if item["kind"] == "dash" else primary):
+            raise ValueError("Dashboard paint target differs from registered role")
+        verify_sample(item, actual)
+    marker = next(item for item in samples if item["kind"] == "marker")
+    dashes = [item for item in samples if item["kind"] == "dash"]
+    if not marker["matched"] or sum(item["matched"] for item in dashes) < 10 or sum(not item["matched"] for item in dashes) < 10:
+        raise ValueError("Dashboard actual marker/dashed hits and gaps required")
+
+
 def verify_gallery(directory: Path) -> list[dict]:
     history = verify_captures(directory)
     live = sorted(directory.rglob("live-usage-*.png"))
     if {path.stem for path in live} != set(LIVE_CAPTURES) or len(live) != len(LIVE_CAPTURES):
         raise ValueError("Missing, extra or duplicate native live screenshots")
-    receipts = history + [live_capture_receipt(path) for path in live]
+    dashboard = sorted(directory.rglob("dashboard-*.png"))
+    if {path.stem for path in dashboard} != set(DASHBOARD_CAPTURES) or len(dashboard) != len(DASHBOARD_CAPTURES):
+        raise ValueError("Missing, extra or duplicate native dashboard screenshots")
+    receipts = history + [live_capture_receipt(path) for path in live] + [dashboard_capture_receipt(path) for path in dashboard]
     if len({item["density"] for item in receipts}) != 1:
         raise ValueError("Capture gallery target density changed")
     return receipts

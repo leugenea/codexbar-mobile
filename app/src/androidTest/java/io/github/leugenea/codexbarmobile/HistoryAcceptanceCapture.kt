@@ -78,7 +78,7 @@ internal class HistoryAcceptanceCapture(private val compose: ComposeTestRule) {
 
     private fun metadata(name: String, scenario: ActivityScenario<MainActivity>, fixture: HistoryNavigationFixture,
         bitmap: Bitmap, visible: List<String>): JSONObject {
-        val source = fixture.owner.historySnapshots.value
+        val source = recordedHistory(fixture.owner)
         val entries = source.storage?.entries.orEmpty()
         val data = JSONObject().put("name", name).put("synthetic", true).put("productionEntry", true)
             .put("visibleRoots", JSONArray(listOf("connection-screen")))
@@ -101,14 +101,17 @@ internal class HistoryAcceptanceCapture(private val compose: ComposeTestRule) {
                 .put("density", it.resources.displayMetrics.density).put("renderedLocale", config.locales[0].toLanguageTag())
                 .put("dark", config.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES)
         }
-        val cursor = compose.onNodeWithTag("history-page-cursor")
+        val stored = compose.onAllNodesWithTag("connection-history").fetchSemanticsNodes().isNotEmpty()
+        val tag = if (stored) "history-page-cursor" else if (name == "history-assembled-fresh-portrait-light") "dashboard-no-info-FIVE_HOUR" else "history-chart-five-hour-equivalent"
+        val observed = compose.onNodeWithTag(tag)
         val layouts = mutableListOf<TextLayoutResult>()
-        cursor.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        observed.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val effective = layouts.single().layoutInput.density
         assertEquals(data.getDouble("fontScale").toFloat(), effective.fontScale)
         assertEquals(data.getDouble("density").toFloat(), effective.density)
         data.put("layoutFontScale", effective.fontScale).put("layoutDensity", effective.density)
-            .put("uiCursor", cursor.fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text })
+            .put("route", if (stored) "LOCAL_HISTORY_DETAILS" else "DASHBOARD").put("layoutLabel", tag)
+        if (stored) data.put("uiCursor", observed.fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text })
         return data
     }
 
@@ -123,7 +126,7 @@ internal class HistoryAcceptanceCapture(private val compose: ComposeTestRule) {
         listOf("Left" to clipped.left, "Top" to clipped.top, "Right" to clipped.right, "Bottom" to clipped.bottom).forEach {
             data.put("canvasClipped${it.first}", it.second)
         }
-        val series = HistoryPlotInputs.project(fixture.owner.historySnapshots.value).fiveHour
+        val series = HistoryPlotInputs.project(recordedHistory(fixture.owner)).fiveHour
         val drawing = historyChartDrawing(series)
         val colors = if (data.getBoolean("dark")) darkColorScheme() else lightColorScheme()
         val pixels = HistoryAcceptancePixels(bitmap, bounds, data.getDouble("density").toFloat())

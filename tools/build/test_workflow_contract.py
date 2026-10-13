@@ -1,4 +1,6 @@
 """Cheap build source/workflow contracts and explicitly synthetic report-parser tests."""
+from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DASHBOARD_NATIVE,
+                                             EXPECTED_CURRENT_READ_JVM, SCANNER_CLASS)
 from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT
 import hashlib
 import json
@@ -28,6 +30,108 @@ SCRATCH = Path(os.environ.get("RUNNER_TEMP", os.environ.get("BUILD_CONTRACT_SCRA
 
 
 class WorkflowContracts(unittest.TestCase):
+    def android_build_steps(self, workflow):
+        # Existing workflow contracts parse named step boundaries with stdlib only.
+        # Android's isolated metrics venv deliberately has no YAML dependency.
+        job = re.search(r"(?ms)^  build:\n(.*?)(?=^  \w+:\n|\Z)", workflow)
+        self.assertIsNotNone(job)
+        steps = []
+        for block in re.split(r"(?m)^      - name: ", job.group(1))[1:]:
+            name, _, body = block.partition("\n")
+            fields = dict(re.findall(r"(?m)^        ([\w-]+): ([^\n]+)$", body))
+            if fields.get("run") == "|":
+                run = body.split("        run: |\n", 1)[1]
+                fields["run"] = "\n".join(line[10:] for line in run.splitlines() if line.startswith("          "))
+            steps.append(dict(fields, name=name))
+        return steps
+
+    def assert_android_offline_parser_environment(self, workflow):
+        steps = self.android_build_steps(workflow)
+        names = [step["name"] for step in steps]
+        prepare_name = "Prepare hash-pinned offline parser environment"
+        discovery_name = "Validate offline build and workflow contracts"
+        for name in (prepare_name, discovery_name):
+            self.assertEqual(names.count(name), 1)
+        initialize = names.index("Initialize build diagnostics")
+        prepare = names.index(prepare_name)
+        discovery = names.index(discovery_name)
+        self.assertLess(initialize, prepare)
+        self.assertLess(prepare, discovery)
+        self.assertLess(discovery, names.index("Set up Temurin JDK 17"))
+        venv = "$RUNNER_TEMP/android-build-contract-venv"
+        python = f'"{venv}/bin/python"'
+        setup = steps[prepare]["run"].replace("\\\n", " ")
+        self.assertIn('python3 --version &&', setup)
+        self.assertIn(f'python3 -m venv "{venv}" &&', setup)
+        self.assertIn(f'timeout --signal=TERM --kill-after=10s 3m {python} -m pip install', setup)
+        for flag in ("--require-hashes", "--no-deps", "--no-cache-dir", "--disable-pip-version-check", "--timeout 30", "--retries 1"):
+            self.assertIn(flag, setup)
+        self.assertEqual(re.findall(r"-r\s+(\S+)", setup), [".github/requirements-metrics.txt"])
+        consumer = steps[discovery]["run"].replace("\\\n", " ")
+        self.assertIn(f"{python} -B -m unittest discover -s tools/build -p 'test_*.py' -v", consumer)
+        self.assertNotIn("-m pip", consumer)
+        self.assertNotRegex(consumer, r"\bpython3\s+-B\s+-m unittest")
+        for step, stem, filename in ((steps[prepare], "setup", "offline-parser-setup.log"),
+                                     (steps[discovery], "contracts", "offline-build-contracts.log")):
+            self.assertEqual(step.get("timeout-minutes"), "5")
+            self.assertNotIn("if", step)
+            self.assertNotIn("continue-on-error", step)
+            script = step["run"]
+            self.assertIn("set -euo pipefail", script)
+            self.assertIn("set +e", script)
+            self.assertIn(f'2>&1 | tee evidence/{filename}\n{stem}_status=("${{PIPESTATUS[@]}}")\nset -e', script)
+            self.assertIn(f'if (( {stem}_status[0] != 0 )); then exit "${{{stem}_status[0]}}"; fi', script)
+            self.assertIn(f"(( {stem}_status[1] == 0 ))", script)
+            self.assertNotIn("|| true", script)
+        upload = next(step for step in steps if step["name"] == "Upload build logs and outputs (all outcomes)")
+        self.assertEqual(upload.get("if"), "always()")
+        self.assertIn("            evidence/", workflow)
+
+    def test_android_offline_discovery_uses_prepared_hash_pinned_isolated_parser_python(self):
+        self.assert_android_offline_parser_environment((ROOT / ".github/workflows/android.yml").read_text())
+
+    def test_android_offline_parser_environment_rejects_missing_late_or_bare_python_bootstrap(self):
+        original = (ROOT / ".github/workflows/android.yml").read_text()
+        prepare = re.search(r"(?ms)^      - name: Prepare hash-pinned offline parser environment\n.*?(?=^      - name: )", original).group()
+        discovery = re.search(r"(?ms)^      - name: Validate offline build and workflow contracts\n.*?(?=^      - name: )", original).group()
+        mutations = [("missing bootstrap", original.replace(prepare, "", 1)),
+                     ("late bootstrap", original.replace(prepare + discovery, discovery + prepare, 1))]
+        for old, new in (
+            ('"$RUNNER_TEMP/android-build-contract-venv/bin/python" -B', 'python3 -B'),
+            ('"$RUNNER_TEMP/android-build-contract-venv/bin/python" -m pip', 'python3 -m pip'),
+            ('python3 -m venv "$RUNNER_TEMP/android-build-contract-venv" &&', 'true &&'),
+            ('--require-hashes', ''), ('--no-deps', ''),
+            ('-r .github/requirements-metrics.txt', '-r .github/requirements-policy.txt'),
+            ('android-build-contract-venv/bin/python" -B', 'other-venv/bin/python" -B'),
+            ('timeout --signal=TERM --kill-after=10s 3m', ''),
+            ('--timeout 30', ''), ('--retries 1', ''),
+        ):
+            self.assertIn(old, original)
+            mutations.append((old, original.replace(old, new, 1)))
+        for name, mutated in mutations:
+            with self.subTest(mutation=name), self.assertRaises(AssertionError):
+                self.assert_android_offline_parser_environment(mutated)
+
+    def test_android_offline_parser_environment_rejects_suppressed_failures_and_missing_diagnostics(self):
+        original = (ROOT / ".github/workflows/android.yml").read_text()
+        for old, new in (
+            ('name: Prepare hash-pinned offline parser environment\n', 'name: Prepare hash-pinned offline parser environment\n        if: false\n'),
+            ('name: Validate offline build and workflow contracts\n', 'name: Validate offline build and workflow contracts\n        continue-on-error: true\n'),
+            ('timeout-minutes: 5\n        run: |\n          set -euo pipefail', 'run: |\n          set -euo pipefail'),
+            ('set -euo pipefail', 'set -eu'),
+            ('tee evidence/offline-parser-setup.log', 'cat'),
+            ('tee evidence/offline-build-contracts.log', 'cat'),
+            ('setup_status=("${PIPESTATUS[@]}")', 'setup_status=(0 0)'),
+            ('contracts_status=("${PIPESTATUS[@]}")', 'contracts_status=(0 0)'),
+            ('exit "${setup_status[0]}"', 'exit 0'),
+            ('exit "${contracts_status[0]}"', 'exit 0'),
+            ('(( setup_status[1] == 0 ))', 'true'),
+            ('(( contracts_status[1] == 0 ))', 'true'),
+        ):
+            self.assertIn(old, original)
+            with self.subTest(mutation=old), self.assertRaises(AssertionError):
+                self.assert_android_offline_parser_environment(original.replace(old, new, 1))
+
     def assert_repository_gate_tools(self, workflow, entrypoint):
         self.assertTrue(workflow.startswith("name: Repository policy\n"))
         self.assertNotRegex(workflow, r"\b[Mm][0-5]\b|[Mm][0-5][_-]|[Mm][0-5][A-Z]")
@@ -669,7 +773,7 @@ class SyntheticReportTests(unittest.TestCase):
                                      (LIVE_USAGE_CLASS, LIVE_USAGE_CASES), (BANKED_RESET_CLASS, BANKED_RESET_CASES), (HISTORY_CLASS, HISTORY_CASES), (HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES), (HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES), (HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES), (HISTORY_CHART_CLASS, HISTORY_CHART_CASES), (HISTORY_NAVIGATION_CLASS, HISTORY_NAVIGATION_CASES), (HISTORY_AUTHORITY_CLASS, HISTORY_AUTHORITY_CASES), (HISTORY_ISOLATION_CLASS, HISTORY_ISOLATION_CASES), (HISTORY_ASSEMBLED_CLASS, HISTORY_ASSEMBLED_CASES), (ACCOUNT_NAME_CLASS, ACCOUNT_NAME_CASES), (ACCOUNT_REMOVAL_CLASS, ACCOUNT_REMOVAL_CASES), (DEVICE_CODE_COPY_CLASS, DEVICE_CODE_COPY_CASES)):
                 for name in sorted(names - ({missing} if missing else set())):
                     ET.SubElement(suite, "testcase", classname=classname, name=name)
-        current = CURRENT_HISTORY_JVM if kind == "jvm" else CURRENT_HISTORY_NATIVE
+        current = (CURRENT_HISTORY_JVM | {SCANNER_CLASS: EXPECTED_CURRENT_READ_JVM} | EXPECTED_DASHBOARD_JVM) if kind == "jvm" else (CURRENT_HISTORY_NATIVE | EXPECTED_DASHBOARD_NATIVE)
         for classname, names in current.items():
             for name in sorted(names):
                 if name != missing:
@@ -691,8 +795,7 @@ class SyntheticReportTests(unittest.TestCase):
                 with self.subTest(kind=kind, container_depth=depth):
                     self.write_report(kind, container_depth=depth)
                     result = verify_reports(self.directory, kind)
-                    self.assertEqual(result["testCount"], len(EXPECTED[kind]) + sum(map(len, (CURRENT_HISTORY_NATIVE if kind == "native" else CURRENT_HISTORY_JVM).values())) +
-                                     (len(CREDENTIAL_CASES) + len(CONNECTION_CASES) + len(USAGE_REFRESH_CASES) + len(LIVE_USAGE_CASES) + len(BANKED_RESET_CASES) + len(HISTORY_CASES) + len(HISTORY_LIFETIME_CASES) + len(HISTORY_SAMPLING_CASES) + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) if kind == "native" else 0))
+                    self.assertEqual(result["testCount"], 147 if kind == "native" else 49)
 
     def test_rejects_missing_tests(self):
         for kind in EXPECTED:

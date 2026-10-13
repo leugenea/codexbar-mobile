@@ -60,6 +60,7 @@ internal class HistoryGraphEntry(val source: HistoryEntry, windows: Collection<H
 internal class HistoryDisplayContext(val generation: HistoryGeneration?) {
     /** Updated on the existing owner lane before publication; independent of delayed collectors. */
     @Volatile var periods: CurrentHistoryPeriods = CurrentHistoryPeriods()
+    @Volatile var selection: HistoryDisplaySelection? = null
 }
 
 /** Read-only view of the recorder's actual worker/display revocation slot, not collected state. */
@@ -91,7 +92,11 @@ internal class HistoryGraphSnapshot(
     val lostSamples: Long = 0,
     val live: HistoryLiveMetadata = HistoryLiveMetadata(),
     val displayPermission: HistoryDisplayPermission? = null,
+    val request: HistoryPresentationRequest = HistoryPresentationRequest.Page(query),
+    val selection: HistoryDisplaySelection? = displayPermission?.context?.selection,
+    val currentPages: CurrentHistoryPages? = null,
 ) {
+    init { require(storage == null || currentPages == null) }
     val usedUnit = HistoryUnit.PERCENT
     val baselineUnit = HistoryUnit.PERCENT
     val deltaUnit = HistoryUnit.PERCENTAGE_POINTS

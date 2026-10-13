@@ -81,7 +81,10 @@ class CurrentHistoryContracts(unittest.TestCase):
         self.assertIn("page.nextAfter", scan)
         self.assertIn("query.limit + 1", scan)
         self.assertIn("HistoryTextComponent", host)
-        self.assertIn("authority?.periods", host)
+        root = (main / "DashboardNavigation.kt").read_text()
+        self.assertIn("authority?.periods", root)
+        self.assertIn("controller.currentHistoryDisplayContext()", root)
+        self.assertNotIn("historySnapshots.value", root + host)
         self.assertNotRegex(host, r"rememberSaveable|SQLiteHistory|usageForeground")
 
 

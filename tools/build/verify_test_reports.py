@@ -60,6 +60,9 @@ CURRENT_HISTORY_JVM = {
         "selectedOrdinalHolesCorrectionsAndResetBoundariesCannotCreateContiguousMeasuredEdges",
         "emptySelectionRetentionReadFailuresCorruptionAndRevocationRemainExplicit",
         "keyedUnknownPercentStatusIsRetainedWithoutInventedMeasurementOrReference",
+        "jointCurrentScanFindsBothWindowsBehindArchivesWithIndependentLookahead",
+        "jointCurrentScanMissingKeysStatusRetentionAndFailuresStayTyped",
+        "jointCurrentScanHasOneHighWaterCeilingAndRejectsRevocation",
     },
 }
 CURRENT_HISTORY_NATIVE = {
@@ -287,6 +290,50 @@ DEVICE_CODE_COPY_CASES = {
 }
 
 
+
+DASHBOARD_JVM = {
+    'io.github.leugenea.codexbarmobile.DashboardPresentationTest': {
+        'compactChartEquivalentUsesOriginalExactFactsAndIndependentReferences',
+        'compactMissingChartAndPhaseActionsKeepTypedErrorsAndSinglePointTruth',
+        'reportedInventoryCountNeverFallsBackToSummaryRowsOrZero',
+    },
+    'io.github.leugenea.codexbarmobile.history.HistoryDisplayAuthorityTest': {
+        'currentNullDiagnosticSelectionCannotReplaySuccessorOrRetiredLoss',
+        'heldJointFactsRejectEqualRequestAfterRouteRoundTrip',
+        'heldJointFactsRejectResetExpiryClockLossAndRetiredContexts',
+    },
+    'io.github.leugenea.codexbarmobile.history.UsageHistoryRecorderTest': {
+        'heldJointRequestRejectsRouteQueryAndAccountSuccessors',
+        'jointRequestPreservesQueueLossGapAndContiguousDurableOrdinals',
+        'jointRequestUsesOneWorkerAndCoalescesLatestSelectionWithoutAdmissions',
+        'admittedPreappendFailureUnderChangedSelectionRetainsActualLossAndNextGap',
+        'admittedAppendFailureUnderChangedSelectionRetainsActualLossWithoutPresentationLoss',
+    },
+}
+DASHBOARD_NATIVE = {
+    'io.github.leugenea.codexbarmobile.DashboardCopyAndTimeTest': {
+        'dashboardAndDisclosureFollowPhoneZoneLocaleAndTicksWithoutRequests',
+        'noReachableTextOrSemanticsUsesRemovedTimePhraseWhileOriginalInstantsRemainExact',
+    },
+    'io.github.leugenea.codexbarmobile.DashboardHistoryIsolationTest': {
+        'heldPairCollectionCannotReplayEqualQueryAfterDetailsRoundTrip',
+        'heldPairCollectionCannotReplayPreviousPeriodAfterResetExpiryOrClockLoss',
+        'heldPairReadCannotPublishAcrossRouteSwitchAccountReplacementAndForegroundRetirement',
+        'pairReadsRemainBoundedBehindArchivesAndCoalesceWithoutExtraAdmissions',
+    },
+    'io.github.leugenea.codexbarmobile.DashboardUiTest': {
+        'bankedDisclosureUsesReportedCountAndRetainsEveryExpiryAndUnknownRow',
+        'dashboardActionsFollowConnectionPhaseAndDormantNavigationDoesNotRead',
+        'dashboardDarkLandscapeAndLargeFontKeepAccessibleTargetsAndCompleteText',
+        'dashboardMissingEmptySingleAndFailedHistoryHaveOneHonestLinePerWindow',
+        'dashboardShowsBothCurrentWindowsWithoutHistoryNavigationAndRetainsMeasuredReferencePixels',
+        'drawerHasExactTwoLabelsBackPrecedenceAndDetailsReturnToDashboard',
+        'dashboardKnownPercentPreservesMalformedResetAndIndependentCurrentSiblingWarning',
+    },
+}
+DASHBOARD_NATIVE_COUNT = sum(map(len, DASHBOARD_NATIVE.values()))
+DASHBOARD_JVM_COUNT = sum(map(len, DASHBOARD_JVM.values()))
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -312,7 +359,8 @@ def verify_reports(directory: Path, kind: str) -> dict:
     if missing:
         raise ValueError(f"Missing real {kind} launch/refresh tests: {sorted(missing)}")
     current_history = CURRENT_HISTORY_JVM if kind == "jvm" else CURRENT_HISTORY_NATIVE
-    for classname, required in current_history.items():
+    dashboard = DASHBOARD_JVM if kind == "jvm" else DASHBOARD_NATIVE
+    for classname, required in (current_history | dashboard).items():
         for name in required:
             matches = [case for case in cases if case["class"] == classname and case["name"] == name]
             if len(matches) != 1:

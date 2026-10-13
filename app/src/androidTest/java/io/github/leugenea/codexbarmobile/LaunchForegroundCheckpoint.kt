@@ -28,6 +28,7 @@ internal class LaunchForegroundCheckpoint : Application.ActivityLifecycleCallbac
     private val caller = ThreadLocal<Caller?>()
     private val epochs = mutableListOf<Epoch>()
     private val submissions = IdentityHashMap<Any, Int>()
+    private val submittedObservers = IdentityHashMap<Any, Any>()
     private val registrations = mutableListOf<Pair<MainActivity, LifecycleEventObserver>>()
     private lateinit var transport: NavigationTransport
     private var installed = false
@@ -121,7 +122,7 @@ internal class LaunchForegroundCheckpoint : Application.ActivityLifecycleCallbac
         try { return action() } finally { caller.set(previous) }
     }
 
-    private fun diagnostics(): String = synchronized(gate) {
+    fun diagnostics(): String = synchronized(gate) {
         "epochs=$epochs, ownerEpoch=$ownerEpoch, requests=${transport.requests.get()}, gets=${transport.gets.get()}, " +
             "calls=${transport.calls.map { "${it.path}(epoch=${it.epoch}, cancelled=${it.cancelled}, live=${it.live()})" }}"
     }
@@ -172,10 +173,16 @@ internal class LaunchForegroundCheckpoint : Application.ActivityLifecycleCallbac
         private val serial = Dispatchers.IO.limitedParallelism(1)
         override fun dispatch(context: CoroutineContext, block: Runnable) {
             val command = synchronized(gate) {
-                caller.get()?.takeIf { installed && it.epoch != null }?.let {
+                val ticket = context[UsageForegroundCommand]
+                caller.get()?.takeIf { ticket != null && installed && it.epoch != null }?.let {
+                    val typed = requireNotNull(ticket)
                     val count = (submissions[it.origin] ?: 0) + 1
+                    assertTrue("Foreground ingress has only true then false", count in 1..2)
+                    assertEquals("Actual foreground boolean matches its ingress sequence", count == 1, typed.foreground)
+                    if (count == 1) submittedObservers[it.origin] = typed.observer
+                    else assertSame("START/STOP use the exact observer", submittedObservers[it.origin], typed.observer)
                     submissions[it.origin] = count
-                    Command(requireNotNull(it.epoch), count == 1)
+                    Command(requireNotNull(it.epoch), typed.foreground)
                 }
             }
             serial.dispatch(context, Runnable {

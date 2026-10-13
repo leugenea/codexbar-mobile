@@ -9,9 +9,19 @@ import xml.etree.ElementTree as ET
 from test_history_text_contract import HistoryTextContracts
 from test_native_coverage_retry import RetryContracts, synthetic_reports
 from verify_test_reports import LIVE_USAGE_CLASS, LIVE_USAGE_CASES, verify_reports
+from test_dashboard_contract import dashboard_captures
 from verify_history_text_captures import LIVE_CAPTURES, LIVE_FACTS, live_capture_receipt, verify_gallery
 
 ROOT = Path(__file__).resolve().parents[2]
+# Independent native-copy expectations; the fixture never copies the validator's subject.
+EXPECTED_LIVE_FACTS = {
+    "live-five-hour-percent": "12.5% used",
+    "live-weekly-percent": "76.25% used",
+    "live-five-hour-reset-absolute": "Reset: Oct 8, 2026, 01:00",
+    "live-five-hour-reset-relative": "Reset: 0 days 1 hour remaining",
+    "live-weekly-reset-absolute": "Reset: Oct 10, 2026, 01:00",
+    "live-weekly-reset-relative": "Reset: 2 days 1 hour remaining",
+}
 NEW_CASES = {"productionLiveLightPaintAndExactUsageResetCapture", "productionLiveDarkPaintAndLargeFontRemainReadable"}
 
 
@@ -28,13 +38,34 @@ class LiveUsageVisualContracts(unittest.TestCase):
             samples = [dict(kind=kind, x=1, y=1, targetArgb=-16777216, actualArgb=-16777216,
                             matched=True, bounds=[0, 0, 2, 3])
                        for kind in ("background", "card", "content", "progress", "track")]
-            data = dict(name=name, screen="live-usage", synthetic=True, productionEntry=True,
+            data = dict(name=name, screen="live-usage", route="CONNECTION_DETAILS", synthetic=True, productionEntry=True,
                         activity=LIVE_USAGE_CLASS.replace("LiveUsageScreenTest", "MainActivity"), phase="OBSERVED",
                         api=36, orientation=1, dark=dark, fontScale=1.0, layoutFontScale=1.0,
                         density=1, layoutDensity=1, renderedLocale="en-US", width=2, height=3,
-                        visibleFacts=LIVE_FACTS, visibleControls=[], visibleRoots=["connection-screen"], pixelSamples=samples, pixelOraclePassed=True)
+                        visibleFacts=EXPECTED_LIVE_FACTS, visibleControls=[], visibleRoots=["connection-screen"], pixelSamples=samples, pixelOraclePassed=True)
             (self.directory / (name + ".png")).write_bytes(self.fixture.png(2, 3))
             (self.directory / (name + ".json")).write_text(json.dumps(data))
+        dashboard_captures(self.directory, self.fixture)
+
+    def test_suffix_free_native_copy_and_capture_expectations_are_independently_exact(self):
+        self.assertEqual(LIVE_FACTS, EXPECTED_LIVE_FACTS)
+        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/LiveUsageScreenTest.kt").read_text()
+        for tag, expected in EXPECTED_LIVE_FACTS.items():
+            if tag.endswith("-percent"):
+                window = tag.removesuffix("-percent")
+                self.assertRegex(source, re.escape(f'progress("{window}",') + r'[^\n]*' + re.escape(f'"{expected}")'))
+            else:
+                self.assertIn(f'text("{tag}", "{expected}")', source)
+        self.captures()
+        for name in LIVE_CAPTURES:
+            path = self.directory / (name + ".json")
+            data = json.loads(path.read_text())
+            for tag in ("live-five-hour-reset-absolute", "live-weekly-reset-absolute"):
+                changed = copy.deepcopy(data)
+                changed["visibleFacts"][tag] += " (hour precision)"
+                path.write_text(json.dumps(changed))
+                with self.subTest(name=name, tag=tag), self.assertRaises(ValueError):
+                    live_capture_receipt(path.with_suffix(".png"))
 
     def test_new_cases_are_registered_and_keep_all_inherited_cases(self):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/LiveUsageScreenTest.kt").read_text()
@@ -71,7 +102,7 @@ class LiveUsageVisualContracts(unittest.TestCase):
 
     def test_gallery_preserves_17_history_images_and_requires_both_live_images(self):
         self.captures()
-        self.assertEqual(len(verify_gallery(self.directory)), 21)
+        self.assertEqual(len(verify_gallery(self.directory)), 28)
         for name in LIVE_CAPTURES:
             self.captures()
             (self.directory / (name + ".png")).unlink()

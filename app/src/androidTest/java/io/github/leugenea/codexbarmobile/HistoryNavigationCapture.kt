@@ -52,11 +52,12 @@ internal class HistoryNavigationCapture(private val compose: ComposeTestRule) {
 
     private fun metadata(name: String, scenario: androidx.test.core.app.ActivityScenario<MainActivity>,
         fixture: HistoryNavigationFixture, bitmap: Bitmap, visible: List<String>): JSONObject {
-        val source = fixture.owner.historySnapshots.value
+        val source = recordedHistory(fixture.owner)
         val metadata = JSONObject().put("synthetic", true).put("name", name).put("api", Build.VERSION.SDK_INT)
             .put("width", bitmap.width).put("height", bitmap.height).put("productionEntry", true)
             .put("visibleRoots", JSONArray(listOf("connection-screen")))
             .put("activity", MainActivity::class.java.name).put("visibleControls", JSONArray(visible))
+            .put("route", if (canvasName(name)) "DASHBOARD" else "LOCAL_HISTORY_DETAILS")
             .put("scope", "production MainActivity navigation with synthetic persisted admissions; no live-provider evidence")
             .put("phase", fixture.owner.state.value.phase.name).put("queryLimit", source.query.limit)
             .put("queryAfter", source.query.after?.ordinal ?: 0).put("queryKind", source.query.kind?.name)
@@ -72,6 +73,8 @@ internal class HistoryNavigationCapture(private val compose: ComposeTestRule) {
         }
         return metadata
     }
+
+    private fun canvasName(name: String) = name == "history-integrated-chart-portrait-light"
 
     private fun addCanvas(metadata: JSONObject, tag: String, bitmap: Bitmap) {
         val node = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode()

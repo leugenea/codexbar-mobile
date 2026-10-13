@@ -54,7 +54,7 @@ internal class LiveUsageCapture(private val compose: ComposeTestRule) {
     private fun metadata(name: String, dark: Boolean, scenario: ActivityScenario<MainActivity>, owner: ConnectionController,
         bitmap: Bitmap, layout: TextLayoutResult): JSONObject {
         val data = JSONObject().put("name", name).put("screen", "live-usage").put("synthetic", true)
-            .put("productionEntry", true).put("activity", MainActivity::class.java.name).put("api", Build.VERSION.SDK_INT)
+            .put("route", "CONNECTION_DETAILS").put("productionEntry", true).put("activity", MainActivity::class.java.name).put("api", Build.VERSION.SDK_INT)
             .put("width", bitmap.width).put("height", bitmap.height).put("phase", owner.state.value.phase.name)
             .put("visibleControls", JSONArray()).put("visibleRoots", JSONArray(listOf("connection-screen")))
             .put("scope", "production MainActivity and default process owner, real isolated Keystore, synthetic transport; not live provider")

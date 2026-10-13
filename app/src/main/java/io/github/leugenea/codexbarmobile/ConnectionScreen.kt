@@ -109,22 +109,7 @@ internal object NativeConnection {
 }
 
 @Composable
-internal fun ConnectionScreen(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit) {
-    var historyOpen by remember { mutableStateOf(false) }
-    val accountName by controller.accountName.collectAsState()
-    Column(Modifier.fillMaxSize().testTag("connection-screen").verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        AccountNameHeader(accountName, controller::renameAccount)
-        OutlinedButton(onClick = { historyOpen = !historyOpen }, modifier = Modifier.testTag("history-toggle")) {
-            Text(stringResource(if (historyOpen) R.string.history_return_connection else R.string.history_open))
-        }
-        if (historyOpen) ConnectionHistory(controller, state.refresh.evaluatedAt)
-        else ConnectionContent(state, controller, openBrowser)
-    }
-}
-
-@Composable
-private fun ConnectionContent(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit) {
+internal fun ConnectionContent(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit) {
     LiveUsageScreen(state) { controller.readUsage() }
     Text(stringResource(R.string.gate_identity))
     Text(stringResource(R.string.gate_boundary))

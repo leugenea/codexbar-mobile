@@ -203,7 +203,9 @@ class UsageHistoryIntegrationTest {
             compose.waitForIdle()
             awaitConnectionScreen(compose, current)
             current.connect(); phase(current, ConnectionPhase.OBSERVED)
-            composeHistory(current, "Compose observer records connect usage") { it.points.size == 1 }
+            composeHistory(current, "Compose observer records connect usage") {
+                it.request is HistoryPresentationRequest.Current && recordedHistory(it).points.size == 1
+            }
             val initial = capability(current)
             scenario.moveToState(Lifecycle.State.CREATED)
             // Graph invalidation precedes native revoke; coordinator availability is post-revoke.
@@ -217,8 +219,12 @@ class UsageHistoryIntegrationTest {
             fake.advance(1_000)
             scenario.moveToState(Lifecycle.State.RESUMED)
             compose.waitForIdle()
-            composeHistory(current, "RESUME records one fresh observation with background break") { it.points.size == 2 }
-            assertTrue(BreakReason.BACKGROUND in current.historySnapshots.value.points.last().segment.breaks)
+            composeHistory(current, "RESUME records one fresh observation with background break") {
+                it.request is HistoryPresentationRequest.Current && recordedHistory(it).points.size == 2
+            }
+            val resumed = current.historySnapshots.value
+            assertTrue(resumed.request is HistoryPresentationRequest.Current)
+            assertTrue(BreakReason.BACKGROUND in recordedHistory(resumed).points.last().segment.breaks)
             assertEquals(4L, fake.gets.get())
             val beforeRecreation = current.historySnapshots.value.generation
             scenario.recreate(); compose.waitForIdle()
@@ -270,8 +276,10 @@ class UsageHistoryIntegrationTest {
     private fun composeHistory(current: ConnectionController, step: String, predicate: (HistoryGraphSnapshot) -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 5_000) { predicate(current.historySnapshots.value) } }
         catch (_: ComposeTimeoutException) {
-            throw AssertionError("$step: last readiness=${current.historySnapshots.value.readiness}, " +
-                "points=${current.historySnapshots.value.points.size}, coordinator=${current.historyAvailability}")
+            val source = current.historySnapshots.value
+            throw AssertionError("$step: last readiness=${source.readiness}, request=${source.request}, " +
+                "currentPages=${source.currentPages != null}, selected=${recordedHistory(source).query}, " +
+                "points=${recordedHistory(source).points.size}, coordinator=${current.historyAvailability}")
         }
     }
     private fun awaitProtectedRemoval() = runBlocking {

@@ -1,5 +1,6 @@
 """Synthetic report/capture parser controls only; never execute application code."""
 from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT
+from dashboard_contract_expectations import EXPECTED_DASHBOARD_NATIVE_COUNT
 import json
 import os
 from pathlib import Path
@@ -19,7 +20,7 @@ from verify_test_reports import HISTORY_ASSEMBLED_CASES, HISTORY_ASSEMBLED_CLASS
 from verify_test_reports import HISTORY_AUTHORITY_CASES, HISTORY_NAVIGATION_CASES, HISTORY_CHART_CASES, HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, verify_reports
 from unittest.mock import patch
 from verify_history_text_captures import CAPTURES, CHART_COUNTS, INTEGRATED_CAPTURES, INTEGRATED_CONTROLS, PNG_CHANNELS, png_size, read_png, verify_captures
-from verify_history_text_captures import ASSEMBLED_CAPTURES, ASSEMBLED_PAGES, ASSEMBLED_CONTROLS, ASSEMBLED_COUNTS
+from verify_history_text_captures import PRODUCTION_ROUTES, ASSEMBLED_CAPTURES, ASSEMBLED_PAGES, ASSEMBLED_CONTROLS, ASSEMBLED_COUNTS
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRATCH = Path(os.environ.get("BUILD_CONTRACT_SCRATCH", tempfile.gettempdir()))
@@ -53,7 +54,7 @@ class HistoryTextContracts(unittest.TestCase):
         self.assertEqual(HISTORY_TEXT_CASES, RETAINED_TEXT_CASES)
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), RETAINED_TEXT_CASES)
         self.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 80 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT)
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 80 + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT)
         for name in RETAINED_TEXT_CASES:
             self.report(name)
             with self.assertRaisesRegex(ValueError, "Missing real native history text"):
@@ -101,6 +102,14 @@ class HistoryTextContracts(unittest.TestCase):
                     metadata.update(pixelOraclePassed=True, canvasLeft=0.1, canvasTop=0.1, canvasRight=1.9, canvasBottom=1.9,
                                     canvasClippedLeft=0.1, canvasClippedTop=0.1, canvasClippedRight=1.9, canvasClippedBottom=1.9)
                     metadata["pixelSamples"] = self.assembled_samples(ASSEMBLED_COUNTS[name])
+            if name in PRODUCTION_ROUTES:
+                metadata["route"] = PRODUCTION_ROUTES[name]
+            if name in ASSEMBLED_CAPTURES:
+                if metadata["route"] == "DASHBOARD":
+                    metadata.pop("uiCursor", None)
+                    metadata["layoutLabel"] = "dashboard-no-info-FIVE_HOUR" if name == "history-assembled-fresh-portrait-light" else "history-chart-five-hour-equivalent"
+                else:
+                    metadata["layoutLabel"] = "history-page-cursor"
             image = self.png(*size)
             if name.startswith("history-current-"):
                 image = self.current_capture(metadata, name, dark)

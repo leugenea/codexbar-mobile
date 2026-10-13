@@ -34,51 +34,61 @@ class CurrentWindowHistoryTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             settings.observe(compose, scenario, false, dark, 1f)
             val requests = fixture.transport.counts()
-            open()
+            openDashboard()
             page(listOf(301L, 302L, 304L, 305L, 306L))
-            assertEquals(307L, owner.historySnapshots.value.storage!!.lastAdmitted!!.ordinal)
-            compose.onNodeWithTag("$five-counts").assertTextEquals(
-                "Drawn markers: 5 · Within-run connections: 2 · Nominal reference lines: 2")
-            listOf("history-current-policy", "$five-title", "$five-legend", "$five-counts", "$five-first", "$five-last",
-                "history-legend", "history-assumption", "history-sparse").forEach(capture::label)
+            assertEquals(307L, recordedHistory(owner).storage!!.lastAdmitted!!.ordinal)
+            assertCurrentDrawing(recordedHistory(owner), 5, 2, 2)
+            listOf("$five-title", "$five-legend", "$five-equivalent", "$five-first", "$five-last").forEach(capture::label)
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
             capture.capture(if (dark) "history-current-dark-portrait" else "history-current-light-portrait", scenario, fixture, emptyList(), chart = true)
+            openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
+            await("initial stored page for current exact facts") {
+                recordedHistory(owner).query == HistoryNavigation().query && recordedHistory(owner).storage?.entries?.size == 32
+            }
+            repeat(9) {
+                click("history-next-page")
+                val after = (it + 1) * 32L
+                await("stored cursor $after and completed page") {
+                    recordedHistory(owner).query.after?.ordinal == after && recordedHistory(owner).storage != null
+                }
+            }
             click("history-details-toggle")
+            repeat(12) { click("history-next") }
             fact("Admission ordinal: 301")
             fact("Measured used percent (exact %): 12.375")
             fact("Observed-only delta (percentage points): -69.29166666666666666666666666666667")
             click("history-next"); fact("Admission ordinal: 302"); fact("Measured used percent (exact %): 35")
-            click("history-next"); fact("Admission ordinal: 304"); fact("Segment break: background")
+            click("history-next"); click("history-next"); fact("Admission ordinal: 304"); fact("Segment break: background")
             click("history-next"); fact("Admission ordinal: 305"); fact("Measured used percent (exact %): 10"); fact("Baseline and delta unavailable: uncertain correction")
             click("history-next"); fact("Admission ordinal: 306"); fact("Measured used percent (exact %): 30")
+            click("history-next"); fact("Admission ordinal: 307")
             compose.onNodeWithTag("history-next").performScrollTo().assertIsNotEnabled()
-            click("history-select-WEEKLY")
-            page(listOf(301L))
-            compose.onNodeWithTag("history-chart-weekly-counts").assertTextEquals(
-                "Drawn markers: 1 · Within-run connections: 0 · Nominal reference lines: 1")
+            returnDashboard(compose, owner)
+            await("weekly pair visible") { recordedHistory(owner, WindowKind.WEEKLY).points.size == 1 }
+            assertCurrentDrawing(recordedHistory(owner, WindowKind.WEEKLY), 1, 0, 1)
             assertEquals(requests, fixture.transport.counts())
-            assertEquals(307L, owner.historySnapshots.value.storage!!.lastAdmitted!!.ordinal)
+            assertEquals(307L, recordedHistory(owner).storage!!.lastAdmitted!!.ordinal)
         }
     }
 
     @Test fun expiryChangedResetUnknownAndAmbiguousRetireCurrentChartsWithoutArchivedFallback() {
         login()
         ActivityScenario.launch(MainActivity::class.java).use {
-            open(); page(listOf(1L))
-            val original = owner.historySnapshots.value.query.window!!
+            openDashboard(); page(listOf(1L))
+            val original = recordedHistory(owner).query.window!!
             fixture.transport.advance(3_600_000)
             fixture.transport.usageStatus = 403
             fixture.transport.inventoryStatus = 200
             owner.readUsage()
             expired(original)
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assertDoesNotExist()
-            compose.onNodeWithTag("history-current-unavailable").assertExists()
+            compose.onNodeWithTag("dashboard-no-info-FIVE_HOUR").assertExists()
             fixture.transport.usageStatus = 200
             fixture.transport.usageBody = usage(1_800_007_200L)
             owner.readUsage()
             currentReset(1_800_007_200L)
-            assertNotEquals(original, owner.historySnapshots.value.query.window)
-            assertTrue(owner.historySnapshots.value.points.all { it.segment.window == owner.historySnapshots.value.query.window })
+            assertNotEquals(original, recordedHistory(owner).query.window)
+            assertTrue(recordedHistory(owner).points.all { it.segment.window == recordedHistory(owner).query.window })
             for ((index, body) in listOf(HistoryAcceptanceAdmissions.UNKNOWN_USAGE,
                 """{"rate_limit":{"primary_window":{"limit_window_seconds":18000,"used_percent":1,"reset_at":1800007200},"secondary_window":{"limit_window_seconds":18000,"used_percent":2,"reset_at":1800007200}}}""").withIndex()) {
                 fixture.transport.advance(1000)
@@ -86,7 +96,7 @@ class CurrentWindowHistoryTest {
                 owner.readUsage()
                 await("unknown or ambiguous current period cannot replay an earlier chart") {
                     !owner.state.value.refresh.refreshing && owner.state.value.refresh.usage.success?.observedAt?.epochSecond == 1_800_003_601L + index &&
-                        owner.historySnapshots.value.query.window == null && owner.historySnapshots.value.storage == null
+                        recordedHistory(owner).query.window == null && recordedHistory(owner).storage == null
                 }
                 compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assertDoesNotExist()
             }
@@ -99,27 +109,27 @@ class CurrentWindowHistoryTest {
         await("restored owner dormant") { owner.state.value.phase == ConnectionPhase.RESTORED }
         ActivityScenario.launch(MainActivity::class.java).use {
             val requests = fixture.transport.counts()
-            open()
-            await("current identity unavailable without live facts") { owner.historySnapshots.value.query.currentOnly && owner.historySnapshots.value.storage == null }
+            openDashboard()
+            await("current identity unavailable without live facts") { recordedHistory(owner).query.currentOnly && recordedHistory(owner).storage == null }
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assertDoesNotExist()
-            click("history-stored-text")
-            await("archived facts reachable as text") { !owner.historySnapshots.value.query.currentOnly && owner.historySnapshots.value.storage?.entries?.size == 1 }
+            openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
+            await("archived facts reachable as text") { !recordedHistory(owner).query.currentOnly && recordedHistory(owner).storage?.entries?.size == 1 }
             click("history-details-toggle"); fact("Measured used percent (exact %): 12.375")
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assertDoesNotExist()
             assertEquals(requests, fixture.transport.counts())
-            assertEquals(1L, owner.historySnapshots.value.storage!!.lastAdmitted!!.ordinal)
+            assertEquals(1L, recordedHistory(owner).storage!!.lastAdmitted!!.ordinal)
         }
     }
 
     private fun expired(window: WindowIdentity) = await("existing evaluation clock expires the original period after the failed read settles") {
-        val source = owner.historySnapshots.value
+        val source = recordedHistory(owner)
         owner.state.value.refresh.evaluatedAt == window.resetAt && !source.live.refreshing &&
             source.live.usage.error == io.github.leugenea.codexbarmobile.transport.ReadError.FORBIDDEN &&
             source.query.currentOnly && source.query.window == null && source.storage == null
     }
 
     private fun currentReset(reset: Long) = await("changed reset identity has its own actual retained measurement") {
-        val source = owner.historySnapshots.value
+        val source = recordedHistory(owner)
         source.query.window?.resetAt?.epochSecond == reset && source.storage != null && source.points.size == 1 && !source.live.refreshing
     }
 
@@ -127,14 +137,14 @@ class CurrentWindowHistoryTest {
         fixture.transport.usageBody = usage(1_799_999_000L)
         login()
         val access = capability()
-        val first = owner.historySnapshots.value.storage!!.entries.single()
+        val first = recordedHistory(owner).storage!!.entries.single()
         val old = owner.state.value.refresh.usage.success!!.usage!!
         for (ordinal in 2L..300L) append(access, first, ordinal, ordinal - 1, HistoryEvent.Observed(old.copy(
             observedAt = old.observedAt!!.plusSeconds(ordinal - 1))))
         fixture.transport.advance(300_000)
         fixture.transport.usageBody = NavigationTransport.USAGE
         owner.readUsage()
-        await("live current identity and real ordinal 301 recorded") { owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 301L && !owner.state.value.refresh.refreshing }
+        await("live current identity and real ordinal 301 recorded") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 301L && !owner.state.value.refresh.refreshing }
         val current = owner.state.value.refresh.usage.success!!.usage!!
         fun measured(percent: String, seconds: Long, reset: Long = 1_800_003_600L): HistoryEvent = HistoryEvent.Observed(
             UsageNormalizer.normalize(UsageInput(Input.Value(WindowInput(Input.Value(18000L), Input.Value(BigDecimal(percent)), Input.Value(reset)))),
@@ -167,12 +177,12 @@ class CurrentWindowHistoryTest {
         owner.usageForeground(fixture.observer, true)
         owner.connect()
         await("real synthetic connect usage persisted") { owner.state.value.phase == ConnectionPhase.OBSERVED &&
-            !owner.state.value.refresh.refreshing && owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L }
+            !owner.state.value.refresh.refreshing && recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L }
     }
 
-    private fun open() { awaitConnectionScreen(compose, owner); click("history-toggle") }
+    private fun openDashboard() { awaitConnectionScreen(compose, owner); returnDashboard(compose, owner) }
     private fun page(ordinals: List<Long>) = await("current bounded selected ordinals $ordinals") {
-        owner.historySnapshots.value.let { source -> source.query.currentOnly && source.query.window != null &&
+        recordedHistory(owner).let { source -> source.query.currentOnly && source.query.window != null &&
             source.readiness == HistoryReadiness.READY && source.storage?.entries?.map { it.id.ordinal } == ordinals }
     }
     private fun click(tag: String) { compose.onNodeWithTag(tag).performScrollTo().performClick(); compose.waitForIdle() }
@@ -180,7 +190,7 @@ class CurrentWindowHistoryTest {
     private fun usage(reset: Long) = """{"rate_limit":{"primary_window":{"limit_window_seconds":18000,"used_percent":12.375,"reset_at":$reset}}}"""
     private fun await(step: String, predicate: () -> Boolean) {
         try { compose.waitUntil(8_000, predicate) } catch (error: ComposeTimeoutException) {
-            throw AssertionError("$step: phase=${owner.state.value.phase}, evaluated=${owner.state.value.refresh.evaluatedAt}, query=${owner.historySnapshots.value.query}, readiness=${owner.historySnapshots.value.readiness}, ordinals=${owner.historySnapshots.value.storage?.entries?.map { it.id.ordinal }}", error)
+            throw AssertionError("$step: phase=${owner.state.value.phase}, evaluated=${owner.state.value.refresh.evaluatedAt}, query=${recordedHistory(owner).query}, readiness=${recordedHistory(owner).readiness}, ordinals=${recordedHistory(owner).storage?.entries?.map { it.id.ordinal }}", error)
         }
     }
 }

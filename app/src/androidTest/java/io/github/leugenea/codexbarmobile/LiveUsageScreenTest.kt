@@ -128,12 +128,13 @@ class LiveUsageScreenTest {
                     !owner.state.value.refresh.refreshing &&
                         compose.onAllNodes(hasTestTag("live-five-hour-percent")).fetchSemanticsNodes().isNotEmpty()
                 }
+                openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
                 representativeFacts()
                 listOf("live-identity", "live-status", "live-allowed", "live-limit", "live-rounding",
                     "live-five-hour-percent", "live-weekly-percent", "live-five-hour-reset-absolute",
                     "live-weekly-reset-absolute", "live-five-hour-reset-relative", "live-weekly-reset-relative").forEach(::noOverflow)
                 compose.onNodeWithTag("live-refresh").performScrollTo().assertIsDisplayed().assertHasClickAction()
-                click("history-toggle")
+                openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
                 compose.onNodeWithTag("history-select-FIVE_HOUR").performScrollTo().assertIsDisplayed()
             }
         }
@@ -157,9 +158,9 @@ class LiveUsageScreenTest {
     private fun representativeFacts() {
         progress("live-five-hour", 0.125f, "Five-hour window · 12.5% used", "Provider-reported usage", "12.5% used")
         progress("live-weekly", 0.7625f, "Weekly window · 76.25% used", "Provider-reported usage", "76.25% used")
-        text("live-five-hour-reset-absolute", "Reset: Oct 8, 2026, 01:00 (hour precision)")
+        text("live-five-hour-reset-absolute", "Reset: Oct 8, 2026, 01:00")
         text("live-five-hour-reset-relative", "Reset: 0 days 1 hour remaining")
-        text("live-weekly-reset-absolute", "Reset: Oct 10, 2026, 01:00 (hour precision)")
+        text("live-weekly-reset-absolute", "Reset: Oct 10, 2026, 01:00")
         text("live-weekly-reset-relative", "Reset: 2 days 1 hour remaining")
         text("live-allowed", "Provider permission: allowed")
         text("live-limit", "Provider limit status: limit not reached")
@@ -180,7 +181,7 @@ class LiveUsageScreenTest {
             fake.usage = response(weekly("12.345678901234567890",
                 reset = ",\"reset_at\":1791594000,\"reset_after_seconds\":176400"))
             read()
-            text("live-weekly-reset-absolute", "Reset: Oct 10, 2026, 01:00 (hour precision)")
+            text("live-weekly-reset-absolute", "Reset: Oct 10, 2026, 01:00")
             text("live-weekly-reset-relative", "Reset: 2 days 0 hours remaining")
             progress("live-weekly", 0.12345679f, "Weekly window · 12.345678901234567890% used",
                 "Provider-reported usage", "12.345678901234567890% used")
@@ -272,7 +273,7 @@ class LiveUsageScreenTest {
         fake.usage = response(fiveHour("12.5", reset = ",\"reset_at\":1793514600"))
         launchLive().use {
             read()
-            text("live-five-hour-reset-absolute", "Reset: Nov 1, 2026, 01:00 UTC-05:00 (hour precision)")
+            text("live-five-hour-reset-absolute", "Reset: Nov 1, 2026, 01:00 UTC-05:00")
             text("live-five-hour-reset-relative", "Reset: 0 days 1 hour remaining")
             compose.onNodeWithTag("live-five-hour-reset-absolute").assertExists()
             compose.onNodeWithTag("live-five-hour-reset-relative").assertExists()
@@ -293,6 +294,7 @@ class LiveUsageScreenTest {
             waitFor("landscape resumed refresh settled") {
                 owner.state.value.refresh.usage.attempt !== previous && !owner.state.value.refresh.refreshing
             }
+            reconstructedConnectionDetails()
             listOf("live-identity", "live-rounding", "live-five-hour-status", "live-five-hour-percent",
                 "live-five-hour-reset-relative", "live-five-hour-reset-absolute").forEach(::noOverflow)
             fake.usage = response("{}", 403)
@@ -312,9 +314,10 @@ class LiveUsageScreenTest {
             waitFor("recreated live root and resumed cycle settle") {
                 owner.state.value.refresh.usage.attempt !== previous &&
                 owner.state.value.phase == ConnectionPhase.OBSERVED && !owner.state.value.refresh.refreshing &&
-                    compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.TestTag, "live-usage")).fetchSemanticsNodes().isNotEmpty()
+                    compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.TestTag, "dashboard")).fetchSemanticsNodes().isNotEmpty()
             }
             scenario.onActivity { assertSame(shared, it.connection) }
+            openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             text("live-five-hour-percent", "12.5% used")
             scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
             compose.waitUntil(timeoutMillis = 10_000) { !shared.state.value.refresh.refreshing }
@@ -342,6 +345,7 @@ class LiveUsageScreenTest {
             compose.waitForIdle()
             waitFor("no synthetic credentials restores disconnected") { owner.state.value.phase == ConnectionPhase.IDLE }
             awaitConnectionScreen(compose, owner)
+            openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             text("live-status", "Disconnected · use the connection controls below to sign in")
             compose.onNodeWithTag("live-refresh").assertIsNotEnabled()
             compose.onNodeWithTag("live-five-hour-progress").assertDoesNotExist()
@@ -359,6 +363,7 @@ class LiveUsageScreenTest {
             compose.waitForIdle()
             waitFor("missing key publishes durable reauthorization") { owner.state.value.phase == ConnectionPhase.REAUTH_REQUIRED }
             awaitConnectionScreen(compose, owner)
+            openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             text("live-status", "Authorization required · sign in again using the controls below")
             compose.onNodeWithTag("live-status").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
             compose.onNodeWithTag("live-weekly-progress").assertDoesNotExist()
@@ -374,7 +379,7 @@ class LiveUsageScreenTest {
             text("banked-status", "Provider-reported banked entitlements")
             text("banked-summary-text", "Usage summary for inventory comparison: 1 available banked reset")
             text("banked-inventory-text", "Inventory reports: 1 available banked reset")
-            text("banked-item-0-absolute", "Banked entitlement expiry: Oct 8, 2026, 00:00 (hour precision)")
+            text("banked-item-0-absolute", "Banked entitlement expiry: Oct 8, 2026, 00:00")
             text("banked-item-0-relative", "Banked entitlement expiry: <1h remaining")
             text("banked-item-0-provider", "Provider status: available")
             assertBankedOwner("banked-item-0", "<1h remaining")
@@ -448,7 +453,7 @@ class LiveUsageScreenTest {
             text("banked-item-0-status", "Entitlement expired")
             text("banked-item-0-relative", "Banked entitlement expiry: Entitlement expired")
             text("banked-item-0-provider", "Provider status: available")
-            text("banked-item-0-absolute", "Banked entitlement expiry: Oct 8, 2026, 00:00 (hour precision)")
+            text("banked-item-0-absolute", "Banked entitlement expiry: Oct 8, 2026, 00:00")
             text("banked-issue-EXPIRED_AVAILABLE_ITEM", "A provider-available item has expired locally. The provider count is retained.")
             text("banked-inventory-text", "Inventory reports: 1 available banked reset")
             assertViewOnlyBanked()
@@ -587,6 +592,7 @@ class LiveUsageScreenTest {
                 scenario.onActivity { orientation = it.resources.configuration.orientation }
                 orientation == Configuration.ORIENTATION_LANDSCAPE && !owner.state.value.refresh.refreshing
             }
+            reconstructedConnectionDetails()
             listOf("banked-title", "banked-status", "banked-summary-text", "banked-inventory-text", "banked-limitations",
                 "banked-item-0-provider", "banked-item-0-absolute", "banked-item-0-relative", "banked-issue-AVAILABLE_ROW_COUNT_MISMATCH").forEach(::noOverflow)
             text("banked-item-0-relative", "Banked entitlement expiry: 1 day 14 hours remaining")
@@ -594,9 +600,10 @@ class LiveUsageScreenTest {
             scenario.recreate()
             waitFor("banked recreated root and resumed inventory settle") {
                 owner.state.value.refresh.inventory.attempt !== previous && !owner.state.value.refresh.refreshing &&
-                    compose.onAllNodes(hasTestTag("banked-section")).fetchSemanticsNodes().isNotEmpty()
+                    compose.onAllNodes(hasTestTag("dashboard")).fetchSemanticsNodes().isNotEmpty()
             }
             scenario.onActivity { assertSame(shared, it.connection) }
+            reconstructedConnectionDetails()
             text("banked-inventory-text", "Inventory reports: 9223372036854775807 available banked resets")
             assertViewOnlyBanked()
         }
@@ -643,8 +650,18 @@ class LiveUsageScreenTest {
         waitFor("restored dormant synthetic session") { owner.state.value.phase == ConnectionPhase.RESTORED }
         assertEquals(0, fake.gets.get())
         awaitConnectionScreen(compose, owner)
+        openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
         text("live-status", "Usage unavailable · refresh to request an observation")
         return scenario
+    }
+
+    private fun reconstructedConnectionDetails() {
+        awaitConnectionScreen(compose, owner)
+        waitFor("reconstructed dashboard before full connection details") {
+            compose.onAllNodes(hasTestTag("dashboard")).fetchSemanticsNodes().size == 1
+        }
+        openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
+        compose.onNodeWithTag("connection-details").assertExists()
     }
 
     private fun read() {

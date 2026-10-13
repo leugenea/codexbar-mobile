@@ -97,14 +97,22 @@ internal class HistoryQueryGate(private val step: String) {
         private set
     @Volatile var returned = false
         private set
+    @Volatile var timedOut = false
+        private set
+    @Volatile private var enteredAtNanos = 0L
 
     fun pause(value: HistoryIsolationFixture.ReadReceipt) {
         receipt = value
+        enteredAtNanos = System.nanoTime()
         entered.countDown()
-        check(released.await(20, TimeUnit.SECONDS)) { "$step: actual SQLite result still held; query=${value.query}" }
+        val resumed = released.await(20, TimeUnit.SECONDS)
+        timedOut = !resumed
+        check(resumed) { "$step: actual SQLite result still held; query=${value.query}" }
         returned = true
     }
 
     fun reached(): Boolean = entered.count == 0L
+    fun isHeld(): Boolean = reached() && released.count == 1L && !returned && !timedOut &&
+        System.nanoTime() - enteredAtNanos < TimeUnit.SECONDS.toNanos(20)
     fun release() { released.countDown() }
 }

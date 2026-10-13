@@ -28,7 +28,7 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
     private val alarm = context.getSystemService(AlarmManager::class.java)
     private val capture = HistoryAcceptanceCapture(compose)
 
-    fun run(history: Boolean) {
+    fun run(history: Boolean, dashboard: Boolean = false) {
         val originalLocales = locales.applicationLocales
         val originalZone = TimeZone.getDefault()
         try {
@@ -44,40 +44,46 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
                 compose.onNodeWithTag("connect").performScrollTo().performClick()
                 await("original endpoint cycle and history admission settled") {
                     fixture.owner.state.value.phase == ConnectionPhase.OBSERVED && !fixture.owner.state.value.refresh.refreshing &&
-                        fixture.owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L
+                        recordedHistory(fixture.owner).storage?.lastAdmitted?.ordinal == 1L
                 }
                 val usage = fixture.owner.state.value.refresh.usage.success
                 val inventory = fixture.owner.state.value.refresh.inventory.success
-                val entry = fixture.owner.historySnapshots.value.storage!!.entries.single()
+                val entry = recordedHistory(fixture.owner).storage!!.entries.single()
                 assertEquals("source receipt precision", Instant.parse("2027-01-15T08:00:00.123Z"), entry.observedAt)
                 assertEquals("expiry source precision", Instant.parse("2027-01-15T09:00:00.123456Z"),
                     inventory!!.inventory!!.items.single().value!!.expiresAt.value)
                 val routes = fixture.transport.counts()
-                ready(scenario, history, Locale.US)
+                ready(scenario, history, dashboard, Locale.US)
                 // API36 en-US MEDIUM clocks use U+202F before the day period (unlike the JDK oracle).
-                labels(history, "Jan 15, 2027, 8:00:00\u202fAM", "Jan 15, 2027, 09:00 (hour precision)", "Jan 15, 2027, 9:00:00\u202fAM", "Jan 15, 2027, 4:00:00\u202fAM")
+                labels(history, dashboard, "Jan 15, 2027, 8:00:00\u202fAM", "Jan 15, 2027, 09:00", "Jan 15, 2027, 9:00:00\u202fAM", "Jan 15, 2027, 4:00:00\u202fAM")
                 var activity: MainActivity? = null
                 scenario.onActivity { activity = it }
                 setZone("America/Los_Angeles")
                 await("actual system zone broadcast updates visible labels") { ZoneId.systemDefault().id == "America/Los_Angeles" }
-                labels(history, "Jan 15, 2027, 12:00:00\u202fAM", "Jan 15, 2027, 01:00 (hour precision)", "Jan 15, 2027, 1:00:00\u202fAM", "Jan 14, 2027, 8:00:00\u202fPM")
+                labels(history, dashboard, "Jan 15, 2027, 12:00:00\u202fAM", "Jan 15, 2027, 01:00", "Jan 15, 2027, 1:00:00\u202fAM", "Jan 14, 2027, 8:00:00\u202fPM")
                 scenario.onActivity { assertSame("zone-only update keeps visible Activity", activity, it) }
                 assertSame("formatting preserves accepted usage source", usage, fixture.owner.state.value.refresh.usage.success)
                 assertSame("formatting preserves accepted inventory source", inventory, fixture.owner.state.value.refresh.inventory.success)
                 assertEquals("zone formatting cannot request transport", routes, fixture.transport.counts())
                 setZone("Europe/Berlin")
                 locales.applicationLocales = LocaleList(Locale.GERMANY)
-                ready(scenario, history, Locale.GERMANY)
-                labels(history, "15.01.2027, 09:00:00", "15.01.2027, 10:00 (hour precision)", "15.01.2027, 10:00:00", "15.01.2027, 05:00:00")
+                ready(scenario, history, dashboard, Locale.GERMANY)
+                labels(history, dashboard, "15.01.2027, 09:00:00", "15.01.2027, 10:00", "15.01.2027, 10:00:00", "15.01.2027, 05:00:00")
                 scenario.recreate()
-                ready(scenario, history, Locale.GERMANY)
-                labels(history, "15.01.2027, 09:00:00", "15.01.2027, 10:00 (hour precision)", "15.01.2027, 10:00:00", "15.01.2027, 05:00:00")
+                ready(scenario, history, dashboard, Locale.GERMANY)
+                labels(history, dashboard, "15.01.2027, 09:00:00", "15.01.2027, 10:00", "15.01.2027, 10:00:00", "15.01.2027, 05:00:00")
                 settleConnectionCommands(compose, fixture.owner, "timestamp configuration/recreation owner receipt")
                 assertSame("recreation keeps original usage facts", usage, fixture.owner.state.value.refresh.usage.success)
                 assertSame("recreation keeps original inventory facts", inventory, fixture.owner.state.value.refresh.inventory.success)
                 assertEquals("local formatting/configuration/recreation adds no provider requests", routes, fixture.transport.counts())
-                assertEquals("no formatting admissions", listOf(entry.id), fixture.owner.historySnapshots.value.storage!!.entries.map { it.id })
-                noRawTime(if (history) "connection-history" else "live-usage")
+                noRawTime(if (dashboard) "dashboard" else if (history) "connection-history" else "live-usage")
+                openDetailRoute(compose, fixture.owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
+                await("bounded stored Page for unchanged formatting admissions") {
+                    fixture.owner.historySnapshots.value.request is io.github.leugenea.codexbarmobile.history.HistoryPresentationRequest.Page &&
+                        fixture.owner.historySnapshots.value.storage?.entries?.size == 1
+                }
+                assertEquals("no formatting admissions", listOf(entry.id), recordedHistory(fixture.owner).storage!!.entries.map { it.id })
+                assertEquals("stored verification adds no provider requests", routes, fixture.transport.counts())
             }
         } finally {
             try { locales.applicationLocales = originalLocales }
@@ -96,19 +102,26 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
         TimeZone.setDefault(null)
     }
 
-    private fun ready(scenario: ActivityScenario<MainActivity>, history: Boolean, locale: Locale) {
+    private fun ready(scenario: ActivityScenario<MainActivity>, history: Boolean, dashboard: Boolean, locale: Locale) {
         await("effective rendering resource locale $locale") {
             var effective: Locale? = null
             scenario.onActivity { effective = it.resources.configuration.locales[0] }
             effective == locale
         }
         awaitConnectionScreen(compose, fixture.owner)
-        if (!history) return
-        if (compose.onAllNodesWithTag("connection-history").fetchSemanticsNodes().isEmpty()) {
-            compose.onNodeWithTag("history-toggle").performScrollTo().performClick()
+        if (dashboard) {
+            returnDashboard(compose, fixture.owner)
+            if (compose.onAllNodesWithTag("banked-disclosure-item-0").fetchSemanticsNodes().isEmpty())
+                compose.onNodeWithTag("banked-disclosure-toggle").performScrollTo().performClick()
+            return
         }
+        if (!history) {
+            openDetailRoute(compose, fixture.owner, DashboardRoute.CONNECTION_DETAILS)
+            return
+        }
+        openDetailRoute(compose, fixture.owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
         await("current history page after configuration") {
-            fixture.owner.historySnapshots.value.storage?.entries?.size == 1 &&
+            recordedHistory(fixture.owner).storage?.entries?.size == 1 &&
                 fixture.owner.historySnapshots.value.query.kind == io.github.leugenea.codexbarmobile.usage.WindowKind.FIVE_HOUR
         }
         await("history detail control composed after current page") {
@@ -119,8 +132,12 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
         }
     }
 
-    private fun labels(history: Boolean, observed: String, reset: String, resetSource: String, nominalStart: String) {
-        if (history) {
+    private fun labels(history: Boolean, dashboard: Boolean, observed: String, reset: String, resetSource: String, nominalStart: String) {
+        if (dashboard) {
+            label("live-five-hour-reset-absolute", "Reset: $reset")
+            label("banked-disclosure-expiry-0", reset)
+            compose.onNodeWithTag("banked-disclosure-remaining-0", useUnmergedTree = true).performScrollTo().assertExists()
+        } else if (history) {
             fact("Source observed at (second precision): $observed")
             fact("Measurement observed at (second precision): $observed")
             val endpoint = "Last successful source observation (second precision): $observed"
@@ -130,8 +147,7 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
             fact("Nominal assumption start (second precision): $nominalStart")
             fact("Nominal assumption end (reset, second precision): $resetSource")
             fact("Reset: $reset")
-            compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true)
-                .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+            compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertDoesNotExist()
         } else {
             label("live-five-hour-reset-absolute", "Reset: $reset")
             label("banked-summary-clock", "Summary observed at (second precision): $observed")

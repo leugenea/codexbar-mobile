@@ -34,18 +34,18 @@ class TimePresentationResourcesTest {
         assertEquals("1 day 14 hours remaining", String.format(Locale.US, strings.getValue("time_remaining"), "1 day 14 hours"))
     }
 
-    @Test fun absoluteFormatsDeclareHourPrecisionAndTheRepeatedHourOffset() {
+    @Test fun absoluteFormatsPreserveLocalDateAndRepeatedHourOffsetWithoutPrecisionSuffix() {
         val strings = resources().filter { it.tagName == "string" }.associate { it.getAttribute("name") to it.textContent }
         assertEquals(
-            "Oct 9, 2026, 14:00 (hour precision)",
+            "Oct 9, 2026, 14:00",
             String.format(Locale.US, strings.getValue("time_absolute"), "Oct 9, 2026", "14:00"),
         )
         assertEquals(
-            "Nov 1, 2026, 01:00 UTC-05:00 (hour precision)",
+            "Nov 1, 2026, 01:00 UTC-05:00",
             String.format(Locale.US, strings.getValue("time_absolute_offset"), "Nov 1, 2026", "01:00", "-05:00"),
         )
         assertEquals(
-            "Oct 25, 2026, 01:00 UTC+00:00 (hour precision)",
+            "Oct 25, 2026, 01:00 UTC+00:00",
             String.format(Locale.US, strings.getValue("time_absolute_offset"), "Oct 25, 2026", "01:00", "+00:00"),
         )
     }

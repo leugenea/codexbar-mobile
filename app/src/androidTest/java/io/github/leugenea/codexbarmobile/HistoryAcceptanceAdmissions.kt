@@ -32,7 +32,7 @@ internal object HistoryAcceptanceAdmissions {
         val current = fixture.owner
         val ready = current.session.snapshot() as SessionResult.Ready
         return Seed(requireNotNull(current.historyCapability(ready.envelope.generation)),
-            current.historySnapshots.value.storage!!.entries.first())
+            recordedHistory(current).storage!!.entries.first())
     }
 
     private fun observation(seed: Seed, percent: String, seconds: Long, resetOffset: Long): HistoryEvent.Observed {

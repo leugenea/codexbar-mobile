@@ -34,24 +34,27 @@ class HistoryAssembledAcceptanceTest {
     @Test fun freshInstallAndSingleObservationExposeNoInventedTrendAndObservedOnlySignedDeltas() {
         launch().use { scenario ->
             await("fresh isolated owner settled without credentials") { fixture.owner.state.value.phase == ConnectionPhase.IDLE }
-            openHistory()
-            compose.onNodeWithTag("history-readiness").assertTextEquals("unavailable")
+            returnDashboard(compose, fixture.owner)
+            compose.onNodeWithTag("dashboard-no-info-FIVE_HOUR").assertTextEquals("No current information.")
+            compose.onNodeWithTag("dashboard-no-info-WEEKLY").assertTextEquals("No current information.")
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assertDoesNotExist()
             compose.onNodeWithTag("history-details-toggle").assertDoesNotExist()
-            compose.onNodeWithTag("$five-content").assertTextEquals("No history page available; usage is not zero")
-            noFact("Measured used percent (exact %): 0")
-            compose.onNodeWithTag("$five-counts").assertTextEquals("Drawn markers: 0 · Within-run connections: 0 · Nominal reference lines: 0")
-            capture.label("$five-no-geometry")
-            compose.onNodeWithTag("history-navigation-title").performScrollTo()
-            capture.capture("history-assembled-fresh-portrait-light", scenario, fixture,
-                listOf("history-select-FIVE_HOUR", "history-select-WEEKLY"))
+            assertCurrentDrawing(recordedHistory(fixture.owner), 0, 0, 0)
+            noFact("Measured used percent (exact %): 0", "dashboard")
+            compose.onNodeWithTag("live-five-hour-percent").assertDoesNotExist()
+            compose.onNodeWithTag("live-weekly-percent").assertDoesNotExist()
+            capture.label("dashboard-no-info-FIVE_HOUR")
+            compose.onNodeWithTag("open-drawer").performScrollTo()
+            capture.capture("history-assembled-fresh-portrait-light", scenario, fixture, listOf("open-drawer", "connect"))
             assertEquals(0L, fixture.transport.requests.get())
         }
         seedDormant(fresh = false)
         launch(dark = true).use { scenario ->
-            openHistory(); page(WindowKind.FIVE_HOUR, 0, 1)
-            chartLabels("Drawn markers: 1 · Within-run connections: 0 · Nominal reference lines: 1")
+            returnDashboard(compose, fixture.owner)
+            await("single current pair recorded") { recordedHistory(fixture.owner).storage?.entries?.size == 1 }
+            chartLabels()
             captureCanvas("history-assembled-single-portrait-dark", scenario)
+            openHistory(); page(WindowKind.FIVE_HOUR, 0, 1)
             click("history-details-toggle")
             fact("Measured used percent (exact %): 12.375")
             fact("Nominal baseline at observation (analytical %): 80")
@@ -82,7 +85,7 @@ class HistoryAssembledAcceptanceTest {
         fixture.transport.usageBody = HistoryAcceptanceAdmissions.SPARSE_USAGE
         seedDormant { HistoryAcceptanceAdmissions.sparse(it) }
         launch(landscape = true, dark = true).use { scenario ->
-            openHistory(); click("history-stored-text"); page(WindowKind.FIVE_HOUR, 0, 7)
+            openHistory(); page(WindowKind.FIVE_HOUR, 0, 7)
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assertDoesNotExist()
             compose.onNodeWithTag("history-navigation-title").performScrollTo()
             capture.capture("history-assembled-breaks-landscape-dark", scenario, fixture,
@@ -108,10 +111,10 @@ class HistoryAssembledAcceptanceTest {
         fixture.transport.usageBody = HistoryAcceptanceAdmissions.UNKNOWN_USAGE
         seedDormant()
         launch(font = 2f).use { scenario ->
-            openHistory()
-            await("unknown current identity unavailable") { fixture.owner.historySnapshots.value.query.currentOnly }
+            returnDashboard(compose, fixture.owner)
+            await("unknown current identity unavailable") { recordedHistory(fixture.owner).query.currentOnly }
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assertDoesNotExist()
-            click("history-stored-text"); page(WindowKind.FIVE_HOUR, 0, 1)
+            openHistory(); page(WindowKind.FIVE_HOUR, 0, 1)
             effectiveFont(2f)
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assertDoesNotExist()
             compose.onNodeWithTag("history-navigation-title").performScrollTo()
@@ -131,7 +134,8 @@ class HistoryAssembledAcceptanceTest {
             fact("Measured used percent (exact %): unknown · not zero")
             fact("Baseline and delta unavailable: used percent unknown")
             noFact("Measured used percent (exact %): 0")
-            click("history-toggle")
+            toggleHistoryDetails(compose, fixture.owner)
+            openDetailRoute(compose, fixture.owner, DashboardRoute.CONNECTION_DETAILS)
             compose.onNodeWithTag("read-usage").performScrollTo().assertIsEnabled()
             dormant()
         }
@@ -140,7 +144,7 @@ class HistoryAssembledAcceptanceTest {
     @Test fun truncatedPageLandscapeLightKeepsHonestLocalCursorAndEveryBoundedDetailReachable() {
         seedDormant { it.seedLocalPage() }
         launch(landscape = true).use { scenario ->
-            openHistory(); click("history-stored-text"); page(WindowKind.FIVE_HOUR, 0, 32)
+            openHistory(); page(WindowKind.FIVE_HOUR, 0, 32)
             fact("More admitted entries exist beyond this page. This component does not fetch them; this is not complete history.")
             click("history-next-page"); page(WindowKind.FIVE_HOUR, 32, 3)
             compose.onNodeWithTag("history-page-ordinals").assertTextEquals("Retained page ordinals: 33 to 35")
@@ -158,7 +162,7 @@ class HistoryAssembledAcceptanceTest {
             compose.onNodeWithTag("history-next").performScrollTo().assertIsNotEnabled()
             click("history-first-page"); page(WindowKind.FIVE_HOUR, 0, 32)
             compose.onNodeWithTag("history-first-page").performScrollTo().assertIsNotEnabled()
-            assertEquals(35L, fixture.owner.historySnapshots.value.storage!!.lastAdmitted!!.ordinal)
+            assertEquals(35L, recordedHistory(fixture.owner).storage!!.lastAdmitted!!.ordinal)
             dormant()
         }
     }
@@ -183,7 +187,7 @@ class HistoryAssembledAcceptanceTest {
         settleConnectionCommands(compose, fixture.owner, "synthetic seed connect admission")
         await("original synthetic usage observation persisted") {
             fixture.owner.state.value.phase == ConnectionPhase.OBSERVED && !fixture.owner.state.value.refresh.refreshing &&
-                fixture.owner.historySnapshots.value.storage?.lastAdmitted?.ordinal == 1L
+                recordedHistory(fixture.owner).storage?.lastAdmitted?.ordinal == 1L
         }
         append(fixture)
         routes = fixture.transport.counts()
@@ -195,7 +199,7 @@ class HistoryAssembledAcceptanceTest {
         }
     }
 
-    private fun openHistory() { awaitConnectionScreen(compose, fixture.owner); click("history-toggle") }
+    private fun openHistory() { awaitConnectionScreen(compose, fixture.owner); toggleHistoryDetails(compose, fixture.owner) }
     private fun click(tag: String) {
         val node = compose.onNodeWithTag(tag)
         node.performScrollTo()
@@ -212,10 +216,10 @@ class HistoryAssembledAcceptanceTest {
         compose.onNodeWithTag("history-page-cursor").assertTextEquals("Exclusive admission cursor: $after · Page limit: 32")
     }
 
-    private fun chartLabels(counts: String) {
-        compose.onNodeWithTag("$five-counts").assertTextEquals(counts)
-        listOf("$five-title", "$five-legend", "$five-counts", "$five-first", "$five-last", "history-legend",
-            "history-assumption", "history-sparse").forEach(capture::label)
+    private fun chartLabels() {
+        compose.onNodeWithTag("$five-equivalent").assertTextEquals("One recorded observation · no observed trend")
+        assertCurrentDrawing(recordedHistory(fixture.owner), 1, 0, 1)
+        listOf("$five-title", "$five-legend", "$five-equivalent", "$five-first", "$five-last").forEach(capture::label)
         compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assert(
             SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
     }
@@ -242,8 +246,9 @@ class HistoryAssembledAcceptanceTest {
     private fun singleFact(value: String) {
         compose.onAllNodes(historyScope() and hasText(value), useUnmergedTree = true).assertCountEquals(1)
     }
-    private fun noFact(value: String) {
-        compose.onAllNodes(historyScope() and hasText(value), useUnmergedTree = true).assertCountEquals(0)
+    private fun noFact(value: String, root: String = "connection-history") {
+        compose.onNodeWithTag(root).assertExists()
+        compose.onAllNodes((hasTestTag(root) or hasAnyAncestor(hasTestTag(root))) and hasText(value), useUnmergedTree = true).assertCountEquals(0)
     }
 
     private fun dormant() {

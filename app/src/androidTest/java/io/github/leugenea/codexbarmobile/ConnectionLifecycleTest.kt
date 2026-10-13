@@ -702,7 +702,7 @@ class ConnectionLifecycleTest {
         compose.onNodeWithTag("banked-inventory-text", useUnmergedTree = true).performScrollTo()
             .assertTextEquals("Inventory reports: 2 available banked resets")
         assertEquals(Instant.parse("2026-10-22T20:31:56.833553Z"), facts.inventory.inventory!!.items.first().value!!.expiresAt.value)
-        // The exact source instant stays an owner oracle; the UI intentionally shows B1 hour precision.
+        // The exact source instant stays an owner oracle; the UI uses B1 containing-hour labels without a precision suffix.
         compose.onNodeWithTag("banked-item-0-absolute", useUnmergedTree = true).performScrollTo().assertExists()
         assertConnectionHasNoDiagnosticDump(compose)
     }
@@ -711,9 +711,11 @@ class ConnectionLifecycleTest {
         compose.waitForIdle()
         await(scenario, "initial $phase") { it.phase == phase }
         awaitConnectionScreen(compose, NativeConnection.get(context))
+        openDetailRoute(compose, NativeConnection.get(context), DashboardRoute.CONNECTION_DETAILS)
         assertConnectionHasNoDiagnosticDump(compose)
     }
     private fun click(tag: String, expectTransition: Boolean = true) {
+        if (tag in setOf("connect", "read-usage", "refresh-session", "open-browser", "copy-device-code", "cancel-connect")) openDetailRoute(compose, NativeConnection.get(context), DashboardRoute.CONNECTION_DETAILS)
         val changesState = tag in setOf("connect", "read-usage", "refresh-session", "remove-account-confirm", "cancel-connect")
         val before = if (changesState) NativeConnection.get(context).state.value else null
         val node = compose.onNodeWithTag(tag)
@@ -747,7 +749,13 @@ class ConnectionLifecycleTest {
             matches
         }
         // A stopped Activity has no registered Compose root; query only the real resumed UI.
-        if (scenario.state.isAtLeast(Lifecycle.State.STARTED)) assertConnectionHasNoDiagnosticDump(compose)
+        if (scenario.state.isAtLeast(Lifecycle.State.STARTED)) {
+            val owner = NativeConnection.get(context)
+            awaitConnectionScreen(compose, owner)
+            assertConnectionHasNoDiagnosticDump(compose)
+            openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
+            assertConnectionHasNoDiagnosticDump(compose)
+        }
     }
     private fun bounded(step: String, last: () -> String = { "no diagnostic" }, test: () -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 10_000, condition = test) }
