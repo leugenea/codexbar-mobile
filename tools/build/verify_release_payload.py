@@ -10,25 +10,26 @@ import subprocess
 import sys
 import zipfile
 
-from complete_codeql_checkout import canonical, digest, read_snapshot, require_sha
+from complete_codeql_checkout import canonical, digest, read_snapshot, require_sha, job_context, require_admission, no_symlink_path
 from release_identity import identity_digest, resolve_identity, validate_identity
 from verify_gradle_execution import validate as validate_execution
-from verify_manifests import check_apk_dump, check_backup_dump, check_manifest, ROOT, NAMESPACE
+from verify_manifests import check_apk_dump, check_backup_dump, check_manifest, ROOT, NAMESPACE, inspect_backup_resources, check_backup_resources
 
 SCHEMA_FIELDS = {'schemaVersion', 'stage', 'purpose', 'distributionAuthorized', 'identity',
                  'identitySha256', 'source', 'producer', 'payload', 'verification', 'signedFinal'}
 METHODS = ['aapt permissions', 'aapt manifest/resources', 'apksigner unsigned check', 'ZIP signature-material absence']
-EVIDENCE_NAMES = ['permissions.txt', 'manifest.txt', 'backup.txt', 'extraction.txt', 'unsigned.txt']
+EVIDENCE_NAMES = ['permissions.txt', 'manifest.txt', 'backup.txt', 'extraction.txt', 'resources.txt', 'backup-resources.json', 'unsigned.txt']
 
 
 def safe_file(root, relative):
     if (not isinstance(relative, str) or not relative or '\\' in relative
             or PurePosixPath(relative).is_absolute() or any(p in ('', '.', '..') for p in relative.split('/'))):
         raise ValueError('Unsafe payload path')
-    path = Path(root) / relative
+    root = no_symlink_path(root)
+    path = root / relative
     if not path.resolve().is_relative_to(Path(root).resolve()):
         raise ValueError('Payload path escapes root')
-    if any(p.is_symlink() for p in [path, *path.parents] if p != Path(root).parent):
+    if any(p.is_symlink() for p in [path, *path.parents]):
         raise ValueError('Payload symlink forbidden')
     return path
 
@@ -95,9 +96,11 @@ def producer(environment, observation):
     root = Path(observation['state']['root'])
     log = root / ('evidence/strict-release.log' if observation['mode'] == 'fixture' else 'evidence/strict.log')
     validate_execution(log.read_text(), 'release' if observation['mode'] == 'fixture' else 'build')
-    event = json.loads(Path(environment['GITHUB_EVENT_PATH']).read_text())
-    source_head = event.get('pull_request', {}).get('head', {}).get('sha', environment['GITHUB_SHA'])
-    require_sha(source_head)
+    context = job_context(environment, root, observation['state']['head'], mode=observation['mode'])
+    require_admission(context)
+    if context != observation['context']:
+        raise ValueError('Producer event/context differs from acquired source')
+    source_head = context['sourceHeadSha']
     return dict(sourceHeadSha=source_head, strictExecutionLogSha256=digest(log.read_bytes()),
                 toolchainEvidenceSha256=digest((root/'evidence/resolved-toolchain.json').read_bytes()),
                 repository=environment['GITHUB_REPOSITORY'], event=environment['GITHUB_EVENT_NAME'],
@@ -105,7 +108,9 @@ def producer(environment, observation):
                 workflowPath='.github/workflows/android.yml',
                 workflowFileSha256=next(row['sha256'] for row in observation['state']['trackedFiles'] if row['path'] == '.github/workflows/android.yml'),
                 job=environment['GITHUB_JOB'], runId=environment['GITHUB_RUN_ID'], runAttempt=environment['GITHUB_RUN_ATTEMPT'],
-                checkoutSha=environment['GITHUB_SHA'], artifactName='android-build-' + environment['GITHUB_RUN_ID'] + '-' + environment['GITHUB_RUN_ATTEMPT'],
+                checkoutSha=observation['state']['head'], checkoutRole=context['checkoutRole'],
+                producerEventSha=context['producerEventSha'], producerEventRef=context['producerEventRef'],
+                eventSha256=context['eventSha256'], artifactName='android-build-' + environment['GITHUB_RUN_ID'] + '-' + environment['GITHUB_RUN_ATTEMPT'],
                 dependencyVerification='strict', tasks=['assembleRelease', 'lintRelease', 'writeBuildIdentity'])
 
 
@@ -143,6 +148,12 @@ def validate_inventory(inventory, root, identity):
         texts[item['path']] = path.read_text()
     check_apk_dump(texts['permissions.txt'], texts['manifest.txt'], variant='release', identity=identity)
     check_backup_dump(texts['backup.txt']); check_backup_dump(texts['extraction.txt'], True)
+    inspections = json.loads(texts['backup-resources.json'])
+    check_backup_resources(texts['manifest.txt'], texts['resources.txt'], inspections)
+    for name, evidence in (('backup_rules', 'backup.txt'), ('data_extraction_rules', 'extraction.txt')):
+        default = [row['xmltree'] for row in inspections[name] if row['configuration'] == '']
+        if default != [texts[evidence]]:
+            raise ValueError('Default backup evidence differs from selected resource')
     diagnostic = json.loads(texts['unsigned.txt'])
     if set(diagnostic) != {'exit', 'stdout', 'stderr'}:
         raise ValueError('Malformed unsigned diagnostic')
@@ -150,21 +161,24 @@ def validate_inventory(inventory, root, identity):
     return inventory
 
 
-def inspect(apk, sdk, output):
+def inspect(apk, sdk, output=None):
     tools = Path(sdk) / 'build-tools/36.0.0'
     if not tools.is_dir():
         raise ValueError('Pinned SDK Build Tools required')
+    texts = {}
     commands = [('permissions.txt', [str(tools/'aapt'), 'dump', 'permissions', str(apk)]),
-                ('manifest.txt', [str(tools/'aapt'), 'dump', 'xmltree', str(apk), 'AndroidManifest.xml']),
-                ('backup.txt', [str(tools/'aapt'), 'dump', 'xmltree', str(apk), 'res/xml/backup_rules.xml']),
-                ('extraction.txt', [str(tools/'aapt'), 'dump', 'xmltree', str(apk), 'res/xml/data_extraction_rules.xml'])]
+                ('manifest.txt', [str(tools/'aapt'), 'dump', 'xmltree', str(apk), 'AndroidManifest.xml'])]
     for name, argv in commands:
-        result = subprocess.run(argv, capture_output=True, text=True, timeout=60, check=True)
-        (output/name).write_text(result.stdout)
+        texts[name] = subprocess.run(argv, capture_output=True, text=True, timeout=60, check=True).stdout
+    texts.update(inspect_backup_resources(apk, sdk, texts['manifest.txt']))
     result = subprocess.run([str(tools/'apksigner'), 'verify', '--verbose', '--print-certs', str(apk)],
                             capture_output=True, text=True, timeout=60, check=False)
     unsigned_diagnostic(result.returncode, result.stdout, result.stderr)
-    (output/'unsigned.txt').write_bytes(canonical(dict(exit=result.returncode, stdout=result.stdout, stderr=result.stderr)) + b'\n')
+    texts['unsigned.txt'] = (canonical(dict(exit=result.returncode, stdout=result.stdout, stderr=result.stderr)) + b'\n').decode()
+    if output is not None:
+        for name in EVIDENCE_NAMES:
+            safe_file(output, name).write_text(texts[name])
+    return texts
 
 
 def create(root, identity, apk, output, sdk, environment=None):
@@ -180,7 +194,8 @@ def create(root, identity, apk, output, sdk, environment=None):
             or elements[0].get('filters') != [] or elements[0].get('outputFile') != Path(apk).name
             or elements[0].get('versionCode') != identity['versionCode'] or elements[0].get('versionName') != identity['versionName']):
         raise ValueError('Release output-metadata does not identify one exact APK')
-    output = Path(output)
+    output = no_symlink_path(output)
+    apk = safe_file(Path(apk).parent, Path(apk).name)
     output.mkdir(parents=True, exist_ok=False)
     name = f"codexbar-mobile-{identity['versionName']}-release-c{identity['versionCode']}-g{identity['shortSha']}-unsigned.apk"
     target = safe_file(output, name)
@@ -198,29 +213,47 @@ def create(root, identity, apk, output, sdk, environment=None):
                                        evidence=[dict(path=n, sha256=digest((output/n).read_bytes())) for n in EVIDENCE_NAMES]), signedFinal=None)
     validate_inventory(inventory, output, identity)
     (output/'inventory.json').write_bytes(canonical(inventory) + b'\n')
-    verify(root, output/'inventory.json', identity, environment)
+    verify(root, output/'inventory.json', identity, dict(environment, ANDROID_HOME=str(sdk)))
     return inventory
 
 
 def source_record(observation, identity):
-    state = observation['state']
-    kind = 'isolated-fixture' if observation['mode'] == 'fixture' else ('pr-merge' if state['head'] != observation['context']['sourceHeadSha'] else 'direct')
+    state, context = observation['state'], observation['context']
+    kinds = {'fixture': 'isolated-fixture', 'normal_pr_merge': 'pr-merge', 'direct': 'direct'}
+    role = context['checkoutRole']
+    if context['compiledCheckoutSha'] != state['head'] or role not in kinds or context['admissionHeld']:
+        raise ValueError('Source checkout role is not acquired/admitted')
+    kind = kinds[role]
     return dict(repository='leugenea/codexbar-mobile', checkoutSha=state['head'], sourceTree=state['tree'],
-                  sourceHeadSha=observation['context'].get('sourceHeadSha', state['head']), checkoutKind=kind,
-                  ref=identity['tag'] if kind == 'isolated-fixture' else observation['context']['ref'],
-                  tagMapSha256=observation['tagMapSha256'], trackedFiles=state['trackedFiles'],
-                  trackedInventorySha256=digest(canonical(state['trackedFiles'])))
+                sourceHeadSha=context['sourceHeadSha'], checkoutKind=kind,
+                producerEventSha=context['producerEventSha'], producerEventRef=context['producerEventRef'],
+                eventName=context['eventName'], eventSha256=context['eventSha256'],
+                ref=identity['tag'] if kind == 'isolated-fixture' else context['producerEventRef'],
+                tagMapSha256=observation['tagMapSha256'], trackedFiles=state['trackedFiles'],
+                trackedInventorySha256=digest(canonical(state['trackedFiles'])))
 
 
 def verify(repo, path, identity, environment=None):
     local_identity(identity, repo)
     _, observation = read_snapshot(repo, environment)
-    inventory = validate_inventory(json.loads(Path(path).read_text()), Path(path).parent, identity)
+    path = safe_file(Path(path).parent, Path(path).name)
+    inventory = validate_inventory(json.loads(path.read_text()), path.parent, identity)
     state = observation['state']
     source = inventory['source']
     if (source != source_record(observation, identity)
             or inventory['producer'] != producer(dict(os.environ if environment is None else environment), observation)):
         raise ValueError('Inventory source/producer differs from actual acquired job/root')
+    environment = dict(os.environ if environment is None else environment)
+    apk = safe_file(path.parent, inventory['payload']['path'])
+    before = unsigned_container(apk)
+    # Independent current SDK observations bind the current bytes, not hashes
+    # supplied by the inventory or previously saved valid inspection text.
+    current = inspect(apk, environment['ANDROID_HOME'])
+    for name in EVIDENCE_NAMES:
+        if current[name] != safe_file(path.parent, name).read_text():
+            raise ValueError('Current APK inspection differs from frozen evidence')
+    if unsigned_container(apk) != before:
+        raise ValueError('APK changed during independent reverification')
     return inventory
 
 

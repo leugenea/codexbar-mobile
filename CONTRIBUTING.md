@@ -128,10 +128,13 @@ configured; any future backend must also avoid output reuse during extraction.
 The existing nonempty extractor-marker block first calls the bounded anonymous
 public exact-HEAD checkout preparation, before app identity resolution. It retains
 the output-cache disable. Managed checkout can persist credentials: preparation
-isolates headers/helpers/includes/environment and never fetches a moving tip or
+isolates headers/helpers/environment, rejects unadmitted credential includes, and never fetches a moving tip or
 changes source, index, config or non-tag refs. Later `clean`/`assemble` validates
 the same job-scoped actual local graph/tag snapshot without another network query.
-The marker comes from the released extractor, not a documented GitHub default-setup
+Managed PR-head producer tuples require actual fixed-category evidence and explicit
+reviewed admission; unknown tuples remain rejected. Credential-only include layout
+recognition preserves bytes and remains blocked from anonymous transport until safe
+isolation is established. The marker comes from the released extractor, not a documented GitHub default-setup
 option: extractor changes require hosted warm-cache validation; static source
 contracts cannot prove the marker's continued identity or successful extraction.
 

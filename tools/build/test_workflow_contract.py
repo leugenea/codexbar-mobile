@@ -1007,7 +1007,7 @@ class SyntheticReportTests(unittest.TestCase):
                 'xmlns:tools="http://schemas.android.com/tools">'
                 + ''.join(f'<uses-permission android:name="{name}"/>' for name in sorted(permissions))
                 + declarations + '<application android:usesCleartextTraffic="false">'
-                '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
+                f'<activity android:name="{MAIN_ACTIVITY}" android:launchMode="singleTask"/>'
                 '</application></manifest>')
 
     def synthetic_apk_activity(self, name=MAIN_ACTIVITY):
@@ -1019,10 +1019,14 @@ class SyntheticReportTests(unittest.TestCase):
         manifest = self.directory / "SYNTHETIC-AndroidManifest.xml"
         for permissions in (SOURCE_PERMISSIONS, APP_PERMISSIONS):
             valid = self.synthetic_manifest(permissions)
-            activity = '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
+            activity = f'<activity android:name="{MAIN_ACTIVITY}" android:launchMode="singleTask"/>'
             for name in ('.MainActivity', 'MainActivity', MAIN_ACTIVITY):
-                manifest.write_text(valid.replace('.MainActivity', name))
-                self.assertEqual(check_manifest(manifest, permissions)['mainActivityLaunchMode'], 'singleTask')
+                manifest.write_text(valid.replace(MAIN_ACTIVITY, name))
+                if permissions == SOURCE_PERMISSIONS or name == MAIN_ACTIVITY:
+                    self.assertEqual(check_manifest(manifest, permissions)['mainActivityLaunchMode'], 'singleTask')
+                else:
+                    with self.assertRaises(ValueError):
+                        check_manifest(manifest, permissions)
             mutations = [
                 (valid.replace(' android:launchMode="singleTask"', ''), 'singleTask'),
                 (valid.replace(activity, ''), 'singleTask'),
@@ -1051,8 +1055,10 @@ class SyntheticReportTests(unittest.TestCase):
                   '  E: application (line=4)\n'
                   '    A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0x0\n')
         activity = self.synthetic_apk_activity()
-        for name in ('.MainActivity', 'MainActivity', MAIN_ACTIVITY):
-            self.assertEqual(check_apk_dump(permissions, prefix + self.synthetic_apk_activity(name)), sorted(APP_PERMISSIONS))
+        self.assertEqual(check_apk_dump(permissions, prefix + self.synthetic_apk_activity(MAIN_ACTIVITY)), sorted(APP_PERMISSIONS))
+        for name in ('.MainActivity', 'MainActivity'):
+            with self.assertRaises(ValueError):
+                check_apk_dump(permissions, prefix + self.synthetic_apk_activity(name))
         for tree, error in (
             (prefix, 'singleTask'),
             (prefix + activity + activity, 'singleTask'),
@@ -1079,8 +1085,8 @@ class SyntheticReportTests(unittest.TestCase):
             text = text.replace('<manifest ', f'<manifest package="{package}" android:versionName="{identity["versionName"]}" android:versionCode="41" ', 1)
             text = text.replace('android:usesCleartextTraffic="false"',
                 'android:usesCleartextTraffic="false" android:allowBackup="false" android:fullBackupContent="@xml/backup_rules" android:dataExtractionRules="@xml/data_extraction_rules" android:debuggable="' + ('true' if variant == 'debug' else 'false') + '"')
-            text = text.replace('<activity android:name=".MainActivity" android:launchMode="singleTask"/>',
-                '<activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>')
+            text = text.replace(f'<activity android:name="{MAIN_ACTIVITY}" android:launchMode="singleTask"/>',
+                f'<activity android:name="{MAIN_ACTIVITY}" android:exported="true" android:launchMode="singleTask"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>')
             for key, value in (('SOURCE_REVISION', identity['sourceSha']), ('SOURCE_TREE', identity['sourceTree']), ('BUILD_CHANNEL', 'dev')):
                 text = text.replace('</application>', f'<meta-data android:name="{NAMESPACE}.{key}" android:value="{value}"/></application>')
             return text
@@ -1201,17 +1207,28 @@ class SyntheticReportTests(unittest.TestCase):
             tree = tree.replace('0x12)0x0', '0x12)0xffffffff')
         for name, text in (('permissions.txt', permissions), ('tree.txt', tree), ('dump.txt', dump)):
             (self.directory / name).write_text(text)
+        # Pure mocked pinned-SDK resource observations, never actual Android proof.
+        from test_release_payload import backup, resource_table
+        for name, text in (('resources.txt', resource_table('debug')), ('backup.txt', backup()), ('extraction.txt', backup(True))):
+            (self.directory/name).write_text(text)
         common = (f'#!{sys.executable}\nimport os, sys\nfrom pathlib import Path\n'
                   'args = sys.argv[1:]\nmutation = os.environ["SYNTHETIC_MUTATION"]\n'
                   'with open("events.txt", "a") as log: log.write(" ".join(args) + "\\n")\n')
         tools = {
+            'build-tools/36.0.0/aapt2': common + "if args[:2] != ['dump', 'resources']: sys.exit(99)\nprint(Path('resources.txt').read_text(), end='')\n",
             'build-tools/36.0.0/aapt': common + '''
 if args[1] == 'permissions':
     print(Path('permissions.txt').read_text(), end='')
-else:
+elif args[3] == 'AndroidManifest.xml':
     print(Path('tree.txt').read_text(), end='')
     if mutation == 'mutated-apk':
         with open(args[2], 'ab') as apk: apk.write(b'mutated after inspection')
+elif args[3] == 'res/xml/backup_rules.xml':
+    print(Path('backup.txt').read_text(), end='')
+elif args[3] == 'res/xml/data_extraction_rules.xml':
+    print(Path('extraction.txt').read_text(), end='')
+else:
+    sys.exit(99)
 ''',
             'platform-tools/adb': common + f'''
 args = args[2:]  # -s serial
@@ -1265,8 +1282,8 @@ else:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(all(value == '0' for value in statuses.values()), statuses)
         self.assertEqual([line.split()[0] for line in events],
-                         ['dump', 'dump', 'tools/build/verify_manifests.py', '-s', '-s',
-                          'tools/build/verify_manifests.py', '-s', 'tools/build/verify_manifests.py', '-s'])
+                         ['dump', 'dump', 'tools/build/verify_manifests.py', 'dump', 'dump', 'dump', 'dump', '-s', '-s',
+                          'tools/build/verify_manifests.py', '-s', 'tools/build/verify_manifests.py', 'dump', 'dump', 'dump', 'dump', '-s'])
         adb_events = [line.split()[2:] for line in events if line.startswith('-s ')]
         self.assertEqual(adb_events, [
             ['install', '-r', 'app/build/outputs/apk/debug/app-debug.apk'],
@@ -1274,8 +1291,8 @@ else:
         digest = (self.directory / 'evidence/native/inspected-apk.sha256').read_text().split()[0]
         apk = self.directory / 'app/build/outputs/apk/debug/app-debug.apk'
         self.assertEqual(digest, hashlib.sha256(apk.read_bytes()).hexdigest())
-        self.assertEqual(events[5], 'tools/build/verify_manifests.py --installed-path evidence/native/installed-package-path.txt --variant debug')
-        self.assertIn('--installed-package evidence/native/installed-package.txt', events[7])
+        self.assertEqual(events[9], 'tools/build/verify_manifests.py --installed-path evidence/native/installed-package-path.txt --variant debug')
+        self.assertIn('--installed-package evidence/native/installed-package.txt', events[11])
 
     def test_installed_observation_fails_closed_and_preserves_graph_error(self):
         for mutation, failed_status in (
@@ -1310,7 +1327,7 @@ else:
         manifest = self.directory / "SYNTHETIC-AndroidManifest.xml"
         prefix = '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
         application = ('<application android:usesCleartextTraffic="false">'
-                       '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
+                       f'<activity android:name="{MAIN_ACTIVITY}" android:launchMode="singleTask"/>'
                        '</application>')
         for expected in (SOURCE_PERMISSIONS, APP_PERMISSIONS):
             for tag in ("uses-permission", "uses-permission-sdk-23"):

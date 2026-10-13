@@ -27,10 +27,10 @@ immutable SHA, anonymously from the fixed public repository. It suppresses
 persisted headers/helpers and unsafe config/environment behavior without rewriting
 credentials/config/source/index. It can add only required objects, remove the
 shallow boundary and create missing advertised canonical local release tag refs.
-No moving tip, public tag write, settings change or identity fallback is used.
+No moving tip, public tag write, settings change or identity fallback is used. Managed PR-head recognition binds the real event name, scanning ref, compiled/source head and raw producer SHA/ref separately from normal PR-merge provenance. Unknown producer tuples stay rejected pending explicit reviewed admission. Exact checkout-action credential-only include layouts are preserved and classified, but remain blocked from anonymous transport until safe isolation is established; recognition never authorizes loading their values.
 
 An internal runner-temp observation is bound to job/run/attempt/root, exact source,
-HEAD/tree/raw and logical index/config/non-tag refs and acquired tag map. Later
+HEAD/tree/raw and logical index/config/non-tag refs and acquired tag map. Observation publication is exclusive and follows no links; protected state is rechecked after publication. Later
 configuration/resolution/reverification checks actual local objects/refs and all
 protected inputs against it. It performs no new live-origin query. This is an
 internal acquisition observation, not an official release admission or portable
@@ -100,3 +100,5 @@ Production RC/stable updates require the same owner production certificate and a
 strictly increasing officially admitted code. Actual signed installation/update and
 live-account proof remain later-unit and owner work; no new OAuth client/account
 configuration is introduced here.
+
+Current-payload re-verification runs the pinned Build Tools 36.0.0 SDK inspections again and compares their observations with the saved evidence. APK backup references are joined to the actual aapt2 resource table; every accepted selected XML configuration is inspected. Unknown mappings, uninspected variants, relative artifact Activity names and split launcher filters fail. Pure mocked transcripts do not establish actual SDK formatting compatibility or runtime acceptance. Payload roots and their entire ancestry must contain no symlinks.

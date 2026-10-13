@@ -1,12 +1,20 @@
 """Pure offline acquisition security/argv/state controls; no Git or network probes."""
 import json
+import os
+import tempfile
+import copy
 from pathlib import Path
 import subprocess
 import unittest
 from unittest.mock import patch
 
 from complete_codeql_checkout import (Git, PUBLIC_URL, config_entries, release_refs,
-                                     safe_environment, validate_config, validate_snapshot, prepare)
+                                     safe_environment, validate_config, validate_snapshot, prepare,
+                                     host_scratch, job_context, require_admission, canonical, digest,
+                                     publish_observation, read_observation, snapshot_path, AcquisitionError, STAGES, CATEGORIES)
+
+
+SCRATCH = host_scratch({'RUNNER_TEMP': os.environ.get('RUNNER_TEMP') if os.environ.get('GITHUB_ACTIONS') == 'true' else os.environ.get('BUILD_CONTRACT_SCRATCH')})
 
 
 class AcquisitionContracts(unittest.TestCase):
@@ -29,7 +37,7 @@ class AcquisitionContracts(unittest.TestCase):
         def fake(argv, **kwargs):
             calls.append((argv, kwargs))
             return subprocess.CompletedProcess(argv, 0, b'', b'')
-        git = Git('/opt/data/tmp/synthetic-root', {'PATH': '/usr/bin'}, fake)
+        git = Git(SCRATCH/'synthetic-root', {'PATH': '/usr/bin', 'RUNNER_TEMP': str(SCRATCH)}, fake)
         git.headers = ['http.https://github.com/.extraheader']
         git.call('fetch', '--no-tags', '--no-write-fetch-head', '--no-auto-maintenance',
                  '--no-write-commit-graph', '--refmap=', PUBLIC_URL, 'a' * 40)
@@ -49,37 +57,48 @@ class AcquisitionContracts(unittest.TestCase):
             calls.append(argv)
             return subprocess.CompletedProcess(argv, 1, b'Authorization: synthetic-secret', b'synthetic-secret')
         with self.assertRaisesRegex(ValueError, 'refused') as error:
-            Git('/opt/data/tmp/synthetic', {}, refused).call('fetch', PUBLIC_URL, 'a' * 40)
+            Git(SCRATCH/'synthetic', {'RUNNER_TEMP': str(SCRATCH)}, refused).call('fetch', PUBLIC_URL, 'a' * 40)
         self.assertNotIn('synthetic-secret', str(error.exception))
         self.assertEqual(len(calls), 1)
         def timeout(argv, **kwargs):
+            calls.append(argv)
             raise subprocess.TimeoutExpired(argv, 60, stderr='synthetic-secret')
         with self.assertRaisesRegex(ValueError, 'timed out'):
-            Git('/opt/data/tmp/synthetic', {}, timeout).call('fetch', PUBLIC_URL, 'a' * 40)
+            Git(SCRATCH/'synthetic', {'RUNNER_TEMP': str(SCRATCH)}, timeout).call('fetch', PUBLIC_URL, 'a' * 40)
+        self.assertEqual(len(calls), 2, 'The timeout must reach the injected subprocess too')
 
     def test_config_parsing_resets_managed_headers_but_rejects_unsafe_scopes(self):
         raw = b'core.filemode\ntrue\0http.https://github.com/.extraheader\nAuthorization: synthetic\0credential.helper\nunsafe-helper\0'
-        headers, includes = validate_config(config_entries(raw), '/opt/data/tmp')
+        headers, includes = validate_config(config_entries(raw), str(SCRATCH))
         self.assertEqual(headers, ['http.https://github.com/.extraheader'])
         self.assertEqual(includes, [])
         for key in ('url.https://wrong.invalid.insteadof', 'http.proxy', 'http.sslcert',
                     'include.path', 'remote.origin.promisor', 'extensions.partialclone',
                     'credential.https://github.com.helper', 'credential.username'):
             with self.subTest(key=key), self.assertRaises(ValueError):
-                validate_config([(key, 'synthetic')], '/opt/data/tmp')
+                validate_config([(key, 'synthetic')], str(SCRATCH))
         for key in ('http.https://userinfo:synthetic@github.com/.extraheader', 'http.https://wrong.invalid/.extraheader'):
             with self.assertRaises(ValueError):
-                validate_config([(key, 'synthetic')], '/opt/data/tmp')
+                validate_config([(key, 'synthetic')], str(SCRATCH))
 
     def test_authorization_include_is_only_nonrecursive_runner_temp_checkout_data(self):
-        key = 'includeif.gitdir:/synthetic/.git.path'
-        path = '/opt/data/tmp/git-credentials-abc-123.config'
-        self.assertEqual(validate_config([(key, path)], '/opt/data/tmp')[1], [Path(path)])
-        for wrong in ('../git-credentials-a.config', '/wrong/git-credentials-a.config', '/opt/data/tmp/other.config'):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as scratch:
+            root = Path(scratch)/'source'
+            path = Path(scratch)/'git-credentials-abc-123.config'
+            path.write_text('SYNTHETIC shape data; never credentials')
+            keys = ['includeif.gitdir:' + item + '.path' for item in (
+                str(root/'.git'), str(root/'.git/worktrees/*'), '/github/workspace/.git', '/github/workspace/.git/worktrees/*')]
+            entries = [(key, str(path)) for key in keys]
+            self.assertEqual(validate_config(entries, scratch, mode='managed', root=root)[1], [path])
             with self.assertRaises(ValueError):
-                validate_config([(key, wrong)], '/opt/data/tmp')
-        with self.assertRaises(ValueError):
-            validate_config([('includeif.onbranch:main.path', path)], '/opt/data/tmp')
+                validate_config(entries, scratch, mode='normal', root=root)
+            for wrong in ('../git-credentials-a.config', '/wrong/git-credentials-a.config', str(Path(scratch)/'other.config')):
+                with self.assertRaises(ValueError):
+                    validate_config([(key, wrong) for key in keys], scratch, mode='managed', root=root)
+            with self.assertRaises(ValueError):
+                validate_config([('includeif.onbranch:main.path', str(path))], scratch, mode='managed', root=root)
+            with self.assertRaises(ValueError):
+                validate_config(entries[:1], scratch, mode='managed', root=root)
 
     def test_release_advertisement_requires_exact_raw_canonical_ref_objects(self):
         text = 'a' * 40 + '\trefs/tags/v0.1.0\n' + 'b' * 40 + '\trefs/tags/v0.1.0-rc.1\n'
@@ -94,10 +113,10 @@ class AcquisitionContracts(unittest.TestCase):
         def forbidden(*args, **kwargs):
             self.fail('Missing marker reached a Git subprocess')
         with self.assertRaises(ValueError):
-            prepare('/opt/data/tmp/synthetic', 'managed', {}, forbidden)
+            prepare(SCRATCH/'synthetic', 'managed', {}, forbidden)
 
     def test_snapshot_cannot_replace_actual_local_graph_or_source_with_a_stamp(self):
-        context = {'fixture': True}
+        context = {'fixture': True, 'mode': 'fixture', 'admissionHeld': False}
         state = {'head': 'a' * 40}
         from complete_codeql_checkout import canonical, digest
         snapshot = dict(schema=1, mode='fixture', context=context, state=state,
@@ -120,3 +139,408 @@ class AcquisitionContracts(unittest.TestCase):
         self.assertIn("'tools/build/complete_codeql_checkout.py', '--mode', 'managed'", source)
         self.assertLess(source.index('complete_codeql_checkout.py'), source.index("include ':app'"))
         self.assertIn('enabled = false', source)
+        self.assertIn('preparation.standardError.asText.get().readLines()', source)
+        self.assertNotIn('standardError =', source)
+        self.assertIn('categories.contains(it)', source)
+        self.assertIn('ignoreExitValue = true', source)
+
+
+class PreparationTranscript:
+    """Synthetic filesystem and injected Git stdout only; never executes Git."""
+    head, source, base, tree, blob = (c * 40 for c in 'abcde')
+
+    def __init__(self, directory, defect=None):
+        self.root = Path(directory)/'source'
+        self.root.mkdir()
+        (self.root/'.git').mkdir()
+        (self.root/'VERSION').write_text('0.1.0\n')
+        for name, value in (('index', 'SYNTHETIC raw index'), ('HEAD', self.head), ('config', 'SYNTHETIC local config')):
+            (self.root/'.git'/name).write_text(value)
+        self.event = Path(directory)/'event.json'
+        self.payload = {'repository': {'full_name': 'leugenea/codexbar-mobile'}, 'number': 150,
+                        'pull_request': {'number': 150, 'base': {'repo': {'full_name': 'leugenea/codexbar-mobile'}},
+                                         'head': {'sha': self.source}, 'merge_commit_sha': self.head}}
+        self.event.write_text(json.dumps(self.payload))
+        self.environment = dict(GITHUB_ACTIONS='true', GITHUB_RUN_ID='7', GITHUB_RUN_ATTEMPT='1', GITHUB_JOB='build',
+                                RUNNER_TEMP=str(directory), GITHUB_WORKSPACE=str(self.root), GITHUB_REPOSITORY='leugenea/codexbar-mobile',
+                                GITHUB_EVENT_NAME='pull_request', GITHUB_EVENT_PATH=str(self.event), GITHUB_SHA=self.head,
+                                GITHUB_REF='refs/pull/150/merge', PATH='/synthetic-path')
+        self.defect, self.calls, self.network_count = defect, [], 0
+        self.index = f'100644 {self.blob} 0\tVERSION\0'.encode()
+        if defect == 'workingBytes':
+            (self.root/'VERSION').write_text('SYNTHETIC dirty bytes')
+        if defect == 'graft':
+            (self.root/'.git/info').mkdir()
+            (self.root/'.git/info/grafts').write_text('SYNTHETIC graft')
+        if defect == 'alternate':
+            (self.root/'.git/objects/info').mkdir(parents=True)
+            (self.root/'.git/objects/info/alternates').write_text('SYNTHETIC alternate')
+        if defect == 'promisor':
+            (self.root/'.git/objects/pack').mkdir(parents=True)
+            (self.root/'.git/objects/pack/SYNTHETIC.promisor').write_text('SYNTHETIC promisor')
+
+    def run(self, argv, **options):
+        self.calls.append((argv, options))
+        position = 3
+        while argv[position] == '-c':
+            position += 2
+        args = tuple(argv[position:])
+        if args[0] in ('fetch', 'ls-remote'):
+            self.network_count += 1
+            home = Path(options['env']['HOME'])
+            assert home.parent == Path(self.environment['RUNNER_TEMP']) and home.is_dir() and not list(home.iterdir())
+            assert options['env']['XDG_CONFIG_HOME'] == str(home)
+            assert 'RUNNER_TEMP' not in options['env'] and 'GITHUB_SHA' not in options['env']
+            if self.defect == 'refusal':
+                return subprocess.CompletedProcess(argv, 1, b'SYNTHETIC secret', b'SYNTHETIC secret')
+            if self.defect == 'timeout':
+                raise subprocess.TimeoutExpired(argv, 60, stderr='SYNTHETIC secret')
+        text = ''
+        if args == ('rev-parse', 'HEAD'):
+            text = self.head
+        elif args == ('rev-parse', 'HEAD^{tree}'):
+            text = self.tree
+        elif args == ('rev-parse', '--show-toplevel'):
+            text = str(self.root)
+        elif args == ('rev-parse', '--git-common-dir'):
+            text = '.git'
+        elif args[:2] == ('rev-parse', '--git-path'):
+            text = '.git/' + args[2]
+        elif args == ('rev-parse', '--is-shallow-repository'):
+            text = 'true' if self.defect == 'shallow' else 'false'
+        elif args == ('config', '--local', '--no-includes', '--null', '--list'):
+            origin = 'https://wrong.invalid' if self.defect == 'origin' else PUBLIC_URL
+            text = 'remote.origin.url\n' + origin + '\0core.filemode\ntrue\0'
+            if self.defect == 'config':
+                text += 'url.https://wrong.invalid.insteadof\nhttps://github.com/\0'
+            if self.defect == 'partial':
+                text += 'remote.origin.promisor\ntrue\0'
+        elif args == ('ls-files', '--stage', '-z'):
+            return subprocess.CompletedProcess(argv, 0, self.index, b'')
+        elif args == ('ls-files', '--others', '--exclude-standard', '-z'):
+            text = 'SYNTHETIC-untracked\0' if self.defect == 'untracked' else ''
+        elif args == ('ls-tree', '-r', '-z', 'HEAD'):
+            text = f'100644 blob {self.blob}\tVERSION\0'
+        elif args == ('cat-file', 'blob', self.blob):
+            text = '0.1.0\n'
+        elif args == ('cat-file', '-p', self.head):
+            text = f'parent {self.source}\nparent {self.base}\n'
+        elif args == ('rev-parse', 'refs/tags/v0.0.1^{commit}'):
+            text = self.source
+        elif args[0] == 'for-each-ref':
+            if args[-1] == 'refs/tags':
+                if self.defect in ('lightweight', 'annotated'):
+                    text = (self.source if self.defect == 'lightweight' else 'f' * 40) + ' refs/tags/v0.0.1\n'
+                elif self.defect == 'tagConflict':
+                    text = self.blob + ' refs/tags/v0.1.0\n'
+                elif self.defect == 'tagMissing':
+                    text = ''
+            elif args[-1] == 'refs/replace':
+                text = 'refs/replace/' + self.head if self.defect == 'replacement' else ''
+            else:
+                text = 'refs/remotes/origin/main ' + (self.blob if self.defect == 'refDrift' and self.network_count >= 2 else self.base)
+        elif args[:3] == ('ls-remote', '--tags', '--refs'):
+            text = self.head + '\trefs/tags/v0.1.0\n' if self.defect in ('tagConflict', 'tagMissing') else ''
+            if self.defect in ('lightweight', 'annotated'):
+                text = (self.source if self.defect == 'lightweight' else 'f' * 40) + '\trefs/tags/v0.0.1\n'
+            if self.defect == 'tagMoved' and self.network_count == 2:
+                text = self.blob + '\trefs/tags/v0.1.0\n'
+            if self.network_count == 2 and self.defect in ('indexDrift', 'configDrift'):
+                (self.root/'.git'/('index' if self.defect == 'indexDrift' else 'config')).write_text('SYNTHETIC drift')
+        elif args[:3] == ('rev-list', '--objects', '--missing=print'):
+            text = '\n'.join((self.head, self.source, self.base, self.tree, self.blob))
+            if self.defect == 'missingObject':
+                text += '\n?' + 'f' * 40
+        elif args == ('cat-file', '--batch-check', '--batch-all-objects'):
+            text = '\n'.join(oid + ' commit 1' for oid in (self.head, self.source, self.base, self.tree, self.blob))
+            if self.defect == 'annotated':
+                text += '\n' + 'f' * 40 + ' tag 1'
+            if self.defect == 'absentObject':
+                text = text.replace(self.blob + ' commit 1', '')
+        elif args[:2] == ('rev-list', '--parents'):
+            text = f'{self.head} {self.source} {self.base}\n{self.source}\n{self.base}'
+            if self.defect == 'missingParent':
+                text = f'{self.head} ' + 'f' * 40
+        else:
+            raise AssertionError('Unspecified synthetic Git command')
+        return subprocess.CompletedProcess(argv, 0, text.encode(), b'')
+
+
+class PreparationContracts(unittest.TestCase):
+    def test_successful_normal_prepare_and_readonly_reuse_execute_complete_transcript(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            fake = PreparationTranscript(directory)
+            before = {n: (fake.root/'.git'/n).read_bytes() for n in ('index', 'config', 'HEAD')}
+            observation = prepare(fake.root, 'normal', fake.environment, fake.run)
+            self.assertEqual(observation['context']['checkoutRole'], 'normal_pr_merge')
+            self.assertEqual(observation['context']['sourceHeadSha'], fake.source)
+            self.assertEqual(observation['context']['producerEventSha'], fake.head)
+            self.assertEqual(fake.network_count, 2)
+            self.assertEqual(prepare(fake.root, 'normal', fake.environment, fake.run), observation)
+            self.assertEqual(fake.network_count, 2, 'Reuse must not query an origin again')
+            self.assertEqual({n: (fake.root/'.git'/n).read_bytes() for n in before}, before)
+            path = snapshot_path(fake.root, fake.environment)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(read_observation(path), observation)
+
+    def test_prepare_negative_matrix_preserves_failures_without_fallback(self):
+        for defect in ('origin', 'config', 'partial', 'workingBytes', 'untracked', 'graft', 'alternate', 'promisor',
+                       'replacement', 'shallow', 'missingObject', 'absentObject', 'missingParent', 'tagConflict',
+                       'tagMissing', 'tagMoved', 'indexDrift', 'configDrift', 'refDrift', 'refusal', 'timeout'):
+            with self.subTest(defect=defect), tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+                fake = PreparationTranscript(directory, defect)
+                with self.assertRaises(AcquisitionError) as error:
+                    prepare(fake.root, 'normal', fake.environment, fake.run)
+                self.assertIn(error.exception.stage, STAGES)
+                self.assertIn(error.exception.category, CATEGORIES)
+                self.assertNotIn('SYNTHETIC secret', error.exception.receipt())
+                self.assertFalse(snapshot_path(fake.root, fake.environment).exists())
+                if defect in ('origin', 'config', 'partial', 'workingBytes', 'untracked', 'graft', 'alternate', 'promisor', 'replacement'):
+                    self.assertEqual(fake.network_count, 0)
+                if defect in ('refusal', 'timeout'):
+                    self.assertEqual(fake.network_count, 1)
+
+    def test_observation_collision_links_and_late_preservation_drift_fail(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            fake = PreparationTranscript(directory)
+            path = snapshot_path(fake.root, fake.environment)
+            outside = Path(directory)/'outside-owned-controlled-target'
+            path.symlink_to(outside)
+            with self.assertRaises(AcquisitionError):
+                prepare(fake.root, 'normal', fake.environment, fake.run)
+            self.assertFalse(outside.exists())
+            self.assertEqual(fake.network_count, 0)
+            with self.assertRaises(ValueError):
+                publish_observation(path, {})
+            path.unlink()
+            path.write_text('SYNTHETIC existing bytes')
+            with self.assertRaises(OSError):
+                publish_observation(path, {})
+            self.assertEqual(path.read_text(), 'SYNTHETIC existing bytes')
+            path.unlink()
+            def late_drift(target, observation):
+                publish_observation(target, observation)
+                (fake.root/'.git/index').write_text('SYNTHETIC after-write drift')
+            with patch('complete_codeql_checkout.publish_observation', side_effect=late_drift), self.assertRaises(AcquisitionError):
+                prepare(fake.root, 'normal', fake.environment, fake.run)
+
+    def test_observation_context_graph_ref_and_state_tampering_never_reacquires(self):
+        for field in ('context', 'state', 'mode', 'tagMapSha256', 'tags'):
+            with self.subTest(field=field), tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+                fake = PreparationTranscript(directory)
+                observation = prepare(fake.root, 'normal', fake.environment, fake.run)
+                path = snapshot_path(fake.root, fake.environment)
+                changed = copy.deepcopy(observation)
+                changed[field] = 'SYNTHETIC tampering'
+                path.write_bytes(canonical(changed))
+                with self.assertRaises(AcquisitionError):
+                    prepare(fake.root, 'normal', fake.environment, fake.run)
+                self.assertEqual(fake.network_count, 2)
+        for field in ('GITHUB_JOB', 'GITHUB_RUN_ID', 'GITHUB_RUN_ATTEMPT'):
+            with self.subTest(field=field), tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+                fake = PreparationTranscript(directory)
+                observation = prepare(fake.root, 'normal', fake.environment, fake.run)
+                wrong = fake.environment | {field: 'another_job' if field == 'GITHUB_JOB' else '8'}
+                snapshot_path(fake.root, wrong).write_bytes(canonical(observation))
+                with self.assertRaises(AcquisitionError):
+                    prepare(fake.root, 'normal', wrong, fake.run)
+                self.assertEqual(fake.network_count, 2)
+        for defect in ('missingObject', 'refDrift', 'indexDrift'):
+            with self.subTest(defect=defect), tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+                fake = PreparationTranscript(directory)
+                prepare(fake.root, 'normal', fake.environment, fake.run)
+                fake.defect = defect
+                if defect == 'indexDrift':
+                    (fake.root/'.git/index').write_text('SYNTHETIC post-observation drift')
+                with self.assertRaises(AcquisitionError):
+                    prepare(fake.root, 'normal', fake.environment, fake.run)
+                self.assertEqual(fake.network_count, 2)
+
+    def test_event_name_missing_empty_wrong_kind_ref_source_and_repository_never_downgrade(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            fake = PreparationTranscript(directory)
+            valid = fake.payload
+            context = job_context(fake.environment, fake.root, fake.head)
+            self.assertEqual(context['eventName'], 'pull_request')
+            for payload in (valid | {'pull_request': None}, valid | {'pull_request': {}},
+                            {k: v for k, v in valid.items() if k != 'pull_request'},
+                            valid | {'repository': {'full_name': 'wrong/public'}},
+                            valid | {'number': 151}):
+                fake.event.write_text(json.dumps(payload))
+                with self.assertRaises(ValueError):
+                    job_context(fake.environment, fake.root, fake.head)
+            fake.event.write_text(json.dumps(valid))
+            for changes in ({'GITHUB_EVENT_NAME': ''}, {'GITHUB_EVENT_NAME': 'dynamic'}, {'GITHUB_EVENT_NAME': 'push'},
+                            {'GITHUB_REF': 'refs/pull/150/head'}, {'GITHUB_SHA': fake.source},
+                            {'GITHUB_REPOSITORY': 'wrong/public'}, {'GITHUB_WORKSPACE': str(SCRATCH/'different')}):
+                with self.subTest(changes=list(changes)), self.assertRaises(ValueError):
+                    job_context(fake.environment | changes, fake.root, fake.head)
+            with self.assertRaises(ValueError):
+                job_context(fake.environment, fake.root, fake.source)
+
+    def test_managed_head_recognition_is_bound_but_every_unadopted_tuple_stays_held(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            fake = PreparationTranscript(directory)
+            managed = fake.environment | {'CODEQL_EXTRACTOR_JAVA_TRAP_DIR': 'SYNTHETIC-marker', 'CODE_SCANNING_REF': 'refs/pull/150/head'}
+            for raw in (fake.head, fake.source, 'f' * 40):
+                context = job_context(managed | {'GITHUB_SHA': raw}, fake.root, fake.source, mode='managed')
+                self.assertEqual(context['checkoutRole'], 'managed_pr_head')
+                self.assertEqual(context['compiledCheckoutSha'], fake.source)
+                self.assertEqual(context['producerEventSha'], raw)
+                self.assertTrue(context['admissionHeld'])
+                with self.assertRaises(AcquisitionError):
+                    require_admission(context)
+            for change in ({'CODE_SCANNING_REF': 'refs/pull/151/head'}, {'CODE_SCANNING_REF': 'refs/pull/150/merge'},
+                           {'CODEQL_EXTRACTOR_JAVA_TRAP_DIR': ''}):
+                with self.assertRaises(AcquisitionError):
+                    job_context(managed | change, fake.root, fake.source, mode='managed')
+            with self.assertRaises(AcquisitionError):
+                job_context(managed, fake.root, fake.head, mode='managed')
+
+    def test_direct_push_and_dispatch_are_event_bound_not_pr_fallbacks(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            fake = PreparationTranscript(directory)
+            for kind in ('push', 'workflow_dispatch'):
+                payload = {'repository': {'full_name': 'leugenea/codexbar-mobile'}, 'ref': 'refs/heads/main',
+                           'after': fake.head, 'head_commit': {'id': fake.head}}
+                fake.event.write_text(json.dumps(payload))
+                env = fake.environment | {'GITHUB_EVENT_NAME': kind, 'GITHUB_REF': 'refs/heads/main'}
+                self.assertEqual(job_context(env, fake.root, fake.head)['checkoutRole'], 'direct')
+                for changed in (payload | {'pull_request': {}}, payload | {'ref': 'refs/heads/wrong'}):
+                    fake.event.write_text(json.dumps(changed))
+                    with self.assertRaises(ValueError):
+                        job_context(env, fake.root, fake.head)
+                fake.event.write_text(json.dumps(payload))
+
+    def test_host_scratch_is_original_validated_input_not_a_child_environment_fallback(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            valid = Path(directory)
+            file = valid/'regular-file'
+            file.write_text('SYNTHETIC')
+            link = valid/'link'
+            link.symlink_to(valid)
+            for value in (None, '', 'relative', str(file), str(valid/'absent'), str(link)):
+                with self.subTest(value=value), self.assertRaises(AcquisitionError):
+                    host_scratch({'RUNNER_TEMP': value, 'BUILD_CONTRACT_SCRATCH': str(valid)})
+            self.assertEqual(host_scratch({'RUNNER_TEMP': str(valid)}), valid)
+            original = dict(PATH='/synthetic', RUNNER_TEMP=str(valid), GH_TOKEN='SYNTHETIC-secret', HOME='/unsafe', GIT_TRACE='1')
+            before = original.copy()
+            calls = []
+            def fake(argv, **options):
+                calls.append(options['env'])
+                self.assertTrue(Path(options['env']['HOME']).is_dir())
+                self.assertEqual(Path(options['env']['HOME']).parent, valid)
+                return subprocess.CompletedProcess(argv, 0, b'', b'')
+            Git(valid/'synthetic', original, fake).call('ls-remote', '--tags', '--refs', PUBLIC_URL)
+            self.assertEqual(original, before)
+            self.assertEqual(len(calls), 1)
+            self.assertFalse(Path(calls[0]['HOME']).exists())
+            for key in ('RUNNER_TEMP', 'GH_TOKEN', 'GIT_TRACE'):
+                self.assertNotIn(key, calls[0])
+
+    def test_fixed_diagnostics_cannot_emit_host_or_exception_values(self):
+        with self.assertRaises(ValueError):
+            AcquisitionError('SYNTHETIC-path', 'TRANSPORT_REFUSED')
+        with self.assertRaises(ValueError):
+            AcquisitionError('HOST_CONTEXT', 'SYNTHETIC-secret')
+        with self.assertRaises(ValueError):
+            AcquisitionError('HOST_CONTEXT', 'EVENT_ROLE_UNSUPPORTED', ('SYNTHETIC-secret',))
+        receipt = AcquisitionError('HOST_CONTEXT', 'EVENT_ROLE_UNSUPPORTED', ('EVENT_PR_MISSING',), message='SYNTHETIC-secret').receipt()
+        self.assertNotIn('SYNTHETIC-secret', receipt)
+        self.assertEqual(receipt, 'ACQUISITION_DIAGNOSTIC HOST_CONTEXT EVENT_ROLE_UNSUPPORTED EVENT_PR_MISSING')
+
+    def test_managed_credential_include_shape_is_observed_but_transport_is_inert_and_held(self):
+        from complete_codeql_checkout import inspect_config
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            root = Path(directory)/'source'
+            (root/'.git').mkdir(parents=True)
+            config = root/'.git/config'
+            config.write_text('SYNTHETIC immutable config bytes')
+            include = Path(directory)/'git-credentials-abc-123.config'
+            include.write_text('SYNTHETIC opaque bytes; not actual credentials')
+            keys = ['includeif.gitdir:' + item + '.path' for item in (
+                str(root/'.git'), str(root/'.git/worktrees/*'), '/github/workspace/.git', '/github/workspace/.git/worktrees/*')]
+            raw = ('remote.origin.url\n' + PUBLIC_URL + '\0' + ''.join(key + '\n' + str(include) + '\0' for key in keys)).encode()
+            commands = []
+            def fake(argv, **options):
+                index = 3
+                while argv[index] == '-c':
+                    index += 2
+                args = argv[index:]
+                commands.append(args)
+                if args[:2] == ['config', '--local']:
+                    stdout = raw
+                elif args[:2] == ['config', '--file']:
+                    self.assertIn('--no-includes', args)
+                    self.assertIn('--name-only', args)
+                    stdout = b'http.https://github.com/.extraheader\0'
+                elif args == ['rev-parse', '--git-path', 'config']:
+                    stdout = str(config).encode()
+                else:
+                    self.fail('Anonymous transport attempted to load recognized credentials')
+                return subprocess.CompletedProcess(argv, 0, stdout, b'')
+            git = Git(root, {'RUNNER_TEMP': directory}, fake)
+            git.mode = 'managed'
+            before = config.read_bytes(), include.read_bytes()
+            self.assertEqual(inspect_config(git), PUBLIC_URL)
+            self.assertEqual(git.includes, [include])
+            with self.assertRaises(AcquisitionError) as held:
+                git.call('ls-remote', '--tags', '--refs', PUBLIC_URL)
+            self.assertIn('CONFIG_INCLUDE_CREDENTIAL_ONLY_RECOGNIZED', held.exception.receipt())
+            self.assertEqual((config.read_bytes(), include.read_bytes()), before)
+            self.assertFalse(any(args[0] == 'ls-remote' for args in commands))
+            for unsupported in (b'credential.helper\0', b'include.path\0', b'http.proxy\0'):
+                def wrong(argv, **options):
+                    result = fake(argv, **options)
+                    return subprocess.CompletedProcess(argv, 0, unsupported if '--file' in argv else result.stdout, b'')
+                with self.assertRaises(AcquisitionError):
+                    invalid = Git(root, {'RUNNER_TEMP': directory}, wrong)
+                    invalid.mode = 'managed'
+                    inspect_config(invalid)
+
+
+    def test_lightweight_and_annotated_acquired_maps_are_peeled_in_successful_prepare_transcripts(self):
+        for kind in ('lightweight', 'annotated'):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+                fake = PreparationTranscript(directory, kind)
+                observation = prepare(fake.root, 'normal', fake.environment, fake.run)
+                self.assertEqual(observation['tags'], {'refs/tags/v0.0.1': fake.source if kind == 'lightweight' else 'f' * 40})
+                self.assertEqual(observation['peeled'], {'refs/tags/v0.0.1': fake.source})
+                self.assertEqual(observation['tagMapSha256'], digest(canonical(observation['tags'])))
+                self.assertEqual(fake.network_count, 2)
+
+    def test_observation_ancestry_links_and_nonregular_entries_never_publish_or_read(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            root = Path(directory)
+            (root/'real').mkdir()
+            (root/'parent').symlink_to(root/'real')
+            with self.assertRaises(ValueError):
+                publish_observation(root/'parent/observation.json', {})
+            self.assertFalse((root/'real/observation.json').exists())
+            (root/'directory-entry').mkdir()
+            with self.assertRaises((ValueError, OSError)):
+                read_observation(root/'directory-entry')
+
+    def test_fixture_script_isolates_inherited_tags_and_models_real_managed_source_without_event_rewrite(self):
+        source = (Path(__file__).resolve().parents[2]/'tools/build/run-hosted-release-fixtures.sh').read_text()
+        self.assertIn('git clone --no-tags --no-local --bare "$GITHUB_WORKSPACE"', source)
+        self.assertIn('git clone --no-tags --no-local "$scratch/origin.git"', source)
+        self.assertIn('inheritedTargetTagsIsolated', source)
+        self.assertIn("context['sourceHeadSha'] if context['checkoutRole'] == 'normal_pr_merge'", source)
+        self.assertIn('"$scratch/managed" "$managed_source_sha"', source)
+        self.assertNotIn('GITHUB_EVENT_PATH=', source)
+        self.assertNotIn('GITHUB_SHA=', source)
+        self.assertNotIn('git tag --force', source)
+
+
+    def test_cli_argument_failure_emits_only_fixed_categories_without_running_git(self):
+        import io
+        from contextlib import redirect_stderr
+        from complete_codeql_checkout import main
+        stderr = io.StringIO()
+        with patch('sys.argv', ['helper', '--mode', 'SYNTHETIC-sensitive-value']), redirect_stderr(stderr), patch('complete_codeql_checkout.prepare') as execution:
+            with self.assertRaises(SystemExit) as error:
+                main()
+        self.assertEqual(error.exception.code, 2)
+        self.assertEqual(stderr.getvalue(), 'ACQUISITION_DIAGNOSTIC HOST_CONTEXT EVENT_ROLE_UNSUPPORTED\n')
+        execution.assert_not_called()

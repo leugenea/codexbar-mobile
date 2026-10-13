@@ -1,6 +1,9 @@
 """Fail closed on permissions, cleartext-off and single-process launcher policy."""
 import argparse
 import json
+import os
+import hashlib
+import subprocess
 from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
@@ -57,11 +60,11 @@ def activity_name(name: str) -> str:
     return name if "." in name else NAMESPACE + "." + name
 
 
-def check_process_owner(application, path: Path) -> None:
+def check_process_owner(application, path: Path, *, source=False) -> None:
     if any(node.get(ANDROID + "process") is not None for node in application.iter()):
         raise ValueError(f"App components must use the default single process: {path}")
     activities = [node for node in application.findall("activity")
-                  if activity_name(node.get(ANDROID + "name", "")) == MAIN_ACTIVITY]
+                  if (activity_name(node.get(ANDROID + "name", "")) if source else node.get(ANDROID + "name")) == MAIN_ACTIVITY]
     if len(activities) != 1 or activities[0].get(ANDROID + "launchMode") != "singleTask":
         raise ValueError(f"MainActivity must declare singleTask launch mode: {path}")
 
@@ -88,7 +91,7 @@ def check_manifest(path: Path, expected=None, *, variant="debug", identity=None)
     if (len(applications) != 1 or applications[0].get(ANDROID + "usesCleartextTraffic") != "false"
             or applications[0].get(ANDROID + "networkSecurityConfig") is not None):
         raise ValueError(f"Cleartext must be explicitly disabled without a policy override: {path}")
-    check_process_owner(applications[0], path)
+    check_process_owner(applications[0], path, source=expected == SOURCE_PERMISSIONS)
     if identity is not None:
         check_generated_policy(manifest, variant, identity)
     return {"manifest": str(path), "requestedPermissions": permissions, "cleartextPermitted": False,
@@ -120,7 +123,7 @@ def check_apk_process_owner(xmltree: str) -> None:
     activities = []
     for block in xmltree_elements(xmltree, "activity"):
         names = re.findall(r'android:name\([^\n]*?\)="([^"]+)"', block)
-        if names and activity_name(names[0]) == MAIN_ACTIVITY:
+        if names == [MAIN_ACTIVITY]:
             activities.append(block)
     mode = r"(?m)^\s*A: android:launchMode\([^\n]*?\)=\(type 0x10\)0x2[ \t]*$"
     if len(activities) != 1 or len(re.findall(mode, activities[0])) != 1:
@@ -242,7 +245,7 @@ def check_generated_policy(manifest, variant, identity):
         if [item[1] for item in metadata if item[0] == key] != [value]:
             raise ValueError("Generated source/channel metadata mismatch")
     check_release_components([(node.tag, node.get(ANDROID + "name", "")) for node in app], variant)
-    activities = [node for node in app.findall("activity") if activity_name(node.get(ANDROID + "name", "")) == MAIN_ACTIVITY]
+    activities = [node for node in app.findall("activity") if node.get(ANDROID + "name") == MAIN_ACTIVITY]
     if len(activities) != 1 or activities[0].get(ANDROID + "exported") != "true":
         raise ValueError("Production launcher must remain exported")
     filters = activities[0].findall("intent-filter")
@@ -253,7 +256,7 @@ def check_generated_policy(manifest, variant, identity):
 
 def check_release_components(components, variant):
     if variant == "release":
-        activities = [activity_name(name) for tag, name in components if tag in ("activity", "activity-alias")]
+        activities = [name for tag, name in components if tag in ("activity", "activity-alias")]
         if activities != [MAIN_ACTIVITY]:
             raise ValueError("Release excludes debug/test Activity components")
         if any(name.startswith(("androidx.test.", "androidx.compose.ui.test.")) for _, name in components):
@@ -310,12 +313,20 @@ def check_apk_identity(xmltree, variant, identity):
                   for block in xmltree_elements(xmltree, tag)]
     check_release_components(components, variant)
     main = [block for block in xmltree_elements(xmltree, "activity")
-            if activity_name(tree_attribute(block, "android:name", string=True)) == MAIN_ACTIVITY]
+            if tree_attribute(block, "android:name", string=True) == MAIN_ACTIVITY]
     if len(main) != 1 or tree_attribute(main[0], "android:exported") != 0xffffffff:
         raise ValueError("APK launcher must remain exported")
-    # MAIN and LAUNCHER must occur exactly once in the APK's launcher intent.
+    # Keep hierarchy: global occurrence counts cannot prove a launcher filter.
+    activities = list(zip(xmltree_elements(xmltree, "activity"), tree_subtrees(xmltree, "activity")))
+    owned = [subtree for attrs, subtree in activities
+             if tree_attribute(attrs, "android:name", string=True) == MAIN_ACTIVITY]
+    filters = tree_subtrees(owned[0], "intent-filter") if len(owned) == 1 else []
+    if len(filters) != 1:
+        raise ValueError("APK MAIN/LAUNCHER identity mismatch")
     for tag, name in (("action", "android.intent.action.MAIN"), ("category", "android.intent.category.LAUNCHER")):
-        if sum(tree_attribute(block, "android:name", string=True) == name for block in xmltree_elements(xmltree, tag)) != 1:
+        names = [tree_attribute(block, "android:name", string=True) for block in xmltree_elements(filters[0], tag)]
+        if names != [name] or sum(tree_attribute(block, "android:name", string=True) == name
+                                 for block in xmltree_elements(xmltree, tag)) != 1:
             raise ValueError("APK MAIN/LAUNCHER identity mismatch")
 
 
@@ -357,6 +368,91 @@ def check_backup_dump(text, extraction=False):
             raise ValueError("Packaged backup exclusions weakened")
 
 
+def backup_resource_files(manifest, resources, *, variant='release'):
+    """Strict aapt2 resource-table parser. Every selected configuration is checked.
+
+    Synthetic transcripts exercise this parser; actual Build Tools 36.0.0 output
+    is an indispensable hosted compatibility gate, with no unknown-format pass.
+    """
+    package, _, _ = variant_policy(variant)
+    apps = xmltree_elements(manifest, 'application')
+    if len(apps) != 1:
+        raise ValueError('Ambiguous backup application')
+    selected = {}
+    for attribute, name in (('fullBackupContent', 'backup_rules'), ('dataExtractionRules', 'data_extraction_rules')):
+        ids = re.findall(r'(?m)^\s*A: android:' + attribute + r'\([^\n]*\)=@(0x[0-9a-f]{8})\s*$', apps[0])
+        if len(ids) != 1 or ids[0] in selected:
+            raise ValueError('Invalid backup resource identity')
+        selected[ids[0]] = name
+    packages = re.findall(r'(?m)^\s*Package name=([^ ]+) id=([0-9a-f]{2})\s*$', resources)
+    if packages != [(package, '7f')]:
+        raise ValueError('Unknown resource-table package')
+    result, current = {}, None
+    for line in resources.splitlines():
+        header = re.fullmatch(r'\s*resource (0x[0-9a-f]{8}) ([^ ]+)(?: PUBLIC)?\s*', line)
+        if header:
+            current = header[1] if header[1] in selected else None
+            if current:
+                expected_name = 'xml/' + selected[current]
+                if header[2] not in (expected_name, package + ':' + expected_name) or current in result:
+                    raise ValueError('Selected backup resource-table name/duplicate mismatch')
+                result[current] = []
+            continue
+        if not current or not line.strip():
+            continue
+        if re.match(r'\s*(?:type |Package )', line):
+            current = None
+            continue
+        value = re.fullmatch(r'\s*\(([A-Za-z0-9-]*)\) \(file\) (res/[A-Za-z0-9_./-]+\.xml) type=XML\s*', line)
+        if not value or '..' in value[2] or '//' in value[2]:
+            raise ValueError('Unknown/uninspected selected backup configuration')
+        if not re.fullmatch(r'res/xml(?:-[A-Za-z0-9-]+)?/' + selected[current] + r'\.xml', value[2]):
+            raise ValueError('Selected backup resource file mismatch')
+        result[current].append({'configuration': value[1], 'path': value[2]})
+    if set(result) != set(selected):
+        raise ValueError('Manifest backup ID missing from resource table')
+    for variants in result.values():
+        configs = [v['configuration'] for v in variants]
+        if not configs or len(configs) > 16 or '' not in configs or len(set(configs)) != len(configs):
+            raise ValueError('Missing/duplicate selected backup configuration')
+    return {selected[oid]: values for oid, values in result.items()}
+
+
+def check_backup_resources(manifest, resources, inspections, *, variant='release'):
+    files = backup_resource_files(manifest, resources, variant=variant)
+    if not isinstance(inspections, dict) or set(inspections) != set(files):
+        raise ValueError('Selected backup inspection set mismatch')
+    for name, expected in files.items():
+        actual = inspections[name]
+        if not isinstance(actual, list) or len(actual) != len(expected):
+            raise ValueError('Selected backup configuration was not inspected')
+        for row, selection in zip(actual, expected):
+            if not isinstance(row, dict) or set(row) != {'configuration', 'path', 'xmltree'} or any(row[k] != v for k, v in selection.items()):
+                raise ValueError('Selected backup resource inspection binding mismatch')
+            check_backup_dump(row['xmltree'], name == 'data_extraction_rules')
+    return files
+
+
+def inspect_backup_resources(apk, sdk, manifest, *, variant='release'):
+    tools = Path(sdk) / 'build-tools/36.0.0'
+    resources = subprocess.run([str(tools/'aapt2'), 'dump', 'resources', str(apk)],
+                               capture_output=True, text=True, timeout=60, check=True).stdout
+    files = backup_resource_files(manifest, resources, variant=variant)
+    inspections, texts = {}, {}
+    for name, selections in files.items():
+        inspections[name] = []
+        for selection in selections:
+            text = subprocess.run([str(tools/'aapt'), 'dump', 'xmltree', str(apk), selection['path']],
+                                  capture_output=True, text=True, timeout=60, check=True).stdout
+            inspections[name].append(selection | {'xmltree': text})
+            if selection['configuration'] == '':
+                texts['backup.txt' if name == 'backup_rules' else 'extraction.txt'] = text
+    check_backup_resources(manifest, resources, inspections, variant=variant)
+    texts['resources.txt'] = resources
+    texts['backup-resources.json'] = json.dumps(inspections, sort_keys=True, separators=(',', ':')) + '\n'
+    return texts
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apk-permissions", type=Path)
@@ -376,7 +472,19 @@ def main() -> None:
         if args.installed_package and not (args.apk_permissions and args.installed_path):
             parser.error("Installed dump requires the APK observations and installed path")
         if args.apk_permissions:
-            check_apk_dump(args.apk_permissions.read_text(), args.apk_xmltree.read_text(), variant=args.variant, identity=identity)
+            supplied = args.apk_xmltree.read_text()
+            check_apk_dump(args.apk_permissions.read_text(), supplied, variant=args.variant, identity=identity)
+            apk_name = 'app-debug.apk' if args.variant == 'debug' else 'app-release-unsigned.apk'
+            apk = ROOT / 'app/build/outputs/apk' / args.variant / apk_name
+            before = hashlib.sha256(apk.read_bytes()).digest()
+            current = subprocess.run([str(Path(os.environ['ANDROID_HOME'])/'build-tools/36.0.0/aapt'),
+                                      'dump', 'xmltree', str(apk), 'AndroidManifest.xml'],
+                                     capture_output=True, text=True, timeout=60, check=True).stdout
+            if current != supplied:
+                raise ValueError('Supplied manifest differs from current APK')
+            inspect_backup_resources(apk, os.environ['ANDROID_HOME'], current, variant=args.variant)
+            if hashlib.sha256(apk.read_bytes()).digest() != before:
+                raise ValueError('APK changed during resource inspection')
         if args.installed_path:
             check_installed_path(args.installed_path.read_text(), variant=args.variant)
         if args.installed_package:

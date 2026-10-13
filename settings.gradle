@@ -16,10 +16,69 @@ dependencyResolutionManagement {
 // CodeQL must observe compilation, not restore compiled outputs.
 if (providers.environmentVariable('CODEQL_EXTRACTOR_JAVA_TRAP_DIR').orElse('').get().trim()) {
     // Explicit preparation precedes app identity; repeated clean/assemble rechecks local evidence.
-    providers.exec {
+    def preparation = providers.exec {
         workingDir settingsDir
         commandLine 'python3', '-B', 'tools/build/complete_codeql_checkout.py', '--mode', 'managed'
-    }.result.get().assertNormalExitValue()
+        ignoreExitValue = true
+    }
+    if (preparation.result.get().exitValue != 0) {
+        // Surface only closed source enums; arbitrary subprocess text stays hidden.
+        def stages = [
+            'HOST_CONTEXT',
+            'EVENT_KIND',
+            'EVENT_PAYLOAD',
+            'EVENT_REF_SHA',
+            'CHECKOUT_RELATION',
+            'SCRATCH_ROOT',
+            'CONFIG_POLICY',
+            'PROTECTED_SOURCE_INDEX_STATE',
+            'OBJECT_GRAPH',
+            'ANONYMOUS_TRANSPORT',
+            'RELEASE_TAG_MAP',
+            'SNAPSHOT_REUSE',
+            'OBSERVATION_WRITE'
+        ] as Set
+        def categories = [
+            'EVENT_ROLE_NORMAL_PR_MERGE',
+            'EVENT_ROLE_MANAGED_PR_HEAD',
+            'EVENT_ROLE_UNSUPPORTED',
+            'EVENT_PR_MISSING',
+            'EVENT_PR_REPOSITORY_MISMATCH',
+            'EVENT_REF_MISMATCH',
+            'EVENT_PRODUCER_SHA_MATCHES_PR_HEAD',
+            'EVENT_PRODUCER_SHA_MATCHES_EVENT_MERGE',
+            'EVENT_PRODUCER_SHA_MATCHES_NEITHER',
+            'CHECKOUT_HEAD_MISMATCH',
+            'CHECKOUT_PARENT_MISMATCH',
+            'SCRATCH_INVALID',
+            'CONFIG_INCLUDE_REJECTED',
+            'CONFIG_OTHER_UNSAFE',
+            'TRANSPORT_SETUP_FAILED',
+            'TRANSPORT_REFUSED',
+            'TRANSPORT_TIMED_OUT',
+            'GRAPH_INCOMPLETE',
+            'TAG_MAP_MISMATCH',
+            'SNAPSHOT_STATE_OR_CONTEXT_MISMATCH',
+            'EVENT_KIND_PULL_REQUEST',
+            'EVENT_KIND_PUSH',
+            'EVENT_KIND_WORKFLOW_DISPATCH',
+            'EVENT_KIND_DYNAMIC',
+            'EVENT_KIND_OTHER',
+            'EVENT_REF_PR_HEAD',
+            'EVENT_REF_PR_MERGE',
+            'EVENT_REF_BRANCH',
+            'EVENT_REF_OTHER',
+            'EVENT_PR_PRESENT',
+            'CONFIG_INCLUDE_CREDENTIAL_ONLY_RECOGNIZED',
+            'CONFIG_INCLUDE_OTHER'
+        ] as Set
+        def receipt = preparation.standardError.asText.get().readLines().find { line ->
+            def tokens = line.split(' ') as List
+            tokens.size() >= 3 && tokens[0] == 'ACQUISITION_DIAGNOSTIC' &&
+                stages.contains(tokens[1]) && tokens.drop(2).every { categories.contains(it) }
+        }
+        throw new GradleException(receipt ?: 'Exact-source preparation rejected without a recognized fixed diagnostic')
+    }
     buildCache {
         local {
             enabled = false

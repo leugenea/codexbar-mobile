@@ -2,11 +2,17 @@
 import copy
 from pathlib import Path
 import tempfile
+import os
 import unittest
 from unittest.mock import patch
 
 from release_identity import (admit_counter, identity_digest, positive_code, read_target,
                               resolve_identity, stable_anchor, validate_identity)
+
+
+# Host-side test allocation stays separate from mocked Git child environments.
+from complete_codeql_checkout import host_scratch
+SCRATCH = host_scratch({'RUNNER_TEMP': os.environ.get('RUNNER_TEMP') if os.environ.get('GITHUB_ACTIONS') == 'true' else os.environ.get('BUILD_CONTRACT_SCRATCH')})
 
 
 def fixture_identity(channel='dev'):
@@ -23,7 +29,7 @@ def fixture_identity(channel='dev'):
 
 class IdentityContracts(unittest.TestCase):
     def test_target_is_one_canonical_line(self):
-        with tempfile.TemporaryDirectory(dir='/opt/data/tmp') as scratch:
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as scratch:
             path = Path(scratch)/'VERSION'
             path.write_text('0.1.0\n')
             self.assertEqual(read_target(path), '0.1.0')
@@ -83,5 +89,5 @@ class IdentityContracts(unittest.TestCase):
     def test_resolver_never_fetches_or_invents_missing_acquisition(self):
         with patch('release_identity.read_snapshot', side_effect=ValueError('No acquisition')) as snapshot:
             with self.assertRaises(ValueError):
-                resolve_identity('/opt/data/tmp/synthetic')
+                resolve_identity(SCRATCH/'synthetic')
             snapshot.assert_called_once()

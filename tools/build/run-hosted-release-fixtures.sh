@@ -8,11 +8,33 @@ export GIT_NO_LAZY_FETCH=1
 export GIT_NO_REPLACE_OBJECTS=1
 scratch=$(mktemp -d "$RUNNER_TEMP/release-identity-fixtures.XXXXXX")
 source_sha=$(git rev-parse HEAD)
+# Use the acquired real PR source head for the representative managed clone.
+# Raw producer event/SHA/ref are retained; no event is manufactured or rewritten.
+managed_source_sha=$(python3 -B - <<'PYCODE'
+import sys
+sys.path.insert(0, 'tools/build')
+from complete_codeql_checkout import read_snapshot
+from pathlib import Path
+_, observation = read_snapshot(Path.cwd())
+context = observation['context']
+print(context['sourceHeadSha'] if context['checkoutRole'] == 'normal_pr_merge' else observation['state']['head'])
+PYCODE
+)
+managed_scanning_ref=$(python3 -B - <<'PYCODE'
+import sys
+sys.path.insert(0, 'tools/build')
+from complete_codeql_checkout import read_snapshot
+from pathlib import Path
+_, observation = read_snapshot(Path.cwd())
+context = observation['context']
+print(context['producerEventRef'].removesuffix('/merge') + '/head' if context['checkoutRole'] == 'normal_pr_merge' else context['producerEventRef'])
+PYCODE
+)
 mkdir -p evidence/release-fixtures
 # A fixed-public shallow clone also exercises settings' managed entry before
 # actual clean/assemble. Its anonymous environment/config is isolated by helper.
 mkdir "$scratch/managed"
-python3 -B - "$scratch/managed" "$source_sha" <<'PYCODE'
+python3 -B - "$scratch/managed" "$managed_source_sha" <<'PYCODE'
 import sys
 sys.path.insert(0, 'tools/build')
 from complete_codeql_checkout import Git, PUBLIC_URL
@@ -32,9 +54,9 @@ PYCODE
   cd "$scratch/managed"
   # Existing managed marker, isolated to this hosted subprocess, never local.
   export CODEQL_EXTRACTOR_JAVA_TRAP_DIR="$scratch/codeql-marker"
-  GITHUB_WORKSPACE="$scratch/managed" timeout --signal=TERM --kill-after=30s 10m ./gradlew --no-daemon --dependency-verification strict \
+  CODE_SCANNING_REF="$managed_scanning_ref" GITHUB_WORKSPACE="$scratch/managed" timeout --signal=TERM --kill-after=30s 10m ./gradlew --no-daemon --dependency-verification strict \
     --no-configuration-cache --console=plain clean > "$scratch/managed-clean.log" 2>&1
-  GITHUB_WORKSPACE="$scratch/managed" timeout --signal=TERM --kill-after=30s 10m ./gradlew --no-daemon --dependency-verification strict \
+  CODE_SCANNING_REF="$managed_scanning_ref" GITHUB_WORKSPACE="$scratch/managed" timeout --signal=TERM --kill-after=30s 10m ./gradlew --no-daemon --dependency-verification strict \
     --no-configuration-cache --console=plain assemble > "$scratch/managed-assemble.log" 2>&1
 )
 cp "$scratch/managed-clean.log" "$scratch/managed-assemble.log" evidence/release-fixtures/
@@ -120,12 +142,30 @@ except ValueError:
     results['ambiguousStableRejected'] = True
 else:
     raise AssertionError('Ambiguous stable maxima accepted')
+# Existing target stable/RC refs must not collide with isolated producer fixtures.
+git.call('tag', 'v0.1.0-rc.1')
+git.call('tag', 'v0.1.0')
+root = clone('tagged-graph')
+prepare(root, 'fixture')
+tagged = resolve_identity(root)
+assert tagged['channel'] == 'dev' and tagged['devDistance'] == 0
+results['taggedDevelopment'] = tagged
+isolated = base/'collision-isolated-origin'
+isolated.mkdir()
+control = Git(isolated)
+control.env['GIT_ALLOW_PROTOCOL'] = 'file'
+control.call('-c', 'protocol.file.allow=always', 'clone', '--no-tags', '--no-local', '--bare', origin.as_uri(), str(isolated))
+assert not control.text('for-each-ref', '--format=%(refname)', 'refs/tags')
+control.call('tag', 'v0.1.0-rc.1')
+control.call('tag', 'v0.1.0')
+assert git.text('rev-parse', 'refs/tags/v0.1.0') == control.text('rev-parse', 'refs/tags/v0.1.0')
+results['inheritedTargetTagsIsolated'] = True
 Path('evidence/release-fixtures/git-contracts.json').write_text(json.dumps(results, sort_keys=True) + '\n')
 PYCODE
 # Fixture tag origin is local and confined to runner temp; it cannot satisfy the
 # fixed-public managed preparation or official signing admission.
-git clone --no-local --bare "$GITHUB_WORKSPACE" "$scratch/origin.git"
-git clone --no-local "$scratch/origin.git" "$scratch/project"
+git clone --no-tags --no-local --bare "$GITHUB_WORKSPACE" "$scratch/origin.git"
+git clone --no-tags --no-local "$scratch/origin.git" "$scratch/project"
 git -C "$scratch/project" checkout --detach "$source_sha"
 target=$(tr -d '\n' < VERSION)
 # Tags are never written in the real worktree or public origin.
@@ -141,7 +181,7 @@ git -C "$scratch/project" fetch --no-auto-maintenance --no-write-fetch-head orig
     code=41
     tag="v$target-rc.1"
     if [[ "$channel" == stable ]]; then code=42; tag="v$target"; fi
-    GITHUB_WORKSPACE="$scratch/managed" timeout --signal=TERM --kill-after=30s 10m ./gradlew --no-daemon --dependency-verification strict \
+    timeout --signal=TERM --kill-after=30s 10m ./gradlew --no-daemon --dependency-verification strict \
       --build-cache --no-configuration-cache --stacktrace --info --console=plain \
       -PreleaseChannel="$channel" -PreleaseTag="$tag" -PreleaseSourceSha="$source_sha" \
       -PreleaseCounter="$code" -PreleasePriorIdentity="$scratch/prior.json" \
