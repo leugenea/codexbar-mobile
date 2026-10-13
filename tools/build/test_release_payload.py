@@ -276,3 +276,72 @@ class PayloadContracts(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     safe_file(root, 'file')
             self.assertEqual(safe_file(real/'payload', 'file').read_text(), 'SYNTHETIC')
+
+
+    def test_selected_resource_structure_never_hides_qualified_or_orphan_rows(self):
+        manifest, table, inspections = tree(fixture_identity()), resource_table(), resource_inspections()
+        continuation = '      (v31) (file) res/xml-v31/backup_rules.xml type=XML\n'
+        anchor = '      () (file) res/xml/backup_rules.xml type=XML\n'
+        for boundary in ('      type xml id=01 entryCount=2\n', '      Package name=wrong id=7f\n',
+                         '  type malformed\n', 'Package malformed\n',
+                         '    resource 0x7f010001 xml/backup_rules\n'):
+            changed = table.replace(anchor, anchor + boundary + continuation)
+            with self.subTest(boundary=boundary), self.assertRaises(ValueError):
+                check_backup_resources(manifest, changed, inspections)
+        for changed in (continuation + table, table + continuation,
+                        table.replace('    resource 0x7f010002', '      resource 0x7f010002'),
+                        table.replace('  type xml id=01 entryCount=2', '      type xml id=01 entryCount=2')):
+            with self.assertRaises(ValueError):
+                backup_resource_files(manifest, changed)
+
+    def test_effective_application_and_activity_enabled_and_data_free_launcher(self):
+        identity = fixture_identity()
+        valid = tree(identity)
+        for anchor in ('    A: android:allowBackup', '      A: android:name'):
+            indent = anchor[:len(anchor)-len(anchor.lstrip())]
+            explicit = indent + 'A: android:enabled(0x0101000e)=(type 0x12)0xffffffff\n'
+            check_apk_identity(valid.replace(anchor, explicit + anchor, 1), 'release', identity)
+            for value in ('(type 0x12)0x0', '(type 0x10)0xffffffff', '@0x7f010099', '"true"', '(type 0x12)0x1'):
+                changed = valid.replace(anchor, indent + 'A: android:enabled(0x0101000e)=' + value + '\n' + anchor, 1)
+                with self.subTest(anchor=anchor, value=value), self.assertRaises(ValueError):
+                    check_apk_identity(changed, 'release', identity)
+            with self.assertRaises(ValueError):
+                check_apk_identity(valid.replace(anchor, explicit * 2 + anchor, 1), 'release', identity)
+        for extra in ('        E: data (line=19)\n          A: android:scheme(0x01010027)="https"\n',
+                      '        E: unknown (line=19)\n',
+                      '        A: android:priority(0x0101001c)=(type 0x10)0x1\n'):
+            with self.assertRaises(ValueError):
+                check_apk_identity(valid.replace('        E: action', extra + '        E: action', 1), 'release', identity)
+        with self.assertRaises(ValueError):
+            check_apk_identity(valid.replace('        E: category', '          E: category', 1), 'release', identity)
+
+    def test_generated_enabled_and_launcher_structure_use_source_policy(self):
+        from verify_manifests import ANDROID, source_metadata, check_generated_policy
+        import xml.etree.ElementTree as ET
+        identity = fixture_identity()
+        root = ET.Element('manifest', {'package': NAMESPACE, ANDROID+'versionName': identity['versionName'],
+                                       ANDROID+'versionCode': str(identity['versionCode'])})
+        app = ET.SubElement(root, 'application', {ANDROID+'allowBackup': 'false', ANDROID+'fullBackupContent': '@xml/backup_rules',
+                                                  ANDROID+'dataExtractionRules': '@xml/data_extraction_rules'})
+        activity = ET.SubElement(app, 'activity', {ANDROID+'name': MAIN_ACTIVITY, ANDROID+'exported': 'true'})
+        launcher = ET.SubElement(activity, 'intent-filter')
+        ET.SubElement(launcher, 'action', {ANDROID+'name': 'android.intent.action.MAIN'})
+        ET.SubElement(launcher, 'category', {ANDROID+'name': 'android.intent.category.LAUNCHER'})
+        for key, value in source_metadata(identity).items():
+            ET.SubElement(app, 'meta-data', {ANDROID+'name': key, ANDROID+'value': value})
+        check_generated_policy(root, 'release', identity)
+        for node in (app, activity):
+            node.set(ANDROID+'enabled', 'true')
+            check_generated_policy(root, 'release', identity)
+            for value in ('false', '@bool/enabled', '1', 'unknown'):
+                node.set(ANDROID+'enabled', value)
+                with self.assertRaises(ValueError):
+                    check_generated_policy(root, 'release', identity)
+            node.attrib.pop(ANDROID+'enabled')
+        extra = ET.SubElement(launcher, 'data', {ANDROID+'scheme': 'https'})
+        with self.assertRaises(ValueError):
+            check_generated_policy(root, 'release', identity)
+        launcher.remove(extra)
+        launcher[0].set(ANDROID+'unknown', 'selector')
+        with self.assertRaises(ValueError):
+            check_generated_policy(root, 'release', identity)

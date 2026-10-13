@@ -23,11 +23,23 @@ Explicit hosted producer preparation uses `complete_codeql_checkout.py` before
 Gradle. Normal Android jobs fetch complete history/tags and verify an anonymous
 public advertisement against actual local objects. Managed CodeQL's existing
 extractor-marker block instead completes its shallow checkout at the exact captured
-immutable SHA, anonymously from the fixed public repository. It suppresses
-persisted headers/helpers and unsafe config/environment behavior without rewriting
-credentials/config/source/index. It can add only required objects, remove the
-shallow boundary and create missing advertised canonical local release tag refs.
-No moving tip, public tag write, settings change or identity fallback is used. Managed PR-head recognition binds the real event name, scanning ref, compiled/source head and raw producer SHA/ref separately from normal PR-merge provenance. Unknown producer tuples stay rejected pending explicit reviewed admission. Exact checkout-action credential-only include layouts are preserved and classified, but remain blocked from anonymous transport until safe isolation is established; recognition never authorizes loading their values.
+immutable SHA, anonymously from the fixed public repository, once its actual
+producer/source role is admitted. Source implementation separates local original
+checkout readers from network children in two private SHA1/files repositories,
+with an empty home/template, verified TLS and no inherited credentials/includes.
+Original reader setup can parse preserved credential-only checkout includes;
+network children never use that metadata. Native full-closure export and strict
+empty-store validation precede descriptor-anchored no-clobber pack/index and
+absent-tag publication; captured shallow retirement is last. Late refusal may
+leave only a validated monotonic delta/owned cleanup-refusal residual, with no
+successful observation or global rollback claim. Git 2.55.0, canary access,
+publication, capacity and real graph proof are hosted pending. Limits remain
+300s total/60s per child/256MiB pack/2GiB monitored scratch; inflated acceptance
+limits are not transient heap guarantees and monitored disk overshoot is unmeasured.
+No moving tip, public tag write, source/index/config/credential/remote/reflog change
+or fallback is admitted. Managed source authority stays held. Four closed original
+producer-SHA-versus-actual-committed-HEAD classes are observational only: an
+unsupported dynamic/missing-PR tuple still fails before snapshot or network.
 
 An internal runner-temp observation is bound to job/run/attempt/root, exact source,
 HEAD/tree/raw and logical index/config/non-tag refs and acquired tag map. Observation publication is exclusive and follows no links; protected state is rechecked after publication. Later
@@ -102,3 +114,12 @@ live-account proof remain later-unit and owner work; no new OAuth client/account
 configuration is introduced here.
 
 Current-payload re-verification runs the pinned Build Tools 36.0.0 SDK inspections again and compares their observations with the saved evidence. APK backup references are joined to the actual aapt2 resource table; every accepted selected XML configuration is inspected. Unknown mappings, uninspected variants, relative artifact Activity names and split launcher filters fail. Pure mocked transcripts do not establish actual SDK formatting compatibility or runtime acceptance. Payload roots and their entire ancestry must contain no symlinks.
+
+The stricter selected-resource structural parser and enabled, direct data-free
+launcher checks have pure synthetic controls; actual Build Tools 36.0.0 output
+compatibility remains hosted pending. SDK entrypoint/launcher/JAR/library identity
+is not independently producer-bound yet (PAY2-1 held). The existing seven-inspection
+payload schema is unchanged. Fixture logs and completed channel graph/payload
+receipts are retained immediately under a bounded named evidence allowlist, even
+on failure. A held managed stage is mandatory and prevents later RC/stable stages;
+retained partial evidence is never successful release or signing proof.

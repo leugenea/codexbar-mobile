@@ -1411,3 +1411,46 @@ else:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Candidate3BoundedContracts(unittest.TestCase):
+    def test_contributor_command_validates_explicit_external_scratch_without_fallback(self):
+        source = (ROOT/'CONTRIBUTING.md').read_text()
+        self.assertIn(': "${BUILD_CONTRACT_SCRATCH:?', source)
+        self.assertIn('BUILD_CONTRACT_SCRATCH="$contract_scratch" TMPDIR="$contract_scratch"', source)
+        self.assertIn('CHECK_PYTHON=../codexbar-check-venv/bin/python bash tools/check.sh', source)
+        self.assertIn('scratch.stat().st_uid != os.getuid()', source)
+        self.assertIn('scratch, *scratch.parents', source)
+        self.assertIn('source, metadata, common', source)
+        self.assertNotIn('/opt/data/tmp', source)
+        preflight = re.search(r"python - \"\$contract_scratch\" <<'PY'\n(.*?)\nPY", source, re.S).group(1)
+        with tempfile.TemporaryDirectory(dir=Path(os.environ['RUNNER_TEMP'] if os.environ.get('GITHUB_ACTIONS') == 'true' else os.environ['BUILD_CONTRACT_SCRATCH'])) as directory:
+            root = Path(directory)/'source'; root.mkdir(); (root/'.git').mkdir()
+            external = Path(directory)/'external'; external.mkdir()
+            link = Path(directory)/'link'; link.symlink_to(external)
+            for selection, success in ((external, True), (root, False), (root/'.git', False), (link, False),
+                                       (external/'absent', False), (Path('relative'), False)):
+                result = subprocess.run([sys.executable, '-B', '-c', preflight, str(selection)], cwd=root,
+                                        capture_output=True, timeout=5)
+                self.assertEqual(result.returncode == 0, success)
+
+    def test_hosted_inline_controls_are_static_and_keep_managed_before_rc(self):
+        source = (ROOT/'tools/build/run-hosted-release-fixtures.sh').read_text()
+        import ast
+        blocks = re.findall(r"<<'([A-Z]+)'\n(.*?)\n\1", source, re.S)
+        for tag, code in blocks:
+            ast.parse(code, filename='hosted-inline:'+tag)
+        self.assertGreaterEqual(len(blocks), 8)
+        for phase in ('INIT_TRANSPORT', 'INIT_VALIDATOR', 'ADVERTISEMENT_BEFORE', 'FETCH_EXACT', 'ADVERTISEMENT_AFTER'):
+            self.assertIn(phase, source)
+        for token in ('inotify_init1', 'inotify_add_watch', 'observer.calibrate()', 'observer.OVERFLOW',
+                      'replaced.calibrate', 'sentinel-invoked', 'store.retire_shallow', 'phase-status.json',
+                      'original_status', 'status == 0 && finalizer != 0', 'os.O_EXCL|os.O_NOFOLLOW'):
+            self.assertIn(token, source)
+        self.assertLess(source.index('fixture_evidence=$(python'), source.index('managed_source_sha='))
+        self.assertLess(source.index('run_phase managed-clean env'), source.index('for channel in rc stable'))
+        self.assertIn('run_phase managed-assemble env', source)
+        self.assertNotIn('cp -R "$scratch', source)
+        self.assertNotIn('inspection-sdk.json', source)
+        self.assertIn('256*1024*1024 if apk', source)
+        self.assertIn('count <= 48', source)

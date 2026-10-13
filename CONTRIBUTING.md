@@ -42,7 +42,45 @@ uv venv -p /usr/bin/python3.13 ../codexbar-check-venv
 uv pip install --python ../codexbar-check-venv/bin/python --require-hashes --no-deps \
   -r .github/requirements-policy.txt -r tools/research/requirements.txt \
   -r .github/requirements-metrics.txt
-CHECK_PYTHON=../codexbar-check-venv/bin/python bash tools/check.sh
+# Select an already-existing, owned external directory explicitly. Do not create
+# scratch in the checkout or fall back to a system temporary directory.
+: "${BUILD_CONTRACT_SCRATCH:?Select existing absolute external scratch}"
+contract_scratch=$BUILD_CONTRACT_SCRATCH
+../codexbar-check-venv/bin/python - "$contract_scratch" <<'PY'
+import os, sys
+from pathlib import Path
+scratch = Path(sys.argv[1])
+source = Path.cwd().resolve()
+if (not scratch.is_absolute() or ".." in scratch.parts or not scratch.is_dir()
+        or scratch.stat().st_uid != os.getuid()
+        or any(p.is_symlink() for p in (scratch, *scratch.parents))):
+    raise ValueError("Select existing owned absolute nonsymlink scratch")
+metadata = source / ".git"
+if any(p.is_symlink() for p in (metadata, *metadata.parents)):
+    raise ValueError("Linked Git metadata")
+if metadata.is_file():
+    raw = metadata.read_text().strip()
+    if not raw.startswith("gitdir: ") or "\n" in raw:
+        raise ValueError("Unknown Git metadata pointer")
+    metadata = source / raw.removeprefix("gitdir: ")
+    if any(p.is_symlink() for p in (metadata, *metadata.parents)):
+        raise ValueError("Linked Git metadata pointer")
+    metadata = metadata.resolve()
+common = metadata
+if (metadata / "commondir").is_symlink():
+    raise ValueError("Linked common directory pointer")
+if (metadata / "commondir").is_file():
+    common = metadata / (metadata / "commondir").read_text().strip()
+    if any(p.is_symlink() for p in (common, *common.parents)):
+        raise ValueError("Linked common Git directory")
+    common = common.resolve()
+if (any(p.is_symlink() for p in (metadata, *metadata.parents, common, *common.parents))
+        or (metadata / "commondir").is_symlink()
+        or any(scratch.is_relative_to(p) for p in (source, metadata, common))):
+    raise ValueError("Scratch must be outside source and Git metadata")
+PY
+BUILD_CONTRACT_SCRATCH="$contract_scratch" TMPDIR="$contract_scratch" \
+  CHECK_PYTHON=../codexbar-check-venv/bin/python bash tools/check.sh
 git diff --check
 ```
 
@@ -128,13 +166,19 @@ configured; any future backend must also avoid output reuse during extraction.
 The existing nonempty extractor-marker block first calls the bounded anonymous
 public exact-HEAD checkout preparation, before app identity resolution. It retains
 the output-cache disable. Managed checkout can persist credentials: preparation
-isolates headers/helpers/environment, rejects unadmitted credential includes, and never fetches a moving tip or
-changes source, index, config or non-tag refs. Later `clean`/`assemble` validates
-the same job-scoped actual local graph/tag snapshot without another network query.
-Managed PR-head producer tuples require actual fixed-category evidence and explicit
-reviewed admission; unknown tuples remain rejected. Credential-only include layout
-recognition preserves bytes and remains blocked from anonymous transport until safe
-isolation is established. The marker comes from the released extractor, not a documented GitHub default-setup
+uses two owned private SHA1/files repositories with an empty home/template and
+credential-free child environment. Original local readers may parse preserved
+checkout includes, but network children use only private metadata and the fixed
+public HTTPS URL. A complete immutable fetch is independently exported/validated
+before bounded no-clobber pack/tag/shallow publication. Later configuration and
+reverification remain origin-free and validate actual local state, not a stamp.
+The exact Git 2.55.0 transport, observer, filesystem and capacity controls still
+require hosted proof. Managed producer/source authority remains held: unsupported
+dynamic or missing-PR tuples fail before network, with a closed original producer
+SHA-versus-committed-HEAD classification. Equality is not admission. SDK inspection
+implementation provenance is separately held; existing installation receipts do
+not prove the launcher/JAR/library closure.
+The marker comes from the released extractor, not a documented GitHub default-setup
 option: extractor changes require hosted warm-cache validation; static source
 contracts cannot prove the marker's continued identity or successful extraction.
 

@@ -231,6 +231,7 @@ def check_generated_policy(manifest, variant, identity):
             or manifest.get(ANDROID + "versionCode") != str(identity["versionCode"])):
         raise ValueError("Generated package/version identity mismatch")
     app = manifest.find("application")
+    require_xml_enabled(app)
     if app.get(ANDROID + "allowBackup") != "false":
         raise ValueError("Backup must remain disabled")
     for key, value in (("fullBackupContent", "@xml/backup_rules"), ("dataExtractionRules", "@xml/data_extraction_rules")):
@@ -248,10 +249,48 @@ def check_generated_policy(manifest, variant, identity):
     activities = [node for node in app.findall("activity") if node.get(ANDROID + "name") == MAIN_ACTIVITY]
     if len(activities) != 1 or activities[0].get(ANDROID + "exported") != "true":
         raise ValueError("Production launcher must remain exported")
+    require_xml_enabled(activities[0])
     filters = activities[0].findall("intent-filter")
     launcher = [node for node in filters if any(c.get(ANDROID + "name") == "android.intent.category.LAUNCHER" for c in node.findall("category"))]
-    if len(launcher) != 1 or [n.get(ANDROID + "name") for n in launcher[0].findall("action")] != ["android.intent.action.MAIN"]:
+    if len(launcher) != 1:
         raise ValueError("Production MAIN/LAUNCHER mismatch")
+    owned = launcher[0]
+    expected = [("action", "android.intent.action.MAIN"), ("category", "android.intent.category.LAUNCHER")]
+    if (owned.attrib or [(n.tag, n.get(ANDROID + "name")) for n in owned] != expected
+            or any(n.attrib != {ANDROID + "name": name} or list(n)
+                   for n, (_, name) in zip(owned, expected))):
+        raise ValueError("Launcher must be the direct data-free reviewed filter")
+    for tag, name in expected:
+        if sum(n.get(ANDROID + "name") == name for n in app.iter(tag)) != 1:
+            raise ValueError("Generated launcher names must belong to one filter")
+
+
+def require_xml_enabled(node):
+    if node.get(ANDROID + "enabled", "true") != "true":
+        raise ValueError("Launcher/application must be effectively enabled")
+
+
+def require_tree_enabled(block):
+    lines = [line.strip() for line in block.splitlines()
+             if re.match(r"A: android:enabled(?:\(|=)", line.strip())]
+    if lines and (len(lines) != 1 or not re.fullmatch(
+            r"A: android:enabled\(0x[0-9a-f]+\)=\(type 0x12\)0xffffffff", lines[0])):
+        raise ValueError("APK launcher/application enabled must be a literal typed true")
+
+
+def check_tree_launcher(block):
+    # Complete structural join: exactly two direct leaf elements, with no filter
+    # attributes, data nodes, nested names or additional attribute selectors.
+    lines = [line for line in block.splitlines() if line.strip()]
+    if len(lines) != 4:
+        raise ValueError("APK launcher filter must be direct and data-free")
+    indent = len(lines[0]) - len(lines[0].lstrip())
+    for offset, (tag, name) in zip((0, 2), (("action", "android.intent.action.MAIN"),
+                                           ("category", "android.intent.category.LAUNCHER"))):
+        if (not re.fullmatch(" " * indent + r"E: " + tag + r" \(line=\d+\)", lines[offset])
+                or not re.fullmatch(" " * (indent + 2) + r'A: android:name\(0x[0-9a-f]+\)="'
+                                    + re.escape(name) + r'"(?: \(Raw: "' + re.escape(name) + r'"\))?', lines[offset + 1])):
+            raise ValueError("APK launcher hierarchy/attributes mismatch")
 
 
 def check_release_components(components, variant):
@@ -289,6 +328,7 @@ def check_apk_identity(xmltree, variant, identity):
     if len(manifests) != 1 or len(apps) != 1:
         raise ValueError("Missing/ambiguous APK manifest/application")
     manifest, app = manifests[0], apps[0]
+    require_tree_enabled(app)
     if (tree_attribute(manifest, "package", string=True) != package
             or tree_attribute(manifest, "android:versionName", string=True) != identity["versionName"]
             or tree_attribute(manifest, "android:versionCode") != identity["versionCode"]):
@@ -316,6 +356,7 @@ def check_apk_identity(xmltree, variant, identity):
             if tree_attribute(block, "android:name", string=True) == MAIN_ACTIVITY]
     if len(main) != 1 or tree_attribute(main[0], "android:exported") != 0xffffffff:
         raise ValueError("APK launcher must remain exported")
+    require_tree_enabled(main[0])
     # Keep hierarchy: global occurrence counts cannot prove a launcher filter.
     activities = list(zip(xmltree_elements(xmltree, "activity"), tree_subtrees(xmltree, "activity")))
     owned = [subtree for attrs, subtree in activities
@@ -323,6 +364,11 @@ def check_apk_identity(xmltree, variant, identity):
     filters = tree_subtrees(owned[0], "intent-filter") if len(owned) == 1 else []
     if len(filters) != 1:
         raise ValueError("APK MAIN/LAUNCHER identity mismatch")
+    depth = min(len(line) - len(line.lstrip()) for line in owned[0].splitlines() if line.strip())
+    headers = [line for line in owned[0].splitlines() if line.strip().startswith('E: intent-filter')]
+    if len(headers) != 1 or len(headers[0]) - len(headers[0].lstrip()) != depth:
+        raise ValueError("APK launcher filter is not an Activity direct child")
+    check_tree_launcher(filters[0])
     for tag, name in (("action", "android.intent.action.MAIN"), ("category", "android.intent.category.LAUNCHER")):
         names = [tree_attribute(block, "android:name", string=True) for block in xmltree_elements(filters[0], tag)]
         if names != [name] or sum(tree_attribute(block, "android:name", string=True) == name
@@ -384,26 +430,55 @@ def backup_resource_files(manifest, resources, *, variant='release'):
         if len(ids) != 1 or ids[0] in selected:
             raise ValueError('Invalid backup resource identity')
         selected[ids[0]] = name
-    packages = re.findall(r'(?m)^\s*Package name=([^ ]+) id=([0-9a-f]{2})\s*$', resources)
-    if packages != [(package, '7f')]:
-        raise ValueError('Unknown resource-table package')
-    result, current = {}, None
+    result, current, package_indent, type_indent, resource_indent = {}, None, None, None, None
+    seen_ids, enclosing_type = set(), None
     for line in resources.splitlines():
-        header = re.fullmatch(r'\s*resource (0x[0-9a-f]{8}) ([^ ]+)(?: PUBLIC)?\s*', line)
-        if header:
-            current = header[1] if header[1] in selected else None
-            if current:
+        if not line.strip():
+            continue
+        if "\t" in line:
+            raise ValueError('Unknown resource-table indentation')
+        indent = len(line) - len(line.lstrip(' '))
+        body = line[indent:]
+        package_header = re.fullmatch(r'Package name=([^ ]+) id=([0-9a-f]{2})', body)
+        if body.startswith('Package '):
+            if (not package_header or package_indent is not None or indent != 0
+                    or package_header.groups() != (package, '7f')):
+                raise ValueError('Unknown/premature resource-table package')
+            package_indent = indent
+            continue
+        type_header = re.fullmatch(r'type ([A-Za-z0-9_]+) id=([0-9a-f]{2}) entryCount=([0-9]+)', body)
+        if body.startswith('type '):
+            if not type_header or package_indent is None or indent != package_indent + 2:
+                raise ValueError('Unknown/premature resource-table type')
+            type_indent, enclosing_type = indent, type_header.groups()
+            current, resource_indent = None, None
+            continue
+        header = re.fullmatch(r'resource (0x[0-9a-f]{8}) ([^ ]+)(?: PUBLIC)?', body)
+        if body.startswith('resource '):
+            if not header or type_indent is None or indent != type_indent + 2:
+                raise ValueError('Unknown/premature resource-table entry')
+            oid = header[1]
+            if oid in seen_ids:
+                raise ValueError('Duplicate resource-table ID')
+            seen_ids.add(oid)
+            current, resource_indent = oid, indent
+            if current in selected:
+                if enclosing_type[:2] != ('xml', oid[4:6]) or oid[2:4] != '7f':
+                    raise ValueError('Selected backup type/package ID mismatch')
                 expected_name = 'xml/' + selected[current]
-                if header[2] not in (expected_name, package + ':' + expected_name) or current in result:
-                    raise ValueError('Selected backup resource-table name/duplicate mismatch')
+                if header[2] not in (expected_name, package + ':' + expected_name):
+                    raise ValueError('Selected backup resource-table name mismatch')
                 result[current] = []
             continue
-        if not current or not line.strip():
+        if resource_indent is None or indent != resource_indent + 2:
+            raise ValueError('Orphan/unknown resource-table continuation')
+        if current not in selected:
+            # Nonselected values have no backup authority. They still require a
+            # legal entry/config depth and cannot act as an enclosing boundary.
+            if not body.startswith('('):
+                raise ValueError('Unknown resource-table continuation')
             continue
-        if re.match(r'\s*(?:type |Package )', line):
-            current = None
-            continue
-        value = re.fullmatch(r'\s*\(([A-Za-z0-9-]*)\) \(file\) (res/[A-Za-z0-9_./-]+\.xml) type=XML\s*', line)
+        value = re.fullmatch(r'\(([A-Za-z0-9-]*)\) \(file\) (res/[A-Za-z0-9_./-]+\.xml) type=XML', body)
         if not value or '..' in value[2] or '//' in value[2]:
             raise ValueError('Unknown/uninspected selected backup configuration')
         if not re.fullmatch(r'res/xml(?:-[A-Za-z0-9-]+)?/' + selected[current] + r'\.xml', value[2]):
