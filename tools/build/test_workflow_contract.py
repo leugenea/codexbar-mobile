@@ -509,6 +509,7 @@ class WorkflowContracts(unittest.TestCase):
                 self.assertIn("name + '-package.xml'", verifier)
             else:
                 self.assertIn(contract, verifier)
+        self.assertIn("(evidence / 'installed-toolchain.json').write_text", verifier)
         for obsolete in ('curl ', 'unzip ', 'tar -x', 'export JAVA_HOME=', 'GITHUB_PATH',
                          '17.0.20', 'installed-archives.sha256', 'sdk-archives.sha1',
                          'write_sdk_package_metadata.py', '--install', 'GITHUB_ENV'):
@@ -534,6 +535,7 @@ class WorkflowContracts(unittest.TestCase):
             self.assertIn(contract, graph)
         self.assertLess(graph.index(check), graph.index('native_coverage_retry.py'))
         self.assertNotIn('|| true', graph.split(check, 1)[1].split('coverage_gate.py phases', 1)[0])
+
 
     def test_every_attempt_checks_real_gate_execution_before_retry(self):
         self.assert_execution_evidence((ROOT / '.github/workflows/android.yml').read_text(),
@@ -578,7 +580,7 @@ class WorkflowContracts(unittest.TestCase):
             (1, 'cmdline-tools-binaries.sha256', 'missing-binary-receipt'),
             (1, 'Pkg.Revision[[:space:]]*=[[:space:]]*22\\.0', 'Pkg.Revision.*'),
             (2, "observed['java.specification.version'] == '17'", "observed['java.specification.version'] == '21'"),
-            (2, 'installed-toolchain.json', 'missing-toolchain-receipt'),
+            (2, "(evidence / 'installed-toolchain.json').write_text", "(evidence / 'missing-toolchain-receipt').write_text"),
             (2, 'timeout 30 java -XshowSettings:properties -version', 'java -version'),
         ]
         for target, old, new in mutations:
@@ -1433,6 +1435,29 @@ class Candidate3BoundedContracts(unittest.TestCase):
                 result = subprocess.run([sys.executable, '-B', '-c', preflight, str(selection)], cwd=root,
                                         capture_output=True, timeout=5)
                 self.assertEqual(result.returncode == 0, success)
+            # Execute the documented guarded boundary with only a mock check
+            # entry. The actual Python preflight is unchanged; no repo gate runs.
+            block = re.search(r"if \.\./codexbar-check-venv/bin/python - .*?\nfi", source, re.S).group(0)
+            block = block.replace(' && git diff --check', '')
+            marker = Path(directory)/'mock-quickcheck-entered'
+            block = block.replace('../codexbar-check-venv/bin/python', sys.executable)
+            block = block.replace('bash tools/check.sh', '"$MOCK_CHECK_ENTRY"')
+            entry = Path(directory)/'entry.sh'
+            entry.write_text('#!/usr/bin/env bash\nprintf entered > "$MOCK_CHECK_MARKER"\n')
+            entry.chmod(0o700)
+            for selection, success in ((external, True), (root, False), (root/'.git', False), (link, False),
+                                       (external/'absent', False), (Path('relative'), False)):
+                marker.unlink(missing_ok=True)
+                env = os.environ | {'contract_scratch':str(selection), 'MOCK_CHECK_ENTRY':str(entry), 'MOCK_CHECK_MARKER':str(marker)}
+                result = subprocess.run(['bash', '-c', block], cwd=root, env=env, capture_output=True, timeout=5)
+                self.assertEqual(result.returncode == 0, success)
+                self.assertEqual(marker.exists(), success, 'Preflight refusal must suppress check entry')
+            marker.unlink(missing_ok=True)
+            owner_refused = block.replace('import os, sys', 'import os, sys\nos.getuid = lambda: -1')
+            env = os.environ | {'contract_scratch':str(external), 'MOCK_CHECK_ENTRY':str(entry), 'MOCK_CHECK_MARKER':str(marker)}
+            result = subprocess.run(['bash','-c',owner_refused],cwd=root,env=env,capture_output=True,timeout=5)
+            self.assertNotEqual(result.returncode,0)
+            self.assertFalse(marker.exists(), 'Injected wrong ownership must suppress quickcheck entry')
 
     def test_hosted_inline_controls_are_static_and_keep_managed_before_rc(self):
         source = (ROOT/'tools/build/run-hosted-release-fixtures.sh').read_text()
@@ -1454,3 +1479,154 @@ class Candidate3BoundedContracts(unittest.TestCase):
         self.assertNotIn('inspection-sdk.json', source)
         self.assertIn('256*1024*1024 if apk', source)
         self.assertIn('count <= 48', source)
+
+class Candidate4MaterialObserverContracts(unittest.TestCase):
+    def observer_class(self):
+        script=(ROOT/'tools/build/verify-hosted-toolchain.sh').read_text()
+        helpers=script.split("python3 - <<'PY'\n",1)[1].split('# The functions above',1)[0]
+        namespace={}
+        exec(compile(helpers,'SYNTHETIC-observer-helpers','exec'),namespace)
+        return namespace['MaterialObserver'],namespace
+
+    def fixture(self, directory):
+        # Every package/launcher/native header is SYNTHETIC, not installed36 output.
+        root=Path(directory)/'source'; root.mkdir(); (root/'.git').mkdir(); (root/'evidence').mkdir()
+        sdk=Path(directory)/'sdk';sdk.mkdir();jdk=Path(directory)/'jdk';jdk.mkdir()
+        for package in ('platforms/android-37.0','build-tools/36.0.0'):
+            target=sdk/package;target.mkdir(parents=True)
+            props,metadata=WorkflowContracts().synthetic_installed_package(package.replace('/', ';', 1),
+                           '3' if package.startswith('platforms') else '36.0.0')
+            (target/'source.properties').write_text('\n'.join(k+'='+v for k,v in props.items())+'\n')
+            (target/'package.xml').write_bytes(ET.tostring(metadata))
+            label='platform' if package.startswith('platforms') else 'build-tools'
+            (root/'evidence'/ (label+'-source.properties')).write_bytes((target/'source.properties').read_bytes())
+            (root/'evidence'/ (label+'-package.xml')).write_bytes((target/'package.xml').read_bytes())
+        for name in ('aapt','aapt2'):
+            (sdk/'build-tools/36.0.0'/name).write_bytes(b'\x7fELF SYNTHETIC, not native format proof')
+        material=jdk/'literal.jar';material.write_bytes(b'SYNTHETIC literal material')
+        launcher=sdk/'build-tools/36.0.0/apksigner'
+        launcher.write_text('#!/external/interpreter\n# SYNTHETIC unsupported expressions\nif [ "$UNKNOWN" ]; then echo "'+str(material)+'"; fi\necho "'+str(material)+'"\n')
+        installed={'sdkRoot':str(sdk),'effectivePackages':{}}
+        for package in ('platforms/android-37.0','build-tools/36.0.0'):
+            props,metadata=WorkflowContracts().synthetic_installed_package(package.replace('/', ';', 1),
+                           '3' if package.startswith('platforms') else '36.0.0')
+            installed['effectivePackages'][package.replace('/', ';', 1)]={'path':package.replace('/', ';', 1),
+                   'revision':props['Pkg.Revision'],'sourceProperties':props}
+        (root/'evidence/installed-toolchain.json').write_text(json.dumps(installed))
+        tracked=[]
+        for name,data in [('VERSION',b'0.1.0\n'),('.github/workflows/android.yml',b'SYNTHETIC workflow bytes'),
+                          ('tools/build/verify-hosted-toolchain.sh',b'SYNTHETIC captured script bytes')]:
+            f=root/name;f.parent.mkdir(parents=True,exist_ok=True);f.write_bytes(data)
+            tracked.append(dict(path=name,sha256=hashlib.sha256(data).hexdigest(),gitMode='100644',blobSha='c'*40))
+        (root/'.git/index').write_bytes(b'SYNTHETIC raw index')
+        (root/'.git/HEAD').write_bytes(b'a'*40+b'\n')
+        event=Path(directory)/'event.json';event.write_text('{"SYNTHETIC":true}')
+        env=dict(GITHUB_ACTIONS='true',GITHUB_REPOSITORY='leugenea/codexbar-mobile',GITHUB_JOB='build',
+                 GITHUB_RUN_ID='7',GITHUB_RUN_ATTEMPT='1',GITHUB_SHA='a'*40,GITHUB_REF='refs/pull/150/merge',
+                 GITHUB_EVENT_NAME='pull_request',GITHUB_EVENT_PATH=str(event),GITHUB_WORKSPACE=str(root),
+                 GITHUB_WORKFLOW='Android',GITHUB_WORKFLOW_REF='leugenea/codexbar-mobile/.github/workflows/android.yml@refs/pull/150/merge',
+                 GITHUB_WORKFLOW_SHA='a'*40,ANDROID_HOME=str(sdk),ANDROID_SDK_ROOT=str(sdk),JAVA_HOME=str(jdk),RUNNER_TEMP=str(Path(directory)))
+        state=dict(head='a'*40,tree='b'*40,root=str(root),rawIndex=hashlib.sha256((root/'.git/index').read_bytes()).hexdigest(),
+                   headFile=hashlib.sha256((root/'.git/HEAD').read_bytes()).hexdigest(),logicalIndex='d'*64,configs={},trackedFiles=tracked)
+        (root/'.git/config').write_bytes(b'SYNTHETIC original config')
+        state['configs'][str(root/'.git/config')]={'sha256':hashlib.sha256((root/'.git/config').read_bytes()).hexdigest(),'mode':0o644}
+        context=dict(mode='normal',checkoutRole='normal_pr_merge',admissionHeld=False,repository=env['GITHUB_REPOSITORY'],compiledCheckoutSha=state['head'],
+                     sourceHeadSha='e'*40,producerEventSha=env['GITHUB_SHA'],producerEventRef=env['GITHUB_REF'],eventName=env['GITHUB_EVENT_NAME'],
+                     eventSha256=hashlib.sha256(event.read_bytes()).hexdigest(),**{k:env[k] for k in ('GITHUB_RUN_ID','GITHUB_RUN_ATTEMPT','GITHUB_JOB')})
+        key=hashlib.sha256(json.dumps([str(root),'7','1','build'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        (Path(directory)/('release-acquisition-'+key+'.json')).write_text(json.dumps(dict(mode='normal',context=context,state=state)))
+        return env,root,sdk,jdk,launcher
+
+    def test_file_only_observation_positive_retains_unknown_literal_selection_and_dedup(self):
+        from unittest.mock import patch
+        Observer,namespace=self.observer_class()
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            env,root,sdk,jdk,launcher=self.fixture(directory)
+            protected={f:str(hashlib.sha256(f.read_bytes()).hexdigest()) for base in (root,sdk,jdk) for f in base.rglob('*') if f.is_file()}
+            with patch('subprocess.run',side_effect=AssertionError('FORBIDDEN child')), patch('subprocess.Popen',side_effect=AssertionError('FORBIDDEN child')):
+                receipt=Observer(env).observe()
+            self.assertEqual(receipt['sdkClosure'],'HELD')
+            self.assertEqual(len(receipt['material']),8)
+            rows={r['path']:r for r in receipt['material']}
+            self.assertEqual(rows[str(launcher)]['launcherText'],launcher.read_text())
+            self.assertEqual(rows[str(launcher)]['selection'],'UNKNOWN')
+            self.assertEqual(rows[str(sdk/'build-tools/36.0.0/aapt')]['format'],'ELF')
+            output=Path(directory)/('sdk-material-observation-'+receipt['contextSha256'])/'observation.json'
+            self.assertEqual(output.read_bytes(),(root/'evidence/sdk-material-observation.json').read_bytes())
+            self.assertEqual(output.stat().st_mode&0o777,0o600)
+            self.assertEqual(output.parent.stat().st_mode&0o777,0o700)
+            for f,digest in protected.items(): self.assertEqual(hashlib.sha256(f.read_bytes()).hexdigest(),digest)
+            with self.assertRaises(FileExistsError): Observer(env).observe()
+            self.assertEqual(output.read_bytes(),(root/'evidence/sdk-material-observation.json').read_bytes())
+        script=(ROOT/'tools/build/verify-hosted-toolchain.sh').read_text()
+        body=script.split("python3 - <<'PY'\n",1)[1].split('\nPY',1)[0]
+        import ast
+        tree=ast.parse(body)
+        self.assertFalse(any(isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute) and n.func.attr in ('run','Popen','system','popen') for n in ast.walk(tree)))
+        self.assertLess(script.index("receipt['effectivePackages'][path] = verify_sdk"),script.index('MaterialObserver(os.environ).observe()'))
+
+    def test_observer_context_roots_material_links_caps_and_collisions_refuse_without_children(self):
+        from unittest.mock import patch
+        Observer,namespace=self.observer_class()
+        for defect in ('repository','producer','workflow','wrong-root','linked-root','metadata','source','index','linked-tool','nonregular',
+                       'launcher-cap','file-cap','rows-cap','aggregate-cap','serialized-cap','deadline','evidence-link','evidence-collision'):
+            with self.subTest(defect=defect),tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+                env,root,sdk,jdk,launcher=self.fixture(directory)
+                if defect=='repository':env['GITHUB_REPOSITORY']='wrong'
+                if defect=='producer':env['GITHUB_SHA']='f'*40
+                if defect=='workflow':env['GITHUB_WORKFLOW_REF']='wrong'
+                if defect=='wrong-root':env['ANDROID_SDK_ROOT']=str(jdk)
+                if defect=='linked-root':
+                    link=Path(directory)/'sdk-link';link.symlink_to(sdk);env['ANDROID_HOME']=env['ANDROID_SDK_ROOT']=str(link)
+                if defect=='metadata':(sdk/'build-tools/36.0.0/source.properties').write_text('Pkg.Revision=99.0.0\n')
+                if defect=='source':(root/'VERSION').write_text('SYNTHETIC changed')
+                if defect=='index':(root/'.git/index').write_text('SYNTHETIC changed')
+                if defect=='linked-tool':launcher.unlink();launcher.symlink_to(jdk/'literal.jar')
+                if defect=='nonregular':launcher.unlink();launcher.mkdir()
+                if defect=='evidence-link':(root/'evidence/sdk-material-observation.json').symlink_to(Path(directory)/'absent')
+                if defect=='evidence-collision':(root/'evidence/sdk-material-observation.json').write_bytes(b'OLD')
+                overrides={'launcher-cap':('MAX_TEXT',8),'file-cap':('MAX_FILE',8),'rows-cap':('MAX_ROWS',3),
+                           'aggregate-cap':('MAX_TOTAL',16),'serialized-cap':('MAX_JSON',64)}
+                with patch('subprocess.run',side_effect=AssertionError('FORBIDDEN')),patch('subprocess.Popen',side_effect=AssertionError('FORBIDDEN')):
+                    if defect in overrides:
+                        attr,value=overrides[defect]
+                        with patch.object(Observer,attr,value),self.assertRaises((ValueError,OSError,AssertionError)): Observer(env).observe()
+                    else:
+                        with self.assertRaises((ValueError,OSError,AssertionError)):
+                            observer=Observer(env)
+                            if defect=='deadline':observer.deadline=0
+                            observer.observe()
+                if defect=='evidence-collision':self.assertEqual((root/'evidence/sdk-material-observation.json').read_bytes(),b'OLD')
+                if defect=='evidence-link':self.assertTrue((root/'evidence/sdk-material-observation.json').is_symlink())
+
+    def test_observer_rechecks_drift_encoded_cap_and_second_copy_failure_residual(self):
+        from unittest.mock import patch
+        Observer,namespace=self.observer_class()
+        for defect in ('input-drift','material-drift','encoded','second-copy','output-link','parent-link'):
+            with self.subTest(defect=defect),tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+                env,root,sdk,jdk,launcher=self.fixture(directory);observer=Observer(env)
+                if defect=='input-drift':
+                    observer.context();(root/'VERSION').write_text('SYNTHETIC drift')
+                    with self.assertRaises(ValueError):observer.context()
+                elif defect=='material-drift':
+                    observer.material(launcher,launcher=True);launcher.write_text('#!SYNTHETIC replacement')
+                    with self.assertRaises(ValueError):observer.preserve()
+                elif defect=='encoded':
+                    # Target serialization accounting without huge input files.
+                    observer.rows={'synthetic':{'launcherText':'\u0000'*1000}}
+                    with patch.object(observer,'context',return_value={'SYNTHETIC':'context'}),patch.object(observer,'material'),patch.object(observer,'MAX_JSON',2048),self.assertRaisesRegex(ValueError,'encoded observation cap'):observer.observe()
+                elif defect=='second-copy':
+                    original=observer.publish
+                    def fail_copy(path,data):
+                        if path.parent==root/'evidence':raise OSError('SYNTHETIC failed second copy')
+                        return original(path,data)
+                    with patch.object(observer,'publish',side_effect=fail_copy),self.assertRaises(OSError):observer.observe()
+                    copies=list(Path(directory).glob('sdk-material-observation-*/observation.json'))
+                    self.assertEqual(len(copies),1);self.assertFalse((root/'evidence/sdk-material-observation.json').exists())
+                elif defect=='output-link':
+                    context=observer.context();key=hashlib.sha256(json.dumps(context,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+                    (Path(directory)/('sdk-material-observation-'+key)).symlink_to(Path(directory)/'absent')
+                    with self.assertRaises(FileExistsError):observer.observe()
+                else:
+                    (root/'evidence').rename(root/'original-evidence');(root/'evidence').symlink_to(jdk)
+                    with self.assertRaises(OSError):observer.observe()

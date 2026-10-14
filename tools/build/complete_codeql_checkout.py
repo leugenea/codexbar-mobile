@@ -14,6 +14,7 @@ import sys
 import time
 import tempfile
 import stat
+import signal
 
 PUBLIC_REPOSITORY = 'leugenea/codexbar-mobile'
 PUBLIC_URL = 'https://github.com/' + PUBLIC_REPOSITORY + '.git'
@@ -43,6 +44,14 @@ CATEGORIES = frozenset("""
     EVENT_KIND_OTHER EVENT_REF_PR_HEAD EVENT_REF_PR_MERGE
     EVENT_REF_BRANCH EVENT_REF_OTHER EVENT_PR_PRESENT
     CONFIG_INCLUDE_CREDENTIAL_ONLY_RECOGNIZED CONFIG_INCLUDE_OTHER
+    CONFIG_INCLUDE_MODE_OR_ROOT_REJECTED
+    CONFIG_INCLUDE_RULE_KEY_REJECTED
+    CONFIG_INCLUDE_DESTINATION_NOT_ABSOLUTE
+    CONFIG_INCLUDE_DESTINATION_PARENT_NOT_HOST_SCRATCH
+    CONFIG_INCLUDE_DESTINATION_NAME_REJECTED
+    CONFIG_INCLUDE_DESTINATION_NOT_REGULAR_FILE
+    CONFIG_INCLUDE_RULE_SET_REJECTED
+    CONFIG_INCLUDE_CREDENTIAL_KEY_SET_REJECTED
 """.split())
 
 
@@ -191,18 +200,23 @@ def validate_config(entries, runner_temp, *, mode="normal", root=None):
             headers.append(key)
         elif key.startswith('includeif.') and key.endswith('.path'):
             if mode != 'managed' or root is None:
-                raise AcquisitionError('CONFIG_POLICY', 'CONFIG_INCLUDE_REJECTED', ('CONFIG_INCLUDE_OTHER',))
+                raise AcquisitionError('CONFIG_POLICY', 'CONFIG_INCLUDE_REJECTED', ('CONFIG_INCLUDE_OTHER', 'CONFIG_INCLUDE_MODE_OR_ROOT_REJECTED'))
             expected = {('includeif.gitdir:' + item + '.path').lower() for item in (
                 str(Path(root) / '.git'), str(Path(root) / '.git/worktrees/*'),
                 '/github/workspace/.git', '/github/workspace/.git/worktrees/*')}
             path = Path(value)
             temporary = host_scratch({'RUNNER_TEMP': str(runner_temp)})
-            if (key not in expected or not path.is_absolute() or path.parent != temporary
-                    or not re.fullmatch(r'git-credentials-[A-Za-z0-9-]+\.config', path.name)):
-                raise AcquisitionError('CONFIG_POLICY', 'CONFIG_INCLUDE_REJECTED', ('CONFIG_INCLUDE_OTHER',))
+            predicates = (
+                (key not in expected, 'CONFIG_INCLUDE_RULE_KEY_REJECTED'),
+                (not path.is_absolute(), 'CONFIG_INCLUDE_DESTINATION_NOT_ABSOLUTE'),
+                (path.parent != temporary, 'CONFIG_INCLUDE_DESTINATION_PARENT_NOT_HOST_SCRATCH'),
+                (not re.fullmatch(r'git-credentials-[A-Za-z0-9-]+\.config', path.name), 'CONFIG_INCLUDE_DESTINATION_NAME_REJECTED'))
+            for refused, category in predicates:
+                if refused:
+                    raise AcquisitionError('CONFIG_POLICY', 'CONFIG_INCLUDE_REJECTED', ('CONFIG_INCLUDE_OTHER', category))
             no_symlink_path(path)
             if not path.is_file():
-                raise AcquisitionError('CONFIG_POLICY', 'CONFIG_INCLUDE_REJECTED', ('CONFIG_INCLUDE_OTHER',))
+                raise AcquisitionError('CONFIG_POLICY', 'CONFIG_INCLUDE_REJECTED', ('CONFIG_INCLUDE_OTHER', 'CONFIG_INCLUDE_DESTINATION_NOT_REGULAR_FILE'))
             includes.append(path)
         elif (key.startswith(('include.', 'url.', 'http.', 'https.', 'proxy.', 'filter.'))
               or key in ('core.sshcommand', 'core.gitproxy', 'core.alternateobjectdirectories',
@@ -217,7 +231,7 @@ def validate_config(entries, runner_temp, *, mode="normal", root=None):
     if includes:
         keys = [key for key, _ in entries if key.startswith('includeif.')]
         if len(keys) != 4 or len(set(keys)) != 4 or len(set(includes)) != 1:
-            raise AcquisitionError('CONFIG_POLICY', 'CONFIG_INCLUDE_REJECTED', ('CONFIG_INCLUDE_OTHER',))
+            raise AcquisitionError('CONFIG_POLICY', 'CONFIG_INCLUDE_REJECTED', ('CONFIG_INCLUDE_OTHER', 'CONFIG_INCLUDE_RULE_SET_REJECTED'))
     return sorted(set(headers)), sorted(set(includes))
 
 
@@ -232,7 +246,7 @@ def inspect_config(git):
         permitted = {'http.https://github.com/.extraheader', 'http.https://github.com/' + PUBLIC_REPOSITORY + '.extraheader',
                      'http.https://github.com/' + PUBLIC_REPOSITORY + '.git.extraheader'}
         if not keys or len(set(keys)) != len(keys) or not set(keys) <= permitted:
-            raise AcquisitionError('CONFIG_POLICY', 'CONFIG_INCLUDE_REJECTED', ('CONFIG_INCLUDE_OTHER',))
+            raise AcquisitionError('CONFIG_POLICY', 'CONFIG_INCLUDE_REJECTED', ('CONFIG_INCLUDE_OTHER', 'CONFIG_INCLUDE_CREDENTIAL_KEY_SET_REJECTED'))
         headers += keys
     git.includes = includes
     if includes:
@@ -266,7 +280,16 @@ def release_refs(text):
 
 
 def local_tags(git):
-    return release_refs(git.text('for-each-ref', '--format=%(objectname) %(refname)', 'refs/tags'))
+    tags = release_refs(git.text('for-each-ref', '--format=%(objectname) %(refname)', 'refs/tags'))
+    for ref, oid in tags.items():
+        path = Path(git.text('rev-parse', '--git-path', ref))
+        path = path if path.is_absolute() else git.root / path
+        if os.path.lexists(path):
+            raw, _ = _regular(path, 41, git.deadline)
+            if raw != (oid + '\n').encode():
+                raise ValueError('Canonical loose tag must be exact direct OID plus LF')
+    _check_deadline(git.deadline)
+    return tags
 
 
 def fingerprint(git):
@@ -292,7 +315,7 @@ def fingerprint(git):
         file = no_symlink_path(git.root / relative)
         if stage != '0' or mode not in ('100644', '100755') or file.is_symlink():
             raise ValueError('Unsupported index entry or symlink')
-        data = file.read_bytes()
+        data, _ = _regular(file, MAX_SCRATCH, git.deadline)
         if git.call('cat-file', 'blob', blob) != data:
             raise ValueError('Tracked working source differs from index')
         actual_mode = '100755' if file.stat().st_mode & 0o111 else '100644'
@@ -307,7 +330,7 @@ def fingerprint(git):
         raise ValueError('Index differs from committed source')
     configs = {}
     for p in git.config_files:
-        sha, size = _file_hash(p, MAX_METADATA)
+        sha, size = _file_hash(p, MAX_METADATA, git.deadline)
         info = p.lstat()
         configs[str(no_symlink_path(p))] = dict(sha256=sha, size=size, mode=stat.S_IMODE(info.st_mode),
                                               device=info.st_dev, inode=info.st_ino)
@@ -316,10 +339,12 @@ def fingerprint(git):
     head_path = Path(git.text('rev-parse', '--git-path', 'HEAD'))
     if not head_path.is_absolute():
         head_path = git.root / head_path
-    return dict(headFile=digest(head_path.read_bytes()), root=str(git.root), head=head, tree=tree, rawIndex=digest(index_path.read_bytes()),
+    result = dict(headFile=digest(_regular(head_path, MAX_METADATA, git.deadline)[0]), root=str(git.root), head=head, tree=tree, rawIndex=digest(_regular(index_path, MAX_SCRATCH, git.deadline)[0]),
                 logicalIndex=digest(logical), trackedFiles=tracked, configs=configs,
                 branch=head_path.read_text().strip(),
-                nonTagRefs=digest(refs.encode()), gitMetadata=json.loads(canonical(_inventory(git.root/'.git'))))
+                nonTagRefs=digest(refs.encode()), gitMetadata=json.loads(canonical(_inventory(git.root/'.git', git.deadline))))
+    _check_deadline(git.deadline)
+    return result
 
 
 def reject_shortcuts(git):
@@ -449,7 +474,7 @@ def job_context(environment, root, head, *, mode='normal', _capture=None):
     except ValueError:
         reject('EVENT_REF_SHA', 'CHECKOUT_HEAD_MISMATCH')
     ref = environment.get('GITHUB_REF', '')
-    source_head, role, held = producer_sha, 'direct', False
+    source_head, role, held = producer_sha, 'direct', mode == 'managed'
     if event_name == 'pull_request':
         pr = event.get('pull_request')
         if not isinstance(pr, dict) or not pr:
@@ -488,6 +513,9 @@ def job_context(environment, root, head, *, mode='normal', _capture=None):
             reject('EVENT_REF_SHA', 'CHECKOUT_HEAD_MISMATCH')
         if mode != 'fixture' and head != producer_sha:
             reject('CHECKOUT_RELATION', 'CHECKOUT_HEAD_MISMATCH')
+    if mode == 'managed' and role == 'direct':
+        # A producer equality is observational; no managed direct role is admitted.
+        reject('EVENT_REF_SHA', 'EVENT_ROLE_UNSUPPORTED')
     if mode == 'fixture':
         if not root.is_relative_to(temporary):
             reject('HOST_CONTEXT', 'EVENT_ROLE_UNSUPPORTED')
@@ -666,7 +694,9 @@ def _prepare(git, mode):
         observation = read_observation(path)
         if observation.get('mode') != mode:
             raise ValueError('Acquisition mode changed in the same job/root')
-        return validate_snapshot(git, observation, context)
+        result = validate_snapshot(git, observation, context)
+        _check_deadline(git.deadline)
+        return result
     git.stage = 'OBJECT_GRAPH'
     store = _SourceStore(git)
     try:
@@ -703,7 +733,9 @@ def _prepare(git, mode):
                            peeled=peeled, tagMapSha256=digest(canonical(tags)))
         validate_snapshot(git, observation, context)
         git.stage = 'OBSERVATION_WRITE'
+        _check_deadline(git.deadline)
         publish_observation(path, observation)
+        _check_deadline(git.deadline)
         # Observation creation cannot authorize a late source/config/auth drift.
         store.protected()
         _context_still_current(git, context)
@@ -714,6 +746,7 @@ def _prepare(git, mode):
             store.cleanup()
         finally:
             store.close_descriptors()
+            _check_deadline(git.deadline)
 
 
 # Private transport has no original Git metadata or inherited authentication
@@ -738,7 +771,13 @@ def _same_file(left, right):
                ('st_dev', 'st_ino', 'st_mode', 'st_nlink', 'st_uid', 'st_gid', 'st_size', 'st_mtime_ns', 'st_ctime_ns'))
 
 
-def _regular(path, limit=None):
+def _check_deadline(deadline):
+    if deadline is not None and time.monotonic() >= deadline:
+        raise ValueError('Acquisition total deadline')
+
+
+def _regular(path, limit=None, deadline=None):
+    _check_deadline(deadline)
     path = no_symlink_path(path)
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
@@ -747,12 +786,14 @@ def _regular(path, limit=None):
             raise ValueError('Unsupported regular nonshared file')
         data = bytearray()
         while True:
+            _check_deadline(deadline)
             part = os.read(fd, 1024 * 1024)
             if not part:
                 break
             data.extend(part)
             if limit is not None and len(data) > limit:
                 raise ValueError('File size limit')
+        _check_deadline(deadline)
         if not _same_file(os.fstat(fd), info) or not _same_file(os.stat(path, follow_symlinks=False), info):
             raise ValueError('File changed during read')
         return bytes(data), (info.st_dev, info.st_ino, stat.S_IMODE(info.st_mode))
@@ -760,7 +801,8 @@ def _regular(path, limit=None):
         os.close(fd)
 
 
-def _file_hash(path, limit=MAX_PACK):
+def _file_hash(path, limit=MAX_PACK, deadline=None):
+    _check_deadline(deadline)
     # Raw byte/trailer binding, not a pack parser; native index-pack validates
     # structure, object hashes, delta closure and strict object constraints.
     fd = os.open(no_symlink_path(path), os.O_RDONLY | os.O_NOFOLLOW)
@@ -770,7 +812,9 @@ def _file_hash(path, limit=MAX_PACK):
             raise ValueError('Unsupported bounded material')
         result = hashlib.sha256()
         while part := os.read(fd, 1024 * 1024):
+            _check_deadline(deadline)
             result.update(part)
+        _check_deadline(deadline)
         if not _same_file(os.fstat(fd), info) or not _same_file(os.stat(path, follow_symlinks=False), info):
             raise ValueError('Material changed')
         return result.hexdigest(), info.st_size
@@ -794,7 +838,7 @@ def _anchor(path, fd, captured):
     no_symlink_path(path)
 
 
-def _inventory(path):
+def _inventory(path, deadline=None):
     """No-follow metadata inventory, including inode/mode and every file byte."""
     result, recorded = {}, 2
     def retain(relative, row):
@@ -804,6 +848,7 @@ def _inventory(path):
             raise ValueError('Protected metadata inventory budget')
         result[relative] = row
     def visit(directory, prefix):
+        _check_deadline(deadline)
         fd, captured = _directory(directory)
         try:
             for name in sorted(os.listdir(fd)):
@@ -814,7 +859,7 @@ def _inventory(path):
                     retain(relative, ('directory', info.st_dev, info.st_ino, stat.S_IMODE(info.st_mode)))
                     visit(target, relative + '/')
                 elif stat.S_ISREG(info.st_mode) and info.st_nlink == 1:
-                    sha, size = _file_hash(target, MAX_SCRATCH)
+                    sha, size = _file_hash(target, MAX_SCRATCH, deadline)
                     retain(relative, ('file', info.st_dev, info.st_ino, stat.S_IMODE(info.st_mode), size, sha))
                 else:
                     raise ValueError('Linked/shared/nonregular metadata')
@@ -822,7 +867,37 @@ def _inventory(path):
         finally:
             os.close(fd)
     visit(Path(path), '')
+    _check_deadline(deadline)
     return result
+
+
+def _leader_done(child):
+    # WNOWAIT keeps the owned leader PID reserved until group termination. poll()
+    # would reap it early and permit PID reuse before the group signal.
+    if not hasattr(os, 'WNOWAIT') or not hasattr(os, 'waitid'):
+        raise ValueError('Owned session wait primitive unsupported')
+    return os.waitid(os.P_PID, child.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is not None
+
+
+def _reap_group(child):
+    # POSIX session created by this dispatcher only. No inherited group can be killed.
+    until = time.monotonic() + 2
+    try:
+        os.killpg(child.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    remaining = until - time.monotonic()
+    if remaining <= 0:
+        raise ValueError('Owned process group reap deadline')
+    child.wait(timeout=remaining)
+    while True:
+        try:
+            os.killpg(child.pid, 0)
+        except ProcessLookupError:
+            return
+        if time.monotonic() >= until:
+            raise ValueError('Owned process group did not terminate within bounded reap window')
+        time.sleep(0.02)
 
 
 class _PrivateTransport:
@@ -846,6 +921,7 @@ class _PrivateTransport:
         self.root_fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=self.parent_fd)
         self.root_anchor = os.fstat(self.root_fd)
         self.closed = False
+        self.group_safe = True
         self.stores = {}
         self.files = 0
         self.material = {}
@@ -869,7 +945,7 @@ class _PrivateTransport:
                 entries = config_entries(self.call(repo, 'READ', 'config', '--local', '--no-includes', '--null', '--list'))
                 if dict(entries) != {'core.repositoryformatversion': '0', 'core.filemode': 'true', 'core.bare': 'true'} or len(entries) != 3:
                     raise ValueError('Unknown fresh bare metadata')
-                self.material[repo] = {name: _regular(self.root/repo/name, MAX_METADATA) for name in ('config', 'HEAD')}
+                self.material[repo] = {name: _regular(self.root/repo/name, MAX_METADATA, self.git.deadline) for name in ('config', 'HEAD')}
                 if self.call(repo, 'READ', 'rev-parse', '--show-object-format').strip() != b'sha1' or self.call(repo, 'READ', 'rev-parse', '--show-ref-format').strip() != b'files':
                     raise ValueError('Unsupported private storage format')
             if self.call('V', 'READ', 'cat-file', '--batch-check', '--batch-all-objects').strip():
@@ -879,6 +955,7 @@ class _PrivateTransport:
             raise
 
     def assert_anchors(self):
+        _check_deadline(self.git.deadline)
         _anchor(self.parent, self.parent_fd, self.parent_anchor)
         _anchor(self.root, self.root_fd, self.root_anchor)
         if stat.S_IMODE(os.fstat(self.root_fd).st_mode) != 0o700 or os.fstat(self.root_fd).st_uid != os.getuid():
@@ -896,7 +973,7 @@ class _PrivateTransport:
                 raise ValueError('Private promisor pack')
         for repo, files in self.material.items():
             for name, material in files.items():
-                if _regular(self.root/repo/name, MAX_METADATA) != material:
+                if _regular(self.root/repo/name, MAX_METADATA, self.git.deadline) != material:
                     raise ValueError('Private metadata drift')
 
     def disk_budget(self):
@@ -939,20 +1016,23 @@ class _PrivateTransport:
                 source.flush()
             os.lseek(fds[2], 0, os.SEEK_SET)
             started = time.monotonic()
-            with subprocess.Popen(argv, cwd=options['cwd'], env=options['env'], stdin=fds[2], stdout=fds[0], stderr=fds[1]) as child:
-                try:
-                    while child.poll() is None:
-                        self.assert_anchors()
-                        self.disk_budget()
-                        if (os.fstat(fds[0]).st_size > MAX_PACK or os.fstat(fds[1]).st_size > MAX_METADATA):
-                            raise ValueError('Private output limit')
-                        if time.monotonic() - started >= options['timeout']:
-                            raise subprocess.TimeoutExpired(argv, options['timeout'])
-                        time.sleep(0.02)
-                except BaseException:
-                    child.kill()
-                    child.wait()
-                    raise
+            child = subprocess.Popen(argv, cwd=options['cwd'], env=options['env'], stdin=fds[2],
+                                     stdout=fds[0], stderr=fds[1], start_new_session=True)
+            self.group_safe = False
+            try:
+                while not _leader_done(child):
+                    self.assert_anchors()
+                    self.disk_budget()
+                    if os.fstat(fds[0]).st_size > MAX_PACK or os.fstat(fds[1]).st_size > MAX_METADATA:
+                        raise ValueError('Private output limit')
+                    if time.monotonic() - started >= options['timeout']:
+                        raise subprocess.TimeoutExpired(argv, options['timeout'])
+                    time.sleep(0.02)
+            finally:
+                # Even a failed/exited leader may leave native descendants. Do not
+                # drain H1 or remove private material until the owned group is gone.
+                _reap_group(child)
+                self.group_safe = True
             if os.fstat(fds[0]).st_size > MAX_PACK or os.fstat(fds[1]).st_size > MAX_METADATA:
                 raise ValueError('Private output limit')
             data = b''
@@ -963,6 +1043,8 @@ class _PrivateTransport:
         finally:
             for fd in fds:
                 os.close(fd)
+            if not self.group_safe:
+                raise ValueError('Owned child group termination unproved')
             for path in (err_path, in_path, out_path if output is None else None):
                 if path is not None and path in identities:
                     info = path.lstat()
@@ -1010,7 +1092,7 @@ class _PrivateTransport:
         except OSError:
             raise AcquisitionError('ANONYMOUS_TRANSPORT', 'TRANSPORT_SETUP_FAILED') from None
         finally:
-            if self.observer is not None and watched:
+            if self.observer is not None and watched and self.group_safe:
                 self.observer.drain(phase)
         self.assert_anchors()
         self.disk_budget()
@@ -1085,6 +1167,8 @@ class _PrivateTransport:
     def close(self):
         if self.closed:
             return
+        if not self.group_safe:
+            raise ValueError('Private cleanup refused with unaccounted child group')
         self.assert_anchors()
         # Owned private tree only. Refuse links/unknown material, and retain an
         # honest cleanup-refusal residual rather than traversing a substituted tree.
@@ -1092,6 +1176,7 @@ class _PrivateTransport:
             fd, anchor = _directory(directory)
             try:
                 for name in os.listdir(fd):
+                    _check_deadline(self.git.deadline)
                     info = os.stat(name, dir_fd=fd, follow_symlinks=False)
                     if stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid():
                         remove(directory/name)
@@ -1113,6 +1198,7 @@ class _PrivateTransport:
         os.close(self.root_fd)
         os.close(self.parent_fd)
         self.closed = True
+        _check_deadline(self.git.deadline)
 
 
 class _PrivateReader:
@@ -1235,6 +1321,7 @@ def _validated_pack(transport, closure):
     fd = os.open(pack, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, 'wb') as stream:
         stream.write(data)
+    _check_deadline(transport.git.deadline)
     del data
     index = pack.with_suffix('.idx')
     output = transport.call('V', 'INDEX', 'index-pack', '--strict', '--check-self-contained-and-connected',
@@ -1242,7 +1329,7 @@ def _validated_pack(transport, closure):
                             '-o', str(index), str(pack))
     if output.decode().strip() != pack_id:
         raise ValueError('Native pack identity mismatch')
-    index_bytes, _ = _regular(index, MAX_PACK)
+    index_bytes, _ = _regular(index, MAX_PACK, transport.git.deadline)
     if len(index_bytes) < 40 or index_bytes[-40:-20].hex() != pack_id or hashlib.sha1(index_bytes[:-20]).digest() != index_bytes[-20:]:
         raise ValueError('Index/pack trailer binding mismatch')
     validator = _PrivateReader(transport, 'V')
@@ -1280,14 +1367,15 @@ class _SourceStore:
                 raise ValueError('Unsupported source layout extension')
             for relative in ('objects', 'objects/pack', 'refs', 'refs/tags'):
                 self.directories[relative] = _directory(self.path/relative)
-            self.initial = _inventory(self.path)
+            local_tags(git)  # Direct raw tag representation is part of layout admission.
+            self.initial = _inventory(self.path, self.git.deadline)
             self.source = {k:v for k,v in fingerprint(git).items() if k != 'gitMetadata'}
             if any(name.endswith(('.lock', '.promisor')) for name in self.initial):
                 raise ValueError('Active lock or partial source storage')
             self.shallow = self.initial.get('shallow')
             self.boundaries = set()
             if self.shallow is not None:
-                raw, _ = _regular(self.path/'shallow', MAX_METADATA)
+                raw, _ = _regular(self.path/'shallow', MAX_METADATA, git.deadline)
                 lines = raw.decode().splitlines()
                 if not lines or len(set(lines)) != len(lines) or any(not SHA.fullmatch(x) for x in lines):
                     raise ValueError('Unknown captured shallow boundary')
@@ -1297,13 +1385,14 @@ class _SourceStore:
             raise
 
     def anchors(self):
+        _check_deadline(self.git.deadline)
         _anchor(self.path, self.fd, self.info)
         for relative, (fd, captured) in self.directories.items():
             _anchor(self.path/relative, fd, captured)
 
     def protected(self):
         self.anchors()
-        actual = _inventory(self.path)
+        actual = _inventory(self.path, self.git.deadline)
         expected = self.initial | self.allowed
         for relative in self.removed:
             expected.pop(relative)
@@ -1319,6 +1408,7 @@ class _SourceStore:
 
     def create(self, relative, data, mode):
         self.anchors()
+        _check_deadline(self.git.deadline)
         parent = str(Path(relative).parent)
         directory = self.fd if parent == '.' else self.directories[parent][0]
         fd = os.open(Path(relative).name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode, dir_fd=directory)
@@ -1330,6 +1420,7 @@ class _SourceStore:
                 stream.write(data)
                 stream.flush()
                 os.fsync(stream.fileno())
+                _check_deadline(self.git.deadline)
         except BaseException:
             raise
         return relative
@@ -1349,6 +1440,7 @@ class _SourceStore:
         for relative, _ in list(reversed(self.owned)):
             self.unlink_owned(relative)
         self.protected()
+        _check_deadline(self.git.deadline)
 
     def close_descriptors(self):
         for fd, _ in self.directories.values():
@@ -1369,7 +1461,7 @@ class _SourceStore:
             raise ValueError('Published inode mismatch')
         # Remove our extra link immediately. Final pair/tag is never rolled back.
         self.unlink_owned(stage)
-        self.allowed[target] = _inventory(self.path)[target]
+        self.allowed[target] = _inventory(self.path, self.git.deadline)[target]
         os.fsync(directory)
         self.protected()
 
@@ -1379,7 +1471,7 @@ class _SourceStore:
         known = self.initial | self.allowed
         present = [name in known for name in names]
         if any(present):
-            if not all(present) or any(_file_hash(self.path/name) != _file_hash(p)
+            if not all(present) or any(_file_hash(self.path/name, deadline=self.git.deadline) != _file_hash(p, deadline=self.git.deadline)
                                        or known[name][3] != 0o444 for name, p in zip(names, (pack, index))):
                 raise ValueError('Partial/different/linked pack collision')
             return
@@ -1387,10 +1479,10 @@ class _SourceStore:
         # Same-directory exclusive staging/no-replace link; never rename over a
         # preexisting pair. Pack first/index last, modes0444, no partial repair.
         for target, material in zip(names, (pack, index)):
-            raw, _ = _regular(material, MAX_PACK)
+            raw, _ = _regular(material, MAX_PACK, self.git.deadline)
             stage = 'objects/pack/acquisition-' + os.urandom(16).hex() + '.tmp'
             self.create(stage, raw, 0o444)
-            if _file_hash(self.path/stage) != _file_hash(material):
+            if _file_hash(self.path/stage, deadline=self.git.deadline) != _file_hash(material, deadline=self.git.deadline):
                 raise ValueError('Staged pack/index differs')
             self.link_final(stage, target)
 
@@ -1421,7 +1513,7 @@ class _SourceStore:
         self.protected()
         # Retire captured boundary LAST, after verified original object readback,
         # direct tag publication and independently complete parent closure.
-        if _inventory(self.path).get('shallow') != self.shallow:
+        if _inventory(self.path, self.git.deadline).get('shallow') != self.shallow:
             raise ValueError('Captured shallow inode/bytes changed')
         os.unlink('shallow', dir_fd=self.fd)
         self.removed.add('shallow')

@@ -278,13 +278,13 @@ def require_tree_enabled(block):
         raise ValueError("APK launcher/application enabled must be a literal typed true")
 
 
-def check_tree_launcher(block):
+def check_tree_launcher(block, parent_indent):
     # Complete structural join: exactly two direct leaf elements, with no filter
     # attributes, data nodes, nested names or additional attribute selectors.
     lines = [line for line in block.splitlines() if line.strip()]
     if len(lines) != 4:
         raise ValueError("APK launcher filter must be direct and data-free")
-    indent = len(lines[0]) - len(lines[0].lstrip())
+    indent = parent_indent + 2
     for offset, (tag, name) in zip((0, 2), (("action", "android.intent.action.MAIN"),
                                            ("category", "android.intent.category.LAUNCHER"))):
         if (not re.fullmatch(" " * indent + r"E: " + tag + r" \(line=\d+\)", lines[offset])
@@ -368,7 +368,7 @@ def check_apk_identity(xmltree, variant, identity):
     headers = [line for line in owned[0].splitlines() if line.strip().startswith('E: intent-filter')]
     if len(headers) != 1 or len(headers[0]) - len(headers[0].lstrip()) != depth:
         raise ValueError("APK launcher filter is not an Activity direct child")
-    check_tree_launcher(filters[0])
+    check_tree_launcher(filters[0], len(headers[0]) - len(headers[0].lstrip()))
     for tag, name in (("action", "android.intent.action.MAIN"), ("category", "android.intent.category.LAUNCHER")):
         names = [tree_attribute(block, "android:name", string=True) for block in xmltree_elements(filters[0], tag)]
         if names != [name] or sum(tree_attribute(block, "android:name", string=True) == name

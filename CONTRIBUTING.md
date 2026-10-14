@@ -46,7 +46,8 @@ uv pip install --python ../codexbar-check-venv/bin/python --require-hashes --no-
 # scratch in the checkout or fall back to a system temporary directory.
 : "${BUILD_CONTRACT_SCRATCH:?Select existing absolute external scratch}"
 contract_scratch=$BUILD_CONTRACT_SCRATCH
-../codexbar-check-venv/bin/python - "$contract_scratch" <<'PY'
+# One guarded execution boundary: a refused preflight never enters quickcheck.
+if ../codexbar-check-venv/bin/python - "$contract_scratch" <<'PY'
 import os, sys
 from pathlib import Path
 scratch = Path(sys.argv[1])
@@ -79,9 +80,12 @@ if (any(p.is_symlink() for p in (metadata, *metadata.parents, common, *common.pa
         or any(scratch.is_relative_to(p) for p in (source, metadata, common))):
     raise ValueError("Scratch must be outside source and Git metadata")
 PY
+then
 BUILD_CONTRACT_SCRATCH="$contract_scratch" TMPDIR="$contract_scratch" \
-  CHECK_PYTHON=../codexbar-check-venv/bin/python bash tools/check.sh
-git diff --check
+  CHECK_PYTHON=../codexbar-check-venv/bin/python bash tools/check.sh && git diff --check
+else
+  false
+fi
 ```
 
 [tools/check.sh](tools/check.sh) runs build/research/metrics/policy Python contracts,

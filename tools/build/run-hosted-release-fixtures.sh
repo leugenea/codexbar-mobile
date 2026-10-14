@@ -385,6 +385,41 @@ try:
     if transport.advertise('ADVERTISEMENT_AFTER') != tags:
         raise ValueError('Fixed advertisement changed')
     assert observer.observed == list(observer.phases)
+    # Hosted-only actual owned-descendant lifetime proof. Public synthetic Python
+    # children exercise the executor, not its closed Git operation admission.
+    # No such process/group probe runs in canonical offline controls.
+    import sys
+    for outcome in ('timeout', 'size', 'failure'):
+        pidfile = transport.root/('group-' + outcome + '.pid')
+        program = """import os, sys, time
+path, outcome = sys.argv[1:]
+pid = os.fork()
+if pid == 0:
+    with open(path, 'x') as stream:
+        stream.write(str(os.getpid()))
+    while True: time.sleep(0.02)
+while not os.path.exists(path): time.sleep(0.01)
+if outcome == 'failure': os._exit(1)
+if outcome == 'size':
+    os.write(2, b'X' * (4 * 1024 * 1024 + 1))
+while True: time.sleep(0.02)
+"""
+        options = dict(env=transport.env, cwd=str(transport.root/'T'), timeout=0.5)
+        try:
+            code, output = transport._execute([sys.executable, '-I', '-c', program, str(pidfile), outcome], options, None)
+        except (subprocess.TimeoutExpired, ValueError):
+            assert outcome in ('timeout', 'size')
+        else:
+            assert outcome == 'failure' and code == 1
+        assert transport.group_safe and pidfile.is_file()
+        descendant = int(pidfile.read_text())
+        try:
+            os.kill(descendant, 0)
+        except ProcessLookupError:
+            pass
+        else:
+            raise ValueError('Owned native descendant survived executor refusal')
+        pidfile.unlink()
     frozen_pack, frozen_index = pack.read_bytes(), index.read_bytes()
     # Native extra-object export negative. The additional object is synthesized
     # only in owned T; this command cannot be reached by the transport dispatcher.

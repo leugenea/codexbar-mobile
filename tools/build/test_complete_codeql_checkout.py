@@ -845,4 +845,192 @@ class PreparationContracts(unittest.TestCase):
             with self.assertRaises(ValueError):
                 transport.advertise('ADVERTISEMENT_BEFORE')
         finally:
-            transport.close()
+            with self.assertRaises(ValueError):
+                transport.close()
+            # Destroy only this synthetic offline fixture through its owning test;
+            # production retains a failed owned residual and never resets its clock.
+            import shutil
+            for fd, _ in transport.stores.values(): os.close(fd)
+            os.close(transport.root_fd); os.close(transport.parent_fd)
+            shutil.rmtree(transport.root)
+
+class Candidate4AcquisitionContracts(unittest.TestCase):
+    def test_all_managed_direct_events_are_held_after_comparison_before_outbound(self):
+        for kind in ('push', 'workflow_dispatch'):
+            for defect in (None, 'invalid-sha', 'wrong-ref', 'missing-payload'):
+                with self.subTest(kind=kind, defect=defect), tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+                    fake = PreparationTranscript(directory)
+                    payload = {'repository':{'full_name':'leugenea/codexbar-mobile'}, 'ref':'refs/heads/main',
+                               'after':fake.head, 'head_commit':{'id':fake.head}}
+                    fake.event.write_text(json.dumps({} if defect == 'missing-payload' else payload))
+                    env = fake.environment | {'GITHUB_EVENT_NAME':kind, 'GITHUB_REF':'refs/heads/main',
+                          'CODEQL_EXTRACTOR_JAVA_TRAP_DIR':'SYNTHETIC', 'CODE_SCANNING_REF':'refs/heads/main'}
+                    if defect == 'invalid-sha': env['GITHUB_SHA'] = 'INVALID'
+                    if defect == 'wrong-ref': env['GITHUB_REF'] = 'refs/heads/other'
+                    with self.assertRaises(AcquisitionError) as refused:
+                        prepare(fake.root, 'managed', env, fake.run)
+                    self.assertEqual(fake.network_count, 0)
+                    self.assertFalse(snapshot_path(fake.root, env).exists())
+                    if defect is None:
+                        self.assertIn('EVENT_PRODUCER_SHA_MATCHES_COMPILED_HEAD', refused.exception.observations)
+
+    def test_raw_loose_tag_admission_and_reuse_rejects_symref_or_trailing_bytes(self):
+        from complete_codeql_checkout import local_tags
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            fake = PreparationTranscript(directory, 'lightweight')
+            tag = fake.root/'.git/refs/tags/v0.0.1'
+            valid = (fake.source+'\n').encode()
+            tag.write_bytes(valid)
+            accepted = prepare(fake.root, 'normal', fake.environment, fake.run)
+            git = Git(fake.root, fake.environment, fake.run)
+            self.assertEqual(local_tags(git), {'refs/tags/v0.0.1':fake.source})
+            for malformed in (b'ref: refs/heads/main\n', fake.source.encode(), valid+b'extra\n',
+                              (fake.source+' trailing\n').encode(), (fake.source+'\r\n').encode()):
+                tag.write_bytes(malformed)
+                with self.assertRaises(ValueError): local_tags(git)
+                with self.assertRaises(ValueError): validate_snapshot(git, accepted, accepted['context'])
+                self.assertEqual(tag.read_bytes(), malformed)
+            tag.write_bytes(valid)
+            self.assertEqual(local_tags(git), accepted['tags'])
+            tag.unlink()
+            (fake.root/'.git/packed-refs').write_text('# pack-refs with: peeled fully-peeled sorted\n'+fake.source+' refs/tags/v0.0.1\n')
+            self.assertEqual(local_tags(git), accepted['tags'], 'Injected packed-only direct positive')
+
+    def test_each_include_predicate_has_one_closed_enum_and_unchanged_refusal(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            root = Path(directory)/'source'
+            target = Path(directory)/'git-credentials-SYNTHETIC.config'; target.write_bytes(b'SYNTHETIC')
+            keys = ['includeif.gitdir:'+item+'.path' for item in (str(root/'.git'), str(root/'.git/worktrees/*'),
+                     '/github/workspace/.git', '/github/workspace/.git/worktrees/*')]
+            good = [(key,str(target)) for key in keys]
+            cases = [ ('CONFIG_INCLUDE_MODE_OR_ROOT_REJECTED', good, 'normal'),
+                ('CONFIG_INCLUDE_RULE_KEY_REJECTED', [('includeif.onbranch:main.path',str(target))], 'managed'),
+                ('CONFIG_INCLUDE_DESTINATION_NOT_ABSOLUTE', [(keys[0],'relative')], 'managed'),
+                ('CONFIG_INCLUDE_DESTINATION_PARENT_NOT_HOST_SCRATCH', [(keys[0],str(Path(directory)/'alias'/target.name))], 'managed'),
+                ('CONFIG_INCLUDE_DESTINATION_NAME_REJECTED', [(keys[0],str(Path(directory)/'other'))], 'managed'),
+                ('CONFIG_INCLUDE_DESTINATION_NOT_REGULAR_FILE', [(keys[0],str(Path(directory)/'git-credentials-absent.config'))], 'managed'),
+                ('CONFIG_INCLUDE_RULE_SET_REJECTED', good[:1], 'managed')]
+            for category, entries, mode in cases:
+                with self.subTest(category=category), self.assertRaises(AcquisitionError) as refused:
+                    validate_config(entries, directory, mode=mode, root=root)
+                self.assertEqual(set(refused.exception.observations), {'CONFIG_INCLUDE_OTHER',category})
+                self.assertEqual((refused.exception.stage,refused.exception.category), ('CONFIG_POLICY','CONFIG_INCLUDE_REJECTED'))
+                self.assertNotIn(str(target), refused.exception.receipt())
+            from complete_codeql_checkout import inspect_config
+            calls=[]
+            def reader(argv, **options):
+                args=private_args(argv); calls.append(args)
+                raw = ('remote.origin.url\n'+PUBLIC_URL+'\0'+''.join(k+'\n'+str(target)+'\0' for k in keys)).encode() if '--local' in args else b'include.path\0'
+                return subprocess.CompletedProcess(argv,0,raw,b'SYNTHETIC secret')
+            git=Git(root, {'RUNNER_TEMP':directory}, reader);git.mode='managed'
+            with self.assertRaises(AcquisitionError) as refused: inspect_config(git)
+            self.assertIn('CONFIG_INCLUDE_CREDENTIAL_KEY_SET_REJECTED',refused.exception.observations)
+            self.assertTrue(all(args[0]=='config' and '--no-includes' in args for args in calls))
+            settings=(Path(__file__).resolve().parents[2]/'settings.gradle').read_text()
+            for enum in [x[0] for x in cases]+['CONFIG_INCLUDE_CREDENTIAL_KEY_SET_REJECTED']:
+                self.assertIn("'"+enum+"'",settings)
+                self.assertIn(enum,CATEGORIES)
+
+    def test_owned_session_group_reaped_before_observer_drain_without_real_process(self):
+        import signal
+        for outcome in ('success','failure','timeout','size'):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+                events=[]
+                git=Git(Path(directory)/'mock-source', {'RUNNER_TEMP':directory},
+                    lambda argv,**kw: private_baseline(argv,**kw) or subprocess.CompletedProcess(argv,0,b'',b''))
+                transport=_PrivateTransport(git)
+                class Observer:
+                    def arm(self,phase): events.append('arm')
+                    def drain(self,phase): events.append('drain')
+                class Child:
+                    pid=123456789
+                    returncode=1 if outcome=='failure' else 0
+                    def poll(self): raise AssertionError('Leader must not be reaped before group signal')
+                    def wait(self,timeout): events.append('wait'); return self.returncode
+                def launch(argv,**kw):
+                    self.assertTrue(kw['start_new_session']);events.append('launch')
+                    return Child()
+                def kill(group, sig):
+                    self.assertEqual(group,Child.pid)
+                    if sig==signal.SIGKILL: events.append('kill')
+                    else: raise ProcessLookupError()
+                transport.observer=Observer(); git.run=subprocess.run
+                try:
+                    with patch('complete_codeql_checkout.subprocess.Popen',side_effect=launch), patch('complete_codeql_checkout.os.killpg',side_effect=kill), patch('complete_codeql_checkout.os.waitid',return_value=None if outcome in ('timeout','size') else object()), patch.object(transport,'disk_budget',side_effect=ValueError('size') if outcome=='size' else None), patch('complete_codeql_checkout.time.sleep'), patch('complete_codeql_checkout.time.monotonic',side_effect=(lambda:git.deadline-1) if outcome=='timeout' else __import__('time').monotonic):
+                        if outcome=='success': transport.advertise('ADVERTISEMENT_BEFORE')
+                        else:
+                            with self.assertRaises((ValueError,AcquisitionError,subprocess.TimeoutExpired)):
+                                # Timeout is injected at the checked child boundary,
+                                # not by running a real sleeper on this host.
+                                if outcome=='timeout':
+                                    with patch.object(transport,'disk_budget',side_effect=subprocess.TimeoutExpired('SYNTHETIC',1)):
+                                        transport.advertise('ADVERTISEMENT_BEFORE')
+                                else: transport.advertise('ADVERTISEMENT_BEFORE')
+                    self.assertLess(events.index('kill'),events.index('wait'))
+                    self.assertLess(events.index('wait'),events.index('drain'))
+                finally: transport.close()
+
+    def test_unproved_group_lifetime_refuses_observer_drain_and_cleanup(self):
+        import time
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            events=[]
+            git=Git(Path(directory)/'mock-source',{'RUNNER_TEMP':directory},
+                    lambda argv,**kw: private_baseline(argv,**kw) or subprocess.CompletedProcess(argv,0,b'',b''))
+            transport=_PrivateTransport(git)
+            class Child:
+                pid=123456789
+                returncode=0
+                def wait(self,timeout): return 0
+            class Observer:
+                def arm(self,phase): events.append('arm')
+                def drain(self,phase): events.append('drain')
+            transport.observer=Observer();git.run=subprocess.run
+            clock=[time.monotonic()]
+            def tick(): clock[0]+=0.01;return clock[0]
+            try:
+                with patch('complete_codeql_checkout.subprocess.Popen',return_value=Child()), patch('complete_codeql_checkout.os.waitid',return_value=object()), patch('complete_codeql_checkout.os.killpg'), patch('complete_codeql_checkout.time.monotonic',side_effect=tick), patch('complete_codeql_checkout.time.sleep'), self.assertRaises(ValueError):
+                    transport.advertise('ADVERTISEMENT_BEFORE')
+                self.assertEqual(events,['arm'])
+                self.assertFalse(transport.group_safe)
+                with self.assertRaises(ValueError): transport.close()
+                self.assertTrue(transport.root.is_dir(), 'Unproved lifetime leaves an honest owned residual')
+            finally:
+                # Only fake children existed; the fixture owner disposes its FDs.
+                for fd,_ in transport.stores.values():os.close(fd)
+                os.close(transport.root_fd);os.close(transport.parent_fd)
+
+    def test_final_hash_and_cleanup_deadline_refuses_pending_success(self):
+        from complete_codeql_checkout import _inventory, _file_hash
+        import complete_codeql_checkout as module
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+            path=Path(directory)/'bounded';path.write_bytes(b'SYNTHETIC')
+            for function in (lambda:_file_hash(path,deadline=1),lambda:_inventory(Path(directory),deadline=1)):
+                with patch('complete_codeql_checkout.time.monotonic',side_effect=[0,0,2,2,2]), self.assertRaises(ValueError):function()
+        original=module._SourceStore.cleanup
+        for phase in ('inventory','cleanup'):
+            with tempfile.TemporaryDirectory(dir=SCRATCH) as directory:
+                fake=PreparationTranscript(directory)
+                def late(store):
+                    original(store)
+                    if snapshot_path(fake.root,fake.environment).exists():
+                        store.git.deadline=0
+                if phase=='cleanup':
+                    with patch.object(module._SourceStore,'cleanup',late), self.assertRaises(ValueError):
+                        prepare(fake.root,'normal',fake.environment,fake.run)
+                else:
+                    inventory=module._inventory
+                    calls=[0]
+                    def late_inventory(path,deadline=None):
+                        result=inventory(path,deadline);calls[0]+=1
+                        if calls[0]>=2:
+                            with patch('complete_codeql_checkout.time.monotonic',return_value=deadline+1):
+                                module._check_deadline(deadline)
+                        return result
+                    with patch('complete_codeql_checkout._inventory',side_effect=late_inventory), self.assertRaises(ValueError):
+                        prepare(fake.root,'normal',fake.environment,fake.run)
+                if phase == 'inventory':
+                    self.assertFalse(snapshot_path(fake.root,fake.environment).exists())
+                else:
+                    # Late failure retains only its owned observation. The pending
+                    # prepare return was refused; this is not an accepted receipt.
+                    self.assertTrue(snapshot_path(fake.root,fake.environment).is_file())

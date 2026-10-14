@@ -74,7 +74,15 @@ if (providers.environmentVariable('CODEQL_EXTRACTOR_JAVA_TRAP_DIR').orElse('').g
             'EVENT_REF_OTHER',
             'EVENT_PR_PRESENT',
             'CONFIG_INCLUDE_CREDENTIAL_ONLY_RECOGNIZED',
-            'CONFIG_INCLUDE_OTHER'
+            'CONFIG_INCLUDE_OTHER',
+            'CONFIG_INCLUDE_MODE_OR_ROOT_REJECTED',
+            'CONFIG_INCLUDE_RULE_KEY_REJECTED',
+            'CONFIG_INCLUDE_DESTINATION_NOT_ABSOLUTE',
+            'CONFIG_INCLUDE_DESTINATION_PARENT_NOT_HOST_SCRATCH',
+            'CONFIG_INCLUDE_DESTINATION_NAME_REJECTED',
+            'CONFIG_INCLUDE_DESTINATION_NOT_REGULAR_FILE',
+            'CONFIG_INCLUDE_RULE_SET_REJECTED',
+            'CONFIG_INCLUDE_CREDENTIAL_KEY_SET_REJECTED'
         ] as Set
         def receipt = preparation.standardError.asText.get().readLines().find { line ->
             def tokens = line.split(' ') as List

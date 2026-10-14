@@ -315,6 +315,14 @@ class PayloadContracts(unittest.TestCase):
         with self.assertRaises(ValueError):
             check_apk_identity(valid.replace('        E: category', '          E: category', 1), 'release', identity)
 
+    def test_launcher_joint_depth_shift_remains_a_negative_mock(self):
+        identity = fixture_identity()
+        valid = tree(identity)
+        shifted = '\n'.join('  ' + line if line.startswith(('        E: action', '        E: category',
+                         '          A: android:name')) else line for line in valid.splitlines())
+        with self.assertRaises(ValueError):
+            check_apk_identity(shifted, 'release', identity)
+
     def test_generated_enabled_and_launcher_structure_use_source_policy(self):
         from verify_manifests import ANDROID, source_metadata, check_generated_policy
         import xml.etree.ElementTree as ET
