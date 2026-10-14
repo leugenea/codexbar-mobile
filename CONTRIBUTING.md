@@ -153,6 +153,14 @@ also fail the job. Checkout v7.0.1 and upload-artifact v7.0.2 use Node 24 with f
 SHA pins; credential persistence remains disabled and existing artifact inputs
 (including hidden-file exclusion, retention and unique Android names) are unchanged.
 
+The hosted build graph overrides `org.gradle.jvmargs` on the command line to allow
+768 MiB of Metaspace for Java class metadata. Full debug/release lint and in-process
+application/test compilation exhausted the 384 MiB cap in the expanded graph.
+Heap remains 1536 MiB, with two workers and nonparallel execution. The local
+`gradle.properties` profile, native and CodeQL profiles retain 384 MiB of Metaspace;
+the build job's 45-minute limit is unchanged. Fresh hosted execution must validate
+this scoped adjustment. See Gradle's [JVM command-line option](https://docs.gradle.org/current/userguide/gradle_command_line.html).
+
 Build job command (the workflow additionally preserves individual pipeline exit codes;
 the init script defines the observation task):
 
@@ -160,6 +168,7 @@ the init script defines the observation task):
 set -euo pipefail
 mkdir -p evidence
 ./gradlew --no-daemon --dependency-verification strict --build-cache \
+  -Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
   --no-configuration-cache --stacktrace --info --console=plain --continue \
   -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
   :app:lintDebug :app:assembleDebug :app:lintRelease :app:assembleRelease :app:processReleaseManifest :app:compileDebugUnitTestKotlin \

@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -463,6 +464,64 @@ class WorkflowContracts(unittest.TestCase):
                         self.assertEqual((sha, version), pins[action])
                     counts[action] += 1
         self.assertEqual(counts, {'actions/checkout': 9, 'actions/upload-artifact': 4})
+
+    def assert_hosted_build_memory_scope(self, workflow, properties, codeql, native):
+        steps = self.android_build_steps(workflow)
+        strict = next(step['run'] for step in steps
+                      if step['name'] == 'Build, lint and unit tests with strict verification')
+        command = strict.split('./gradlew ', 1)[1].split('2>&1', 1)[0].replace('\\\n', ' ')
+        arguments = shlex.split(command)
+        actual = [value for value in arguments if value.startswith('-Dorg.gradle.jvmargs=')]
+        self.assertEqual(actual, ['-Dorg.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8'])
+        self.assertEqual(workflow.count('org.gradle.jvmargs'), 1)
+        self.assertNotIn('org.gradle.jvmargs', workflow.split('  instrumented:\n', 1)[1] + codeql + native)
+        self.assertNotRegex(strict, r'--max-workers|--parallel|org\.gradle\.(?:workers\.max|parallel)')
+        self.assertIn('org.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=384m -Dfile.encoding=UTF-8', properties.splitlines())
+        self.assertIn('org.gradle.workers.max=2', properties.splitlines())
+        self.assertIn('org.gradle.parallel=false', properties.splitlines())
+        self.assertIn('kotlin.compiler.execution.strategy=in-process', properties.splitlines())
+        build = workflow.split('  build:\n', 1)[1].split('  instrumented:\n', 1)[0]
+        self.assertIn('    timeout-minutes: 45\n', build)
+        self.assert_cached_execution(workflow, native, (ROOT / 'tools/build/verify-hosted-toolchain.sh').read_text())
+
+    def memory_scope_sources(self):
+        return [(ROOT / path).read_text() for path in (
+            '.github/workflows/android.yml', 'gradle.properties', '.github/workflows/codeql.yml',
+            'tools/build/run-hosted-native-smoke.sh')]
+
+    def test_hosted_strict_graph_has_scoped_metaspace_without_changing_other_profiles_or_gates(self):
+        self.assert_hosted_build_memory_scope(*self.memory_scope_sources())
+
+    def test_hosted_memory_scope_rejects_global_profile_changes_timeout_increase_and_weaker_gates(self):
+        original = self.memory_scope_sources()
+        override = '-Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8"'
+        mutations = [
+            (0, override, ''),
+            (0, override, override.replace('768m', '384m')),
+            (0, override, override.replace('1536m', '2048m')),
+            (0, override, override.replace('-Dorg.gradle', '-Porg.gradle')),
+            (0, override, override.replace('"', '')),
+            (0, 'timeout-minutes: 45', 'timeout-minutes: 60'),
+            (0, '--dependency-verification strict', '--dependency-verification off'),
+            (0, ':app:lintRelease ', ''),
+            (0, ':app:compileDebugAndroidTestKotlin ', ''),
+            (0, ':app:testDebugUnitTest ', ''),
+            (0, '--build-cache', '--build-cache --max-workers=4'),
+            (1, 'MaxMetaspaceSize=384m', 'MaxMetaspaceSize=768m'),
+            (1, 'org.gradle.workers.max=2', 'org.gradle.workers.max=4'),
+            (1, 'org.gradle.parallel=false', 'org.gradle.parallel=true'),
+        ]
+        for index, old, new in mutations:
+            changed = original.copy()
+            self.assertIn(old, changed[index])
+            changed[index] = changed[index].replace(old, new, 1)
+            with self.subTest(index=index, mutation=new), self.assertRaises(AssertionError):
+                self.assert_hosted_build_memory_scope(*changed)
+        for index in (2, 3):
+            changed = original.copy()
+            changed[index] += '\n' + override
+            with self.subTest(profile=index), self.assertRaises(AssertionError):
+                self.assert_hosted_build_memory_scope(*changed)
 
     def assert_cached_execution(self, workflow, script, verifier):
         strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]

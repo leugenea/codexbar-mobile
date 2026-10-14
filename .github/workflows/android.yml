@@ -113,6 +113,7 @@ jobs:
           set -o pipefail
           set +e
           ./gradlew --no-daemon --dependency-verification strict --build-cache --no-configuration-cache \
+            -Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
             --stacktrace --info --console=plain --continue \
             -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
             :app:lintDebug :app:assembleDebug :app:lintRelease :app:assembleRelease :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
