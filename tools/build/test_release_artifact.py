@@ -35,8 +35,18 @@ BADGING = (f"package: name='{PACKAGE}' versionCode='1' versionName='{EXPECTED['v
            f"launchable-activity: name='{MAIN_ACTIVITY}' label='Synthetic' icon=''\n")
 SIGNATURE = 'DOES NOT VERIFY\nERROR: Missing META-INF/MANIFEST.MF\n'
 
-RESOURCES = 'spec resource 0x7f080000 synthetic:xml/backup_rules flags=0x0\n' + \
-            'spec resource 0x7f080001 synthetic:xml/data_extraction_rules flags=0x0\n'
+def resource_dump(backup='res/xml/backup_rules.xml', extraction='res/xml/data_extraction_rules.xml', encoding='string8'):
+    # Explicit synthetic observations matching the inspected AOSP --values printer.
+    return (f'      spec resource 0x7f080000 {PACKAGE}:xml/backup_rules: flags=0x00000000\n'
+            f'      spec resource 0x7f080001 {PACKAGE}:xml/data_extraction_rules: flags=0x00000000\n'
+            '      config (default):\n'
+            f'        resource 0x7f080000 {PACKAGE}:xml/backup_rules: t=0x03 d=0x00000006 (s=0x0008 r=0x00)\n'
+            f'          ({encoding}) "{backup}"\n'
+            f'        resource 0x7f080001 {PACKAGE}:xml/data_extraction_rules: t=0x03 d=0x00000000 (s=0x0008 r=0x00)\n'
+            f'          ({encoding}) "{extraction}"\n')
+
+
+RESOURCES = resource_dump()
 
 
 def exclusion_tree(root, sections=()):
@@ -63,9 +73,11 @@ class ArtifactTests(unittest.TestCase):
         self.zip()
         self.reports = self.root / 'reports'
 
-    def zip(self, signature=None):
+    def zip(self, signature=None, xml_paths=('res/xml/backup_rules.xml', 'res/xml/data_extraction_rules.xml')):
         with zipfile.ZipFile(self.apk, 'w') as archive:
             archive.writestr('AndroidManifest.xml', b'SYNTHETIC, not Android binary XML')
+            for member in xml_paths:
+                archive.writestr(member, b'SYNTHETIC XML bytes, not Android binary XML')
             if signature:
                 archive.writestr(signature, b'SYNTHETIC signature')
 
@@ -119,6 +131,110 @@ class ArtifactTests(unittest.TestCase):
             self.reports.mkdir()
             with self.assertRaisesRegex(ValueError, 'reference'):
                 artifact.inspect_backup(self.apk, self.root, TREE, self.reports)
+
+    def test_renamed_and_unrenamed_xml_members_use_values_and_exact_distinct_paths(self):
+        layouts = (('res/4j.xml', 'res/Qq.xml'), ('res/xml/backup_rules.xml', 'res/xml/data_extraction_rules.xml'))
+        for backup, extraction in layouts:
+            for encoding in ('string8', 'string16'):
+                self.zip(xml_paths=(backup, extraction))
+                resources = resource_dump(backup, extraction, encoding)
+                trees = {backup: LEGACY, extraction: EXTRACTION}
+                def tool(command):
+                    args = [str(part) for part in command]
+                    if args[2:] == ['--values', 'resources', str(self.apk)]:
+                        return 0, resources
+                    self.assertEqual(args[:4], [str(self.root / 'aapt'), 'dump', 'xmltree', str(self.apk)])
+                    return 0, trees[args[4]]
+                with self.subTest(layout=(backup, extraction), encoding=encoding), \
+                        patch.object(artifact, 'run_tool', side_effect=tool) as run:
+                    self.reports.mkdir(exist_ok=True)
+                    artifact.inspect_backup(self.apk, self.root, TREE, self.reports)
+                    self.assertEqual(run.call_count, 3)
+                self.assertEqual((self.reports / 'resources.txt').read_text(), resources)
+                self.assertEqual((self.reports / 'backup_rules.txt').read_text(), LEGACY)
+                self.assertEqual((self.reports / 'data_extraction_rules.txt').read_text(), EXTRACTION)
+
+    def test_resource_mapping_rejects_wrong_logical_identity_missing_and_duplicate_rows(self):
+        lines = RESOURCES.splitlines(keepends=True)
+        for resources in (
+            RESOURCES.replace('0x7f080000', '0x7f080099'),
+            RESOURCES.replace('xml/backup_rules:', 'xml/other_rules:'),
+            RESOURCES.replace(PACKAGE + ':xml/backup_rules:', 'wrong.package:xml/backup_rules:'),
+            RESOURCES.replace('        resource 0x7f080000', '        resource 0x7f080099'),
+            ''.join(lines[1:]),
+            RESOURCES.replace(lines[3] + lines[4], ''),
+            RESOURCES + lines[0],
+            RESOURCES + lines[3] + lines[4],
+            RESOURCES.replace(lines[4], lines[4] + lines[4]),
+        ):
+            with self.subTest(resources=resources), self.assertRaises(ValueError):
+                artifact.resource_xml_path(resources, '0x7f080000', PACKAGE + ':xml/backup_rules')
+
+    def test_resource_values_reject_malformed_unsupported_or_absent_scalar_entries(self):
+        for resources in (
+            RESOURCES.replace('t=0x03', 't=0x01'),
+            RESOURCES.replace('t=0x03 d=0x00000006 (s=0x0008 r=0x00)', '<bag>'),
+            RESOURCES.replace('d=0x00000006', 'd=malformed'),
+            RESOURCES.replace('flags=0x00000000', 'flags=malformed'),
+            RESOURCES.replace('        resource 0x7f080000', '        resource malformed'),
+            RESOURCES.replace('(string8)', '(string32)'),
+            RESOURCES.replace('(string8) "res/xml/backup_rules.xml"', '(string) null'),
+            RESOURCES.replace('          (string8) "res/xml/backup_rules.xml"\n', ''),
+        ):
+            with self.subTest(resources=resources), self.assertRaises(ValueError):
+                artifact.resource_xml_path(resources, '0x7f080000', PACKAGE + ':xml/backup_rules')
+        self.assertEqual(artifact.resource_xml_path(RESOURCES.replace('\n', '\r\n'), '0x7f080000',
+                                                  PACKAGE + ':xml/backup_rules'), 'res/xml/backup_rules.xml')
+
+    def test_mapped_xml_member_must_be_valid_unique_and_present_without_name_fallback(self):
+        for member in ('../res/4j.xml', 'res/../4j.xml', 'res//4j.xml', '/res/4j.xml',
+                       'assets/4j.xml', 'res/has space.xml', 'res/4j.txt', 'res\\4j.xml'):
+            with self.subTest(member=member), self.assertRaises(ValueError):
+                artifact.check_xml_member(self.apk, member)
+        with self.assertRaisesRegex(ValueError, 'missing'):
+            artifact.check_xml_member(self.apk, 'res/missing.xml')
+        self.zip(xml_paths=('res/4j.xml', 'res/4j.xml'))
+        with self.assertRaisesRegex(ValueError, 'duplicated'):
+            artifact.check_xml_member(self.apk, 'res/4j.xml')
+        # Conventional files cannot replace an absent member selected by the resource value.
+        self.zip()
+        self.reports.mkdir()
+        with patch.object(artifact, 'run_tool', return_value=(0, resource_dump('res/4j.xml', 'res/Qq.xml'))) as run:
+            with self.assertRaisesRegex(ValueError, 'missing'):
+                artifact.inspect_backup(self.apk, self.root, TREE, self.reports)
+            run.assert_called_once()
+
+    def test_resolved_xml_keeps_sections_domains_and_whole_domain_exclusions_mandatory(self):
+        for malformed in (EXTRACTION.replace('cloud-backup', 'unsupported-backup'),
+                          EXTRACTION.replace('device-transfer', 'unsupported-transfer'),
+                          EXTRACTION.replace('exclude', 'include', 1),
+                          EXTRACTION.replace('domain="database"', 'domain="root"', 1),
+                          EXTRACTION.replace('path="."', 'path="narrow"', 1),
+                          LEGACY):
+            with patch.object(artifact, 'run_tool', side_effect=[(0, RESOURCES), (0, LEGACY), (0, malformed)]):
+                self.reports.mkdir(exist_ok=True)
+                with self.subTest(tree=malformed), self.assertRaises(ValueError):
+                    artifact.inspect_backup(self.apk, self.root, TREE, self.reports)
+
+    def test_resource_or_selected_xml_tool_failure_retains_output_and_stops_inspection(self):
+        for outputs, label in (([(1, 'resource tool failure')], 'resources'),
+                               ([(0, RESOURCES), (1, 'XML tool failure')], 'backup_rules'),
+                               ([(0, RESOURCES), (0, LEGACY), (1, 'XML tool failure')], 'data_extraction_rules')):
+            with patch.object(artifact, 'run_tool', side_effect=outputs) as run:
+                self.reports.mkdir(exist_ok=True)
+                with self.subTest(label=label), self.assertRaisesRegex(ValueError, 'aapt ' + label):
+                    artifact.inspect_backup(self.apk, self.root, TREE, self.reports)
+                self.assertEqual(run.call_count, len(outputs))
+                self.assertEqual((self.reports / (label + '.txt')).read_text(), outputs[-1][1])
+
+    def test_subprocess_argument_array_preserves_values_flag_and_spaced_paths(self):
+        # No SDK process runs: inspect the actual subprocess consumer arguments.
+        command = [self.root / 'SDK space/aapt', 'dump', '--values', 'resources', self.root / 'APK space.apk']
+        with patch.object(artifact.subprocess, 'run', return_value=artifact.subprocess.CompletedProcess([], 0, RESOURCES)) as run:
+            self.assertEqual(artifact.run_tool(command), (0, RESOURCES))
+            self.assertEqual(run.call_args.args[0], [str(part) for part in command])
+            self.assertTrue(run.call_args.kwargs['text'])
+            self.assertEqual(run.call_args.kwargs['timeout'], 60)
 
     def test_signature_claim_and_generic_tool_failures_never_pass(self):
         for signature in ((0, 'Verifies'), (1, 'Java runtime missing'), (127, 'command not found'), (1, 'DOES NOT VERIFY')):

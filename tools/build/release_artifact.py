@@ -8,7 +8,7 @@ import re
 import subprocess
 import zipfile
 
-from verify_manifests import check_apk_dump, xmltree_elements, MAIN_ACTIVITY
+from verify_manifests import check_apk_dump, xmltree_elements, MAIN_ACTIVITY, PACKAGE
 from version_identity import resolve, git
 
 
@@ -19,8 +19,9 @@ def run_tool(command):
 
 
 
-def dump_apk(tools, apk, label, arguments, reports):
-    status, output = run_tool([tools / 'aapt', 'dump', arguments[0], apk, *arguments[1:]])
+def dump_apk(tools, apk, label, arguments, reports, values=False):
+    options = ['--values'] if values else []
+    status, output = run_tool([tools / 'aapt', 'dump', *options, arguments[0], apk, *arguments[1:]])
     (reports / (label + '.txt')).write_text(output)
     if status:
         raise ValueError(f'aapt {label} failed with exit {status}; see inspection report')
@@ -51,18 +52,68 @@ def backup_exclusions(tree, roots):
             raise ValueError('APK backup exclusion domains differ from source policy')
 
 
+def resource_scalar_path(resources, entry):
+    lines = []
+    indent = len(entry['indent'])
+    for line in resources[entry.end():].splitlines():
+        if not line.strip():
+            continue
+        if len(line) - len(line.lstrip()) <= indent:
+            break
+        lines.append(line.strip())
+    if len(lines) != 1:
+        raise ValueError('APK XML resource requires exactly one scalar string value')
+    value = re.fullmatch(r'\(string(?:8|16)\) "([^"\r\n]+)"', lines[0])
+    if not value:
+        raise ValueError('APK XML resource has a missing or unsupported string value')
+    return value[1]
+
+
+def check_resource_spec(resources, reference, logical_name):
+    # aapt --values grammar: AOSP frameworks/base 99b01a65cc4c104933788b3143285ab6bae65827,
+    # tools/aapt/Main.cpp and libs/androidfw/ResourceTypes.cpp (ResTable::print/print_value).
+    specs = re.findall(r'(?m)^[ \t]*spec resource (\S+) (\S+): ([^\r\n]*)\r?$', resources)
+    related = [row for row in specs if row[0] == reference or row[1] == logical_name]
+    if len(related) != 1 or related[0][:2] != (reference, logical_name):
+        raise ValueError('APK backup reference differs from the unique intended source resource')
+    if not re.fullmatch(r'0x[0-9a-f]{8}', reference) or not re.fullmatch(r'flags=0x[0-9a-f]{8}', related[0][2]):
+        raise ValueError('APK XML resource declaration is malformed or unsupported')
+
+
+def resource_xml_path(resources, reference, logical_name):
+    check_resource_spec(resources, reference, logical_name)
+    entries = list(re.finditer(r'(?m)^(?P<indent>[ \t]*)resource (?P<id>\S+) '
+                              r'(?P<name>\S+): (?P<value>[^\r\n]*)\r?$', resources))
+    matches = [entry for entry in entries if entry['id'] == reference or entry['name'] == logical_name]
+    if len(matches) != 1 or (matches[0]['id'], matches[0]['name']) != (reference, logical_name):
+        raise ValueError('APK XML resource value mapping is missing or ambiguous')
+    entry = matches[0]
+    if not re.fullmatch(r't=0x03 d=0x[0-9a-f]{8} \(s=0x[0-9a-f]{4} r=0x[0-9a-f]{2}\)(?: \(PUBLIC\))?', entry['value']):
+        raise ValueError('APK XML resource must contain a supported scalar string entry')
+    return resource_scalar_path(resources, entry)
+
+
+def check_xml_member(apk, member):
+    if (not re.fullmatch(r'res/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.xml', member)
+            or any(part in {'.', '..'} for part in member.split('/'))):
+        raise ValueError('APK XML resource value is not a valid packaged XML member path')
+    with zipfile.ZipFile(apk) as archive:
+        entries = [entry for entry in archive.infolist() if entry.filename == member]
+        if len(entries) != 1 or entries[0].is_dir():
+            raise ValueError('APK XML resource member is missing or duplicated')
+
+
 def inspect_backup(apk, tools, xmltree, reports):
-    resources = dump_apk(tools, apk, 'resources', ['resources'], reports)
+    resources = dump_apk(tools, apk, 'resources', ['resources'], reports, values=True)
     app = xmltree_elements(xmltree, 'application')[0]
     for attribute_name, filename, roots in (
         ('fullBackupContent', 'backup_rules', ('full-backup-content',)),
         ('dataExtractionRules', 'data_extraction_rules', ('data-extraction-rules', 'cloud-backup', 'device-transfer')),
     ):
         reference = attribute(app, attribute_name, r'(@0x[0-9a-f]+)')[1:]
-        ids = set(re.findall(r'\bresource (0x[0-9a-f]+) [^\s:]+:xml/' + filename + r'(?=[:\s])', resources))
-        if ids != {reference}:
-            raise ValueError('APK backup reference differs from the intended source resource')
-        tree = dump_apk(tools, apk, filename, ['xmltree', 'res/xml/' + filename + '.xml'], reports)
+        member = resource_xml_path(resources, reference, PACKAGE + ':xml/' + filename)
+        check_xml_member(apk, member)
+        tree = dump_apk(tools, apk, filename, ['xmltree', member], reports)
         backup_exclusions(tree, roots)
 
 def apk_bytes(apk):
