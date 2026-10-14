@@ -7,12 +7,13 @@ Keep repository prose, code comments, issue/PR text and commit messages in Engli
 Discuss behavior changes before expanding scope. Add meaningful tests for behavior
 changes; TDD/test-first or deliberately failing CI is not required.
 
-Keep changes small and obtain independent full-diff review. The strict required
-status-check policy requires PR branches to be up to date with `main` before
-merge. After updating a branch, obtain review and green hosted checks on the new
-exact head. Merge only the reviewed exact head with all applicable hosted checks
-green, using squash merge; verify all applicable main workflows and artifacts at
-the exact merge SHA.
+Keep changes small. Run quick checks, publish the candidate, and wait for all
+applicable hosted checks to pass on the exact head before commissioning independent
+read-only full-diff review. The strict required status-check policy requires PR
+branches to be up to date with `main` before merge. After updating a branch, repeat
+quick checks, publication, green exact-head hosted checks and independent review.
+Merge only the reviewed exact head with all applicable hosted checks green, using
+squash merge; verify all applicable main workflows and artifacts at the exact merge SHA.
 Documentation-only PRs are not exempt. Store history and review evidence in
 GitHub issues/PRs, not committed receipts or generated reports.
 
@@ -298,10 +299,16 @@ publication must use those exact accepted bytes, not an unreviewed rebuild. Phys
 phone/live acceptance and an explicit owner GO remain necessary. Issue 145 provides
 no key, secret, signing, public tag, Release or publication action.
 
-For the default-to-advanced CodeQL rollout, the parent first obtains independent
-complete-source review and publishes the replacement workflow. Only then may the
-parent use the specifically approved default-setup transition and read back the
-setting. Confirm successful exact-candidate `actions`, `python` and manual
-`java-kotlin` analysis; do not keep competing managed/advanced Java analyses running.
+For the default-to-advanced CodeQL rollout, the owner explicitly approved parent
+disabling default setup after publishing the executable replacement and before
+independent review, so advanced CodeQL can obtain green CI first. The parent has
+read back `not-configured` and unchanged branch protections. The replacement was
+published in [PR #151](https://github.com/leugenea/codexbar-mobile/pull/151).
+This configuration change does not establish successful analysis or source approval.
+After quick checks and publication of each correction, confirm all applicable
+exact-head hosted checks, including `actions`, `python` and manual `java-kotlin`
+analysis, pass before commissioning independent read-only complete-source review.
+Then use the reviewed exact head for squash merge and verify exact-merge main
+workflows and artifacts. Do not keep competing managed/advanced Java analyses running.
 The default query suite and remote threat model are retained by omitting overrides.
 The required status contexts and CodeQL error/high-or-higher protection remain unchanged.

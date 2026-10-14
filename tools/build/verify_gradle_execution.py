@@ -13,10 +13,10 @@ REQUIRED = {'build': COMMON + LINT + RELEASE_LINT, 'native': COMMON + NATIVE}
 STATES = {'SUCCESS', 'FAILED', 'FROM_CACHE', 'UP_TO_DATE', 'SKIPPED', 'NO_SOURCE'}
 
 
-def outcomes(log):
+def outcomes(log, prefix='GATE_TASK_OUTCOME'):
     observed = {}
     for line in log.splitlines():
-        if not line.startswith('GATE_TASK_OUTCOME '):
+        if not line.startswith(prefix + ' '):
             continue
         fields = line.split()
         if len(fields) != 3 or fields[2] not in STATES:
@@ -69,11 +69,19 @@ COMPILERS = ('compileDebugKotlin', 'compileReleaseKotlin', 'compileDebugUnitTest
              'compileDebugAndroidTestKotlin')
 
 
-def validate_compilation(log):
+def validate_compilation(log, graph_exit=0):
+    if graph_exit != 0:
+        raise ValueError(f'CodeQL compilation graph failed: exit {graph_exit}')
+    observed = outcomes(log, 'COMPILER_TASK_OUTCOME')
     for name in COMPILERS:
-        states = re.findall(r'^> Task :app:' + name + r'([^\n]*)$', log, re.M)
-        if states != ['']:
-            raise ValueError(f'CodeQL requires actual successful compilation: {name} {states}')
+        path = ':app:' + name
+        if observed.get(path) != 'SUCCESS':
+            raise ValueError(f'CodeQL requires successful terminal compilation outcome: {path} {observed.get(path)}')
+        # --info can repeat plain task headers during one execution. Any failed,
+        # skipped or reused header still contradicts the successful terminal state.
+        states = re.findall(r'^> Task ' + re.escape(path) + r'(?:[ \t]+([^\n]*))?$', log, re.M)
+        if not states or any(state.strip() for state in states):
+            raise ValueError(f'CodeQL compilation headers contradict execution: {path} {states}')
 
 
 def main():
@@ -83,7 +91,7 @@ def main():
     parser.add_argument('--graph-exit', type=int, default=0)
     args = parser.parse_args()
     if args.graph == 'codeql':
-        validate_compilation(args.log.read_text())
+        validate_compilation(args.log.read_text(), args.graph_exit)
         print('CodeQL Kotlin compilation tasks executed without reuse/skip')
         return
     observed = validate(args.log.read_text(), args.graph, args.graph_exit)

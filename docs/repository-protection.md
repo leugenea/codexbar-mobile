@@ -21,10 +21,10 @@ targets the default branch (`main`), with no excluded refs or bypass actors.
 
 The strict status-check policy requires PR branches to be up to date with `main`
 before merge. The delivery procedure in [CONTRIBUTING](../CONTRIBUTING.md) also
-requires independent review and green exact-head hosted gates; independent
-approval remains procedural, not a configured approval requirement. This document
-does not authorize a settings change; the owner must approve any configuration
-update.
+requires all applicable exact-head hosted gates to pass before independent read-only
+full-diff review; independent approval remains procedural, not a configured approval
+requirement. This document does not authorize a settings change; the owner must
+approve any configuration update.
 
 ## Check contexts and enforcement
 
@@ -64,12 +64,18 @@ actual hosted evidence, not a source claim. Fork PRs use credential-free checkou
 no secrets and GitHub's unprivileged pull-request code-scanning upload behavior.
 Only analysis jobs request `security-events: write`; all checkouts use contents read.
 
-The repository's last observed configuration uses GitHub-managed default setup.
-The owner approved this specific replacement migration; no settings were changed by
-source authorship. After independent source review and publishing the executable
-workflow, the parent may disable default setup and read back the exact setting, then
-verify all three exact-candidate analyses before delivery. Avoid indefinite competing
-Java analyses. Retain the separate CodeQL `errors` / `high_or_higher` rule and every
+On October 14, 2026, the owner explicitly approved parent disabling default setup
+before independent review, once the executable replacement was published in
+[PR #151](https://github.com/leugenea/codexbar-mobile/pull/151). The parent disabled
+default setup and read back `not-configured` with unchanged branch rules. Source
+authorship performed no settings writes. This migration permits advanced CodeQL CI;
+it does not establish successful analysis or independent source approval.
+
+The delivery sequence is quick checks, publication, all applicable exact-head hosted
+checks green, independent read-only complete-source review, squash merge and
+exact-merge main workflow/artifact verification. All three CodeQL analyses must pass
+with the other applicable checks before review. Avoid indefinite competing Java
+analyses. Retain the separate CodeQL `errors` / `high_or_higher` rule and every
 required status context. This approval does not authorize other repository changes.
 The historical default-setup [first run on October 10, 2026](https://github.com/leugenea/codexbar-mobile/actions/runs/38085283380)
 scanned 69 of 150 Kotlin files without test extraction; it does not establish coverage

@@ -114,7 +114,7 @@ jobs:
           set -e
           if (( build_status[0] != 0 )); then exit "${build_status[0]}"; fi
           (( build_status[1] == 0 ))
-          python3 tools/build/verify_gradle_execution.py codeql evidence/codeql-build.log
+          python3 tools/build/verify_gradle_execution.py codeql evidence/codeql-build.log --graph-exit "${build_status[0]}"
       - name: Analyze selected language
         uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:

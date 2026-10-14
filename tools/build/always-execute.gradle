@@ -66,3 +66,18 @@ gradle.taskGraph.afterTask { task, state ->
         }
     }
 }
+
+
+// CodeQL's --info task headers can repeat; record each actual terminal state.
+// This observer does not change compiler cacheability in ordinary Android jobs.
+if (providers.environmentVariable('CODEQL_EXTRACTOR_JAVA_TRAP_DIR').isPresent()) {
+    def compilerNames = [
+        'compileDebugKotlin', 'compileReleaseKotlin', 'compileDebugUnitTestKotlin',
+        'compileDebugAndroidTestKotlin'
+    ]
+    gradle.taskGraph.afterTask { task, state ->
+        if (task.project == project && task.name in compilerNames) {
+            logger.lifecycle("COMPILER_TASK_OUTCOME ${task.path} ${gateOutcome(state)}")
+        }
+    }
+}
