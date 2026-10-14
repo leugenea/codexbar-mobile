@@ -1,0 +1,121 @@
+name: CodeQL
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: actions
+            build-mode: none
+          - language: python
+            build-mode: none
+          - language: java-kotlin
+            build-mode: manual
+    env:
+      RELEASE_CHANNEL: dev
+      GRADLE_USER_HOME: ${{ github.workspace }}/../android-gradle-codeql
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Temurin JDK 17
+        if: matrix.language == 'java-kotlin'
+        timeout-minutes: 5
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+          java-package: jdk
+          architecture: x64
+          overwrite-settings: false
+      - name: Select isolated Android SDK
+        if: matrix.language == 'java-kotlin'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/android-sdk"
+          printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' \
+            "$RUNNER_TEMP/android-sdk" "$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
+      - name: Set up Android command-line tools
+        if: matrix.language == 'java-kotlin'
+        timeout-minutes: 5
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          cmdline-tools-version: '15859902' # Build ID maps to tools directory 22.0
+          packages: ''
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+      - name: Install named project SDK packages and verify observed toolchain
+        if: matrix.language == 'java-kotlin'
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          sdkmanager="$ANDROID_HOME/cmdline-tools/22.0/bin/sdkmanager"
+          timeout 30 "$sdkmanager" --version > evidence/sdkmanager-version.txt 2>&1
+          timeout --signal=TERM --kill-after=30s 10m "$sdkmanager" --sdk_root="$ANDROID_HOME" --channel=0 \
+            --install 'platforms;android-37.0' 'build-tools;36.0.0' 2>&1 | tee evidence/sdk-install.log
+          bash tools/build/verify-hosted-toolchain.sh
+      - name: Set up Gradle dependency cache and wrapper validation
+        if: matrix.language == 'java-kotlin'
+        timeout-minutes: 5
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        with:
+          cache-provider: basic
+          cache-disabled: false
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          validate-wrappers: true
+          allow-snapshot-wrappers: false
+          dependency-graph: disabled
+          build-scan-publish: false
+          add-job-summary: always
+          add-job-summary-as-pr-comment: never
+      - name: Initialize CodeQL analysis
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # Omitted query/config overrides retain the default suite and remote threat model.
+      - name: Compile Kotlin application and test sources for extraction
+        if: matrix.language == 'java-kotlin'
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          mkdir -p evidence
+          set +e
+          ./gradlew --no-daemon --dependency-verification strict --no-build-cache --no-configuration-cache \
+            --stacktrace --info --console=plain clean :app:assembleDebug :app:assembleRelease \
+            :app:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin \
+            2>&1 | tee evidence/codeql-build.log
+          build_status=("${PIPESTATUS[@]}")
+          set -e
+          if (( build_status[0] != 0 )); then exit "${build_status[0]}"; fi
+          (( build_status[1] == 0 ))
+          python3 tools/build/verify_gradle_execution.py codeql evidence/codeql-build.log
+      - name: Analyze selected language
+        uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: /language:${{ matrix.language }}

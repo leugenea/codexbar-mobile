@@ -76,8 +76,8 @@ The real connection/live flow is the default launcher and recreation destination
 An already activated owner may resume a bounded read cycle on Activity STARTED.
 
 Both hosted graphs generate `processReleaseManifest` as well as the debug manifest;
-the shared gate requires both generated policies. Release assembly is not otherwise
-part of CI, so this adds manifest merging only, not release compilation/signing.
+the shared gate requires both generated policies. The build job additionally assembles
+the unsigned release APK and runs full `lintRelease` with strict dependency verification.
 App variant manifest overlays and destructive/protected-policy merge directives
 are rejected. The native script checks the debug APK, binds its SHA-256, reinstalls
 that same file after AGP test cleanup, requires a package-specific `pm path`, checks
@@ -114,13 +114,15 @@ output reuse. Configuration
 cache remains disabled (`--no-configuration-cache`) for the outcome listeners and
 init-script observation.
 
-CodeQL default setup's `clean` / `assemble` must compile sources, not restore
-compiled task outputs. When `CODEQL_EXTRACTOR_JAVA_TRAP_DIR` is present,
+The explicit [CodeQL workflow](.github/workflows/codeql.yml) must compile sources,
+not restore compiled task outputs. Its manual Java/Kotlin build runs `clean`, both
+app assemblies and debug JVM/native test compilation with `--no-build-cache`.
+It verifies actual compiler task execution before analysis. When `CODEQL_EXTRACTOR_JAVA_TRAP_DIR` is present,
 [settings.gradle](settings.gradle) disables the local task-output cache for that
 traced build; ordinary builds keep output reuse. CodeQL dependency/wrapper caching
 remains enabled and is distinct from task-output caching. No remote build cache is
 configured; any future backend must also avoid output reuse during extraction.
-The marker comes from the released extractor, not a documented GitHub default-setup
+The marker comes from the released extractor, not a documented GitHub workflow
 option: extractor changes require hosted warm-cache validation; static source
 contracts cannot prove the marker's continued identity or successful extraction.
 
@@ -159,7 +161,7 @@ mkdir -p evidence
 ./gradlew --no-daemon --dependency-verification strict --build-cache \
   --no-configuration-cache --stacktrace --info --console=plain --continue \
   -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
-  :app:lintDebug :app:assembleDebug :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
+  :app:lintDebug :app:assembleDebug :app:lintRelease :app:assembleRelease :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
   :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
   2>&1 | tee evidence/strict.log | bash tools/build/filter-gradle-console.sh
 python3 tools/build/verify_gradle_execution.py build evidence/strict.log
@@ -204,7 +206,7 @@ and are superseded for current acceptance by the 0.90 rule in [app/build.gradle]
 Both Android jobs upload all-outcome artifacts:
 `android-build-<run_id>-<run_attempt>` and `android-instrumented-<run_id>-<run_attempt>`,
 retained for seven days. Inspect SDK/toolchain/build logs, lint/JUnit reports,
-merged manifests and debug APKs; native artifacts also contain emulator/logcat,
+merged manifests and debug/unsigned release APKs; native artifacts also contain emulator/logcat,
 connected-test results, exec/ec data and coverage XML/HTML/inventory/phase outputs.
 Missing reports are not passing tests. A failure before instrumentation is an
 infrastructure boundary, not runtime proof; passing native tests with failing
@@ -236,8 +238,7 @@ or live-provider evidence. Outputs stay in CI artifacts or external scratch.
 [Dependabot](.github/dependabot.yml) scans Actions, Gradle and both Python locations
 weekly; minor/patch groups and separate majors do not imply automerge. SHA-pinned
 Action version scans are not a promise of immediate advisory/security-update PRs.
-PR workflows and tests must not use secrets or live credentials. CodeQL default
-setup scans Actions, Java/Kotlin and Python; its code-scanning rule is separate
+PR workflows and tests must not use secrets or live credentials. The explicit advanced CodeQL workflow scans Actions, Java/Kotlin and Python; its code-scanning rule is separate
 from required status checks.
 
 See [code-quality policy](docs/code-quality.md) and the
@@ -245,3 +246,62 @@ See [code-quality policy](docs/code-quality.md) and the
 Metrics are informational, not coverage or merge-policy substitutes. Exact check
 names and owner-only configuration recommendations are in
 [repository protection](docs/repository-protection.md).
+
+## Version, packages and unsigned release preparation
+
+[VERSION](VERSION) is the single development target, initially `0.1.0`.
+[version_identity.py](tools/build/version_identity.py) supplies Gradle's version inputs.
+Normal builds use `RELEASE_CHANNEL=dev` (also the default), even at an RC/stable tag.
+The name is `<target>-dev.<reachable count since last stable ancestor>+g<12-digit checkout SHA>`.
+With no stable ancestor the count is all commits reachable from HEAD. The nearest
+stable ancestor is the one leaving the smallest reachable count; ties select the
+highest stable version. A target before that ancestor is rejected. Shallow history,
+malformed version-like `v[0-9]*` tags and conflicting official inputs fail with an
+actionable error. Git reads local history only; there is no fetch or fallback.
+Every compiling hosted checkout uses `fetch-depth: 0` and `persist-credentials: false`.
+The compiled checkout SHA includes a PR's actual merge checkout, never a substituted head.
+
+The namespace and Kotlin/test/capture class identities remain
+`io.github.leugenea.codexbarmobile`. Debug's application ID is
+`io.github.leugenea.codexbarmobile.dev`; release's is
+`io.github.leugenea.codexbarmobile`. MainActivity is fully qualified in the source
+manifest. Each package has its own AndroidX signature-only receiver permission.
+These packages have isolated Android app data. This change does not uninstall,
+migrate or promise upgrade compatibility with an earlier development install.
+
+RC/stable builds require explicit `RELEASE_CHANNEL=rc|stable`, an exact
+`RELEASE_TAG=v<target>-rc.<positive N>|v<target>` pointing at clean checkout HEAD,
+and canonical integer `RELEASE_VERSION_CODE` (1..2100000000) strictly greater than
+`RELEASE_PREVIOUS_VERSION_CODE` (0..2100000000). Development uses code 1 and rejects
+all official tag/counter inputs. CI exercises official inputs only in disposable
+hosted local clones: tagged dev, RC and stable actually assemble and inspect unsigned
+APKs; source/tag/counter/shallow/malformed controls fail closed. No public tag or
+production allocator is created. Later trusted allocation must prevent counter reuse
+across official admissions and reruns; caller-supplied fixture counters are not that service.
+Published stable tags must remain immutable.
+
+The ordinary build job fully lints and assembles release, then
+[release_artifact.py](tools/build/release_artifact.py) inspects its actual unsigned
+bytes against independent checkout/version inputs. Permissions, signature-only
+receiver, cleartext-off, backup-off, production debuggability, launcher, singleTask
+and default-process policy must pass. The filename, byte size/SHA256, source SHA/tree,
+run/attempt, build inputs and unsigned inspection are bound in `artifact-manifest.json`.
+Immediate reverification repeats inspection and rejects byte or inventory drift.
+Reports and manifests are evidence only; no job admits source or skips setup from them.
+All outcomes are retained in the existing build artifact for seven days, including
+`evidence/release/` and `evidence/release-fixtures/`. These APKs are non-distributable
+signing inputs, not signed candidates or published releases.
+
+Signing, production counters, candidate activation and publication remain separate
+owner-gated work. A later signed candidate must be verified as actual signed bytes;
+publication must use those exact accepted bytes, not an unreviewed rebuild. Physical
+phone/live acceptance and an explicit owner GO remain necessary. Issue 145 provides
+no key, secret, signing, public tag, Release or publication action.
+
+For the default-to-advanced CodeQL rollout, the parent first obtains independent
+complete-source review and publishes the replacement workflow. Only then may the
+parent use the specifically approved default-setup transition and read back the
+setting. Confirm successful exact-candidate `actions`, `python` and manual
+`java-kotlin` analysis; do not keep competing managed/advanced Java analyses running.
+The default query suite and remote threat model are retained by omitting overrides.
+The required status contexts and CodeQL error/high-or-higher protection remain unchanged.

@@ -96,7 +96,7 @@ class LocalExecutionPolicyTests(unittest.TestCase):
         self.assertIn("apply from: rootProject.file('tools/build/always-execute.gradle')", app)
         self.assertIn('org.gradle.caching=true', properties.splitlines())
         for name in set(sum(REQUIRED.values(), ())):
-            if name not in ('lintAnalyzeDebug', 'lintAnalyzeDebugUnitTest', 'lintAnalyzeDebugAndroidTest', 'lintReportDebug', 'lintDebug'):
+            if not name.startswith('lint'):
                 self.assertIn("'" + name + "'", policy)
         for contract in ("task.name.startsWith('lint')", 'tasks.configureEach { task ->',
                          'task.outputs.upToDateWhen { false }',

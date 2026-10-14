@@ -275,16 +275,17 @@ class ConnectionLaunchSmokeTest {
 
     private fun assertInstalledNetworkPolicy() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        assertEquals("io.github.leugenea.codexbarmobile.dev", context.packageName)
         val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
         assertNotNull(info)
         assertEquals(
             "Installed APK must request exactly the approved permission set",
             setOf("android.permission.INTERNET",
-                "io.github.leugenea.codexbarmobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"),
+                "${context.packageName}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"),
             info.requestedPermissions.orEmpty().toSet(),
         )
         val receiver = context.packageManager.getPermissionInfo(
-            "io.github.leugenea.codexbarmobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION", 0,
+            "${context.packageName}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION", 0,
         )
         assertEquals("Installed receiver permission must remain signature-only",
             PermissionInfo.PROTECTION_SIGNATURE, receiver.protectionLevel)

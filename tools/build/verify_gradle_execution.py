@@ -8,7 +8,8 @@ LINT = ('lintAnalyzeDebug', 'lintAnalyzeDebugUnitTest', 'lintAnalyzeDebugAndroid
         'lintReportDebug', 'lintDebug')
 NATIVE = ('connectedDebugAndroidTest', 'collectDebugCoverageInputs', 'jacocoDebugReport',
           'jacocoDebugCoverageVerification')
-REQUIRED = {'build': COMMON + LINT, 'native': COMMON + NATIVE}
+RELEASE_LINT = ('lintAnalyzeRelease', 'lintReportRelease', 'lintRelease')
+REQUIRED = {'build': COMMON + LINT + RELEASE_LINT, 'native': COMMON + NATIVE}
 STATES = {'SUCCESS', 'FAILED', 'FROM_CACHE', 'UP_TO_DATE', 'SKIPPED', 'NO_SOURCE'}
 
 
@@ -27,12 +28,25 @@ def outcomes(log):
     return observed
 
 
-def reject_reused_headers(log, protected):
+def suppressed_vital(path, state, observed):
+    match = re.fullmatch(r':app:lintVital(Report)?([A-Z].*)', path)
+    if state != 'SKIPPED' or not match:
+        return False
+    partner = ':app:lint' + (match[1] or '') + match[2]
+    return observed.get(path) == 'SKIPPED' and observed.get(partner) == 'SUCCESS'
+
+
+def reject_reused_headers(log, protected, observed):
     # A stale/success receipt cannot hide a reuse banner in the full --info log.
     for path, state in re.findall(r'^> Task (:\S+) (FROM-CACHE|UP-TO-DATE|SKIPPED|NO-SOURCE)$', log, re.M):
-        if path in protected or path.startswith(':app:lint'):
+        if (path in protected or path.startswith(':app:lint')) and not suppressed_vital(path, state, observed):
             raise ValueError(f'Gate task header shows reuse/skip: {path} {state}')
 
+
+
+def permitted_outcome(path, state, observed, graph_exit):
+    return (state == 'SUCCESS' or (graph_exit != 0 and state == 'FAILED')
+            or suppressed_vital(path, state, observed))
 
 def validate(log, graph, graph_exit=0):
     observed = outcomes(log)
@@ -45,18 +59,33 @@ def validate(log, graph, graph_exit=0):
     if missing:
         raise ValueError(f'Missing gate outcomes: {sorted(missing)}')
     for path, state in observed.items():
-        if state != 'SUCCESS' and not (graph_exit != 0 and state == 'FAILED'):
+        if not permitted_outcome(path, state, observed, graph_exit):
             raise ValueError(f'Gate did not execute successfully: {path} {state}')
-    reject_reused_headers(log, required | observed.keys())
+    reject_reused_headers(log, required | observed.keys(), observed)
     return observed
+
+
+COMPILERS = ('compileDebugKotlin', 'compileReleaseKotlin', 'compileDebugUnitTestKotlin',
+             'compileDebugAndroidTestKotlin')
+
+
+def validate_compilation(log):
+    for name in COMPILERS:
+        states = re.findall(r'^> Task :app:' + name + r'([^\n]*)$', log, re.M)
+        if states != ['']:
+            raise ValueError(f'CodeQL requires actual successful compilation: {name} {states}')
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('graph', choices=REQUIRED)
+    parser.add_argument('graph', choices=(*REQUIRED, 'codeql'))
     parser.add_argument('log', type=Path)
     parser.add_argument('--graph-exit', type=int, default=0)
     args = parser.parse_args()
+    if args.graph == 'codeql':
+        validate_compilation(args.log.read_text())
+        print('CodeQL Kotlin compilation tasks executed without reuse/skip')
+        return
     observed = validate(args.log.read_text(), args.graph, args.graph_exit)
     print(f'Gradle gate execution verified ({args.graph}, graph exit {args.graph_exit}): {observed}')
 

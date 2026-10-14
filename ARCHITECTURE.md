@@ -2,7 +2,7 @@
 
 ## Implemented application
 
-One Android phone app module, `io.github.leugenea.codexbarmobile`, launches
+One Android phone app module with namespace `io.github.leugenea.codexbarmobile` launches
 `MainActivity` via MAIN/LAUNCHER directly into the real `ConnectionScreen` dashboard.
 Disconnected, restoring/loading, reauthorization, error and unknown usage remain
 honest projections of the one process owner; no sample model or preview route is shipped.
@@ -18,8 +18,11 @@ or tab selector, and no legacy Bundle selection can switch the destination.
 No storage migration is needed for the retired ephemeral UI choices.
 
 The source manifest requests INTERNET only, with `usesCleartextTraffic="false"`.
+Debug installs as `io.github.leugenea.codexbarmobile.dev`; release installs as
+`io.github.leugenea.codexbarmobile`. Classes and native/capture identities retain the
+namespace; package data is isolated without an upgrade/migration promise.
 The exact merged/APK/installed allowlist also includes the existing AndroidX Core
-signature-only `io.github.leugenea.codexbarmobile.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`;
+signature-only `<applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`;
 it is not another platform/network permission. Gates reject any missing or extra
 permission and any Network Security Config override. The manifest flag is sufficient
 for the current API 26 minimum / API 37 target; moving to target API 38 or adding
@@ -1239,3 +1242,20 @@ assembled acceptance retains the conditional gates above. Further providers, sig
 distribution remain separate future scope; sparse sampling is not verified-account or
 continuous background history.
 See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
+
+
+## Hosted unsigned release boundary
+
+VERSION and complete local Git history supply Gradle's explicit dev/RC/stable inputs.
+Normal tagged checkouts remain dev; official fixture builds need exact clean tagged
+source and increasing positive caller-supplied counters. No signing or allocator is
+implemented. The strict build job adds real release assembly/full lint and independent
+unsigned APK inspection/inventory/reverification. Temporary hosted clones exercise
+actual tagged dev/RC/stable builds without public tags. Each job owns its checkout and
+ordinary selected SDK setup; inventories are retained evidence, never build admission.
+The advanced CodeQL workflow owns a full-history credential-free checkout and manually
+compiles both app variants and debug test sources without task-output cache reuse.
+Its analysis output, all existing debug/native/capture cases and compatible >=90%
+whole-handwritten INSTRUCTION union still need exact-candidate hosted acceptance.
+[CONTRIBUTING](CONTRIBUTING.md) defines inputs, artifact policy and the parent-owned
+approved CodeQL migration; signing/publication and owner GO remain successor work.

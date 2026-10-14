@@ -167,6 +167,19 @@ def contains_secrets_context(value):
     return False
 
 
+
+def job_permission_policy(filename, name, job, default_permissions):
+    permission = job.get("permissions", default_permissions)
+    if filename == "code-metrics.yml" and name in WRITERS:
+        expected, condition = WRITERS[name]
+        require(permission == expected, f"{name}: unexpected writer permissions")
+        require(job.get("if") == condition, f"{name}: writer must run only on push to main")
+    elif filename == "codeql.yml" and name == "analyze":
+        require(permission == {"contents": "read", "security-events": "write"},
+                "CodeQL analysis requires only contents: read and security-events: write")
+    else:
+        require(permission in ({}, {"contents": "read"}), f"{name}: job permissions must be read-only")
+
 def workflow_policy(text, filename):
     workflow = load_yaml(text)
     require(isinstance(workflow, dict), "workflow must be a mapping")
@@ -187,13 +200,7 @@ def workflow_policy(text, filename):
         # Explicit GitHub-hosted labels only: no self-hosted or dynamic labels.
         require(runner in ("ubuntu-24.04", "ubuntu-22.04", "ubuntu-latest", "windows-latest", "macos-latest"),
                 f"{name}: runner must be an explicit GitHub-hosted label")
-        permission = job.get("permissions", workflow["permissions"])
-        if filename == "code-metrics.yml" and name in WRITERS:
-            expected, condition = WRITERS[name]
-            require(permission == expected, f"{name}: unexpected writer permissions")
-            require(job.get("if") == condition, f"{name}: writer must run only on push to main")
-        else:
-            require(permission in ({}, {"contents": "read"}), f"{name}: job permissions must be read-only")
+        job_permission_policy(filename, name, job, workflow["permissions"])
         for step in job.get("steps", []):
             if action_identity(str(step.get("uses", ""))) == "actions/checkout":
                 require(step.get("with", {}).get("persist-credentials") is False,

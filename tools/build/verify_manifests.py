@@ -10,10 +10,15 @@ ANDROID = "{http://schemas.android.com/apk/res/android}"
 TOOLS = "{http://schemas.android.com/tools}"
 PACKAGE = "io.github.leugenea.codexbarmobile"
 MAIN_ACTIVITY = PACKAGE + ".MainActivity"
-RECEIVER_PERMISSION = PACKAGE + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+DEBUG_PACKAGE = PACKAGE + '.dev'
+RECEIVER_PERMISSION = DEBUG_PACKAGE + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
 SOURCE_PERMISSIONS = frozenset({"android.permission.INTERNET"})
 # androidx.core 1.18.0 already contributes this signature-only receiver permission.
 APP_PERMISSIONS = SOURCE_PERMISSIONS | {RECEIVER_PERMISSION}
+
+
+def permissions_for(package):
+    return SOURCE_PERMISSIONS | {package + '.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'}
 
 
 def check_permissions(permissions, expected=APP_PERMISSIONS) -> list[str]:
@@ -74,7 +79,7 @@ def check_manifest(path: Path, expected=APP_PERMISSIONS) -> dict:
         raise ValueError(f"Conditional manifest permission: {path}")
     permissions = check_permissions((node.get(ANDROID + "name") for node in nodes), expected)
     declarations = manifest.findall("permission")
-    expected_declarations = {RECEIVER_PERMISSION} if expected == APP_PERMISSIONS else set()
+    expected_declarations = set(expected) - SOURCE_PERMISSIONS
     if ({node.get(ANDROID + "name") for node in declarations} != expected_declarations
             or any(node.get(ANDROID + "protectionLevel") != "signature" for node in declarations)):
         raise ValueError(f"Permission declarations must preserve the signature-only receiver: {path}")
@@ -119,8 +124,8 @@ def check_apk_process_owner(xmltree: str) -> None:
         raise ValueError("APK MainActivity must declare singleTask launch mode")
 
 
-def check_apk_dump(permissions: str, xmltree: str) -> list[str]:
-    if not re.search(r"(?m)^package: " + re.escape(PACKAGE) + r"\s*$", permissions):
+def check_apk_dump(permissions: str, xmltree: str, package=DEBUG_PACKAGE) -> list[str]:
+    if not re.search(r"(?m)^package: " + re.escape(package) + r"\s*$", permissions):
         raise ValueError("Missing APK package identity")
     names = []
     for line in permissions.splitlines():
@@ -129,7 +134,8 @@ def check_apk_dump(permissions: str, xmltree: str) -> list[str]:
             if not match or "maxSdkVersion" in line:
                 raise ValueError("Malformed or conditional APK permission")
             names.append(match[1])
-    result = check_permissions(names)
+    receiver = package + '.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+    result = check_permissions(names, permissions_for(package))
     declarations = []
     # aapt XML-tree elements are nested by indentation; read only each declaration.
     lines = xmltree.splitlines()
@@ -146,10 +152,10 @@ def check_apk_dump(permissions: str, xmltree: str) -> list[str]:
         block = "\n".join(attributes)
         name = re.findall(r'android:name\([^\n]*?\)="([^"]+)"', block)
         signature = re.findall(r"android:protectionLevel\([^\n]*?\)=\(type 0x11\)0x2[ \t]*$", block, re.M)
-        if name != [RECEIVER_PERMISSION] or len(signature) != 1:
+        if name != [receiver] or len(signature) != 1:
             raise ValueError("APK receiver permission must remain signature-only")
         declarations.append(name[0])
-    if declarations != [RECEIVER_PERMISSION]:
+    if declarations != [receiver]:
         raise ValueError("APK receiver permission declaration missing or unexpected")
     cleartext = re.findall(r"(?m)^\s*A: android:usesCleartextTraffic\([^\n]*", xmltree)
     if (len(cleartext) != 1 or not re.search(r"=\(type 0x12\)0x0\s*$", cleartext[0])
@@ -160,7 +166,7 @@ def check_apk_dump(permissions: str, xmltree: str) -> list[str]:
 
 
 def check_installed_dump(text: str) -> list[str]:
-    if len(re.findall(r"(?m)^\s*Package \[" + re.escape(PACKAGE) + r"\]", text)) != 1:
+    if len(re.findall(r"(?m)^\s*Package \[" + re.escape(DEBUG_PACKAGE) + r"\]", text)) != 1:
         raise ValueError("Missing installed package identity")
     sections = re.findall(r"(?m)^([ \t]*)requested permissions:[ \t]*$", text)
     if len(sections) != 1:
@@ -183,7 +189,7 @@ def check_installed_dump(text: str) -> list[str]:
 
 def check_installed_path(text: str) -> None:
     paths = text.splitlines()
-    pattern = (r"package:/data/app/(?:[^/\s]+/)*" + re.escape(PACKAGE)
+    pattern = (r"package:/data/app/(?:[^/\s]+/)*" + re.escape(DEBUG_PACKAGE)
                + r"-[^/\s]+/(?:base|split_[^/\s]+)\.apk")
     if not paths or any(not re.fullmatch(pattern, path) for path in paths):
         raise ValueError("Missing or wrong installed package path")
@@ -214,7 +220,7 @@ def main() -> None:
     for variant in ("debug", "release"):
         path = (ROOT / "app/build/intermediates/merged_manifests" / variant
                 / f"process{variant.title()}Manifest/AndroidManifest.xml")
-        receipt.append(check_manifest(path))
+        receipt.append(check_manifest(path, permissions_for({'debug': DEBUG_PACKAGE, 'release': PACKAGE}[variant])))
     destination = ROOT / "evidence/verified-manifests.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(receipt, indent=2) + "\n")

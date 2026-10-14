@@ -146,7 +146,7 @@ class GradleConsoleTests(unittest.TestCase):
         # The native prefix ends before report/retry/device operations.
         workflow = (ROOT / ".github/workflows/android.yml").read_text()
         if kind == "build":
-            step = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
+            step = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("      - name:", 1)[0]
             shell = textwrap.dedent(step.split("        run: |\n", 1)[1])
             log_paths = ("evidence/strict.log",)
         else:

@@ -13,7 +13,7 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-from verify_manifests import (APP_PERMISSIONS, PACKAGE, RECEIVER_PERMISSION, SOURCE_PERMISSIONS, check_apk_dump,
+from verify_manifests import (APP_PERMISSIONS, DEBUG_PACKAGE as PACKAGE, MAIN_ACTIVITY, RECEIVER_PERMISSION, SOURCE_PERMISSIONS, check_apk_dump,
                               check_installed_dump, check_installed_path, check_manifest, check_permissions,
                               check_source_manifests)
 from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
@@ -338,7 +338,7 @@ class WorkflowContracts(unittest.TestCase):
             self.assertIn(actual, native)
         permission_set = re.search(r'setOf\((.*?)\),', native, re.S)
         assert permission_set is not None
-        self.assertEqual(set(re.findall(r'"([^"]+)"', permission_set[1])), APP_PERMISSIONS)
+        self.assertEqual(set(re.findall(r'"([^"]+)"', permission_set[1].replace("${context.packageName}", PACKAGE))), APP_PERMISSIONS)
         for policy in ("ApplicationInfo.FLAG_USES_CLEARTEXT_TRAFFIC",
                        "NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted",
                        "PermissionInfo.PROTECTION_SIGNATURE", "receiver.protectionLevel"):
@@ -383,7 +383,7 @@ class WorkflowContracts(unittest.TestCase):
                          "diagnostic-screen.png", "logcat-live.txt", "project-sdk-before.sha256",
                          "system-images;android-36;google_apis;x86_64", "--channel=0",
                          "aapt\" dump permissions", "aapt\" dump xmltree",
-                         "shell dumpsys package io.github.leugenea.codexbarmobile",
+                         "shell dumpsys package io.github.leugenea.codexbarmobile.dev",
                          "verify_manifests.py --apk-permissions", "--apk-xmltree", "--installed-package"):
             self.assertIn(contract, script)
         for unsafe in ("--dependency-verification off", "--write-verification-metadata", "testInstrumentationRunnerArguments",
@@ -462,7 +462,7 @@ class WorkflowContracts(unittest.TestCase):
                     with self.subTest(workflow=path.name, action=action):
                         self.assertEqual((sha, version), pins[action])
                     counts[action] += 1
-        self.assertEqual(counts, {'actions/checkout': 8, 'actions/upload-artifact': 4})
+        self.assertEqual(counts, {'actions/checkout': 9, 'actions/upload-artifact': 4})
 
     def assert_cached_execution(self, workflow, script, verifier):
         strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
@@ -476,7 +476,7 @@ class WorkflowContracts(unittest.TestCase):
                            "--gradle-user-home", " -g "):
                 self.assertNotIn(unsafe, command)
         self.assertEqual(re.findall(r":app:(\w+)", strict), [
-            "verifyResolvedToolchain", "lintDebug", "assembleDebug", "processReleaseManifest", "compileDebugUnitTestKotlin",
+            "verifyResolvedToolchain", "lintDebug", "assembleDebug", "lintRelease", "assembleRelease", "processReleaseManifest", "compileDebugUnitTestKotlin",
             "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest",
         ])
         self.assertEqual(re.findall(r":app:(\w+)", connected), [
@@ -1010,7 +1010,7 @@ class SyntheticReportTests(unittest.TestCase):
                 '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
                 '</application></manifest>')
 
-    def synthetic_apk_activity(self, name=PACKAGE + ".MainActivity"):
+    def synthetic_apk_activity(self, name=MAIN_ACTIVITY):
         return ('    E: activity (line=5)\n'
                 f'      A: android:name(0x01010003)="{name}"\n'
                 '      A: android:launchMode(0x0101001d)=(type 0x10)0x2\n')
@@ -1020,7 +1020,7 @@ class SyntheticReportTests(unittest.TestCase):
         for permissions in (SOURCE_PERMISSIONS, APP_PERMISSIONS):
             valid = self.synthetic_manifest(permissions)
             activity = '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
-            for name in ('.MainActivity', 'MainActivity', PACKAGE + '.MainActivity'):
+            for name in ('.MainActivity', 'MainActivity', MAIN_ACTIVITY):
                 manifest.write_text(valid.replace('.MainActivity', name))
                 self.assertEqual(check_manifest(manifest, permissions)['mainActivityLaunchMode'], 'singleTask')
             mutations = [
@@ -1051,7 +1051,7 @@ class SyntheticReportTests(unittest.TestCase):
                   '  E: application (line=4)\n'
                   '    A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0x0\n')
         activity = self.synthetic_apk_activity()
-        for name in ('.MainActivity', 'MainActivity', PACKAGE + '.MainActivity'):
+        for name in ('.MainActivity', 'MainActivity', MAIN_ACTIVITY):
             self.assertEqual(check_apk_dump(permissions, prefix + self.synthetic_apk_activity(name)), sorted(APP_PERMISSIONS))
         for tree, error in (
             (prefix, 'singleTask'),
@@ -1078,6 +1078,8 @@ class SyntheticReportTests(unittest.TestCase):
         for name, text in files.items():
             path = self.directory / name
             path.parent.mkdir(parents=True, exist_ok=True)
+            if '/release/' in name:
+                text = text.replace(PACKAGE, PACKAGE.removesuffix('.dev'))
             path.write_text(text)
 
     def run_manifest_cli(self):
