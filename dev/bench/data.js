@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791871727812,
+  "lastUpdate": 1792136756397,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -1995,6 +1995,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/978eaa6ee9cceeaca517d05326b5d6bafec97884"
         },
         "date": 1791871724207,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "50774ef3ac90c5e42d8295d892ee4bdaab7e5bfe",
+          "message": "feat(release): conventional versioned unsigned APK preparation (#151)\n\n* feat(release): simplify versioned unsigned APK preparation\n\n* fix(ci): prepare policy test imports and verify compiler outcomes\n\n* fix(ci): scope metaspace headroom to strict hosted build\n\n* fix(release): resolve optimized backup XML resource members",
+          "timestamp": "2026-10-16T10:45:29+03:00",
+          "tree_id": "da312131299ba0c47db706b58d40f42878c80a9e",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/50774ef3ac90c5e42d8295d892ee4bdaab7e5bfe"
+        },
+        "date": 1792136755802,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
