@@ -17,8 +17,9 @@ jobs:
   build:
     name: Build, lint and unit tests (strict dependency verification)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
+      RELEASE_CHANNEL: dev
       # runner.temp is unavailable in job env; keep the cache outside checkout.
       GRADLE_USER_HOME: ${{ github.workspace }}/../android-gradle-build
     steps:
@@ -26,7 +27,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 0
       - name: Initialize build diagnostics
         run: mkdir -p evidence
       - name: Prepare hash-pinned offline parser environment
@@ -112,9 +113,10 @@ jobs:
           set -o pipefail
           set +e
           ./gradlew --no-daemon --dependency-verification strict --build-cache --no-configuration-cache \
+            -Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
             --stacktrace --info --console=plain --continue \
             -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
-            :app:lintDebug :app:assembleDebug :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
+            :app:lintDebug :app:assembleDebug :app:lintRelease :app:assembleRelease :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
             :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
             2>&1 | tee evidence/strict.log | bash tools/build/filter-gradle-console.sh
           # Capture every pipeline status before any command resets PIPESTATUS.
@@ -126,6 +128,24 @@ jobs:
           python3 tools/build/verify_gradle_execution.py build evidence/strict.log
           python3 tools/build/verify_manifests.py
           python3 tools/build/verify_test_reports.py jvm
+      - name: Inspect and reverify unsigned release signing input
+        timeout-minutes: 5
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 tools/build/version_identity.py --expected-sha "$EXPECTED_SOURCE_SHA" > evidence/build-identity.json
+          filename=$(python3 -c 'import json; v=json.load(open("evidence/build-identity.json")); print(f"codexbar-mobile-{v["versionName"]}-{v["versionCode"]}-unsigned.apk")')
+          mkdir -p evidence/release
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "evidence/release/$filename"
+          for operation in create verify; do
+            python3 tools/build/release_artifact.py "$operation" --expected-sha "$EXPECTED_SOURCE_SHA" \
+              --apk "evidence/release/$filename" --manifest evidence/release/artifact-manifest.json \
+              --reports evidence/release/inspection
+          done
+      - name: Run isolated hosted version and release fixtures
+        timeout-minutes: 15
+        run: python3 tools/build/hosted_release_fixtures.py
       - name: Upload build logs and outputs (all outcomes)
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -148,6 +168,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     env:
+      RELEASE_CHANNEL: dev
       # Same home is inherited by setup-gradle and every wrapper invocation.
       GRADLE_USER_HOME: ${{ github.workspace }}/../android-gradle-instrumented
     steps:
@@ -155,6 +176,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Initialize native diagnostics
         run: |
           mkdir -p evidence/native

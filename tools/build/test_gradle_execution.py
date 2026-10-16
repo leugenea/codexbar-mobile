@@ -7,7 +7,7 @@ import sys
 import tempfile
 import unittest
 
-from verify_gradle_execution import REQUIRED, validate
+from verify_gradle_execution import COMPILERS, REQUIRED, validate, validate_compilation
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -91,12 +91,95 @@ class ExecutionEvidenceTests(unittest.TestCase):
             validate(candidate, 'native', 1)
 
 
+def compiler_log():
+    # The retained hosted --info log had 3/2/2/2 plain headers for one execution.
+    lines = []
+    for name, repetitions in zip(COMPILERS, (3, 2, 2, 2)):
+        lines += ['> Task :app:' + name] * repetitions
+        lines += ['COMPILER_TASK_OUTCOME :app:' + name + ' SUCCESS']
+    return '\n'.join(lines)
+
+
+class CompilationEvidenceTests(unittest.TestCase):
+    def test_repeated_info_headers_accept_successful_terminal_outcomes(self):
+        validate_compilation(compiler_log())
+        # Interleaved/reprinted headers after the receipt remain informational.
+        validate_compilation(compiler_log() + '\n' + '\n'.join('> Task :app:' + name for name in COMPILERS))
+        validate_compilation(compiler_log() + '\n> Task :app:compileDebugKotlinOther FROM-CACHE')
+
+    def test_each_compiler_requires_receipt_and_header(self):
+        for name in COMPILERS:
+            for prefix in ('COMPILER_TASK_OUTCOME :app:', '> Task :app:'):
+                log = '\n'.join(line for line in compiler_log().splitlines() if not line.startswith(prefix + name))
+                with self.subTest(task=name, prefix=prefix), self.assertRaises(ValueError):
+                    validate_compilation(log)
+
+    def test_each_compiler_rejects_nonexecution_and_failure_terminal_states(self):
+        for name in COMPILERS:
+            for state in ('FROM_CACHE', 'UP_TO_DATE', 'SKIPPED', 'NO_SOURCE', 'FAILED'):
+                log = compiler_log().replace(name + ' SUCCESS', name + ' ' + state)
+                with self.subTest(task=name, state=state), self.assertRaises(ValueError):
+                    validate_compilation(log)
+
+    def test_successful_receipt_cannot_hide_a_contradictory_header_before_or_after_it(self):
+        for name in COMPILERS:
+            for state in ('FROM-CACHE', 'UP-TO-DATE', 'SKIPPED', 'NO-SOURCE', 'FAILED'):
+                bad = f'> Task :app:{name} {state}'
+                for log in (bad + '\n' + compiler_log(), compiler_log() + '\n' + bad):
+                    with self.subTest(task=name, state=state), self.assertRaises(ValueError):
+                        validate_compilation(log)
+
+    def test_duplicate_or_conflicting_terminal_receipts_fail_in_both_orders(self):
+        for name in COMPILERS:
+            for state in ('SUCCESS', 'FAILED', 'FROM_CACHE', 'SKIPPED'):
+                bad = f'COMPILER_TASK_OUTCOME :app:{name} {state}'
+                for log in (bad + '\n' + compiler_log(), compiler_log() + '\n' + bad):
+                    with self.subTest(task=name, state=state), self.assertRaisesRegex(ValueError, 'Duplicate'):
+                        validate_compilation(log)
+
+    def test_malformed_or_wrong_kind_receipts_do_not_prove_compilation(self):
+        for bad in ('COMPILER_TASK_OUTCOME :app:compileDebugKotlin UNKNOWN',
+                    'COMPILER_TASK_OUTCOME :app:compileDebugKotlin', 'COMPILER_TASK_OUTCOME bad',
+                    'COMPILER_TASK_OUTCOME :app:compileDebugKotlin SUCCESS extra'):
+            with self.subTest(receipt=bad), self.assertRaises(ValueError):
+                validate_compilation(compiler_log() + '\n' + bad)
+        with self.assertRaises(ValueError):
+            validate_compilation(compiler_log().replace('COMPILER_TASK_OUTCOME', 'GATE_TASK_OUTCOME'))
+
+    def test_nonzero_graph_exit_cannot_pass_with_successful_compilers(self):
+        for code in (1, 7, 124, 130, 143):
+            with self.subTest(code=code), self.assertRaisesRegex(ValueError, 'graph failed'):
+                validate_compilation(compiler_log(), code)
+
+    def assert_compiler_observer(self, policy):
+        block = policy.split("// CodeQL's --info task headers can repeat;", 1)[1]
+        self.assertIn("if (providers.environmentVariable('CODEQL_EXTRACTOR_JAVA_TRAP_DIR').isPresent()) {", block)
+        names = re.search(r'def compilerNames = \[(.*?)\]', block, re.S)
+        self.assertIsNotNone(names)
+        self.assertEqual(tuple(re.findall(r"'([^']+)'", names[1])), COMPILERS)
+        for text in ('gradle.taskGraph.afterTask { task, state ->',
+                     'task.project == project && task.name in compilerNames',
+                     'COMPILER_TASK_OUTCOME ${task.path} ${gateOutcome(state)}'):
+            self.assertIn(text, block)
+        self.assertNotIn('outputs.', block)
+        self.assertNotIn('upToDateWhen', block)
+
+    def test_codeql_only_observer_emits_terminal_states_for_exact_demanded_tasks(self):
+        policy = (ROOT / 'tools/build/always-execute.gradle').read_text()
+        self.assert_compiler_observer(policy)
+        for old in ("'compileDebugKotlin'", "'compileReleaseKotlin'", "'compileDebugUnitTestKotlin'",
+                    "'compileDebugAndroidTestKotlin'", 'task.project == project && ',
+                    'COMPILER_TASK_OUTCOME ${task.path} ${gateOutcome(state)}'):
+            with self.subTest(mutation=old), self.assertRaises(AssertionError):
+                self.assert_compiler_observer(policy.replace(old, '', 1))
+
+
 class LocalExecutionPolicyTests(unittest.TestCase):
     def assert_local_policy(self, app, policy, properties):
         self.assertIn("apply from: rootProject.file('tools/build/always-execute.gradle')", app)
         self.assertIn('org.gradle.caching=true', properties.splitlines())
         for name in set(sum(REQUIRED.values(), ())):
-            if name not in ('lintAnalyzeDebug', 'lintAnalyzeDebugUnitTest', 'lintAnalyzeDebugAndroidTest', 'lintReportDebug', 'lintDebug'):
+            if not name.startswith('lint'):
                 self.assertIn("'" + name + "'", policy)
         for contract in ("task.name.startsWith('lint')", 'tasks.configureEach { task ->',
                          'task.outputs.upToDateWhen { false }',

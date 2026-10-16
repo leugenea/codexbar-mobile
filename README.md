@@ -134,3 +134,10 @@ Documentation-only changes still receive all declared PR gates.
 
 [MIT](LICENSE), Copyright (c) 2026 Luckyanets Eugene. Upstream copied material
 retains its own licenses and notices; see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md).
+
+
+Development builds use the isolated `io.github.leugenea.codexbarmobile.dev` package
+and a `0.1.0-dev.<history count>+g<checkout SHA>` name. Hosted CI also prepares a
+verified **unsigned, non-distributable release APK** as a future signing input.
+It is not a signed candidate or published release, and no data migration or upgrade
+compatibility is promised. See [version and release preparation](CONTRIBUTING.md#version-packages-and-unsigned-release-preparation).

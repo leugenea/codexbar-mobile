@@ -171,6 +171,13 @@ abstract class DebugCoverageInputs extends DefaultTask {
 }
 
 
+// One resolver serves Gradle and independent hosted APK expectations. No network fallback.
+def versionOutput = providers.exec {
+    workingDir rootProject.projectDir
+    commandLine 'python3', 'tools/build/version_identity.py'
+}.standardOutput.asText.get()
+def buildIdentity = new groovy.json.JsonSlurper().parseText(versionOutput)
+
 android {
     namespace 'io.github.leugenea.codexbarmobile'
     compileSdk {
@@ -182,13 +189,14 @@ android {
         applicationId 'io.github.leugenea.codexbarmobile'
         minSdk 26
         targetSdk 37
-        versionCode 1
-        versionName '0.1.0'
+        versionCode buildIdentity.versionCode
+        versionName buildIdentity.versionName
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     testCoverage { jacocoVersion = '0.8.15' }
     buildTypes {
         debug {
+            applicationIdSuffix '.dev'
             enableUnitTestCoverage = true
             enableAndroidTestCoverage = true
         }

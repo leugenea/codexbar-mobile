@@ -253,13 +253,13 @@ if (( apk_hash_status == 0 && aapt_status == 0 && apk_xmltree_status == 0 && apk
     install_status=$?
   fi
   if (( install_status == 0 )); then
-    timeout 15 "$adb" -s "$ANDROID_SERIAL" shell pm path io.github.leugenea.codexbarmobile \
+    timeout 15 "$adb" -s "$ANDROID_SERIAL" shell pm path io.github.leugenea.codexbarmobile.dev \
       > evidence/native/installed-package-path.txt
     installed_path_status=$?
     python3 tools/build/verify_manifests.py --installed-path evidence/native/installed-package-path.txt
     installed_path_policy_status=$?
     if (( installed_path_status == 0 && installed_path_policy_status == 0 )); then
-      timeout 15 "$adb" -s "$ANDROID_SERIAL" shell dumpsys package io.github.leugenea.codexbarmobile \
+      timeout 15 "$adb" -s "$ANDROID_SERIAL" shell dumpsys package io.github.leugenea.codexbarmobile.dev \
         > evidence/native/installed-package.txt
       installed_dump_status=$?
       python3 tools/build/verify_manifests.py --apk-permissions evidence/native/apk-permissions.txt \
@@ -270,7 +270,7 @@ if (( apk_hash_status == 0 && aapt_status == 0 && apk_xmltree_status == 0 && apk
   fi
 fi
 # Always attempt cleanup, including a partial/failed installation or failed observation.
-timeout 15 "$adb" -s "$ANDROID_SERIAL" uninstall io.github.leugenea.codexbarmobile \
+timeout 15 "$adb" -s "$ANDROID_SERIAL" uninstall io.github.leugenea.codexbarmobile.dev \
   > evidence/native/installed-package-uninstall.txt 2>&1
 uninstall_status=$?
 if (( uninstall_status == 0 )); then

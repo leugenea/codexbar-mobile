@@ -18,7 +18,7 @@ REQUIRED_FILES = GUIDES + FORMS + (PR_TEMPLATE, CONFIG, ".gitignore", "LICENSE")
 LINK = re.compile(r"\[[^\]\n]+\]\(([^)\s]+)\)")
 SECRET = re.compile(r"\b(?:tokens?|passwords?|device[ _-]?codes?|raw[ _-]?account[ _-]?data)\b", re.I)
 # AGP-provided tasks are declared via the Android plugin/variant, not tasks.register.
-ANDROID_TASKS = {"assembleDebug", "lintDebug", "testDebugUnitTest", "processReleaseManifest",
+ANDROID_TASKS = {"assembleRelease", "lintRelease", "assembleDebug", "lintDebug", "testDebugUnitTest", "processReleaseManifest",
                  "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
                  "assembleDebugAndroidTest", "connectedDebugAndroidTest"}
 REQUIRED_CHECK_CONTEXTS = {("android.yml", "Android CI result"),
@@ -62,10 +62,22 @@ def coverage_minimum(text, build):
     assert "INSTRUCTION" in text, "Coverage counter absent"
 
 
+
+def job_names(job):
+    name = job['name']
+    expression = '${{ matrix.language }}'
+    if expression not in name:
+        return [name]
+    rows = job['strategy']['matrix']['include']
+    names = [name.replace(expression, row['language']) for row in rows]
+    assert names and len(set(names)) == len(names), 'Matrix contexts must be nonempty and distinct'
+    return names
+
 def check_contexts(table, workflows):
     rows = re.findall(r"^\| `([^`]+\.yml)` \| `([^`]+)` \| ([^|]+) \|$", table, re.M)
     assert rows, "Check context mapping absent"
-    actual = {(file, job["name"]) for file, data in workflows.items() for job in data["jobs"].values()}
+    actual = {(file, name) for file, data in workflows.items()
+              for job in data["jobs"].values() for name in job_names(job)}
     documented = {(file, name) for file, name, _ in rows}
     assert len(documented) == len(rows), "Duplicate documented context"
     assert documented == actual, f"Workflow/document contexts differ: {documented ^ actual}"
@@ -74,6 +86,8 @@ def check_contexts(table, workflows):
     for file, name, category in rows:
         if file == "code-metrics.yml":
             allowed = {"Informational", "Main-only; not required for PRs"}
+        elif file == "codeql.yml":
+            allowed = {"Code-scanning rule; not a required status check"}
         elif (file, name) in REQUIRED_CHECK_CONTEXTS:
             allowed = {"Required"}
         else:
@@ -269,6 +283,17 @@ class PublicReadinessTests(unittest.TestCase):
             workflows = {file: {"jobs": {"job": {"name": name}}}}
             table = f"| `{file}` | `{name}` | {category} |"
             with self.subTest(name=name), self.assertRaises(AssertionError):
+                check_contexts(table, workflows)
+
+    def test_matrix_contexts_require_every_language_and_scanning_enforcement(self):
+        job = {'name': 'Analyze (${{ matrix.language }})', 'strategy': {'matrix': {'include': [
+            {'language': 'actions'}, {'language': 'java-kotlin'}, {'language': 'python'}]}}}
+        workflows = {'codeql.yml': {'jobs': {'analyze': job}}}
+        rows = [f'| `codeql.yml` | `Analyze ({language})` | Code-scanning rule; not a required status check |'
+                for language in ('actions', 'java-kotlin', 'python')]
+        check_contexts('\n'.join(rows), workflows)
+        for table in ('\n'.join(rows[:-1]), '\n'.join(rows).replace('Code-scanning rule; not a required status check', 'Required')):
+            with self.assertRaises(AssertionError):
                 check_contexts(table, workflows)
 
     def test_required_status_checker_rejects_documented_name_drift(self):

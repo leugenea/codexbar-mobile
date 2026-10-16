@@ -7,13 +7,14 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 import sys
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-from verify_manifests import (APP_PERMISSIONS, PACKAGE, RECEIVER_PERMISSION, SOURCE_PERMISSIONS, check_apk_dump,
+from verify_manifests import (APP_PERMISSIONS, DEBUG_PACKAGE as PACKAGE, MAIN_ACTIVITY, RECEIVER_PERMISSION, SOURCE_PERMISSIONS, check_apk_dump,
                               check_installed_dump, check_installed_path, check_manifest, check_permissions,
                               check_source_manifests)
 from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
@@ -338,7 +339,7 @@ class WorkflowContracts(unittest.TestCase):
             self.assertIn(actual, native)
         permission_set = re.search(r'setOf\((.*?)\),', native, re.S)
         assert permission_set is not None
-        self.assertEqual(set(re.findall(r'"([^"]+)"', permission_set[1])), APP_PERMISSIONS)
+        self.assertEqual(set(re.findall(r'"([^"]+)"', permission_set[1].replace("${context.packageName}", PACKAGE))), APP_PERMISSIONS)
         for policy in ("ApplicationInfo.FLAG_USES_CLEARTEXT_TRAFFIC",
                        "NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted",
                        "PermissionInfo.PROTECTION_SIGNATURE", "receiver.protectionLevel"):
@@ -383,7 +384,7 @@ class WorkflowContracts(unittest.TestCase):
                          "diagnostic-screen.png", "logcat-live.txt", "project-sdk-before.sha256",
                          "system-images;android-36;google_apis;x86_64", "--channel=0",
                          "aapt\" dump permissions", "aapt\" dump xmltree",
-                         "shell dumpsys package io.github.leugenea.codexbarmobile",
+                         "shell dumpsys package io.github.leugenea.codexbarmobile.dev",
                          "verify_manifests.py --apk-permissions", "--apk-xmltree", "--installed-package"):
             self.assertIn(contract, script)
         for unsafe in ("--dependency-verification off", "--write-verification-metadata", "testInstrumentationRunnerArguments",
@@ -462,7 +463,65 @@ class WorkflowContracts(unittest.TestCase):
                     with self.subTest(workflow=path.name, action=action):
                         self.assertEqual((sha, version), pins[action])
                     counts[action] += 1
-        self.assertEqual(counts, {'actions/checkout': 8, 'actions/upload-artifact': 4})
+        self.assertEqual(counts, {'actions/checkout': 9, 'actions/upload-artifact': 4})
+
+    def assert_hosted_build_memory_scope(self, workflow, properties, codeql, native):
+        steps = self.android_build_steps(workflow)
+        strict = next(step['run'] for step in steps
+                      if step['name'] == 'Build, lint and unit tests with strict verification')
+        command = strict.split('./gradlew ', 1)[1].split('2>&1', 1)[0].replace('\\\n', ' ')
+        arguments = shlex.split(command)
+        actual = [value for value in arguments if value.startswith('-Dorg.gradle.jvmargs=')]
+        self.assertEqual(actual, ['-Dorg.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8'])
+        self.assertEqual(workflow.count('org.gradle.jvmargs'), 1)
+        self.assertNotIn('org.gradle.jvmargs', workflow.split('  instrumented:\n', 1)[1] + codeql + native)
+        self.assertNotRegex(strict, r'--max-workers|--parallel|org\.gradle\.(?:workers\.max|parallel)')
+        self.assertIn('org.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=384m -Dfile.encoding=UTF-8', properties.splitlines())
+        self.assertIn('org.gradle.workers.max=2', properties.splitlines())
+        self.assertIn('org.gradle.parallel=false', properties.splitlines())
+        self.assertIn('kotlin.compiler.execution.strategy=in-process', properties.splitlines())
+        build = workflow.split('  build:\n', 1)[1].split('  instrumented:\n', 1)[0]
+        self.assertIn('    timeout-minutes: 45\n', build)
+        self.assert_cached_execution(workflow, native, (ROOT / 'tools/build/verify-hosted-toolchain.sh').read_text())
+
+    def memory_scope_sources(self):
+        return [(ROOT / path).read_text() for path in (
+            '.github/workflows/android.yml', 'gradle.properties', '.github/workflows/codeql.yml',
+            'tools/build/run-hosted-native-smoke.sh')]
+
+    def test_hosted_strict_graph_has_scoped_metaspace_without_changing_other_profiles_or_gates(self):
+        self.assert_hosted_build_memory_scope(*self.memory_scope_sources())
+
+    def test_hosted_memory_scope_rejects_global_profile_changes_timeout_increase_and_weaker_gates(self):
+        original = self.memory_scope_sources()
+        override = '-Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8"'
+        mutations = [
+            (0, override, ''),
+            (0, override, override.replace('768m', '384m')),
+            (0, override, override.replace('1536m', '2048m')),
+            (0, override, override.replace('-Dorg.gradle', '-Porg.gradle')),
+            (0, override, override.replace('"', '')),
+            (0, 'timeout-minutes: 45', 'timeout-minutes: 60'),
+            (0, '--dependency-verification strict', '--dependency-verification off'),
+            (0, ':app:lintRelease ', ''),
+            (0, ':app:compileDebugAndroidTestKotlin ', ''),
+            (0, ':app:testDebugUnitTest ', ''),
+            (0, '--build-cache', '--build-cache --max-workers=4'),
+            (1, 'MaxMetaspaceSize=384m', 'MaxMetaspaceSize=768m'),
+            (1, 'org.gradle.workers.max=2', 'org.gradle.workers.max=4'),
+            (1, 'org.gradle.parallel=false', 'org.gradle.parallel=true'),
+        ]
+        for index, old, new in mutations:
+            changed = original.copy()
+            self.assertIn(old, changed[index])
+            changed[index] = changed[index].replace(old, new, 1)
+            with self.subTest(index=index, mutation=new), self.assertRaises(AssertionError):
+                self.assert_hosted_build_memory_scope(*changed)
+        for index in (2, 3):
+            changed = original.copy()
+            changed[index] += '\n' + override
+            with self.subTest(profile=index), self.assertRaises(AssertionError):
+                self.assert_hosted_build_memory_scope(*changed)
 
     def assert_cached_execution(self, workflow, script, verifier):
         strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
@@ -476,7 +535,7 @@ class WorkflowContracts(unittest.TestCase):
                            "--gradle-user-home", " -g "):
                 self.assertNotIn(unsafe, command)
         self.assertEqual(re.findall(r":app:(\w+)", strict), [
-            "verifyResolvedToolchain", "lintDebug", "assembleDebug", "processReleaseManifest", "compileDebugUnitTestKotlin",
+            "verifyResolvedToolchain", "lintDebug", "assembleDebug", "lintRelease", "assembleRelease", "processReleaseManifest", "compileDebugUnitTestKotlin",
             "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest",
         ])
         self.assertEqual(re.findall(r":app:(\w+)", connected), [
@@ -1010,7 +1069,7 @@ class SyntheticReportTests(unittest.TestCase):
                 '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
                 '</application></manifest>')
 
-    def synthetic_apk_activity(self, name=PACKAGE + ".MainActivity"):
+    def synthetic_apk_activity(self, name=MAIN_ACTIVITY):
         return ('    E: activity (line=5)\n'
                 f'      A: android:name(0x01010003)="{name}"\n'
                 '      A: android:launchMode(0x0101001d)=(type 0x10)0x2\n')
@@ -1020,7 +1079,7 @@ class SyntheticReportTests(unittest.TestCase):
         for permissions in (SOURCE_PERMISSIONS, APP_PERMISSIONS):
             valid = self.synthetic_manifest(permissions)
             activity = '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
-            for name in ('.MainActivity', 'MainActivity', PACKAGE + '.MainActivity'):
+            for name in ('.MainActivity', 'MainActivity', MAIN_ACTIVITY):
                 manifest.write_text(valid.replace('.MainActivity', name))
                 self.assertEqual(check_manifest(manifest, permissions)['mainActivityLaunchMode'], 'singleTask')
             mutations = [
@@ -1051,7 +1110,7 @@ class SyntheticReportTests(unittest.TestCase):
                   '  E: application (line=4)\n'
                   '    A: android:usesCleartextTraffic(0x010104ec)=(type 0x12)0x0\n')
         activity = self.synthetic_apk_activity()
-        for name in ('.MainActivity', 'MainActivity', PACKAGE + '.MainActivity'):
+        for name in ('.MainActivity', 'MainActivity', MAIN_ACTIVITY):
             self.assertEqual(check_apk_dump(permissions, prefix + self.synthetic_apk_activity(name)), sorted(APP_PERMISSIONS))
         for tree, error in (
             (prefix, 'singleTask'),
@@ -1078,6 +1137,8 @@ class SyntheticReportTests(unittest.TestCase):
         for name, text in files.items():
             path = self.directory / name
             path.parent.mkdir(parents=True, exist_ok=True)
+            if '/release/' in name:
+                text = text.replace(PACKAGE, PACKAGE.removesuffix('.dev'))
             path.write_text(text)
 
     def run_manifest_cli(self):
