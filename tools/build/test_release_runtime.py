@@ -112,6 +112,31 @@ class RuntimeTests(RuntimeFixture):
             with self.subTest(raw=raw), self.assertRaises(ValueError):
                 runtime.reconcile(raw, EXPECTED, self.apk, self.classes)
 
+    def test_selected_archive_once_retains_variants_but_duplicate_or_conflicting_receipts_fail(self):
+        raw = copy.deepcopy(self.raw)
+        raw['components'][1]['variants'] = [
+            {'name': name, 'attributes': {'artifactType': 'aar'}, 'capabilities': [COMPONENT]}
+            for name in ('releaseVariantReleaseRuntimePublication',
+                         COMPONENT + ' variant releaseVariantReleaseRuntimePublication',
+                         'adhoc variant for ' + COMPONENT)
+        ]
+        inventory = runtime.reconcile(raw, EXPECTED, self.apk, self.classes)
+        self.assertEqual(len(inventory['artifacts']), 1)
+        selected = next(row for row in inventory['resolution']['components'] if row['id'] == COMPONENT)
+        self.assertEqual(selected['variants'], sorted(raw['components'][1]['variants'], key=runtime.canonical))
+        for changes in ({}, {'path': str(self.root / 'other.aar')},
+                        {'size': raw['artifacts'][0]['size'] + 1}, {'sha256': '0' * 64}):
+            duplicate = {**raw['artifacts'][0], **changes}
+            bad = {**raw, 'artifacts': [raw['artifacts'][0], duplicate]}
+            with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, 'Duplicate resolved artifact'):
+                runtime.reconcile(bad, EXPECTED, self.apk, self.classes)
+        # Distinct classifier filenames are separate artifact identities, not collapsed by component.
+        extra = self.root / 'runtime-extra.jar'
+        extra.write_bytes(archive([('other/Extra.class', b'SYNTHETIC extra')]))
+        raw['artifacts'].append({'component': COMPONENT, 'path': str(extra), **runtime.file_record(extra)})
+        inventory = runtime.reconcile(raw, EXPECTED, self.apk, self.classes + ['other.Extra'])
+        self.assertEqual([row['filename'] for row in inventory['artifacts']], ['runtime-extra.jar', 'runtime.aar'])
+
     def test_unknown_and_duplicate_classes_are_not_silently_assigned(self):
         for name in ['unknown.Library', 'absent.Context$$ExternalSyntheticLambda0', 'j$.time.Clock']:
             inv = runtime.reconcile(self.raw, EXPECTED, self.apk, self.classes + [name])
@@ -194,6 +219,22 @@ class BundleTests(RuntimeFixture):
         bundle.verify_files(one, files)
         for name in files:
             self.assertEqual((one / name).read_bytes(), (two / name).read_bytes())
+
+    def test_bcp47_merged_resource_names_pass_without_allowing_unsafe_paths(self):
+        resource = 'res/values-b+sr+Latn/values-b+sr+Latn.xml'
+        self.outer.write_bytes(archive([*runtime.members(self.outer.read_bytes()).items(), (resource, b'<resources/>')]))
+        self.raw['artifacts'][0].update(runtime.file_record(self.outer))
+        inventory = runtime.reconcile(self.raw, EXPECTED, self.apk, self.classes)
+        self.assertIn(resource, inventory['artifacts'][0]['mergedInputs'])
+        files = bundle.render(self.root, inventory, self.receipt)
+        self.assertIn(resource.encode(), files['runtime-inventory.json'])
+        from jsonschema import ValidationError
+        for path in ('../' + resource, '/' + resource, 'res/../values+x.xml',
+                     'res//values+x.xml', 'res/./values+x.xml', 'res/values+x\\\\bad.xml', 'res/values+x\x00.xml'):
+            bad = copy.deepcopy(inventory)
+            bad['artifacts'][0]['mergedInputs'] = [path]
+            with self.subTest(path=path), self.assertRaises(ValidationError):
+                bundle.render(self.root, bad, self.receipt)
 
     def test_notice_omission_duplicate_bad_hash_and_parent_binding_rejected(self):
         original = copy.deepcopy(self.catalog)

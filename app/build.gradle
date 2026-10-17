@@ -227,12 +227,21 @@ abstract class ReleaseRuntimeInputs extends DefaultTask {
                 addVariant(dep.resolvedVariant)
             }
         }
-        def artifacts = runtimeConfiguration.incoming.artifacts.artifacts.collect { artifact ->
+        def artifactsByKey = [:]
+        runtimeConfiguration.incoming.artifacts.artifacts.each { artifact ->
             addVariant(artifact.variant)
             def file = artifact.file
-            [component: addNode(artifact.id.componentIdentifier), filename: file.name,
-             path: file.absolutePath, size: file.length(), sha256: sha(file.bytes)]
-        }.sort { a, b -> (a.component <=> b.component) ?: (a.filename <=> b.filename) }
+            def row = [component: addNode(artifact.id.componentIdentifier), filename: file.name,
+                       path: file.absolutePath, size: file.length(), sha256: sha(file.bytes)]
+            // Publication and ad-hoc variants can expose the same selected archive.
+            // Match the consumer's component/filename identity, retaining every variant above.
+            def key = [row.component, row.filename]
+            if (artifactsByKey.containsKey(key) && artifactsByKey[key] != row) {
+                throw new GradleException("Conflicting resolved runtime artifact: ${key}")
+            }
+            artifactsByKey[key] = row
+        }
+        def artifacts = artifactsByKey.values().toList().sort { a, b -> (a.component <=> b.component) ?: (a.filename <=> b.filename) }
         def projectClasses = [] as Set
         classDirs.get().each { directory ->
             project.fileTree(directory.asFile).matching { include '**/*.class' }.files.each { file ->

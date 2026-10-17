@@ -50,6 +50,19 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn('collectReleaseRuntimeInventory', REQUIRED['build'])
         self.assertNotIn('collectReleaseRuntimeInventory', REQUIRED['native'])
 
+    def test_selected_archive_identity_is_shared_with_fail_closed_consumer(self):
+        collector = (ROOT / 'app/build.gradle').read_text().split(
+            'abstract class ReleaseRuntimeInputs', 1)[1].split('// One resolver', 1)[0]
+        # One physical core AAR was exposed by publication and ad-hoc variants.
+        # Canonicalize at the producer, not by relaxing the consumer's uniqueness check.
+        for text in ('def artifactsByKey = [:]', 'def key = [row.component, row.filename]',
+                     'artifactsByKey.containsKey(key) && artifactsByKey[key] != row',
+                     'throw new GradleException("Conflicting resolved runtime artifact: ${key}")',
+                     'artifactsByKey[key] = row', 'artifactsByKey.values().toList().sort'):
+            self.assertIn(text, collector)
+        collection = collector.split('runtimeConfiguration.incoming.artifacts.artifacts.each', 1)[1]
+        self.assertLess(collection.index('addVariant(artifact.variant)'), collection.index('artifactsByKey[key] = row'))
+
     def test_runtime_sidecars_are_mandatory_hosted_build_and_existing_fixture_consumers(self):
         workflow = (ROOT / '.github/workflows/android.yml').read_text()
         build = workflow.split('  instrumented:', 1)[0]

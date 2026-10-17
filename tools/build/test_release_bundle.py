@@ -183,6 +183,28 @@ class CorpusTests(unittest.TestCase):
         psl = next(r for r in catalog['embedded'] if r['id'].endswith('#public-suffix-list'))
         self.assertEqual(runtime.fingerprint(data)['sha256'], psl['selector']['members'][0]['sha256'])
 
+    def test_selected_futures_coordinates_have_exact_source_backed_attribution(self):
+        sources = {
+            'androidx.concurrent:concurrent-futures:1.1.0':
+                ('cc06fb6045a6c066f50e237a3c2126bc88c16d358a57b3612ba633c9f530b0a0',
+                 b'Copyright 2018 The Android Open Source Project'),
+            'com.google.guava:listenablefuture:1.0':
+                ('3d1bd8d4a39b293612a40e547ec51d9ce34fa638d7adeae83871cdbe2923b161',
+                 b'Copyright (C) 2007 The Guava Authors'),
+        }
+        inventory = {'resolution': {'components': [{'id': key, 'status': 'observed'} for key in sources]},
+                     'artifacts': [], 'members': [], 'classes': []}
+        entries, files = bundle.attribution(runtime.ROOT, inventory)
+        self.assertEqual({entry['id'] for entry in entries}, set(sources))
+        for entry in entries:
+            digest, copyright_text = sources[entry['id']]
+            self.assertEqual(entry['sourceArchive']['sha256'], digest)
+            self.assertEqual(entry['license'], 'Apache-2.0')
+            evidence = next(row for row in entry['evidence'] if row['role'] == 'attribution')
+            self.assertEqual(evidence['source'], entry['sourceArchive']['url'])
+            self.assertIn(copyright_text, files['legal/' + evidence['path']])
+        self.assertIn('legal/Apache-2.0.txt', files)
+
     def test_catalog_full_preserved_bytes_schemas_and_known_scoped_material(self):
         catalog = runtime.load(runtime.ROOT / bundle.CATALOG)
         self.assertEqual(len({r['id'] for r in catalog['components'] + catalog['embedded']}),

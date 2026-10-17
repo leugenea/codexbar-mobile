@@ -12,6 +12,66 @@
           "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
         },
         {
+          "path": "attribution/androidx.concurrent--concurrent-futures--1.1.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "882baf86144215cefb53db68e59e7f9bb8c1301158163e5bca8eea4522c3c920",
+          "size": 1092,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures/1.1.0/concurrent-futures-1.1.0-sources.jar"
+        }
+      ],
+      "id": "androidx.concurrent:concurrent-futures:1.1.0",
+      "license": "Apache-2.0",
+      "name": "androidx.concurrent:concurrent-futures",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "cc06fb6045a6c066f50e237a3c2126bc88c16d358a57b3612ba633c9f530b0a0",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures/1.1.0/concurrent-futures-1.1.0-sources.jar"
+      },
+      "version": "1.1.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/com.google.guava--listenablefuture--1.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "72c67c0b9ceb923bc5be9c4a626baee776ffcf06ce1b40448abcf35605ebe912",
+          "size": 894,
+          "source": "https://repo.maven.apache.org/maven2/com/google/guava/listenablefuture/1.0/listenablefuture-1.0-sources.jar"
+        }
+      ],
+      "id": "com.google.guava:listenablefuture:1.0",
+      "license": "Apache-2.0",
+      "name": "com.google.guava:listenablefuture",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "3d1bd8d4a39b293612a40e547ec51d9ce34fa638d7adeae83871cdbe2923b161",
+        "url": "https://repo.maven.apache.org/maven2/com/google/guava/listenablefuture/1.0/listenablefuture-1.0-sources.jar"
+      },
+      "version": "1.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
           "path": "attribution/androidx.activity--activity-compose--1.13.0.txt",
           "role": "attribution",
           "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
