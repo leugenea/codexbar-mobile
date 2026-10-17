@@ -156,15 +156,40 @@ class FinalBundleTests(RuntimeFixture):
         receipt_path = self.root / 'artifact.json'
         raw_path.write_bytes(runtime.canonical(self.raw))
         receipt_path.write_bytes(runtime.canonical(self.receipt))
-        with patch.object(artifact, 'inventory', return_value=self.receipt), \
-                patch.object(bundle, 'observe_classes', return_value=sorted(self.classes)):
+        with patch.object(artifact, 'inventory', return_value=self.receipt) as inspect, \
+                patch.object(bundle, 'observe_classes', return_value=sorted(self.classes)) as observe:
             files = bundle.unsigned_files(self.root, EXPECTED, self.apk, receipt_path, raw_path, self.root, self.root / 'reports')
-        bundle.verify_files(self.unsigned, files)
+            bundle.verify_files(self.unsigned, files)
+            self.outer.write_bytes(self.outer.read_bytes() + b'SYNTHETIC changed archive')
+            with self.assertRaisesRegex(ValueError, 'artifact byte/name/component mismatch'):
+                bundle.unsigned_files(self.root, EXPECTED, self.apk, receipt_path, raw_path, self.root, self.root / 'reports')
+            self.assertEqual(inspect.call_count, 2)
+            self.assertEqual(observe.call_count, 2)
         self.raw['artifacts'] = []
         raw_path.write_bytes(runtime.canonical(self.raw))
         with patch.object(artifact, 'inventory', return_value=self.receipt), \
                 patch.object(bundle, 'observe_classes', return_value=sorted(self.classes)), self.assertRaisesRegex(ValueError, 'Missing'):
             bundle.unsigned_files(self.root, EXPECTED, self.apk, receipt_path, raw_path, self.root, self.root / 'reports')
+
+
+class SchemaUniquenessTests(unittest.TestCase):
+    def test_string_map_fast_path_matches_stock_json_equality_and_fallback(self):
+        from jsonschema import Draft7Validator, validators
+        optimized = validators.extend(Draft7Validator, {'uniqueItems': bundle.string_map_unique_items})
+        stock = Draft7Validator({'uniqueItems': True})
+        fast = optimized({'uniqueItems': True})
+        values = [None, False, True, 0, 1, 1.0, '', 'x', [], [True], [1], {},
+                  {'a': 'x'}, {'a': 'y'}, {'a': 'x', 'b': 'y'}, {'b': 'y', 'a': 'x'},
+                  {'a': True}, {'a': 1}, {'a': 1.0}, {'a': None}, {'a': ['x']},
+                  {'a': {'b': True}}, {'a': {'b': 1}}]
+        for one in values:
+            for two in values:
+                with self.subTest(one=one, two=two):
+                    self.assertEqual(fast.is_valid([one, two]), stock.is_valid([one, two]))
+        for instance in ([], None, {}, 'not an array', [values]):
+            with self.subTest(instance=instance):
+                self.assertEqual(fast.is_valid(instance), stock.is_valid(instance))
+        self.assertTrue(optimized({'uniqueItems': False}).is_valid([{'a': 'x'}, {'a': 'x'}]))
 
 
 class CorpusTests(unittest.TestCase):

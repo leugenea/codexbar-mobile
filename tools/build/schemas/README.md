@@ -23,4 +23,8 @@ Validation uses only the existing hash-pinned `tools/research/requirements.txt`
 jsonschema stack, with an offline local registry for all schema references. Standard
 library imports remain usable without that stack; invoking rendering/schema
 validation requires the prepared interpreter. No schema download occurs in CI or
-bundle verification.
+bundle verification. Inventory `uniqueItems` validation uses exact sorted key/value
+tuples and a set for flat string-valued objects (including class records), avoiding
+pairwise comparison of the large class array. Other shapes retain the stock Draft-07
+comparison, including distinct boolean/number semantics. All schemas and validation
+keywords remain enforced; verification still independently re-derives current inputs.

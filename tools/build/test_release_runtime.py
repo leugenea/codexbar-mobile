@@ -220,6 +220,31 @@ class BundleTests(RuntimeFixture):
         for name in files:
             self.assertEqual((one / name).read_bytes(), (two / name).read_bytes())
 
+    def test_large_class_inventory_keeps_exact_uniqueness_without_pairwise_fallback(self):
+        from jsonschema import Draft7Validator, ValidationError
+        stock = Draft7Validator.VALIDATORS['uniqueItems']
+        inventory = copy.deepcopy(self.inventory)
+        inventory['classes'] = [{'name': f'example.Class{i}', 'kind': 'project', 'component': 'app'}
+                                for i in range(2000)]
+
+        def bounded_fallback(validator, enabled, instance, schema):
+            if isinstance(instance, list) and len(instance) >= 2000:
+                self.fail('Large class records reached pairwise uniqueItems fallback')
+            yield from stock(validator, enabled, instance, schema)
+
+        with patch.dict(Draft7Validator.VALIDATORS, {'uniqueItems': bounded_fallback}):
+            bundle.render(self.root, inventory, self.receipt)
+            # An equal row with a different key order is still a duplicate.
+            inventory['classes'].append(dict(reversed(list(inventory['classes'][0].items()))))
+            with self.assertRaises(ValidationError):
+                bundle.render(self.root, inventory, self.receipt)
+        inventory['classes'].pop()
+        for row in ({'name': 'missing fields'}, {'name': 'bad type', 'kind': 1, 'component': 'app'},
+                    {**inventory['classes'][0], 'extra': 'not allowed'}):
+            invalid = {**inventory, 'classes': [row]}
+            with self.subTest(row=row), self.assertRaises(ValidationError):
+                bundle.render(self.root, invalid, self.receipt)
+
     def test_bcp47_merged_resource_names_pass_without_allowing_unsafe_paths(self):
         resource = 'res/values-b+sr+Latn/values-b+sr+Latn.xml'
         self.outer.write_bytes(archive([*runtime.members(self.outer.read_bytes()).items(), (resource, b'<resources/>')]))

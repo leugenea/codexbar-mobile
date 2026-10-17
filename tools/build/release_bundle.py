@@ -157,9 +157,24 @@ def sbom(inventory, entries, apk_record):
             'components': components, 'dependencies': dependencies}
 
 
+def string_map_unique_items(validator, enabled, instance, schema):
+    """Keep exact uniqueItems semantics without pairwise comparison of class records."""
+    from jsonschema import Draft7Validator, ValidationError
+    if (enabled and validator.is_type(instance, 'array')
+            and all(type(row) is dict and all(type(k) is str and type(v) is str for k, v in row.items())
+                    for row in instance)):
+        # Sorted complete key/value tuples preserve object equality and ignore key order.
+        # Other JSON shapes use the stock comparison, including bool/number semantics.
+        rows = [tuple(sorted(row.items())) for row in instance]
+        if len(rows) != len(set(rows)):
+            yield ValidationError('Array has non-unique elements')
+    else:
+        yield from Draft7Validator.VALIDATORS['uniqueItems'](validator, enabled, instance, schema)
+
+
 def validate_schemas(root, inventory, manifest, bom, catalog=None):
     # Lazy dependency: stdlib-only Android consumers/import contracts remain usable.
-    from jsonschema import Draft7Validator, ValidationError
+    from jsonschema import Draft7Validator, ValidationError, validators
     from referencing import Registry, Resource
     if bom.get('bomFormat') != 'CycloneDX' or bom.get('specVersion') != '1.6':
         raise ValidationError('This pipeline requires CycloneDX JSON 1.6')
@@ -169,8 +184,9 @@ def validate_schemas(root, inventory, manifest, bom, catalog=None):
         doc = load(schema_dir / 'cyclonedx' / name)
         resources.append((doc['$id'], Resource.from_contents(doc)))
     registry = Registry().with_resources(resources)
-    for value, name in ((inventory, 'runtime-inventory.schema.json'), (manifest, 'release-bundle.schema.json')):
-        Draft7Validator(load(schema_dir / name), registry=registry).validate(value)
+    inventory_validator = validators.extend(Draft7Validator, {'uniqueItems': string_map_unique_items})
+    inventory_validator(load(schema_dir / 'runtime-inventory.schema.json'), registry=registry).validate(inventory)
+    Draft7Validator(load(schema_dir / 'release-bundle.schema.json'), registry=registry).validate(manifest)
     Draft7Validator(load(schema_dir / 'cyclonedx/bom-1.6.schema.json'), registry=registry).validate(bom)
     if catalog is not None:
         Draft7Validator(load(schema_dir / 'runtime-catalog.schema.json'), registry=registry).validate(catalog)
