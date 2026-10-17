@@ -172,7 +172,7 @@ mkdir -p evidence
   --no-configuration-cache --stacktrace --info --console=plain --continue \
   -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
   :app:lintDebug :app:assembleDebug :app:lintRelease :app:assembleRelease :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
-  :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
+  :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:collectReleaseRuntimeInventory \
   2>&1 | tee evidence/strict.log | bash tools/build/filter-gradle-console.sh
 python3 tools/build/verify_gradle_execution.py build evidence/strict.log
 python3 tools/build/verify_manifests.py
@@ -307,6 +307,95 @@ owner-gated work. A later signed candidate must be verified as actual signed byt
 publication must use those exact accepted bytes, not an unreviewed rebuild. Physical
 phone/live acceptance and an explicit owner GO remain necessary. Issue 145 provides
 no key, secret, signing, public tag, Release or publication action.
+
+### APK-bound runtime SBOM and notices
+
+The build graph additionally runs fresh `:app:collectReleaseRuntimeInventory`.
+It resolves **only** `releaseRuntimeClasspath`, at task execution, retaining selected
+variants, dependency/constraint edges, original archive filenames/hashes and project
+class names. KMP forwarding variants retain their selected leaf relationship. It
+reads, but never transforms, the assembled single release APK. The private input
+receipt is `app/build/runtime-release/runtime-resolution.json`; local cache paths
+are not emitted into public sidecars. This supports the current unminified,
+unflavored, single-APK release. Unsupported classes/members or archive transforms
+fail with diagnostics instead of guessing provenance or changing dependencies.
+
+`release_runtime.py` reads every selected AAR/JAR, including nested JARs, and joins
+actual **defined** classes from the installed `apkanalyzer` to those inputs, project
+classes, generated resource classes or context-bound D8 synthetics. Native, asset
+and Java-resource contributions use member hashes. Compiled resources/manifests
+are labeled as merged outputs of the release inputs, not falsely assigned unique
+source ownership. Optimized XML names still use issue 145's actual resource-table
+mapping for security inspection. Baseline profiles and a small named set of Android
+packaging metadata are generated outputs; unexplained payloads block creation.
+
+The [candidate attribution catalog](tools/build/runtime-licenses.json) is not a
+second dependency lock or a list of everything shipped. It supplies full preserved
+source-backed license/copyright/NOTICE material for the observed/merged runtime
+contributors and known nested/native/source/data components. BOMs/metadata nodes
+without packaged payload remain in the inventory ledger but outside the SBOM.
+[Corpus scope](docs/legal/runtime/README.md) discloses unknown standalone embedded
+versions and candidate historical notice provenance. No historical rebuild,
+exhaustive genealogy, proof of every unknown notice's absence or legal warranty is
+claimed. A concrete conflict or specifically missing applicable obligation remains
+blocking; it cannot be waived by a guessed POM license or by the renderer.
+
+The hosted build creates and independently re-derives `evidence/release/bundle/`:
+
+- `runtime-inventory.json`: source/build/APK identity, selected graph, observed
+  class/member ownership, archive/nested hashes and explicit attribution bindings.
+- `runtime.cdx.json`: CycloneDX JSON 1.6, checked against the vendored official
+  schema; only shipping contributors/embedded portions, with an actual APK hash.
+- `THIRD_PARTY_NOTICES.txt` and `legal/`: component mappings, full notice/license
+  texts, MPL corresponding PSL source, original NOTICE and recipient directions.
+- `artifact-manifest.json`: the reverified unsigned inspection contract.
+- `bundle-manifest.json`: stage, exact APK basename/size/SHA-256, source/build
+  identity and byte hashes of every sidecar. It does not hash itself.
+
+Outputs are deterministic UTF-8/LF/sorted JSON without timestamps, random IDs or
+machine paths. Duplicate keys/IDs, unsafe paths/symlinks, unresolved membership,
+incorrect embedded/notice bindings and file omissions/substitutions fail closed.
+The all-outcome build upload retains the bundle and SDK/diagnostic reports. The
+existing tagged-dev/RC/stable hosted fixtures also create/re-derive a capsule,
+without signing or increasing their 15-minute budget. Use the existing prepared
+hash-pinned parser interpreter (it now also installs the unchanged research lock):
+
+```sh
+"$RUNNER_TEMP/android-build-contract-venv/bin/python" tools/build/release_bundle.py create-unsigned \
+  --expected-sha "$EXPECTED_SOURCE_SHA" --apk "$UNSIGNED_APK" \
+  --artifact-manifest evidence/release/artifact-manifest.json \
+  --resolution app/build/runtime-release/runtime-resolution.json \
+  --bundle evidence/release/bundle --reports evidence/release/runtime-inspection
+# Repeat with verify-unsigned; it re-reads the current Gradle inputs and APK.
+```
+
+The final-signed interface is a **reader/binder**, not a signing workflow. Downstream
+admission must independently select/pin the accepted unsigned source/capsule and
+expected signing certificate. It rechecks the accepted capsule offline, re-inspects
+unsigned and signed APK identity/security, invokes actual SDK signature verification
+with the independent certificate SHA-256, and requires identical complete
+non-signature ZIP payloads. Recognized v1 signature additions and ZIP layout changes
+are allowed; changed code/resources/assets/native/non-signature META-INF are not.
+No Gradle cache is needed for this accepted-capsule reader. It never mutates either
+APK or the original bundle, and writes to a new, separate empty directory:
+
+```sh
+"$CAPSULE_PYTHON" tools/build/release_bundle.py bind-final \
+  --expected-sha "$EXPECTED_SOURCE_SHA" --unsigned-apk "$UNSIGNED_APK" \
+  --unsigned-bundle "$ACCEPTED_UNSIGNED_BUNDLE" --apk "$SIGNED_APK" \
+  --expected-signer "$EXPECTED_CERTIFICATE_SHA256" \
+  --bundle "$NEW_FINAL_BUNDLE" --reports "$SEPARATE_INSPECTION_REPORTS"
+# Repeat the same inputs with verify-final; neither operation signs an APK.
+```
+
+`--sdk` may explicitly select the SDK; otherwise `ANDROID_HOME` is used. RC/stable
+commands retain the same explicit version/tag/counter inputs as the original build.
+`final-signed` means a verified byte binding, **not publication/activation GO**;
+`distributionApproval` is always false. Unsigned capsules are never distributable.
+Pure synthetic signature/ZIP controls prove parser/orchestration behavior, not a real
+signature. Actual signed-candidate execution, trusted counters, key custody and
+publication remain issues 147/148 and owner-gated. No local Android/JVM tests, lint,
+coverage, emulator or SDK probes are authorized by this sidecar tooling change.
 
 For the default-to-advanced CodeQL rollout, the owner explicitly approved parent
 disabling default setup after publishing the executable replacement and before

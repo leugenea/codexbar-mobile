@@ -1,0 +1,80 @@
+Published source archive: https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.11.0/kotlinx-serialization-json-jvm-1.11.0-sources.jar
+Source archive SHA-256: 8a0eae6ac1a42a0fbe1b850ea4e21ad71d2a8aa896ee2257b1492b471bd5c5fe
+
+Source members:
+  commonMain/kotlinx/serialization/json/internal/StringOps.kt
+
+/*
+ * Copyright 2017-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.
+ */
+
+Source members:
+  commonMain/kotlinx/serialization/json/JsonContentPolymorphicSerializer.kt
+  commonMain/kotlinx/serialization/json/JsonDecoder.kt
+  commonMain/kotlinx/serialization/json/JsonElementBuilders.kt
+  commonMain/kotlinx/serialization/json/JsonEncoder.kt
+  commonMain/kotlinx/serialization/json/JsonTransformingSerializer.kt
+
+/*
+ * Copyright 2017-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.
+ */
+
+Source members:
+  commonMain/kotlinx/serialization/json/JsonAnnotations.kt
+  commonMain/kotlinx/serialization/json/JsonElementSerializers.kt
+  commonMain/kotlinx/serialization/json/internal/JsonElementMarker.kt
+  commonMain/kotlinx/serialization/json/internal/JsonExceptions.kt
+  commonMain/kotlinx/serialization/json/internal/JsonIterator.kt
+  commonMain/kotlinx/serialization/json/internal/JsonNamesMap.kt
+  commonMain/kotlinx/serialization/json/internal/JsonSerializersModuleValidator.kt
+  commonMain/kotlinx/serialization/json/internal/JsonTreeReader.kt
+  commonMain/kotlinx/serialization/json/internal/Polymorphic.kt
+  commonMain/kotlinx/serialization/json/internal/SchemaCache.kt
+  commonMain/kotlinx/serialization/json/internal/StreamingJsonDecoder.kt
+  commonMain/kotlinx/serialization/json/internal/TreeJsonDecoder.kt
+  commonMain/kotlinx/serialization/json/internal/WriteMode.kt
+  commonMain/kotlinx/serialization/json/internal/lexer/AbstractJsonLexer.kt
+  commonMain/kotlinx/serialization/json/internal/lexer/ReaderJsonLexer.kt
+  commonMain/kotlinx/serialization/json/internal/lexer/StringJsonLexer.kt
+  jvmMain/kotlinx/serialization/json/JsonSchemaCache.kt
+  jvmMain/kotlinx/serialization/json/JvmStreams.kt
+  jvmMain/kotlinx/serialization/json/internal/createMapForCache.kt
+
+/*
+ * Copyright 2017-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.
+ */
+
+Source members:
+  commonMain/kotlinx/serialization/json/JsonElement.kt
+  commonMain/kotlinx/serialization/json/internal/CharArrayPool.common.kt
+  commonMain/kotlinx/serialization/json/internal/Composers.kt
+  commonMain/kotlinx/serialization/json/internal/StreamingJsonEncoder.kt
+  commonMain/kotlinx/serialization/json/internal/SuppressAnimalSniffer.kt
+  commonMain/kotlinx/serialization/json/internal/TreeJsonEncoder.kt
+  jvmMain/kotlinx/serialization/json/internal/ArrayPools.kt
+
+/*
+ * Copyright 2017-2022 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.
+ */
+
+Source members:
+  jvmMain/kotlinx/serialization/json/internal/FormatLanguage.kt
+
+/*
+ * Copyright 2017-2023 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.
+ */
+
+Source members:
+  commonMain/kotlinx/serialization/json/Json.kt
+  commonMain/kotlinx/serialization/json/internal/lexer/CommentLexers.kt
+
+/*
+ * Copyright 2017-2024 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.
+ */
+
+Source members:
+  commonMain/kotlinx/serialization/json/JsonExceptions.kt
+
+/*
+ * Copyright 2017-2026 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license.
+ */

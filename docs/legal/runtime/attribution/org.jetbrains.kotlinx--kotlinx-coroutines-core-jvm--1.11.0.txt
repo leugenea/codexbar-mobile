@@ -1,0 +1,2 @@
+Published source archive: https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0-sources.jar
+Source archive SHA-256: 3e0847c0b463965404d5b6fe5d6868000a220b050180dec68501801e9439976a

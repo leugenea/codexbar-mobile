@@ -1,0 +1,2 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-java8/2.9.4/lifecycle-common-java8-2.9.4-sources.jar
+Source archive SHA-256: 895e71679cd319db8140664d650af6695b0530f5896be9b8ecccd24cc4f6674f

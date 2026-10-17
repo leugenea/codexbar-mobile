@@ -1,0 +1,379 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-android/1.12.1/runtime-android-1.12.1-sources.jar
+Source archive SHA-256: 645edc8a6d5054f3de00cb097d3fc1f6d0d8e5a75a0f21cec04cbeb77c57d989
+
+Source members:
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/ImmutableCollection.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/ImmutableList.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/ImmutableMap.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/ImmutableSet.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/adapters/ReadOnlyCollectionAdapters.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/extensions.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableList/AbstractListIterator.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableList/AbstractPersistentList.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableList/BufferIterator.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableList/PersistentVector.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableList/PersistentVectorBuilder.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableList/PersistentVectorIterator.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableList/PersistentVectorMutableIterator.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableList/SmallPersistentVector.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableList/TrieIterator.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableList/Utils.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableMap/PersistentHashMap.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableMap/PersistentHashMapBuilder.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableMap/PersistentHashMapBuilderContentIterators.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableMap/PersistentHashMapBuilderContentViews.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableMap/PersistentHashMapContentIterators.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableMap/PersistentHashMapContentViews.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableMap/TrieNode.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableSet/PersistentHashSet.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableSet/PersistentHashSetBuilder.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableSet/PersistentHashSetIterator.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableSet/PersistentHashSetMutableIterator.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/immutableSet/TrieNode.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/persistentOrderedMap/PersistentOrderedMap.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/persistentOrderedMap/PersistentOrderedMapBuilder.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/persistentOrderedMap/PersistentOrderedMapBuilderContentIterators.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/persistentOrderedMap/PersistentOrderedMapBuilderContentViews.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/persistentOrderedMap/PersistentOrderedMapContentIterators.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/persistentOrderedMap/PersistentOrderedMapContentViews.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/persistentOrderedSet/PersistentOrderedSet.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/persistentOrderedSet/PersistentOrderedSetBuilder.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/persistentOrderedSet/PersistentOrderedSetIterator.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/implementations/persistentOrderedSet/PersistentOrderedSetMutableIterator.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/internal/EndOfChain.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/internal/ListImplementation.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/internal/MutabilityOwnership.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/internal/commonFunctions.kt
+
+/*
+ * Copyright 2016-2019 JetBrains s.r.o.
+ * Use of this source code is governed by the Apache 2.0 License that can be found in the LICENSE.txt file.
+ */
+
+Source members:
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/internal/ForEachOneBit.kt
+  commonMain/androidx/compose/runtime/external/kotlinx/collections/immutable/internal/MutableCounter.kt
+
+/*
+ * Copyright 2016-2020 JetBrains s.r.o.
+ * Use of this source code is governed by the Apache 2.0 License that can be found in the LICENSE.txt file.
+ */
+
+Source members:
+  commonMain/androidx/compose/runtime/Applier.kt
+  commonMain/androidx/compose/runtime/Composable.kt
+  commonMain/androidx/compose/runtime/Composables.kt
+  commonMain/androidx/compose/runtime/Composer.kt
+  commonMain/androidx/compose/runtime/Composition.kt
+  commonMain/androidx/compose/runtime/CompositionContext.kt
+  commonMain/androidx/compose/runtime/CompositionLocal.kt
+  commonMain/androidx/compose/runtime/JoinedKey.kt
+  commonMain/androidx/compose/runtime/SnapshotState.kt
+  commonMain/androidx/compose/runtime/Stack.kt
+  commonMain/androidx/compose/runtime/ValueHolders.kt
+  commonMain/androidx/compose/runtime/internal/Trace.kt
+
+/*
+ * Copyright 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/runtime/BitwiseOperators.kt
+  commonMain/androidx/compose/runtime/ComposeCompilerApi.kt
+  commonMain/androidx/compose/runtime/ComposeVersion.kt
+  commonMain/androidx/compose/runtime/Effects.kt
+  commonMain/androidx/compose/runtime/ExperimentalComposeApi.kt
+  commonMain/androidx/compose/runtime/InternalComposeApi.kt
+  commonMain/androidx/compose/runtime/Latch.kt
+  commonMain/androidx/compose/runtime/NoLiveLiterals.kt
+  commonMain/androidx/compose/runtime/OpaqueKey.kt
+  commonMain/androidx/compose/runtime/PausableMonotonicFrameClock.kt
+  commonMain/androidx/compose/runtime/Recomposer.kt
+  commonMain/androidx/compose/runtime/collection/MutableVector.kt
+  commonMain/androidx/compose/runtime/internal/ComposableLambda.kt
+  commonMain/androidx/compose/runtime/internal/Decoy.kt
+  commonMain/androidx/compose/runtime/internal/FunctionKeyMeta.kt
+  commonMain/androidx/compose/runtime/internal/LiveLiteral.kt
+  commonMain/androidx/compose/runtime/internal/StabilityInferred.kt
+  commonMain/androidx/compose/runtime/snapshots/ListUtils.kt
+  commonMain/androidx/compose/runtime/snapshots/Snapshot.kt
+  commonMain/androidx/compose/runtime/snapshots/SnapshotIdSet.kt
+  commonMain/androidx/compose/runtime/snapshots/SnapshotStateList.kt
+  commonMain/androidx/compose/runtime/snapshots/SnapshotStateMap.kt
+  commonMain/androidx/compose/runtime/snapshots/SnapshotStateObserver.kt
+  commonMain/androidx/compose/runtime/tooling/InspectionTables.kt
+  jvmAndAndroidMain/androidx/compose/runtime/internal/ComposableLambda.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/runtime/internal/ComposableLambdaN.jvmAndAndroid.kt
+
+/*
+ * Copyright 2020 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/runtime/SnapshotState.android.kt
+  commonMain/androidx/compose/runtime/BroadcastFrameClock.kt
+  commonMain/androidx/compose/runtime/ComposableInferredTarget.kt
+  commonMain/androidx/compose/runtime/ComposableOpenTarget.kt
+  commonMain/androidx/compose/runtime/ComposableTarget.kt
+  commonMain/androidx/compose/runtime/ComposableTargetMarker.kt
+  commonMain/androidx/compose/runtime/DerivedState.kt
+  commonMain/androidx/compose/runtime/DisallowComposableCalls.kt
+  commonMain/androidx/compose/runtime/ExplicitGroupsComposable.kt
+  commonMain/androidx/compose/runtime/MonotonicFrameClock.kt
+  commonMain/androidx/compose/runtime/MovableContent.kt
+  commonMain/androidx/compose/runtime/NonRestartableComposable.kt
+  commonMain/androidx/compose/runtime/ProduceState.kt
+  commonMain/androidx/compose/runtime/ReadOnlyComposable.kt
+  commonMain/androidx/compose/runtime/RecomposeScopeImpl.kt
+  commonMain/androidx/compose/runtime/RememberObserver.kt
+  commonMain/androidx/compose/runtime/SnapshotFlow.kt
+  commonMain/androidx/compose/runtime/SnapshotMutationPolicy.kt
+  commonMain/androidx/compose/runtime/internal/SnapshotThreadLocal.kt
+  commonMain/androidx/compose/runtime/snapshots/SnapshotDoubleIndexHeap.kt
+  commonMain/androidx/compose/runtime/snapshots/SnapshotMutableState.kt
+  commonMain/androidx/compose/runtime/tooling/CompositionData.kt
+
+/*
+ * Copyright 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/runtime/InternalComposeTracingApi.kt
+  commonMain/androidx/compose/runtime/internal/JvmDefaultWithCompatibility.kt
+  commonMain/androidx/compose/runtime/snapshots/SnapshotContextElement.kt
+  commonMain/androidx/compose/runtime/snapshots/SnapshotWeakSet.kt
+  jvmAndAndroidMain/androidx/compose/runtime/internal/JvmDefaultWithCompatibility.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/runtime/reflect/ComposableMethod.jvmAndAndroid.kt
+
+/*
+ * Copyright 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/runtime/SnapshotDoubleState.android.kt
+  androidMain/androidx/compose/runtime/SnapshotFloatState.android.kt
+  androidMain/androidx/compose/runtime/SnapshotIntState.android.kt
+  androidMain/androidx/compose/runtime/SnapshotLongState.android.kt
+  commonMain/androidx/compose/runtime/ComposeNodeLifecycleCallback.kt
+  commonMain/androidx/compose/runtime/CompositionLocalMap.kt
+  commonMain/androidx/compose/runtime/DontMemoize.kt
+  commonMain/androidx/compose/runtime/ExperimentalComposeRuntimeApi.kt
+  commonMain/androidx/compose/runtime/HotReloader.kt
+  commonMain/androidx/compose/runtime/NonSkippableComposable.kt
+  commonMain/androidx/compose/runtime/SnapshotDoubleState.kt
+  commonMain/androidx/compose/runtime/SnapshotFloatState.kt
+  commonMain/androidx/compose/runtime/SnapshotIntState.kt
+  commonMain/androidx/compose/runtime/SnapshotLongState.kt
+  commonMain/androidx/compose/runtime/SnapshotStateExtensions.kt
+  commonMain/androidx/compose/runtime/collection/ScopeMap.kt
+  commonMain/androidx/compose/runtime/composer/gapbuffer/changelist/ComposerChangeListWriter.kt
+  commonMain/androidx/compose/runtime/composer/gapbuffer/changelist/Operation.kt
+  commonMain/androidx/compose/runtime/composer/gapbuffer/changelist/OperationArgContainer.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/LinkGroupSourceInformation.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/changelist/ChangeList.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/changelist/ComposerChangeListWriter.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/changelist/FixupList.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/changelist/Operation.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/changelist/OperationArgContainer.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/changelist/Operations.kt
+  commonMain/androidx/compose/runtime/internal/IntRef.kt
+  commonMain/androidx/compose/runtime/internal/PersistentCompositionLocalMap.kt
+  commonMain/androidx/compose/runtime/snapshots/AutoboxingStateValueProperty.kt
+  commonMain/androidx/compose/runtime/snapshots/StateFactoryMarker.kt
+  commonMain/androidx/compose/runtime/snapshots/StateObjectImpl.kt
+  commonMain/androidx/compose/runtime/tooling/CompositionObserver.kt
+
+/*
+ * Copyright 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/runtime/MonotonicFrameClock.android.kt
+  androidMain/androidx/compose/runtime/collection/ArrayUtils.android.kt
+  androidMain/androidx/compose/runtime/internal/Thread.android.kt
+  androidMain/androidx/compose/runtime/internal/Trace.android.kt
+  androidMain/androidx/compose/runtime/internal/Utils.android.kt
+  androidMain/androidx/compose/runtime/platform/Synchronization.android.kt
+  commonMain/androidx/compose/runtime/CheckResult.kt
+  commonMain/androidx/compose/runtime/ComposeRuntimeFlags.kt
+  commonMain/androidx/compose/runtime/PausableComposition.kt
+  commonMain/androidx/compose/runtime/Preconditions.kt
+  commonMain/androidx/compose/runtime/TestOnly.kt
+  commonMain/androidx/compose/runtime/collection/ArrayUtils.kt
+  commonMain/androidx/compose/runtime/collection/Extensions.kt
+  commonMain/androidx/compose/runtime/collection/MultiValueMap.kt
+  commonMain/androidx/compose/runtime/collection/ScatterSetWrapper.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/GroupFlags.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/GroupHandle.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/SlotTable.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/SlotTableAddresSpace.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/SlotTableBuilder.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/SlotTableEditor.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/SlotTableReader.kt
+  commonMain/androidx/compose/runtime/internal/Atomic.kt
+  commonMain/androidx/compose/runtime/internal/RememberEventDispatcher.kt
+  commonMain/androidx/compose/runtime/internal/Thread.kt
+  commonMain/androidx/compose/runtime/internal/Utils.kt
+  commonMain/androidx/compose/runtime/internal/WeakReference.kt
+  commonMain/androidx/compose/runtime/platform/Synchronization.kt
+  commonMain/androidx/compose/runtime/snapshots/SnapshotId.kt
+  commonMain/androidx/compose/runtime/snapshots/SnapshotStateSet.kt
+  commonMain/androidx/compose/runtime/snapshots/tooling/SnapshotObserver.kt
+  commonMain/androidx/compose/runtime/tooling/ComposeStackTrace.kt
+  commonMain/androidx/compose/runtime/tooling/ComposeStackTraceBuilder.kt
+  commonMain/androidx/compose/runtime/tooling/CompositionErrorContext.kt
+  jvmAndAndroidMain/androidx/compose/runtime/OldSynchronization.jvm.kt
+  jvmAndAndroidMain/androidx/compose/runtime/TestOnly.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/runtime/internal/Atomic.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/runtime/internal/Expect.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/runtime/internal/Thread.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/runtime/internal/WeakReference.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/runtime/snapshots/SnapshotContextElement.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/runtime/snapshots/SnapshotId.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/runtime/tooling/DiagnosticComposeException.jvmAndAndroid.kt
+
+/*
+ * Copyright 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/runtime/snapshots/SnapshotStateList.android.kt
+  androidMain/androidx/compose/runtime/snapshots/SnapshotStateSet.android.kt
+  commonMain/androidx/compose/runtime/CancellationHandle.kt
+  commonMain/androidx/compose/runtime/CompositeKeyHashCode.kt
+  commonMain/androidx/compose/runtime/GapComposer.kt
+  commonMain/androidx/compose/runtime/LinkComposer.kt
+  commonMain/androidx/compose/runtime/NextFrameEndCallbackQueue.kt
+  commonMain/androidx/compose/runtime/composer/DebugStringFormattable.kt
+  commonMain/androidx/compose/runtime/composer/RememberManager.kt
+  commonMain/androidx/compose/runtime/composer/gapbuffer/SlotTable.kt
+  commonMain/androidx/compose/runtime/composer/gapbuffer/changelist/ChangeList.kt
+  commonMain/androidx/compose/runtime/composer/gapbuffer/changelist/FixupList.kt
+  commonMain/androidx/compose/runtime/composer/gapbuffer/changelist/Operations.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/KeyInfo.kt
+  commonMain/androidx/compose/runtime/composer/linkbuffer/LinkAnchor.kt
+  commonMain/androidx/compose/runtime/internal/AwaiterQueue.kt
+  commonMain/androidx/compose/runtime/internal/PlatformOptimizedCancellationException.kt
+  commonMain/androidx/compose/runtime/internal/System.kt
+  commonMain/androidx/compose/runtime/tooling/ComposeToolingApi.kt
+  commonMain/androidx/compose/runtime/tooling/IdentifiableRecomposeScope.kt
+  commonMain/androidx/compose/runtime/tooling/SourceInformation.kt
+  jvmAndAndroidMain/androidx/compose/runtime/CompositeKeyHashCode.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/runtime/TracingContext.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/runtime/internal/PlatformOptimizedCancellationException.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/runtime/internal/System.jvmAndAndroid.kt
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/runtime/ViewTreeHostDefaultKey.android.kt
+  commonMain/androidx/compose/runtime/Anchor.kt
+  commonMain/androidx/compose/runtime/HostDefaultKey.kt
+  commonMain/androidx/compose/runtime/HostDefaultProvider.kt
+  commonMain/androidx/compose/runtime/composer/GroupInfo.kt
+  commonMain/androidx/compose/runtime/composer/GroupKind.kt
+  commonMain/androidx/compose/runtime/composer/GroupSourceInformation.kt
+  commonMain/androidx/compose/runtime/composer/gapbuffer/GapAnchor.kt
+  commonMain/androidx/compose/runtime/tooling/ComposeToolingFlags.kt
+
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */

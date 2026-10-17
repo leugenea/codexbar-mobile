@@ -1,0 +1,326 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.10.0/annotation-jvm-1.10.0-sources.jar
+Source archive SHA-256: 4f093265c2f99d314a5e161d748100588c49663b098a8a031aa173315c530ef7
+
+Source members:
+  jvmMain/androidx/annotation/NonNull.jvm.kt
+  jvmMain/androidx/annotation/Nullable.jvm.kt
+
+/*
+ * Copyright (C) 2013 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/annotation/IntDef.kt
+  commonMain/androidx/annotation/StringDef.kt
+  jvmMain/androidx/annotation/AnimRes.jvm.kt
+  jvmMain/androidx/annotation/AnimatorRes.jvm.kt
+  jvmMain/androidx/annotation/AnyRes.jvm.kt
+  jvmMain/androidx/annotation/ArrayRes.jvm.kt
+  jvmMain/androidx/annotation/AttrRes.jvm.kt
+  jvmMain/androidx/annotation/BoolRes.jvm.kt
+  jvmMain/androidx/annotation/ColorRes.jvm.kt
+  jvmMain/androidx/annotation/DimenRes.jvm.kt
+  jvmMain/androidx/annotation/DrawableRes.jvm.kt
+  jvmMain/androidx/annotation/FractionRes.jvm.kt
+  jvmMain/androidx/annotation/IdRes.jvm.kt
+  jvmMain/androidx/annotation/IntegerRes.jvm.kt
+  jvmMain/androidx/annotation/InterpolatorRes.jvm.kt
+  jvmMain/androidx/annotation/LayoutRes.jvm.kt
+  jvmMain/androidx/annotation/MenuRes.jvm.kt
+  jvmMain/androidx/annotation/PluralsRes.jvm.kt
+  jvmMain/androidx/annotation/RawRes.jvm.kt
+  jvmMain/androidx/annotation/StringRes.jvm.kt
+  jvmMain/androidx/annotation/StyleRes.jvm.kt
+  jvmMain/androidx/annotation/StyleableRes.jvm.kt
+  jvmMain/androidx/annotation/XmlRes.jvm.kt
+
+/*
+ * Copyright (C) 2014 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/annotation/CallSuper.kt
+  commonMain/androidx/annotation/CheckResult.kt
+  commonMain/androidx/annotation/ColorInt.kt
+  commonMain/androidx/annotation/FloatRange.kt
+  commonMain/androidx/annotation/IntRange.kt
+  commonMain/androidx/annotation/MainThread.kt
+  commonMain/androidx/annotation/Size.kt
+  commonMain/androidx/annotation/UiThread.kt
+  commonMain/androidx/annotation/VisibleForTesting.kt
+  jvmMain/androidx/annotation/BinderThread.jvm.kt
+  jvmMain/androidx/annotation/Keep.jvm.kt
+  jvmMain/androidx/annotation/RequiresPermission.jvm.kt
+  jvmMain/androidx/annotation/TransitionRes.jvm.kt
+  jvmMain/androidx/annotation/WorkerThread.jvm.kt
+
+/*
+ * Copyright (C) 2015 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/annotation/AnyThread.kt
+  commonMain/androidx/annotation/ProductionVisibility.kt
+  commonMain/androidx/annotation/RestrictTo.kt
+  jvmMain/androidx/annotation/Dimension.jvm.kt
+  jvmMain/androidx/annotation/DimensionUnit.jvm.kt
+  jvmMain/androidx/annotation/HalfFloat.jvm.kt
+  jvmMain/androidx/annotation/Px.jvm.kt
+  jvmMain/androidx/annotation/RequiresApi.jvm.kt
+  jvmMain/androidx/annotation/RestrictTo.jvm.kt
+
+/*
+ * Copyright (C) 2016 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/annotation/ColorLong.kt
+  commonMain/androidx/annotation/GuardedBy.kt
+  commonMain/androidx/annotation/LongDef.kt
+  jvmMain/androidx/annotation/FontRes.jvm.kt
+  jvmMain/androidx/annotation/NavigationRes.jvm.kt
+
+/*
+ * Copyright (C) 2017 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  jvmMain/androidx/annotation/ChecksSdkIntAtLeast.jvm.kt
+  jvmMain/androidx/annotation/DoNotInline.jvm.kt
+
+/*
+ * Copyright (C) 2020 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/annotation/Discouraged.kt
+
+/*
+ * Copyright (C) 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/annotation/EmptySuper.kt
+  commonMain/androidx/annotation/OpenForTesting.kt
+  commonMain/androidx/annotation/ReturnThis.kt
+  jvmMain/androidx/annotation/DeprecatedSinceApi.jvm.kt
+  jvmMain/androidx/annotation/RequiresExtension.jvm.kt
+
+/*
+ * Copyright (C) 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/annotation/RequiresFeature.kt
+
+/*
+ * Copyright 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  jvmMain/androidx/annotation/ContentView.jvm.kt
+  jvmMain/androidx/annotation/InspectableProperty.jvm.kt
+
+/*
+ * Copyright 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  jvmMain/androidx/annotation/DisplayContext.jvm.kt
+  jvmMain/androidx/annotation/GravityInt.jvm.kt
+  jvmMain/androidx/annotation/NonUiContext.jvm.kt
+  jvmMain/androidx/annotation/UiContext.jvm.kt
+
+/*
+ * Copyright 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/annotation/RequiresApi.kt
+
+/*
+ * Copyright 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  jvmMain/androidx/annotation/ReplaceWith.jvm.kt
+
+/*
+ * Copyright 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  jvmMain/androidx/annotation/ChecksFlag.jvm.kt
+  jvmMain/androidx/annotation/RequiresFlag.jvm.kt
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */

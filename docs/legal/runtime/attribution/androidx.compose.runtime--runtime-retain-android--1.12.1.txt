@@ -1,0 +1,33 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-retain-android/1.12.1/runtime-retain-android-1.12.1-sources.jar
+Source archive SHA-256: 6dab377d2582f7a2b7fcea90dda660ef49f6560081b899bb81e0b597cfa01dfc
+
+Source members:
+  commonMain/androidx/compose/runtime/retain/ClassHash.kt
+  commonMain/androidx/compose/runtime/retain/ForgetfulRetainedValuesStore.kt
+  commonMain/androidx/compose/runtime/retain/LocalRetainedValuesStore.kt
+  commonMain/androidx/compose/runtime/retain/ManagedRetainedValuesStore.kt
+  commonMain/androidx/compose/runtime/retain/Retain.kt
+  commonMain/androidx/compose/runtime/retain/RetainObserver.kt
+  commonMain/androidx/compose/runtime/retain/RetainedEffect.kt
+  commonMain/androidx/compose/runtime/retain/RetainedValueHolder.kt
+  commonMain/androidx/compose/runtime/retain/RetainedValuesStore.kt
+  commonMain/androidx/compose/runtime/retain/RetainedValuesStoreRegistry.kt
+  commonMain/androidx/compose/runtime/retain/impl/Preconditions.kt
+  commonMain/androidx/compose/runtime/retain/impl/SafeMultiValueMap.kt
+  jvmAndAndroidMain/androidx/compose/runtime/retain/ClassHash.jvmAndAndroid.kt
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */

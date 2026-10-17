@@ -7,38 +7,39 @@ upstream copyright, license and NOTICE material when distributing copied portion
 
 ## Application runtime dependencies
 
-The declared app dependencies below are runtime inputs; the BOM supplies version
-constraints rather than executable code. Exact final APK contents and the complete
-configuration-resolved transitive closure still need hosted verification.
+Release attribution is produced by the [APK-bound pipeline](CONTRIBUTING.md#apk-bound-runtime-sbom-and-notices),
+not by enumerating verification XML. The
+[reviewed candidate catalog](tools/build/runtime-licenses.json) and
+[preserved full texts](docs/legal/runtime/README.md) cover exact versions of the
+AndroidX/Compose, Kotlin/coroutines/serialization, OkHttp/Okio and annotation inputs,
+plus known nested, native and generated-data portions. A catalog entry is not proof
+that it ships: build/test-only inputs and constraint-only BOMs are excluded from the
+shipping SBOM. Only the fresh exact release graph and actual APK determine that list.
 
-| Component / selected version | Attribution | Declared license |
-| --- | --- | --- |
-| Compose BOM 2026.09.00 | Android Open Source Project / AndroidX contributors | Apache-2.0 |
-| Compose UI 1.12.1, Material3 1.4.0 | Android Open Source Project / AndroidX contributors | Apache-2.0 |
-| Activity Compose 1.13.0 | Android Open Source Project / AndroidX contributors | Apache-2.0 |
-| kotlinx-coroutines-android / core-jvm 1.11.0 | JetBrains / Kotlin contributors | Apache-2.0 |
-| OkHttp / okhttp-android 5.5.0 | Square and Lysine contributors | Apache-2.0 |
-| Public Suffix List data bundled in okhttp-android 5.5.0 | Mozilla Foundation / publicsuffix.org contributors | MPL-2.0 |
-| Okio / okio-jvm 3.18.1 (OkHttp transitive) | Square and Lysine contributors | Apache-2.0 |
-| kotlinx-serialization-json / core 1.11.0 (JSON tree only) | JetBrains / Kotlin contributors | Apache-2.0 |
-| AndroidX Annotation 1.10.0 / Startup 1.2.0 (OkHttp Android transitives) | Android Open Source Project / AndroidX contributors | Apache-2.0 |
-| Kotlin standard library (2.4.20 present in the acquisition graph) | JetBrains / Kotlin contributors | Apache-2.0; selected runtime version not yet established here |
+Every candidate bundle contains CycloneDX JSON 1.6, a complete observed runtime
+inventory, `THIRD_PARTY_NOTICES.txt`, required `legal/` material and byte-bound
+manifests. Preserve the entire matching capsule when later distributing the exact
+signed APK. Changed dependencies require fresh source-backed attribution; unknown
+components, changed known embedded hashes or missing applicable material block the
+pipeline instead of producing guessed complete status.
 
-Public Suffix List data ships as `assets/PublicSuffixDatabase.list` inside
-okhttp-android, unmodified by this project. OkHttp compiles the original list into
-its data format. Source form is available from [publicsuffix.org](https://publicsuffix.org/list/)
-and the [tagged OkHttp repository](https://github.com/square/okhttp/blob/parent-5.5.0/okhttp/src/jvmTest/resources/okhttp3/internal/publicsuffix/public_suffix_list.dat).
-See the [upstream Public Suffix List NOTICE](https://github.com/square/okhttp/blob/parent-5.5.0/okhttp/src/jvmTest/resources/okhttp3/internal/publicsuffix/NOTICE)
-and [MPL-2.0 terms](https://mozilla.org/MPL/2.0/); this embedded data is not Apache-2.0.
+Known embedded attribution includes Emoji2's relocated FlatBuffers (standalone
+version unknown; full relevant Apache/Google BSD candidate headers retained),
+graphics-path's native/header licenses, Kotlin stdlib's GWT/Guava/ThreeTenBP/Boost
+portions, source-embedded Apache/Android portions, and OkHttp's Unicode IDNA data
+and MPL-2.0 Public Suffix List. Relevant candidate ASF Core and Android/Harmony
+notice sections are preserved with truthful scope; unrelated aggregate projects
+are not presented as shipped libraries. This bounded policy does not promise
+exhaustive historical genealogy or legal clearance.
 
-Additional runtime candidate families in the reviewed acquisition graph include
-Compose animation/foundation/runtime, AndroidX lifecycle/core/collection,
-navigationevent/savedstate/window/profileinstaller/annotations and JSpecify.
-AndroidX and Kotlin families declare Apache-2.0; JSpecify declares Apache-2.0.
-Their presence in verification XML is not proof that each ships: XML also contains
-parents, POMs, BOMs, multiple versions and build/test inputs. Before release,
-resolve debug/release/Android-test configurations at the exact head and select
-license/NOTICE texts against the actual APK, including embedded components.
+OkHttp Android 5.5.0's exact corresponding PSL source, original NOTICE and full
+MPL-2.0 are provided in [the local source material](docs/legal/runtime/psl/SOURCE.txt),
+not a moving latest-source link. It reproduces `assets/PublicSuffixDatabase.list`
+with the cataloged hash. Unicode IDNA 15.1.0 uses the separately preserved
+Unicode-3.0 terms. The exact fork release source is
+[lysine-dev/okhttp a94bdf152084d11acecd44dcd09ffef203f4f0aa](https://github.com/lysine-dev/okhttp/tree/a94bdf152084d11acecd44dcd09ffef203f4f0aa).
+Unsigned capsules remain non-distributable signing inputs; final-signed binding is
+not an owner publication or activation GO.
 
 ## Build, test and repository tooling (not a release-runtime list)
 
@@ -106,9 +107,11 @@ See the exact provenance and transformations in
 
 ## Open attribution work
 
-No guessed approvals: resolve the exact runtime/test closure and APK-bound notices;
-audit bundled/shaded/native components in Actions, jscpd, rpds/PyYAML, JDK/SDK and
-host tooling; retrieve/verify the benchmark Action's missing license text.
+No guessed approvals: execute and reverify the exact release-runtime capsule for
+each candidate, including the scoped embedded attribution and corresponding source.
+The separate build/test/host tooling audit remains open for Actions, jscpd,
+rpds/PyYAML, JDK/SDK and host tooling; retrieve/verify the benchmark Action's missing
+license text. Those unrelated graphs are not claimed as APK components.
 
 Exact-version POM license gaps remain for `javax.inject:javax.inject:1`,
 `net.sf.kxml:kxml2:2.3.0`, Bouncy Castle `bcpkix-jdk18on`, `bcprov-jdk18on` and

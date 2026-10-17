@@ -1,0 +1,257 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-graphics-android/1.12.1/ui-graphics-android-1.12.1-sources.jar
+Source archive SHA-256: f488fa1e995113d6acf9011f66d347f8f0fb12db303460adab72f923de747591
+
+Source members:
+  androidMain/androidx/compose/ui/graphics/AndroidPath.android.kt
+  commonMain/androidx/compose/ui/graphics/BlendMode.kt
+  commonMain/androidx/compose/ui/graphics/ClipOp.kt
+  commonMain/androidx/compose/ui/graphics/ColorFilter.kt
+  commonMain/androidx/compose/ui/graphics/FilterQuality.kt
+  commonMain/androidx/compose/ui/graphics/ImageBitmap.kt
+  commonMain/androidx/compose/ui/graphics/Paint.kt
+  commonMain/androidx/compose/ui/graphics/PaintingStyle.kt
+  commonMain/androidx/compose/ui/graphics/PathFillType.kt
+  commonMain/androidx/compose/ui/graphics/PathOperation.kt
+  commonMain/androidx/compose/ui/graphics/PointMode.kt
+  commonMain/androidx/compose/ui/graphics/StrokeCap.kt
+  commonMain/androidx/compose/ui/graphics/StrokeJoin.kt
+  commonMain/androidx/compose/ui/graphics/TileMode.kt
+  commonMain/androidx/compose/ui/graphics/VertexMode.kt
+  commonMain/androidx/compose/ui/graphics/Vertices.kt
+
+/*
+ * Copyright 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/graphics/AndroidCanvas.android.kt
+  androidMain/androidx/compose/ui/graphics/AndroidImageBitmap.android.kt
+  androidMain/androidx/compose/ui/graphics/AndroidPaint.android.kt
+  androidMain/androidx/compose/ui/graphics/AndroidShader.android.kt
+  androidMain/androidx/compose/ui/graphics/RectHelper.android.kt
+  commonMain/androidx/compose/ui/graphics/Brush.kt
+  commonMain/androidx/compose/ui/graphics/Canvas.kt
+  commonMain/androidx/compose/ui/graphics/Color.kt
+  commonMain/androidx/compose/ui/graphics/Shader.kt
+  commonMain/androidx/compose/ui/graphics/Shadow.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/Adaptation.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/ColorModel.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/ColorSpace.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/ColorSpaces.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/Connector.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/Illuminant.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/Lab.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/RenderIntent.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/Rgb.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/TransferParameters.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/WhitePoint.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/Xyz.kt
+  commonMain/androidx/compose/ui/graphics/painter/BitmapPainter.kt
+  commonMain/androidx/compose/ui/graphics/painter/ColorPainter.kt
+  commonMain/androidx/compose/ui/graphics/painter/Painter.kt
+  commonMain/androidx/compose/ui/graphics/vector/PathBuilder.kt
+  commonMain/androidx/compose/ui/graphics/vector/PathNode.kt
+  commonMain/androidx/compose/ui/graphics/vector/PathParser.kt
+
+/*
+ * Copyright 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/graphics/AndroidBlendMode.android.kt
+  androidMain/androidx/compose/ui/graphics/AndroidColorSpace.android.kt
+  androidMain/androidx/compose/ui/graphics/AndroidMatrixConversions.android.kt
+  androidMain/androidx/compose/ui/graphics/AndroidPathEffect.android.kt
+  androidMain/androidx/compose/ui/graphics/AndroidPathMeasure.android.kt
+  androidMain/androidx/compose/ui/graphics/AndroidTileMode.android.kt
+  androidMain/androidx/compose/ui/graphics/AndroidVertexMode.android.kt
+  androidMain/androidx/compose/ui/graphics/CanvasUtils.android.kt
+  commonMain/androidx/compose/ui/graphics/Degrees.kt
+  commonMain/androidx/compose/ui/graphics/Float16.kt
+  commonMain/androidx/compose/ui/graphics/Matrix.kt
+  commonMain/androidx/compose/ui/graphics/Outline.kt
+  commonMain/androidx/compose/ui/graphics/Path.kt
+  commonMain/androidx/compose/ui/graphics/PathEffect.kt
+  commonMain/androidx/compose/ui/graphics/PathMeasure.kt
+  commonMain/androidx/compose/ui/graphics/PixelMap.kt
+  commonMain/androidx/compose/ui/graphics/RectangleShape.kt
+  commonMain/androidx/compose/ui/graphics/Shape.kt
+  commonMain/androidx/compose/ui/graphics/drawscope/CanvasDrawScope.kt
+  commonMain/androidx/compose/ui/graphics/drawscope/ContentDrawScope.kt
+  commonMain/androidx/compose/ui/graphics/drawscope/DrawContext.kt
+  commonMain/androidx/compose/ui/graphics/drawscope/DrawScope.kt
+  commonMain/androidx/compose/ui/graphics/drawscope/DrawScopeMarker.kt
+  commonMain/androidx/compose/ui/graphics/drawscope/DrawTransform.kt
+  commonMain/androidx/compose/ui/graphics/drawscope/EmptyCanvas.kt
+
+/*
+ * Copyright 2020 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/graphics/AndroidColorFilter.android.kt
+  androidMain/androidx/compose/ui/graphics/AndroidRenderEffect.android.kt
+  commonMain/androidx/compose/ui/graphics/ColorMatrix.kt
+  commonMain/androidx/compose/ui/graphics/ExperimentalGraphicsApi.kt
+  commonMain/androidx/compose/ui/graphics/RenderEffect.kt
+  commonMain/androidx/compose/ui/graphics/colorspace/Oklab.kt
+  commonMain/androidx/compose/ui/graphics/painter/BrushPainter.kt
+
+/*
+ * Copyright 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/ui/graphics/internal/JvmDefaultWithCompatibility.kt
+  jvmAndAndroidMain/androidx/compose/ui/graphics/internal/JvmDefaultWithCompatibility.jvmAndroidAndroid.kt
+
+/*
+ * Copyright 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/graphics/AndroidPathIterator.android.kt
+  commonMain/androidx/compose/ui/graphics/InlineClassHelper.kt
+  commonMain/androidx/compose/ui/graphics/PathIterator.kt
+  commonMain/androidx/compose/ui/graphics/PathSegment.kt
+  commonMain/androidx/compose/ui/graphics/vector/FastFloatParser.kt
+
+/*
+ * Copyright 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/graphics/AndroidGraphicsContext.android.kt
+  androidMain/androidx/compose/ui/graphics/layer/AndroidGraphicsLayer.android.kt
+  androidMain/androidx/compose/ui/graphics/layer/GraphicsLayerV23.android.kt
+  androidMain/androidx/compose/ui/graphics/layer/GraphicsLayerV29.android.kt
+  androidMain/androidx/compose/ui/graphics/layer/GraphicsViewLayer.android.kt
+  androidMain/androidx/compose/ui/graphics/layer/LayerSnapshot.android.kt
+  androidMain/androidx/compose/ui/graphics/layer/view/PlaceholderHardwareCanvas.android.kt
+  androidMain/androidx/compose/ui/graphics/layer/view/ViewLayerContainer.android.kt
+  androidMain/androidx/compose/ui/graphics/shadow/AndroidShadowContext.android.kt
+  androidMain/androidx/compose/ui/graphics/shadow/Blur.android.kt
+  commonMain/androidx/compose/ui/graphics/Bezier.kt
+  commonMain/androidx/compose/ui/graphics/GraphicsContext.kt
+  commonMain/androidx/compose/ui/graphics/IntervalTree.kt
+  commonMain/androidx/compose/ui/graphics/PathGeometry.kt
+  commonMain/androidx/compose/ui/graphics/PathHitTester.kt
+  commonMain/androidx/compose/ui/graphics/PathSvg.kt
+  commonMain/androidx/compose/ui/graphics/layer/ChildLayerDependenciesTracker.kt
+  commonMain/androidx/compose/ui/graphics/layer/CompositingStrategy.kt
+  commonMain/androidx/compose/ui/graphics/layer/GraphicsLayer.kt
+  commonMain/androidx/compose/ui/graphics/shadow/Blur.kt
+  commonMain/androidx/compose/ui/graphics/shadow/DropShadowPainter.kt
+  commonMain/androidx/compose/ui/graphics/shadow/InnerShadowPainter.kt
+  commonMain/androidx/compose/ui/graphics/shadow/Shadow.kt
+  commonMain/androidx/compose/ui/graphics/shadow/ShadowContext.kt
+  commonMain/androidx/compose/ui/graphics/shadow/ShadowRenderer.kt
+
+/*
+ * Copyright 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/graphics/AndroidColor.android.kt
+  commonMain/androidx/compose/ui/graphics/Interpolatable.kt
+  commonMain/androidx/compose/ui/graphics/LayerOutsets.kt
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */

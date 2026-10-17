@@ -11,9 +11,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class ReleasePipelineTests(unittest.TestCase):
     def test_new_android_consumers_import_without_policy_site_packages(self):
-        # The Android metrics-only venv must not depend on the broader policy venv.
+        # Schema validation is explicit; SDK/runtime consumers remain stdlib-only at import.
         consumers = ('test_release_pipeline', 'test_release_artifact', 'test_version_identity',
-                     'release_artifact', 'version_identity', 'hosted_release_fixtures', 'verify_gradle_execution')
+                     'release_artifact', 'version_identity', 'hosted_release_fixtures', 'verify_gradle_execution',
+                     'release_runtime', 'release_bundle', 'test_release_runtime', 'test_release_bundle')
         script = 'import importlib, sys; sys.path.insert(0, sys.argv[1]); ' \
                  '[importlib.import_module(name) for name in sys.argv[2:]]'
         result = subprocess.run([sys.executable, '-I', '-S', '-B', '-c', script,
@@ -31,6 +32,44 @@ class ReleasePipelineTests(unittest.TestCase):
                 validate(valid.replace(partner + ' SUCCESS', partner + ' SKIPPED'), 'build')
             with self.assertRaises(ValueError):
                 validate(valid.replace(f'{name} SKIPPED', f'{name} FROM_CACHE'), 'build')
+
+    def test_runtime_observation_is_release_only_and_fresh_without_application_changes(self):
+        app = (ROOT / 'app/build.gradle').read_text()
+        collector = app.split('abstract class ReleaseRuntimeInputs', 1)[1].split('// One resolver', 1)[0]
+        for text in ('runtimeConfiguration.incoming.resolutionResult.allComponents',
+                     'runtimeConfiguration.incoming.artifacts.artifacts', 'artifact.id.componentIdentifier',
+                     'variant.externalVariant', 'dep.constraint', 'sha(file.bytes)'):
+            self.assertIn(text, collector)
+        for forbidden in ('compileClasspath', 'configurations.findAll', 'testRuntimeClasspath', 'zipTree'):
+            self.assertNotIn(forbidden, collector)
+        registration = app.split("withBuildType('release')", 1)[1].split('def debugClasses', 1)[0]
+        self.assertIn('variant.runtimeConfiguration', registration)
+        self.assertIn('SingleArtifact.APK.INSTANCE', registration)
+        self.assertIn('ScopedArtifacts.Scope.PROJECT', registration)
+        self.assertIn("destination.set(layout.buildDirectory.dir('runtime-release'))", registration)
+        self.assertIn('collectReleaseRuntimeInventory', REQUIRED['build'])
+        self.assertNotIn('collectReleaseRuntimeInventory', REQUIRED['native'])
+
+    def test_runtime_sidecars_are_mandatory_hosted_build_and_existing_fixture_consumers(self):
+        workflow = (ROOT / '.github/workflows/android.yml').read_text()
+        build = workflow.split('  instrumented:', 1)[0]
+        self.assertIn(':app:collectReleaseRuntimeInventory', build)
+        self.assertIn('app/build/runtime-release/', build.split('Upload build logs and outputs (all outcomes)', 1)[1])
+        block = build.split('- name: Create and rederive APK-bound runtime SBOM and notices', 1)[1].split('- name:', 1)[0]
+        for text in ('for operation in create-unsigned verify-unsigned',
+                     'android-build-contract-venv/bin/python', '--expected-sha "$EXPECTED_SOURCE_SHA"',
+                     '--artifact-manifest evidence/release/artifact-manifest.json',
+                     '--resolution app/build/runtime-release/runtime-resolution.json',
+                     '--bundle evidence/release/bundle'):
+            self.assertIn(text, block)
+        for forbidden in ('continue-on-error:', 'if:', '|| true', 'bind-final', 'apksigner sign'):
+            self.assertNotIn(forbidden, block)
+        fixtures = (ROOT / 'tools/build/hosted_release_fixtures.py').read_text()
+        for text in (':app:collectReleaseRuntimeInventory', 'unsigned_files(root, expected',
+                     'verify_files(capsule, unsigned_files(', 'write_bundle(capsule, files'):
+            self.assertIn(text, fixtures)
+        self.assertIn('timeout-minutes: 15', build.split('Run isolated hosted version and release fixtures', 1)[1])
+        self.assertIn('MaxMetaspaceSize=768m', build)
 
     def test_gradle_package_and_single_version_resolver_contract(self):
         app = (ROOT / 'app/build.gradle').read_text()

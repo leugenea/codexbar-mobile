@@ -1259,3 +1259,23 @@ Its analysis output, all existing debug/native/capture cases and compatible >=90
 whole-handwritten INSTRUCTION union still need exact-candidate hosted acceptance.
 [CONTRIBUTING](CONTRIBUTING.md) defines inputs, artifact policy and the parent-owned
 approved CodeQL migration; signing/publication and owner GO remain successor work.
+
+The release-only runtime observer additionally resolves the selected release graph
+and original AAR/JAR hashes, then reconciles actual APK class definitions and payload
+members. Merged manifest/resources are explicitly shared build outputs, not claimed
+byte-identical source files. A bounded source-backed catalog includes known nested
+Emoji2, graphics native/header, Kotlin source portions, Unicode IDNA and MPL PSL data;
+unknown standalone versions and candidate historical notice scope stay explicit.
+Deterministic CycloneDX 1.6, notice/source material, inventory and bundle manifests
+bind the exact APK bytes. Current Gradle-input regeneration and actual SDK inspection
+are hosted gates, not established by source/static tests. No app dependency or
+production-class/coverage policy changes are required.
+
+A separate final-signed reader verifies the independently expected certificate,
+identity/security and unchanged complete non-signature payload, then creates new
+sidecars bound to the final APK hash without mutating either APK or the accepted
+unsigned capsule. It neither signs nor grants source/publication authority. Ordinary
+trusted hosted Gradle builds remain the build boundary; no historical compiler-byte
+reconstruction, generic decompiler or exhaustive notice-genealogy system is introduced.
+See [capsule commands and limits](CONTRIBUTING.md#apk-bound-runtime-sbom-and-notices)
+and [preserved attribution scope](docs/legal/runtime/README.md).

@@ -40,7 +40,7 @@ jobs:
             python3 -m venv "$RUNNER_TEMP/android-build-contract-venv" &&
             timeout --signal=TERM --kill-after=10s 3m "$RUNNER_TEMP/android-build-contract-venv/bin/python" -m pip install \
               --require-hashes --no-deps --no-cache-dir --disable-pip-version-check --timeout 30 --retries 1 \
-              -r .github/requirements-metrics.txt
+              -r .github/requirements-metrics.txt -r tools/research/requirements.txt
           } 2>&1 | tee evidence/offline-parser-setup.log
           setup_status=("${PIPESTATUS[@]}")
           set -e
@@ -117,7 +117,7 @@ jobs:
             --stacktrace --info --console=plain --continue \
             -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
             :app:lintDebug :app:assembleDebug :app:lintRelease :app:assembleRelease :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
-            :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest \
+            :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:collectReleaseRuntimeInventory \
             2>&1 | tee evidence/strict.log | bash tools/build/filter-gradle-console.sh
           # Capture every pipeline status before any command resets PIPESTATUS.
           graph_status=("${PIPESTATUS[@]}")
@@ -143,9 +143,23 @@ jobs:
               --apk "evidence/release/$filename" --manifest evidence/release/artifact-manifest.json \
               --reports evidence/release/inspection
           done
+      - name: Create and rederive APK-bound runtime SBOM and notices
+        timeout-minutes: 5
+        env:
+          EXPECTED_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          filename=$(python3 -c 'import json; v=json.load(open("evidence/build-identity.json")); print(f"codexbar-mobile-{v["versionName"]}-{v["versionCode"]}-unsigned.apk")')
+          for operation in create-unsigned verify-unsigned; do
+            "$RUNNER_TEMP/android-build-contract-venv/bin/python" tools/build/release_bundle.py "$operation" \
+              --expected-sha "$EXPECTED_SOURCE_SHA" --apk "evidence/release/$filename" \
+              --artifact-manifest evidence/release/artifact-manifest.json \
+              --resolution app/build/runtime-release/runtime-resolution.json \
+              --bundle evidence/release/bundle --reports evidence/release/runtime-inspection
+          done
       - name: Run isolated hosted version and release fixtures
         timeout-minutes: 15
-        run: python3 tools/build/hosted_release_fixtures.py
+        run: '"$RUNNER_TEMP/android-build-contract-venv/bin/python" tools/build/hosted_release_fixtures.py'
       - name: Upload build logs and outputs (all outcomes)
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -156,6 +170,7 @@ jobs:
             build/reports/
             app/build/reports/
             app/build/test-results/
+            app/build/runtime-release/
             app/build/outputs/apk/
             app/build/intermediates/merged_manifests/
           if-no-files-found: error

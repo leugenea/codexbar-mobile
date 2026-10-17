@@ -1,0 +1,187 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/collection/collection-jvm/1.5.0/collection-jvm-1.5.0-sources.jar
+Source archive SHA-256: bcc6197ec5fb349e86ae3ba6c94b164d3a9ac5a03d9f9c235d7c4eb24e5878b3
+
+Source members:
+  jvmMain/androidx/collection/ArrayMap.jvm.kt
+
+/*
+ * Copyright (C) 2017 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  jvmMain/androidx/collection/package-info.java
+
+/*
+ * Copyright (C) 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/collection/ArraySet.kt
+  commonMain/androidx/collection/LongSparseArray.kt
+  commonMain/androidx/collection/SimpleArrayMap.kt
+  jvmMain/androidx/collection/ArrayMap.java
+  jvmMain/androidx/collection/LongSparseArray.jvm.kt
+
+/*
+ * Copyright 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/collection/IndexBasedArrayIterator.kt
+
+/*
+ * Copyright 2020 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/collection/CircularArray.kt
+  commonMain/androidx/collection/CircularIntArray.kt
+  commonMain/androidx/collection/CollectionPlatformUtils.kt
+  commonMain/androidx/collection/LruCache.kt
+  commonMain/androidx/collection/SparseArray.kt
+  commonMain/androidx/collection/SparseArrayCompat.kt
+  commonMain/androidx/collection/internal/ContainerHelpers.kt
+  commonMain/androidx/collection/internal/Lock.kt
+  commonMain/androidx/collection/internal/LockExt.kt
+  commonMain/androidx/collection/internal/LruHashMap.kt
+  jvmMain/androidx/collection/ArraySet.jvm.kt
+  jvmMain/androidx/collection/ArraySetJvmUtil.java
+  jvmMain/androidx/collection/CollectionPlatformUtils.jvm.kt
+  jvmMain/androidx/collection/SparseArrayCompat.jvm.kt
+  jvmMain/androidx/collection/internal/Lock.jvm.kt
+  jvmMain/androidx/collection/internal/LruHashMap.jvm.kt
+
+/*
+ * Copyright 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/collection/DoubleList.kt
+  commonMain/androidx/collection/FloatFloatMap.kt
+  commonMain/androidx/collection/FloatFloatPair.kt
+  commonMain/androidx/collection/FloatIntMap.kt
+  commonMain/androidx/collection/FloatList.kt
+  commonMain/androidx/collection/FloatLongMap.kt
+  commonMain/androidx/collection/FloatObjectMap.kt
+  commonMain/androidx/collection/FloatSet.kt
+  commonMain/androidx/collection/IntFloatMap.kt
+  commonMain/androidx/collection/IntIntMap.kt
+  commonMain/androidx/collection/IntIntPair.kt
+  commonMain/androidx/collection/IntList.kt
+  commonMain/androidx/collection/IntLongMap.kt
+  commonMain/androidx/collection/IntObjectMap.kt
+  commonMain/androidx/collection/IntSet.kt
+  commonMain/androidx/collection/LongFloatMap.kt
+  commonMain/androidx/collection/LongIntMap.kt
+  commonMain/androidx/collection/LongList.kt
+  commonMain/androidx/collection/LongLongMap.kt
+  commonMain/androidx/collection/LongLongPair.kt
+  commonMain/androidx/collection/LongObjectMap.kt
+  commonMain/androidx/collection/LongSet.kt
+  commonMain/androidx/collection/ObjectFloatMap.kt
+  commonMain/androidx/collection/ObjectIntMap.kt
+  commonMain/androidx/collection/ObjectList.kt
+  commonMain/androidx/collection/ObjectLongMap.kt
+  commonMain/androidx/collection/OrderedScatterSet.kt
+  commonMain/androidx/collection/PackingUtils.kt
+  commonMain/androidx/collection/ScatterMap.kt
+  commonMain/androidx/collection/ScatterSet.kt
+  commonMain/androidx/collection/internal/PackingHelpers.kt
+  jvmMain/androidx/collection/internal/PackingHelpers.jvm.kt
+
+/*
+ * Copyright 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/collection/DoubleSet.kt
+  commonMain/androidx/collection/SieveCache.kt
+  commonMain/androidx/collection/internal/RuntimeHelpers.kt
+
+/*
+ * Copyright 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */

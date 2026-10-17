@@ -1,0 +1,362 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "components": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "disclosure": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)(?!.*//)[A-Za-z0-9_.!/-]+$",
+                  "type": "string"
+                },
+                "role": {
+                  "enum": [
+                    "license",
+                    "notice",
+                    "attribution",
+                    "source"
+                  ]
+                },
+                "scope": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "sha256": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "size": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "source": {
+                  "pattern": "^https://",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "sha256",
+                "size",
+                "source",
+                "scope",
+                "role"
+              ],
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "id": {
+            "pattern": "^[A-Za-z0-9_.:+#-]+$",
+            "type": "string"
+          },
+          "license": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "noticeScope": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "parent": {
+            "pattern": "^[A-Za-z0-9_.:+#-]+$",
+            "type": "string"
+          },
+          "selector": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "members": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "member": {
+                          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)(?!.*//)[A-Za-z0-9_.!/-]+$",
+                          "type": "string"
+                        },
+                        "sha256": {
+                          "pattern": "^[0-9a-f]{64}$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "member",
+                        "sha256"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "members"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "classPrefixes": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "classPrefixes"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "sourceArchive": {
+            "additionalProperties": false,
+            "properties": {
+              "sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "url": {
+                "pattern": "^https://",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url",
+              "sha256"
+            ],
+            "type": "object"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "license",
+          "evidence",
+          "noticeScope",
+          "disclosure"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "embedded": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "disclosure": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)(?!.*//)[A-Za-z0-9_.!/-]+$",
+                  "type": "string"
+                },
+                "role": {
+                  "enum": [
+                    "license",
+                    "notice",
+                    "attribution",
+                    "source"
+                  ]
+                },
+                "scope": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "sha256": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "size": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "source": {
+                  "pattern": "^https://",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "sha256",
+                "size",
+                "source",
+                "scope",
+                "role"
+              ],
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "id": {
+            "pattern": "^[A-Za-z0-9_.:+#-]+$",
+            "type": "string"
+          },
+          "license": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "noticeScope": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "parent": {
+            "pattern": "^[A-Za-z0-9_.:+#-]+$",
+            "type": "string"
+          },
+          "selector": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "members": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "member": {
+                          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)(?!.*//)[A-Za-z0-9_.!/-]+$",
+                          "type": "string"
+                        },
+                        "sha256": {
+                          "pattern": "^[0-9a-f]{64}$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "member",
+                        "sha256"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "members"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "classPrefixes": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "classPrefixes"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "sourceArchive": {
+            "additionalProperties": false,
+            "properties": {
+              "sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "url": {
+                "pattern": "^https://",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url",
+              "sha256"
+            ],
+            "type": "object"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "license",
+          "evidence",
+          "noticeScope",
+          "disclosure"
+        ],
+        "type": "object"
+      },
+      "minItems": 0,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "kind": {
+      "const": "runtime-attribution-catalog"
+    },
+    "policy": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schema": {
+      "const": 1
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "policy",
+    "components",
+    "embedded"
+  ],
+  "type": "object"
+}

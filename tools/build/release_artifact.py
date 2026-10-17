@@ -152,7 +152,16 @@ def application_policy(xmltree):
     attribute(launchers[0], 'exported', r'(\(type 0x12\)0xffffffff)')
 
 
-def inspect_apk(apk, expected, sdk, report_dir):
+def signer_certificate(output, expected):
+    if not re.fullmatch(r'[0-9a-f]{64}', expected or ''):
+        raise ValueError('Expected signer certificate must be canonical SHA-256')
+    signers = re.findall(r'(?m)^Signer #([1-9][0-9]*) certificate SHA-256 digest: ([0-9a-fA-F]{64})[ \t]*$', output)
+    if signers != [('1', expected)]:
+        raise ValueError('APK must have exactly the independently expected signer certificate')
+    return expected
+
+
+def inspect_apk(apk, expected, sdk, report_dir, *, expected_signer=None):
     report_dir.mkdir(parents=True, exist_ok=True)
     tools = sdk / 'build-tools/36.0.0'
     results = {}
@@ -169,17 +178,26 @@ def inspect_apk(apk, expected, sdk, report_dir):
     if launch != [MAIN_ACTIVITY]:
         raise ValueError('APK must expose exactly the production MAIN/LAUNCHER activity')
     application_policy(results['manifest'])
-    status, signature = run_tool([tools / 'apksigner', 'verify', '--verbose', apk])
+    options = ['--print-certs'] if expected_signer is not None else []
+    status, signature = run_tool([tools / 'apksigner', 'verify', '--verbose', *options, apk])
     (report_dir / 'signature.txt').write_text(signature)
-    # A generic tool failure is not unsigned evidence. Both absence of a signing
-    # block/JAR signature and apksigner's explicit missing-META-INF refusal are needed.
-    if status == 0 or not re.search(r'Missing META-INF/MANIFEST.MF|No JAR signatures', signature):
-        raise ValueError('apksigner did not independently confirm an unsigned APK')
+    if expected_signer is None:
+        # Keep the unsigned default strict: generic tool failure is not unsigned evidence.
+        if status == 0 or not re.search(r'Missing META-INF/MANIFEST.MF|No JAR signatures', signature):
+            raise ValueError('apksigner did not independently confirm an unsigned APK')
+        apk_bytes(apk)
+    else:
+        if status != 0:
+            raise ValueError('Final APK signature verification failed')
+        signer_certificate(signature, expected_signer)
     inspect_backup(apk, tools, results['manifest'], report_dir)
-    return {'backupExclusionsVerified': True, 'package': package[0][0], 'versionCode': int(package[0][1]), 'versionName': package[0][2],
-            'requestedPermissions': permissions, 'cleartextPermitted': False,
-            'allowBackup': False, 'debuggable': False, 'launcher': MAIN_ACTIVITY,
-            'launchMode': 'singleTask', 'defaultProcessOnly': True, 'unsigned': True}
+    inspection = {'backupExclusionsVerified': True, 'package': package[0][0], 'versionCode': int(package[0][1]), 'versionName': package[0][2],
+                 'requestedPermissions': permissions, 'cleartextPermitted': False,
+                 'allowBackup': False, 'debuggable': False, 'launcher': MAIN_ACTIVITY,
+                 'launchMode': 'singleTask', 'defaultProcessOnly': True, 'unsigned': expected_signer is None}
+    if expected_signer is not None:
+        inspection['signerCertificateSha256'] = expected_signer
+    return inspection
 
 
 def inventory(apk, expected, run_id, attempt, sdk, reports):

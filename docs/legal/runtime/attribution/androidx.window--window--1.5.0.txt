@@ -1,0 +1,225 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/window/window/1.5.0/window-1.5.0-sources.jar
+Source archive SHA-256: 37d85fa5e68b3bc28c88b05dc2b0d5d7caf0af3d7692bd0bc0c56a8dc6ca6a33
+
+Source members:
+  androidx/window/embedding/OverlayInfo.kt
+
+/*
+ * Copyright (C) 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidx/window/area/EmptyWindowAreaControllerImpl.kt
+  androidx/window/area/RearDisplaySessionImpl.kt
+  androidx/window/area/WindowAreaController.kt
+  androidx/window/area/WindowAreaControllerImpl.kt
+  androidx/window/area/WindowAreaSession.kt
+  androidx/window/area/WindowAreaSessionCallback.kt
+  androidx/window/core/Bounds.kt
+  androidx/window/core/BuildConfig.kt
+  androidx/window/core/ExperimentalWindowApi.kt
+  androidx/window/core/SpecificationComputer.kt
+  androidx/window/core/Version.kt
+  androidx/window/embedding/ActivityFilter.kt
+  androidx/window/embedding/ActivityRule.kt
+  androidx/window/embedding/ActivityStack.kt
+  androidx/window/embedding/EmbeddingAdapter.kt
+  androidx/window/embedding/EmbeddingBackend.kt
+  androidx/window/embedding/EmbeddingCompat.kt
+  androidx/window/embedding/EmbeddingInterfaceCompat.kt
+  androidx/window/embedding/EmbeddingRule.kt
+  androidx/window/embedding/ExtensionEmbeddingBackend.kt
+  androidx/window/embedding/MatcherUtils.kt
+  androidx/window/embedding/RuleParser.kt
+  androidx/window/embedding/SplitController.kt
+  androidx/window/embedding/SplitInfo.kt
+  androidx/window/embedding/SplitPairFilter.kt
+  androidx/window/embedding/SplitPairRule.kt
+  androidx/window/embedding/SplitPlaceholderRule.kt
+  androidx/window/embedding/SplitRule.kt
+  androidx/window/layout/DisplayFeature.kt
+  androidx/window/layout/FoldingFeature.kt
+  androidx/window/layout/HardwareFoldingFeature.kt
+  androidx/window/layout/SafeWindowLayoutComponentProvider.kt
+  androidx/window/layout/WindowInfoTracker.kt
+  androidx/window/layout/WindowInfoTrackerImpl.kt
+  androidx/window/layout/WindowLayoutInfo.kt
+  androidx/window/layout/WindowMetrics.kt
+  androidx/window/layout/WindowMetricsCalculator.kt
+  androidx/window/layout/WindowMetricsCalculatorCompat.kt
+  androidx/window/layout/adapter/WindowBackend.kt
+  androidx/window/layout/adapter/extensions/ExtensionsWindowLayoutInfoAdapter.kt
+  androidx/window/layout/adapter/sidecar/ExtensionInterfaceCompat.kt
+  androidx/window/layout/adapter/sidecar/SidecarAdapter.kt
+  androidx/window/layout/adapter/sidecar/SidecarCompat.kt
+  androidx/window/layout/adapter/sidecar/SidecarWindowBackend.kt
+  androidx/window/layout/util/ActivityCompatHelperApi24.kt
+  androidx/window/layout/util/DisplayCompatHelper.kt
+
+/*
+ * Copyright 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidx/window/WindowProperties.kt
+  androidx/window/area/RearDisplayPresentationSessionPresenterImpl.kt
+  androidx/window/area/WindowAreaPresentationSessionCallback.kt
+  androidx/window/area/WindowAreaSessionPresenter.kt
+  androidx/window/core/ActivityComponentInfo.kt
+  androidx/window/core/ConsumerAdapter.kt
+  androidx/window/core/ExtensionsUtil.kt
+  androidx/window/core/PredicateAdapter.kt
+  androidx/window/core/VerificationMode.kt
+  androidx/window/embedding/ActivityEmbeddingController.kt
+  androidx/window/embedding/RuleController.kt
+  androidx/window/embedding/SplitAttributes.kt
+  androidx/window/embedding/SplitAttributesCalculatorParams.kt
+  androidx/window/layout/adapter/sidecar/DistinctElementSidecarCallback.java
+  androidx/window/layout/util/ContextCompatHelper.kt
+
+/*
+ * Copyright 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidx/window/RequiresWindowSdkExtension.kt
+  androidx/window/SafeWindowExtensionsProvider.kt
+  androidx/window/WindowSdkExtensions.kt
+  androidx/window/area/SafeWindowAreaComponentProvider.kt
+  androidx/window/area/WindowAreaCapability.kt
+  androidx/window/area/WindowAreaInfo.kt
+  androidx/window/area/reflectionguard/ExtensionWindowAreaPresentationRequirements.java
+  androidx/window/area/reflectionguard/ExtensionWindowAreaStatusRequirements.java
+  androidx/window/area/reflectionguard/WindowAreaComponentApi3Requirements.java
+  androidx/window/area/reflectionguard/WindowAreaComponentValidator.kt
+  androidx/window/area/utils/PresentationWindowCompatUtils.kt
+  androidx/window/embedding/ActivityEmbeddingOptions.kt
+  androidx/window/embedding/ActivityEmbeddingOptionsImpl.kt
+  androidx/window/embedding/EmbeddingAnimationBackground.kt
+  androidx/window/embedding/EmbeddingAspectRatio.kt
+  androidx/window/embedding/EmbeddingBounds.kt
+  androidx/window/embedding/EmbeddingConfiguration.kt
+  androidx/window/embedding/OverlayAttributes.kt
+  androidx/window/embedding/OverlayAttributesCalculatorParams.kt
+  androidx/window/embedding/OverlayController.kt
+  androidx/window/embedding/OverlayControllerImpl.kt
+  androidx/window/embedding/OverlayCreateParams.kt
+  androidx/window/embedding/ParentContainerInfo.kt
+  androidx/window/embedding/SafeActivityEmbeddingComponentProvider.kt
+  androidx/window/embedding/SplitPinRule.kt
+  androidx/window/layout/adapter/extensions/ExtensionWindowBackend.kt
+  androidx/window/layout/adapter/extensions/ExtensionWindowBackendApi0.kt
+  androidx/window/layout/adapter/extensions/ExtensionWindowBackendApi1.kt
+  androidx/window/layout/adapter/extensions/ExtensionWindowBackendApi2.kt
+  androidx/window/layout/adapter/extensions/MulticastConsumer.kt
+  androidx/window/reflection/ReflectionUtils.kt
+  androidx/window/reflection/WindowExtensionsConstants.kt
+
+/*
+ * Copyright 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidx/window/area/adapter/WindowAreaAdapter.kt
+  androidx/window/area/adapter/WindowAreaAdapterApi3.kt
+  androidx/window/area/adapter/WindowAreaAdapterApi4.kt
+  androidx/window/embedding/ActivityWindowInfoCallbackController.kt
+  androidx/window/embedding/DividerAttributes.kt
+  androidx/window/embedding/EmbeddedActivityWindowInfo.kt
+  androidx/window/embedding/EmbeddingAnimationParams.kt
+  androidx/window/layout/SupportedPosture.kt
+  androidx/window/layout/adapter/WindowSizeClassFactory.kt
+  androidx/window/layout/adapter/extensions/ExtensionWindowBackendApi6.kt
+  androidx/window/layout/adapter/extensions/ExtensionWindowBackendApi9.kt
+  androidx/window/layout/adapter/extensions/MulticastConsumerApi2.kt
+  androidx/window/layout/util/BoundsHelper.kt
+  androidx/window/layout/util/DensityCompatHelper.kt
+  androidx/window/layout/util/DisplayHelper.kt
+  androidx/window/layout/util/WindowMetricsCompatHelper.kt
+  androidx/window/reflection/Consumer2.kt
+  androidx/window/reflection/JFunction2.kt
+  androidx/window/reflection/Predicate2.kt
+
+/*
+ * Copyright 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidx/window/embedding/ActivityStackConsumer.kt
+  androidx/window/embedding/OverlayControllerActivityStackConsumer.kt
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
