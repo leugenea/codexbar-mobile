@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 
 from release_artifact import inventory
+from release_bundle import unsigned_files, write_bundle, verify_files
 from version_identity import git, resolve
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,7 +24,10 @@ def build_case(root, label, env, reports):
     expected = resolve(root, env)
     command(root, './gradlew', '--no-daemon', '--dependency-verification', 'strict', '--build-cache',
             '--no-configuration-cache', '--stacktrace', '--console=plain', ':app:assembleRelease',
-            env=env, log=reports / 'assemble.log')
+            ':app:collectReleaseRuntimeInventory', env=env, log=reports / 'assemble.log')
+    if (reports / 'assemble.log').read_text().splitlines().count(
+            'GATE_TASK_OUTCOME :app:collectReleaseRuntimeInventory SUCCESS') != 1:
+        raise ValueError('Hosted fixture requires fresh release runtime collection')
     name = f'codexbar-mobile-{expected["versionName"]}-{expected["versionCode"]}-unsigned.apk'
     apk = reports / name
     shutil.copyfile(root / 'app/build/outputs/apk/release/app-release-unsigned.apk', apk)
@@ -33,6 +37,13 @@ def build_case(root, label, env, reports):
     if receipt != inventory(apk, resolve(root, env), env['GITHUB_RUN_ID'], env['GITHUB_RUN_ATTEMPT'],
                             Path(env['ANDROID_HOME']), reports / 'reinspection'):
         raise ValueError(f'Hosted fixture reverification failed: {label}')
+    resolution = root / 'app/build/runtime-release/runtime-resolution.json'
+    capsule = reports / 'bundle'
+    files = unsigned_files(root, expected, apk, reports / 'artifact-manifest.json', resolution,
+                           Path(env['ANDROID_HOME']), reports / 'runtime-inspection')
+    write_bundle(capsule, files, [apk, resolution])
+    verify_files(capsule, unsigned_files(root, resolve(root, env), apk, reports / 'artifact-manifest.json',
+                                        resolution, Path(env['ANDROID_HOME']), reports / 'runtime-reinspection'))
     return expected
 
 

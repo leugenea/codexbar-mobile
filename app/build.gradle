@@ -1,6 +1,10 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import com.android.build.api.artifact.ScopedArtifact
 import com.android.build.api.variant.ScopedArtifacts
+import com.android.build.api.artifact.SingleArtifact
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import groovy.json.JsonOutput
 import java.security.MessageDigest
 import java.util.zip.ZipFile
@@ -171,6 +175,100 @@ abstract class DebugCoverageInputs extends DefaultTask {
 }
 
 
+abstract class ReleaseRuntimeInputs extends DefaultTask {
+    @InputFiles @PathSensitive(PathSensitivity.RELATIVE)
+    abstract ListProperty<RegularFile> getClassJars()
+    @InputFiles @PathSensitive(PathSensitivity.RELATIVE)
+    abstract ListProperty<Directory> getClassDirs()
+    @InputDirectory abstract DirectoryProperty getApkDirectory()
+    @OutputDirectory abstract DirectoryProperty getDestination()
+    @Input String buildInputsJson
+    @Internal def runtimeConfiguration
+
+    @TaskAction
+    void collect() {
+        def sha = { byte[] bytes -> MessageDigest.getInstance('SHA-256').digest(bytes).encodeHex().toString() }
+        def coordinate = { id ->
+            if (id instanceof ModuleComponentIdentifier) return "${id.group}:${id.module}:${id.version}".toString()
+            if (id instanceof ProjectComponentIdentifier && id.projectPath == ':app') return 'app'
+            throw new GradleException("Unsupported runtime project/file component: ${id}")
+        }
+        def nodes = [:]
+        def edges = [] as Set
+        def addNode = { id ->
+            def key = coordinate(id)
+            if (!nodes.containsKey(key)) nodes[key] = [id: key, variants: []]
+            key
+        }
+        def addVariant
+        addVariant = { variant ->
+            def key = addNode(variant.owner)
+            def attributes = variant.attributes.keySet().collectEntries { attr ->
+                [(attr.name): variant.attributes.getAttribute(attr).toString()]
+            }
+            def value = [name: variant.displayName, attributes: attributes,
+                capabilities: variant.capabilities.collect { "${it.group}:${it.name}:${it.version}".toString() }.sort()]
+            if (!nodes[key].variants.contains(value)) nodes[key].variants.add(value)
+            if (variant.externalVariant.present) {
+                def external = variant.externalVariant.get()
+                def target = addNode(external.owner)
+                edges.add([from: key, to: target, constraint: false])
+                addVariant(external)
+            }
+        }
+        // Execution-time resolution of this exact variant, never build/test configurations.
+        runtimeConfiguration.incoming.resolutionResult.allComponents.each { component ->
+            def from = addNode(component.id)
+            component.variants.each { addVariant(it) }
+            component.dependencies.each { dep ->
+                if (!(dep instanceof ResolvedDependencyResult)) throw new GradleException("Unresolved runtime edge: ${dep}")
+                def to = addNode(dep.selected.id)
+                edges.add([from: from, to: to, constraint: dep.constraint])
+                addVariant(dep.resolvedVariant)
+            }
+        }
+        def artifactsByKey = [:]
+        runtimeConfiguration.incoming.artifacts.artifacts.each { artifact ->
+            addVariant(artifact.variant)
+            def file = artifact.file
+            def row = [component: addNode(artifact.id.componentIdentifier), filename: file.name,
+                       path: file.absolutePath, size: file.length(), sha256: sha(file.bytes)]
+            // Publication and ad-hoc variants can expose the same selected archive.
+            // Match the consumer's component/filename identity, retaining every variant above.
+            def key = [row.component, row.filename]
+            if (artifactsByKey.containsKey(key) && artifactsByKey[key] != row) {
+                throw new GradleException("Conflicting resolved runtime artifact: ${key}")
+            }
+            artifactsByKey[key] = row
+        }
+        def artifacts = artifactsByKey.values().toList().sort { a, b -> (a.component <=> b.component) ?: (a.filename <=> b.filename) }
+        def projectClasses = [] as Set
+        classDirs.get().each { directory ->
+            project.fileTree(directory.asFile).matching { include '**/*.class' }.files.each { file ->
+                projectClasses.add(directory.asFile.toPath().relativize(file.toPath()).toString().replace('/', '.').replaceAll(/\.class$/, ''))
+            }
+        }
+        classJars.get().each { jar ->
+            new ZipFile(jar.asFile).withCloseable { zip ->
+                zip.entries().toList().findAll { !it.directory && it.name.endsWith('.class') }.each {
+                    projectClasses.add(it.name.replace('/', '.').replaceAll(/\.class$/, ''))
+                }
+            }
+        }
+        def apks = project.fileTree(apkDirectory.get().asFile).matching { include '*.apk' }.files
+        if (apks.size() != 1) throw new GradleException('Runtime inventory requires exactly one release APK')
+        def apk = apks.first()
+        def receipt = [schema: 1, kind: 'release-runtime-resolution', variant: 'release',
+            configuration: runtimeConfiguration.name, buildInputs: new groovy.json.JsonSlurper().parseText(buildInputsJson),
+            apk: [filename: apk.name, size: apk.length(), sha256: sha(apk.bytes)],
+            components: nodes.values().sort { it.id }, edges: edges.toList().sort { it.toString() },
+            artifacts: artifacts, projectClasses: projectClasses.toList().sort()]
+        def output = destination.get().asFile
+        output.mkdirs()
+        new File(output, 'runtime-resolution.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(receipt)) + '\n'
+    }
+}
+
 // One resolver serves Gradle and independent hosted APK expectations. No network fallback.
 def versionOutput = providers.exec {
     workingDir rootProject.projectDir
@@ -268,6 +366,21 @@ androidComponents.onVariants(androidComponents.selector().withBuildType('debug')
     variant.artifacts.forScope(ScopedArtifacts.Scope.PROJECT).use(coverageInputs).toGet(
         ScopedArtifact.CLASSES.INSTANCE, { it.classJars }, { it.classDirs })
 }
+androidComponents.onVariants(androidComponents.selector().withBuildType('release')) { variant ->
+    if (variant.name != 'release' || android.buildTypes.release.minifyEnabled || android.buildTypes.release.shrinkResources) {
+        throw new GradleException('Runtime inventory supports one unflavored, unminified, non-resource-shrunk release')
+    }
+    def runtimeInputs = tasks.register('collectReleaseRuntimeInventory', ReleaseRuntimeInputs) {
+        dependsOn 'assembleRelease'
+        buildInputsJson = versionOutput
+        runtimeConfiguration = variant.runtimeConfiguration
+        apkDirectory.set(variant.artifacts.get(SingleArtifact.APK.INSTANCE))
+        destination.set(layout.buildDirectory.dir('runtime-release'))
+    }
+    variant.artifacts.forScope(ScopedArtifacts.Scope.PROJECT).use(runtimeInputs).toGet(
+        ScopedArtifact.CLASSES.INSTANCE, { it.classJars }, { it.classDirs })
+}
+
 def debugClasses = fileTree(layout.buildDirectory.dir('coverage-gate/classes')) { include '**/*.class' }
 def debugCoverageData = files(
     layout.buildDirectory.file('outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec'),

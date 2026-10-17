@@ -1,0 +1,359 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-android/1.4.0/material3-android-1.4.0-sources.jar
+Source archive SHA-256: 3e3209422a382566a780e2c1410edd866e4474498098fdbcf942c690ade1ddaa
+
+Source members:
+  androidMain/androidx/compose/material3/AndroidAlertDialog.android.kt
+  androidMain/androidx/compose/material3/DynamicTonalPalette.android.kt
+  androidMain/androidx/compose/material3/internal/Strings.android.kt
+  commonMain/androidx/compose/material3/AlertDialog.kt
+  commonMain/androidx/compose/material3/AppBar.kt
+  commonMain/androidx/compose/material3/Badge.kt
+  commonMain/androidx/compose/material3/Button.kt
+  commonMain/androidx/compose/material3/Checkbox.kt
+  commonMain/androidx/compose/material3/ColorScheme.kt
+  commonMain/androidx/compose/material3/ContentColor.kt
+  commonMain/androidx/compose/material3/ExperimentalMaterial3Api.kt
+  commonMain/androidx/compose/material3/FloatingActionButton.kt
+  commonMain/androidx/compose/material3/Icon.kt
+  commonMain/androidx/compose/material3/IconButton.kt
+  commonMain/androidx/compose/material3/InteractiveComponentSize.kt
+  commonMain/androidx/compose/material3/MaterialTheme.kt
+  commonMain/androidx/compose/material3/NavigationBar.kt
+  commonMain/androidx/compose/material3/NavigationDrawer.kt
+  commonMain/androidx/compose/material3/NavigationRail.kt
+  commonMain/androidx/compose/material3/RadioButton.kt
+  commonMain/androidx/compose/material3/Scaffold.kt
+  commonMain/androidx/compose/material3/Snackbar.kt
+  commonMain/androidx/compose/material3/SnackbarHost.kt
+  commonMain/androidx/compose/material3/Surface.kt
+  commonMain/androidx/compose/material3/Text.kt
+  commonMain/androidx/compose/material3/TonalPalette.kt
+  commonMain/androidx/compose/material3/Typography.kt
+  commonMain/androidx/compose/material3/internal/Elevation.kt
+  commonMain/androidx/compose/material3/internal/Strings.kt
+  commonMain/androidx/compose/material3/tokens/CheckboxTokens.kt
+  commonMain/androidx/compose/material3/tokens/ColorDarkTokens.kt
+  commonMain/androidx/compose/material3/tokens/ColorLightTokens.kt
+  commonMain/androidx/compose/material3/tokens/ColorSchemeKeyTokens.kt
+  commonMain/androidx/compose/material3/tokens/DialogTokens.kt
+  commonMain/androidx/compose/material3/tokens/ElevatedButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/ElevationTokens.kt
+  commonMain/androidx/compose/material3/tokens/ExtendedFabPrimaryTokens.kt
+  commonMain/androidx/compose/material3/tokens/FilledButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/FilledTonalButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/NavigationBarTokens.kt
+  commonMain/androidx/compose/material3/tokens/NavigationDrawerTokens.kt
+  commonMain/androidx/compose/material3/tokens/NavigationRailCollapsedTokens.kt
+  commonMain/androidx/compose/material3/tokens/OutlinedButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/PaletteTokens.kt
+  commonMain/androidx/compose/material3/tokens/RadioButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/ShapeTokens.kt
+  commonMain/androidx/compose/material3/tokens/SnackbarTokens.kt
+  commonMain/androidx/compose/material3/tokens/StateTokens.kt
+  commonMain/androidx/compose/material3/tokens/TextButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/TypeScaleTokens.kt
+  commonMain/androidx/compose/material3/tokens/TypefaceTokens.kt
+  commonMain/androidx/compose/material3/tokens/TypographyKeyTokens.kt
+  commonMain/androidx/compose/material3/tokens/TypographyTokens.kt
+
+/*
+ * Copyright 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/material3/AndroidMenu.android.kt
+  androidMain/androidx/compose/material3/SearchBar.android.kt
+  androidMain/androidx/compose/material3/internal/CalendarModel.android.kt
+  androidMain/androidx/compose/material3/internal/CalendarModelImpl.android.kt
+  androidMain/androidx/compose/material3/internal/SystemBarsDefaultInsets.android.kt
+  commonMain/androidx/compose/material3/Card.kt
+  commonMain/androidx/compose/material3/Chip.kt
+  commonMain/androidx/compose/material3/DatePicker.kt
+  commonMain/androidx/compose/material3/Divider.kt
+  commonMain/androidx/compose/material3/ExposedDropdownMenu.kt
+  commonMain/androidx/compose/material3/ListItem.kt
+  commonMain/androidx/compose/material3/Menu.kt
+  commonMain/androidx/compose/material3/OutlinedTextField.kt
+  commonMain/androidx/compose/material3/ProgressIndicator.kt
+  commonMain/androidx/compose/material3/Shapes.kt
+  commonMain/androidx/compose/material3/Slider.kt
+  commonMain/androidx/compose/material3/SwipeToDismissBox.kt
+  commonMain/androidx/compose/material3/Switch.kt
+  commonMain/androidx/compose/material3/Tab.kt
+  commonMain/androidx/compose/material3/TabRow.kt
+  commonMain/androidx/compose/material3/TextField.kt
+  commonMain/androidx/compose/material3/TextFieldDefaults.kt
+  commonMain/androidx/compose/material3/internal/AnchoredDraggable.kt
+  commonMain/androidx/compose/material3/internal/CalendarModel.kt
+  commonMain/androidx/compose/material3/internal/DragGestureDetectorCopy.kt
+  commonMain/androidx/compose/material3/internal/MappedInteractionSource.kt
+  commonMain/androidx/compose/material3/internal/SystemBarsDefaultInsets.kt
+  commonMain/androidx/compose/material3/internal/TextFieldImpl.kt
+  commonMain/androidx/compose/material3/tokens/AssistChipTokens.kt
+  commonMain/androidx/compose/material3/tokens/BadgeTokens.kt
+  commonMain/androidx/compose/material3/tokens/BottomAppBarTokens.kt
+  commonMain/androidx/compose/material3/tokens/DividerTokens.kt
+  commonMain/androidx/compose/material3/tokens/ElevatedCardTokens.kt
+  commonMain/androidx/compose/material3/tokens/FilledAutocompleteTokens.kt
+  commonMain/androidx/compose/material3/tokens/FilledCardTokens.kt
+  commonMain/androidx/compose/material3/tokens/FilledIconButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/FilledTextFieldTokens.kt
+  commonMain/androidx/compose/material3/tokens/FilledTonalIconButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/FilterChipTokens.kt
+  commonMain/androidx/compose/material3/tokens/IconButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/InputChipTokens.kt
+  commonMain/androidx/compose/material3/tokens/ListTokens.kt
+  commonMain/androidx/compose/material3/tokens/MenuTokens.kt
+  commonMain/androidx/compose/material3/tokens/MotionTokens.kt
+  commonMain/androidx/compose/material3/tokens/OutlinedAutocompleteTokens.kt
+  commonMain/androidx/compose/material3/tokens/OutlinedCardTokens.kt
+  commonMain/androidx/compose/material3/tokens/OutlinedIconButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/OutlinedTextFieldTokens.kt
+  commonMain/androidx/compose/material3/tokens/PrimaryNavigationTabTokens.kt
+  commonMain/androidx/compose/material3/tokens/ScrimTokens.kt
+  commonMain/androidx/compose/material3/tokens/SearchBarTokens.kt
+  commonMain/androidx/compose/material3/tokens/SearchViewTokens.kt
+  commonMain/androidx/compose/material3/tokens/ShapeKeyTokens.kt
+  commonMain/androidx/compose/material3/tokens/SliderTokens.kt
+  commonMain/androidx/compose/material3/tokens/SuggestionChipTokens.kt
+  commonMain/androidx/compose/material3/tokens/SwitchTokens.kt
+  jvmMain/androidx/compose/material3/internal/LegacyCalendarModelImpl.jvm.kt
+
+/*
+ * Copyright 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/material3/CalendarLocale.android.kt
+  androidMain/androidx/compose/material3/DatePickerDialog.android.kt
+  androidMain/androidx/compose/material3/ModalBottomSheet.android.kt
+  androidMain/androidx/compose/material3/TimeFormat.android.kt
+  androidMain/androidx/compose/material3/TimePicker.android.kt
+  androidMain/androidx/compose/material3/Tooltip.android.kt
+  androidMain/androidx/compose/material3/internal/AccessibilityServiceStateProvider.android.kt
+  androidMain/androidx/compose/material3/internal/BasicTooltip.android.kt
+  androidMain/androidx/compose/material3/internal/DefaultPlatformTextStyle.android.kt
+  commonMain/androidx/compose/material3/BottomSheetScaffold.kt
+  commonMain/androidx/compose/material3/CalendarLocale.kt
+  commonMain/androidx/compose/material3/DateInput.kt
+  commonMain/androidx/compose/material3/DateRangeInput.kt
+  commonMain/androidx/compose/material3/DateRangePicker.kt
+  commonMain/androidx/compose/material3/Label.kt
+  commonMain/androidx/compose/material3/SegmentedButton.kt
+  commonMain/androidx/compose/material3/SheetDefaults.kt
+  commonMain/androidx/compose/material3/TimeFormat.kt
+  commonMain/androidx/compose/material3/TimePicker.kt
+  commonMain/androidx/compose/material3/Tooltip.kt
+  commonMain/androidx/compose/material3/carousel/Arrangement.kt
+  commonMain/androidx/compose/material3/internal/AccessibilityServiceStateProvider.kt
+  commonMain/androidx/compose/material3/internal/BasicTooltip.kt
+  commonMain/androidx/compose/material3/internal/DefaultPlatformTextStyle.kt
+  commonMain/androidx/compose/material3/internal/InternalMutatorMutex.kt
+  commonMain/androidx/compose/material3/internal/MenuPosition.kt
+  commonMain/androidx/compose/material3/internal/MutableWindowInsets.kt
+  commonMain/androidx/compose/material3/internal/ProvideContentColorTextStyle.kt
+  commonMain/androidx/compose/material3/pulltorefresh/PullToRefresh.kt
+  commonMain/androidx/compose/material3/tokens/DateInputModalTokens.kt
+  commonMain/androidx/compose/material3/tokens/DatePickerModalTokens.kt
+  commonMain/androidx/compose/material3/tokens/OutlinedSegmentedButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/PlainTooltipTokens.kt
+  commonMain/androidx/compose/material3/tokens/RichTooltipTokens.kt
+  commonMain/androidx/compose/material3/tokens/SecondaryNavigationTabTokens.kt
+  commonMain/androidx/compose/material3/tokens/SheetBottomTokens.kt
+  commonMain/androidx/compose/material3/tokens/TimeInputTokens.kt
+  commonMain/androidx/compose/material3/tokens/TimePickerTokens.kt
+  jvmMain/androidx/compose/material3/CalendarLocale.jvm.kt
+
+/*
+ * Copyright 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/material3/ExposedDropdownMenu.android.kt
+  androidMain/androidx/compose/material3/WideNavigationRail.android.kt
+  androidMain/androidx/compose/material3/internal/BackHandler.android.kt
+  androidMain/androidx/compose/material3/internal/BasicEdgeToEdgeDialog.android.kt
+  androidMain/androidx/compose/material3/internal/colorUtil/Cam.android.kt
+  androidMain/androidx/compose/material3/internal/colorUtil/CamUtils.android.kt
+  androidMain/androidx/compose/material3/internal/colorUtil/Frame.android.kt
+  androidMain/androidx/compose/material3/internal/colorUtil/HCTSolver.android.kt
+  commonMain/androidx/compose/material3/DatePickerDialog.kt
+  commonMain/androidx/compose/material3/DragHandle.kt
+  commonMain/androidx/compose/material3/ExperimentalMaterial3ExpressiveApi.kt
+  commonMain/androidx/compose/material3/HorizontalCenterOptically.kt
+  commonMain/androidx/compose/material3/ModalBottomSheet.kt
+  commonMain/androidx/compose/material3/MotionScheme.kt
+  commonMain/androidx/compose/material3/NavigationItem.kt
+  commonMain/androidx/compose/material3/Ripple.kt
+  commonMain/androidx/compose/material3/SearchBar.kt
+  commonMain/androidx/compose/material3/SecureTextField.kt
+  commonMain/androidx/compose/material3/ShortNavigationBar.kt
+  commonMain/androidx/compose/material3/WideNavigationRail.kt
+  commonMain/androidx/compose/material3/WideNavigationRailState.kt
+  commonMain/androidx/compose/material3/carousel/Carousel.kt
+  commonMain/androidx/compose/material3/carousel/CarouselItemScope.kt
+  commonMain/androidx/compose/material3/carousel/CarouselState.kt
+  commonMain/androidx/compose/material3/carousel/KeylineList.kt
+  commonMain/androidx/compose/material3/carousel/KeylineSnapPosition.kt
+  commonMain/androidx/compose/material3/carousel/Keylines.kt
+  commonMain/androidx/compose/material3/carousel/Strategy.kt
+  commonMain/androidx/compose/material3/internal/AccessibilityUtil.kt
+  commonMain/androidx/compose/material3/internal/AnimatedShape.kt
+  commonMain/androidx/compose/material3/internal/BackHandler.kt
+  commonMain/androidx/compose/material3/internal/BasicEdgeToEdgeDialog.kt
+  commonMain/androidx/compose/material3/internal/ChildParentSemantics.kt
+  commonMain/androidx/compose/material3/internal/FloatProducer.kt
+  commonMain/androidx/compose/material3/internal/Icons.kt
+  commonMain/androidx/compose/material3/internal/LayoutUtil.kt
+  commonMain/androidx/compose/material3/internal/PlatformOptimizedCancellationException.kt
+  commonMain/androidx/compose/material3/tokens/AppBarLargeTokens.kt
+  commonMain/androidx/compose/material3/tokens/AppBarMediumTokens.kt
+  commonMain/androidx/compose/material3/tokens/AppBarSmallTokens.kt
+  commonMain/androidx/compose/material3/tokens/AppBarTokens.kt
+  commonMain/androidx/compose/material3/tokens/BaselineButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/ButtonGroupSmallTokens.kt
+  commonMain/androidx/compose/material3/tokens/ButtonLargeTokens.kt
+  commonMain/androidx/compose/material3/tokens/ButtonMediumTokens.kt
+  commonMain/androidx/compose/material3/tokens/ButtonSmallTokens.kt
+  commonMain/androidx/compose/material3/tokens/ButtonXLargeTokens.kt
+  commonMain/androidx/compose/material3/tokens/ButtonXSmallTokens.kt
+  commonMain/androidx/compose/material3/tokens/CircularProgressIndicatorTokens.kt
+  commonMain/androidx/compose/material3/tokens/DragHandleTokens.kt
+  commonMain/androidx/compose/material3/tokens/ExpressiveMotionTokens.kt
+  commonMain/androidx/compose/material3/tokens/ExtendedFabLargeTokens.kt
+  commonMain/androidx/compose/material3/tokens/ExtendedFabMediumTokens.kt
+  commonMain/androidx/compose/material3/tokens/ExtendedFabSmallTokens.kt
+  commonMain/androidx/compose/material3/tokens/FabBaselineTokens.kt
+  commonMain/androidx/compose/material3/tokens/FabLargeTokens.kt
+  commonMain/androidx/compose/material3/tokens/FabMediumTokens.kt
+  commonMain/androidx/compose/material3/tokens/FabMenuBaselineTokens.kt
+  commonMain/androidx/compose/material3/tokens/FabPrimaryContainerTokens.kt
+  commonMain/androidx/compose/material3/tokens/FabSecondaryContainerTokens.kt
+  commonMain/androidx/compose/material3/tokens/FabSmallTokens.kt
+  commonMain/androidx/compose/material3/tokens/FloatingToolbarTokens.kt
+  commonMain/androidx/compose/material3/tokens/LargeIconButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/LinearProgressIndicatorTokens.kt
+  commonMain/androidx/compose/material3/tokens/LoadingIndicatorTokens.kt
+  commonMain/androidx/compose/material3/tokens/MediumIconButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/MotionSchemeKeyTokens.kt
+  commonMain/androidx/compose/material3/tokens/NavigationBarHorizontalItemTokens.kt
+  commonMain/androidx/compose/material3/tokens/NavigationBarVerticalItemTokens.kt
+  commonMain/androidx/compose/material3/tokens/NavigationRailBaselineItemTokens.kt
+  commonMain/androidx/compose/material3/tokens/NavigationRailColorTokens.kt
+  commonMain/androidx/compose/material3/tokens/NavigationRailExpandedTokens.kt
+  commonMain/androidx/compose/material3/tokens/NavigationRailHorizontalItemTokens.kt
+  commonMain/androidx/compose/material3/tokens/NavigationRailVerticalItemTokens.kt
+  commonMain/androidx/compose/material3/tokens/ProgressIndicatorTokens.kt
+  commonMain/androidx/compose/material3/tokens/SmallIconButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/StandardMotionTokens.kt
+  commonMain/androidx/compose/material3/tokens/TonalButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/XLargeIconButtonTokens.kt
+  commonMain/androidx/compose/material3/tokens/XSmallIconButtonTokens.kt
+  jvmMain/androidx/compose/material3/DatePicker.jvm.kt
+  jvmMain/androidx/compose/material3/internal/InternalMutatorMutex.jvm.kt
+  jvmMain/androidx/compose/material3/internal/System.jvm.kt
+
+/*
+ * Copyright 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/material3/AppBarDsl.kt
+  commonMain/androidx/compose/material3/IconButtonDefaults.kt
+  commonMain/androidx/compose/material3/TimePickerDialog.kt
+  commonMain/androidx/compose/material3/internal/DraggableAnchors.kt
+  commonMain/androidx/compose/material3/internal/System.kt
+  commonMain/androidx/compose/material3/tokens/AppBarLargeFlexibleTokens.kt
+  commonMain/androidx/compose/material3/tokens/AppBarMediumFlexibleTokens.kt
+  commonMain/androidx/compose/material3/tokens/ConnectedButtonGroupSmallTokens.kt
+  commonMain/androidx/compose/material3/tokens/DockedToolbarTokens.kt
+  commonMain/androidx/compose/material3/tokens/SplitButtonLargeTokens.kt
+  commonMain/androidx/compose/material3/tokens/SplitButtonMediumTokens.kt
+  commonMain/androidx/compose/material3/tokens/SplitButtonSmallTokens.kt
+  commonMain/androidx/compose/material3/tokens/SplitButtonXLargeTokens.kt
+  commonMain/androidx/compose/material3/tokens/SplitButtonXSmallTokens.kt
+  jvmMain/androidx/compose/material3/internal/PlatformOptimizedCancellationException.jvm.kt
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/material3/AppBarColumn.kt
+  commonMain/androidx/compose/material3/AppBarRow.kt
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */

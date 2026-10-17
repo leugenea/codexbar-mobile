@@ -1,0 +1,2 @@
+Published source archive: https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/2.2.10/kotlin-stdlib-jdk7-2.2.10-sources.jar
+Source archive SHA-256: 2534c8908432e06de73177509903d405b55f423dd4c2f747e16b92a2162611e6

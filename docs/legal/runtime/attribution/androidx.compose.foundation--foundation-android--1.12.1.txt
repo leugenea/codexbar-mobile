@@ -1,0 +1,653 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation-android/1.12.1/foundation-android-1.12.1-sources.jar
+Source archive SHA-256: 5b58cea5db2583142e4b4b39dce10cbd75722bd06ab35161f06f987be90a53f1
+
+Source members:
+  commonMain/androidx/compose/foundation/selection/Toggleable.kt
+
+/*
+ * Copyright 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/foundation/DarkTheme.android.kt
+  commonMain/androidx/compose/foundation/Background.kt
+  commonMain/androidx/compose/foundation/Clickable.kt
+  commonMain/androidx/compose/foundation/Image.kt
+  commonMain/androidx/compose/foundation/ProgressSemantics.kt
+  commonMain/androidx/compose/foundation/Scroll.kt
+  commonMain/androidx/compose/foundation/gestures/Draggable.kt
+  commonMain/androidx/compose/foundation/selection/Selectable.kt
+  commonMain/androidx/compose/foundation/shape/GenericShape.kt
+  commonMain/androidx/compose/foundation/text/TextDelegate.kt
+  commonMain/androidx/compose/foundation/text/TextLayoutHelper.kt
+  commonMain/androidx/compose/foundation/text/selection/SelectionMode.kt
+  commonMain/androidx/compose/foundation/text/selection/TextSelectionDelegate.kt
+
+/*
+ * Copyright 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/foundation/gestures/AndroidScrollable.android.kt
+  androidMain/androidx/compose/foundation/text/TextFieldKeyInput.android.kt
+  commonMain/androidx/compose/foundation/Border.kt
+  commonMain/androidx/compose/foundation/BorderStroke.kt
+  commonMain/androidx/compose/foundation/Canvas.kt
+  commonMain/androidx/compose/foundation/ExperimentalFoundationApi.kt
+  commonMain/androidx/compose/foundation/Focusable.kt
+  commonMain/androidx/compose/foundation/Indication.kt
+  commonMain/androidx/compose/foundation/InternalFoundationApi.kt
+  commonMain/androidx/compose/foundation/MutatorMutex.kt
+  commonMain/androidx/compose/foundation/gestures/DragGestureDetector.kt
+  commonMain/androidx/compose/foundation/gestures/ForEachGesture.kt
+  commonMain/androidx/compose/foundation/gestures/Scrollable.kt
+  commonMain/androidx/compose/foundation/gestures/ScrollableState.kt
+  commonMain/androidx/compose/foundation/gestures/TapGestureDetector.kt
+  commonMain/androidx/compose/foundation/gestures/TransformGestureDetector.kt
+  commonMain/androidx/compose/foundation/gestures/Transformable.kt
+  commonMain/androidx/compose/foundation/interaction/Interaction.kt
+  commonMain/androidx/compose/foundation/interaction/InteractionSource.kt
+  commonMain/androidx/compose/foundation/lazy/LazyDsl.kt
+  commonMain/androidx/compose/foundation/lazy/LazyItemScope.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListItemInfo.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListLayoutInfo.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListMeasure.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListMeasureResult.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListMeasuredItem.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListMeasuredItemProvider.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListState.kt
+  commonMain/androidx/compose/foundation/shape/AbsoluteCutCornerShape.kt
+  commonMain/androidx/compose/foundation/shape/CornerBasedShape.kt
+  commonMain/androidx/compose/foundation/shape/CornerSize.kt
+  commonMain/androidx/compose/foundation/shape/CutCornerShape.kt
+  commonMain/androidx/compose/foundation/shape/RoundedCornerShape.kt
+  commonMain/androidx/compose/foundation/text/BasicText.kt
+  commonMain/androidx/compose/foundation/text/BasicTextField.kt
+  commonMain/androidx/compose/foundation/text/CoreTextField.kt
+  commonMain/androidx/compose/foundation/text/InlineTextContent.kt
+  commonMain/androidx/compose/foundation/text/InternalFoundationTextApi.kt
+  commonMain/androidx/compose/foundation/text/KeyboardOptions.kt
+  commonMain/androidx/compose/foundation/text/TextFieldCursor.kt
+  commonMain/androidx/compose/foundation/text/TextFieldDelegate.kt
+  commonMain/androidx/compose/foundation/text/TextFieldPressGestureFilter.kt
+  commonMain/androidx/compose/foundation/text/TextFieldScroll.kt
+  commonMain/androidx/compose/foundation/text/TextFieldSize.kt
+  commonMain/androidx/compose/foundation/text/selection/MultiWidgetSelectionDelegate.kt
+  commonMain/androidx/compose/foundation/text/selection/TextFieldSelectionManager.kt
+
+/*
+ * Copyright 2020 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/foundation/AndroidOverscroll.android.kt
+  androidMain/androidx/compose/foundation/Clickable.android.kt
+  androidMain/androidx/compose/foundation/EdgeEffectCompat.android.kt
+  androidMain/androidx/compose/foundation/Magnifier.android.kt
+  androidMain/androidx/compose/foundation/OverscrollConfiguration.android.kt
+  androidMain/androidx/compose/foundation/PlatformMagnifier.android.kt
+  androidMain/androidx/compose/foundation/lazy/layout/Lazy.android.kt
+  androidMain/androidx/compose/foundation/lazy/layout/PrefetchScheduler.android.kt
+  androidMain/androidx/compose/foundation/text/AndroidCursorHandle.android.kt
+  androidMain/androidx/compose/foundation/text/ContextMenu.android.kt
+  androidMain/androidx/compose/foundation/text/KeyEventHelpers.android.kt
+  androidMain/androidx/compose/foundation/text/KeyMapping.android.kt
+  androidMain/androidx/compose/foundation/text/StringHelpers.android.kt
+  androidMain/androidx/compose/foundation/text/TextPointerIcon.android.kt
+  androidMain/androidx/compose/foundation/text/TouchMode.android.kt
+  androidMain/androidx/compose/foundation/text/selection/AndroidSelectionHandles.android.kt
+  androidMain/androidx/compose/foundation/text/selection/SelectionManager.android.kt
+  androidMain/androidx/compose/foundation/text/selection/TextFieldSelectionManager.android.kt
+  commonMain/androidx/compose/foundation/DarkTheme.kt
+  commonMain/androidx/compose/foundation/Expect.kt
+  commonMain/androidx/compose/foundation/Hoverable.kt
+  commonMain/androidx/compose/foundation/Overscroll.kt
+  commonMain/androidx/compose/foundation/gestures/FlingBehavior.kt
+  commonMain/androidx/compose/foundation/gestures/Orientation.kt
+  commonMain/androidx/compose/foundation/gestures/ScrollExtensions.kt
+  commonMain/androidx/compose/foundation/gestures/TransformableState.kt
+  commonMain/androidx/compose/foundation/interaction/DragInteraction.kt
+  commonMain/androidx/compose/foundation/interaction/FocusInteraction.kt
+  commonMain/androidx/compose/foundation/interaction/HoverInteraction.kt
+  commonMain/androidx/compose/foundation/interaction/PressInteraction.kt
+  commonMain/androidx/compose/foundation/lazy/LazyItemScopeImpl.kt
+  commonMain/androidx/compose/foundation/lazy/LazyList.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListIntervalContent.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListItemProvider.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListScrollPosition.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListScrollScope.kt
+  commonMain/androidx/compose/foundation/lazy/LazyScopeMarker.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGrid.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridIntervalContent.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridItemProvider.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridItemScopeImpl.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridMeasure.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridMeasureResult.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridMeasuredLine.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridMeasuredLineProvider.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridScopeMarker.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridScrollPosition.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridScrollScope.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridSpanLayoutProvider.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazySemantics.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayout.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutItemContentFactory.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutItemProvider.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutMeasureScope.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutPrefetchState.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridScrollScope.kt
+  commonMain/androidx/compose/foundation/platform/Synchronization.kt
+  commonMain/androidx/compose/foundation/relocation/BringIntoViewRequester.kt
+  commonMain/androidx/compose/foundation/relocation/BringIntoViewResponder.kt
+  commonMain/androidx/compose/foundation/selection/SelectableGroup.kt
+  commonMain/androidx/compose/foundation/shape/AbsoluteRoundedCornerShape.kt
+  commonMain/androidx/compose/foundation/text/ClickableText.kt
+  commonMain/androidx/compose/foundation/text/CommonContextMenuArea.kt
+  commonMain/androidx/compose/foundation/text/ContextMenu.kt
+  commonMain/androidx/compose/foundation/text/KeyCommand.kt
+  commonMain/androidx/compose/foundation/text/KeyEventHelpers.kt
+  commonMain/androidx/compose/foundation/text/KeyMapping.kt
+  commonMain/androidx/compose/foundation/text/KeyboardActionRunner.kt
+  commonMain/androidx/compose/foundation/text/KeyboardActions.kt
+  commonMain/androidx/compose/foundation/text/LongPressTextDragObserver.kt
+  commonMain/androidx/compose/foundation/text/StringHelpers.kt
+  commonMain/androidx/compose/foundation/text/TextFieldGestureModifiers.kt
+  commonMain/androidx/compose/foundation/text/TextFieldKeyInput.kt
+  commonMain/androidx/compose/foundation/text/TextLayoutResultProxy.kt
+  commonMain/androidx/compose/foundation/text/TextPointerIcon.kt
+  commonMain/androidx/compose/foundation/text/TouchMode.kt
+  commonMain/androidx/compose/foundation/text/UndoManager.kt
+  commonMain/androidx/compose/foundation/text/selection/Selectable.kt
+  commonMain/androidx/compose/foundation/text/selection/Selection.kt
+  commonMain/androidx/compose/foundation/text/selection/SelectionAdjustment.kt
+  commonMain/androidx/compose/foundation/text/selection/SelectionContainer.kt
+  commonMain/androidx/compose/foundation/text/selection/SelectionHandles.kt
+  commonMain/androidx/compose/foundation/text/selection/SelectionMagnifier.kt
+  commonMain/androidx/compose/foundation/text/selection/SelectionManager.kt
+  commonMain/androidx/compose/foundation/text/selection/SelectionRegistrar.kt
+  commonMain/androidx/compose/foundation/text/selection/SelectionRegistrarImpl.kt
+  commonMain/androidx/compose/foundation/text/selection/SimpleLayout.kt
+  commonMain/androidx/compose/foundation/text/selection/TextPreparedSelection.kt
+  commonMain/androidx/compose/foundation/text/selection/TextSelectionColors.kt
+  jvmAndAndroidMain/androidx/compose/foundation/text/UndoManager.jvmAndAndroid.kt
+
+/*
+ * Copyright 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/foundation/ExcludeFromSystemGesture.android.kt
+  androidMain/androidx/compose/foundation/SystemGestureExclusion.android.kt
+  androidMain/androidx/compose/foundation/text/DeadKeyCombiner.android.kt
+  androidMain/androidx/compose/foundation/text/TextFieldFocusModifier.android.kt
+  commonMain/androidx/compose/foundation/BasicMarquee.kt
+  commonMain/androidx/compose/foundation/CheckScrollableContainerConstraints.kt
+  commonMain/androidx/compose/foundation/ClipScrollableContainer.kt
+  commonMain/androidx/compose/foundation/FocusedBounds.kt
+  commonMain/androidx/compose/foundation/gestures/AnchoredDraggable.kt
+  commonMain/androidx/compose/foundation/gestures/BringIntoViewRequestPriorityQueue.kt
+  commonMain/androidx/compose/foundation/gestures/ContentInViewNode.kt
+  commonMain/androidx/compose/foundation/gestures/UpdatableAnimationState.kt
+  commonMain/androidx/compose/foundation/gestures/snapping/LazyGridSnapLayoutInfoProvider.kt
+  commonMain/androidx/compose/foundation/gestures/snapping/LazyListSnapLayoutInfoProvider.kt
+  commonMain/androidx/compose/foundation/gestures/snapping/SnapFlingBehavior.kt
+  commonMain/androidx/compose/foundation/gestures/snapping/SnapLayoutInfoProvider.kt
+  commonMain/androidx/compose/foundation/internal/JvmDefaultWithCompatibility.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListBeyondBoundsModifier.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridDsl.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridItemInfo.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridItemScope.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridLayoutInfo.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridMeasuredItem.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridMeasuredItemProvider.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridSpan.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridState.kt
+  commonMain/androidx/compose/foundation/lazy/layout/IntervalList.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutKeyIndexMap.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutScrollScope.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutSemantics.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazySaveableStateHolder.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGrid.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridCells.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridDsl.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridIntervalContent.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridItemProvider.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridItemScope.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridLaneInfo.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridMeasure.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridMeasurePolicy.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridMeasureResult.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridScrollPosition.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridSemantics.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridSpan.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridState.kt
+  commonMain/androidx/compose/foundation/text/AnnotatedStringResolveInlineContent.kt
+  commonMain/androidx/compose/foundation/text/DeadKeyCombiner.kt
+  commonMain/androidx/compose/foundation/text/PointerMoveDetector.kt
+  commonMain/androidx/compose/foundation/text/TextFieldFocusModifier.kt
+  commonMain/androidx/compose/foundation/text/ValidatingOffsetMapping.kt
+  jvmAndAndroidMain/androidx/compose/foundation/ActualJvm.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/foundation/internal/JvmDefaultWithCompatibility.jvmAndAndroid.kt
+
+/*
+ * Copyright 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/foundation/AndroidExternalSurface.android.kt
+  androidMain/androidx/compose/foundation/BasicTooltip.android.kt
+  androidMain/androidx/compose/foundation/PreferKeepClear.android.kt
+  androidMain/androidx/compose/foundation/RectListNode.android.kt
+  androidMain/androidx/compose/foundation/draganddrop/AndroidDragAndDropSource.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/CursorAnchorInfoBuilder.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/CursorAnchorInfoController.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/EditorInfo.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/InputEventCallback2.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/InputMethodManager.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/LegacyCursorAnchorInfoBuilder.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/LegacyCursorAnchorInfoController.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/LegacyPlatformTextInputServiceAdapter.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/RecordingInputConnection.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/TextFieldDragAndDropNode.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/ToCharArray.android.kt
+  commonMain/androidx/compose/foundation/BasicTooltip.kt
+  commonMain/androidx/compose/foundation/ScrollableArea.kt
+  commonMain/androidx/compose/foundation/gestures/Draggable2D.kt
+  commonMain/androidx/compose/foundation/gestures/snapping/SnapPosition.kt
+  commonMain/androidx/compose/foundation/internal/InlineClassHelper.kt
+  commonMain/androidx/compose/foundation/lazy/LazyLayoutSemanticState.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListPrefetchStrategy.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListSemantics.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridBeyondBoundsModifier.kt
+  commonMain/androidx/compose/foundation/lazy/layout/AwaitFirstLayoutModifier.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutBeyondBoundsInfo.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutBeyondBoundsModifierLocal.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutBeyondBoundsState.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutIntervalContent.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutNearestRangeState.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutPinnableItem.kt
+  commonMain/androidx/compose/foundation/lazy/layout/ObservableScopeInvalidator.kt
+  commonMain/androidx/compose/foundation/lazy/layout/PrefetchScheduler.kt
+  commonMain/androidx/compose/foundation/lazy/staggeredgrid/LazyStaggeredGridBeyondBoundsModifier.kt
+  commonMain/androidx/compose/foundation/pager/LazyLayoutPager.kt
+  commonMain/androidx/compose/foundation/pager/LazyLayoutSemanticState.kt
+  commonMain/androidx/compose/foundation/pager/MeasuredPage.kt
+  commonMain/androidx/compose/foundation/pager/PageInfo.kt
+  commonMain/androidx/compose/foundation/pager/PageSize.kt
+  commonMain/androidx/compose/foundation/pager/Pager.kt
+  commonMain/androidx/compose/foundation/pager/PagerBeyondBoundsModifier.kt
+  commonMain/androidx/compose/foundation/pager/PagerLayoutInfo.kt
+  commonMain/androidx/compose/foundation/pager/PagerMeasure.kt
+  commonMain/androidx/compose/foundation/pager/PagerMeasurePolicy.kt
+  commonMain/androidx/compose/foundation/pager/PagerMeasureResult.kt
+  commonMain/androidx/compose/foundation/pager/PagerScope.kt
+  commonMain/androidx/compose/foundation/pager/PagerScrollPosition.kt
+  commonMain/androidx/compose/foundation/pager/PagerScrollScope.kt
+  commonMain/androidx/compose/foundation/pager/PagerSemantics.kt
+  commonMain/androidx/compose/foundation/pager/PagerSnapDistance.kt
+  commonMain/androidx/compose/foundation/pager/PagerState.kt
+  commonMain/androidx/compose/foundation/text/BasicSecureTextField.kt
+  commonMain/androidx/compose/foundation/text/TextLinkScope.kt
+  commonMain/androidx/compose/foundation/text/input/KeyboardActionHandler.kt
+  commonMain/androidx/compose/foundation/text/input/internal/CodepointHelpers.kt
+  commonMain/androidx/compose/foundation/text/input/internal/CursorAnimationState.kt
+  commonMain/androidx/compose/foundation/text/input/internal/LegacyAdaptingPlatformTextInputModifierNode.kt
+  commonMain/androidx/compose/foundation/text/input/internal/LegacyPlatformTextInputServiceAdapter.kt
+  commonMain/androidx/compose/foundation/text/input/internal/MathUtils.kt
+  commonMain/androidx/compose/foundation/text/input/internal/TextFieldDragAndDropNode.kt
+  commonMain/androidx/compose/foundation/text/input/internal/ToCharArray.kt
+  commonMain/androidx/compose/foundation/text/input/internal/selection/PressDownGesture.kt
+  commonMain/androidx/compose/foundation/text/input/internal/selection/TextFieldHandleState.kt
+  commonMain/androidx/compose/foundation/text/input/internal/selection/TextFieldMagnifier.kt
+  commonMain/androidx/compose/foundation/text/input/internal/selection/TextFieldSelectionState.kt
+  commonMain/androidx/compose/foundation/text/input/internal/selection/TextPreparedSelection.kt
+  commonMain/androidx/compose/foundation/text/input/internal/undo/TextUndoOperation.kt
+  commonMain/androidx/compose/foundation/text/input/internal/undo/UndoManager.kt
+  commonMain/androidx/compose/foundation/text/modifiers/InlineDensity.kt
+  commonMain/androidx/compose/foundation/text/modifiers/LayoutUtils.kt
+  commonMain/androidx/compose/foundation/text/modifiers/MinLinesConstrainer.kt
+  commonMain/androidx/compose/foundation/text/modifiers/ModifierUtils.kt
+  commonMain/androidx/compose/foundation/text/modifiers/MultiParagraphLayoutCache.kt
+  commonMain/androidx/compose/foundation/text/modifiers/ParagraphLayoutCache.kt
+  commonMain/androidx/compose/foundation/text/modifiers/SelectableTextAnnotatedStringElement.kt
+  commonMain/androidx/compose/foundation/text/modifiers/SelectableTextAnnotatedStringNode.kt
+  commonMain/androidx/compose/foundation/text/modifiers/SelectionController.kt
+  commonMain/androidx/compose/foundation/text/modifiers/TextAnnotatedStringElement.kt
+  commonMain/androidx/compose/foundation/text/modifiers/TextAnnotatedStringNode.kt
+  commonMain/androidx/compose/foundation/text/modifiers/TextStringSimpleElement.kt
+  commonMain/androidx/compose/foundation/text/modifiers/TextStringSimpleNode.kt
+  commonMain/androidx/compose/foundation/text/selection/SelectionGestures.kt
+  commonMain/androidx/compose/foundation/text/selection/SelectionLayout.kt
+  jvmAndAndroidMain/androidx/compose/foundation/text/input/internal/CodepointHelpers.jvmAndAndroid.kt
+
+/*
+ * Copyright 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/foundation/draganddrop/DragAndDropSource.kt
+  commonMain/androidx/compose/foundation/draganddrop/DragAndDropTarget.kt
+
+/*
+ * Copyright 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/foundation/content/MediaType.android.kt
+  androidMain/androidx/compose/foundation/content/TransferableContent.android.kt
+  androidMain/androidx/compose/foundation/content/internal/DragAndDropRequestPermission.android.kt
+  androidMain/androidx/compose/foundation/content/internal/ReceiveContentDragAndDropNode.android.kt
+  androidMain/androidx/compose/foundation/contextmenu/ContextMenuUi.android.kt
+  androidMain/androidx/compose/foundation/draganddrop/LegacyDragAndDropSource.android.kt
+  androidMain/androidx/compose/foundation/draganddrop/LegacyDragAndDropSourceWithDefaultPainter.android.kt
+  androidMain/androidx/compose/foundation/gestures/BringIntoViewSpec.android.kt
+  androidMain/androidx/compose/foundation/gestures/TapGestureDetector.android.kt
+  androidMain/androidx/compose/foundation/internal/ClipboardUtils.android.kt
+  androidMain/androidx/compose/foundation/platform/Synchronization.android.kt
+  androidMain/androidx/compose/foundation/text/AutofillHighlight.android.kt
+  androidMain/androidx/compose/foundation/text/BasicText.android.kt
+  androidMain/androidx/compose/foundation/text/TextFieldCursor.android.kt
+  androidMain/androidx/compose/foundation/text/TextFieldScroll.android.kt
+  androidMain/androidx/compose/foundation/text/contextmenu/data/TextContextMenuData.android.kt
+  androidMain/androidx/compose/foundation/text/handwriting/HandwritingDetector.android.kt
+  androidMain/androidx/compose/foundation/text/handwriting/HandwritingHandler.android.kt
+  androidMain/androidx/compose/foundation/text/handwriting/StylusHandwriting.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/AndroidTextInputSession.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/ComposeInputMethodManager.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/HandwritingGesture.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/ImeEditCommand.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/StatelessInputConnection.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/TextFieldKeyEventHandler.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/TextFieldLayoutStateCache.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/TextInputSession.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/selection/AndroidTextFieldMagnifier.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/selection/TextFieldSelectionState.android.kt
+  commonMain/androidx/compose/foundation/ComposeFoundationFlags.kt
+  commonMain/androidx/compose/foundation/content/MediaType.kt
+  commonMain/androidx/compose/foundation/content/ReceiveContent.kt
+  commonMain/androidx/compose/foundation/content/ReceiveContentListener.kt
+  commonMain/androidx/compose/foundation/content/TransferableContent.kt
+  commonMain/androidx/compose/foundation/content/internal/DragAndDropRequestPermission.kt
+  commonMain/androidx/compose/foundation/content/internal/ReceiveContentConfiguration.kt
+  commonMain/androidx/compose/foundation/content/internal/ReceiveContentDragAndDropNode.kt
+  commonMain/androidx/compose/foundation/contextmenu/ContextMenuArea.kt
+  commonMain/androidx/compose/foundation/contextmenu/ContextMenuGestures.kt
+  commonMain/androidx/compose/foundation/contextmenu/ContextMenuState.kt
+  commonMain/androidx/compose/foundation/contextmenu/ContextMenuUi.kt
+  commonMain/androidx/compose/foundation/gestures/BringIntoViewSpec.kt
+  commonMain/androidx/compose/foundation/gestures/MouseWheelScrollingLogic.kt
+  commonMain/androidx/compose/foundation/gestures/TargetedFlingBehavior.kt
+  commonMain/androidx/compose/foundation/gestures/snapping/PagerSnapLayoutInfoProvider.kt
+  commonMain/androidx/compose/foundation/internal/ClipboardUtils.kt
+  commonMain/androidx/compose/foundation/internal/PlatformOptimizedCancellationException.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridPrefetchStrategy.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutItemAnimation.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutItemAnimator.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutMeasuredItem.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutScrollDeltaBetweenPasses.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutStickyItems.kt
+  commonMain/androidx/compose/foundation/text/AutofillHighlight.kt
+  commonMain/androidx/compose/foundation/text/ClipboardEventsHandler.kt
+  commonMain/androidx/compose/foundation/text/LinkStateInteractionSourceObserver.kt
+  commonMain/androidx/compose/foundation/text/TextAutoSize.kt
+  commonMain/androidx/compose/foundation/text/contextmenu/builder/TextContextMenuBuilderScope.kt
+  commonMain/androidx/compose/foundation/text/contextmenu/data/TextContextMenuData.kt
+  commonMain/androidx/compose/foundation/text/contextmenu/modifier/TextContextMenuModifier.kt
+  commonMain/androidx/compose/foundation/text/contextmenu/provider/TextContextMenuProvider.kt
+  commonMain/androidx/compose/foundation/text/handwriting/StylusHandwriting.kt
+  commonMain/androidx/compose/foundation/text/input/InputTransformation.kt
+  commonMain/androidx/compose/foundation/text/input/OutputTransformation.kt
+  commonMain/androidx/compose/foundation/text/input/TextFieldBuffer.kt
+  commonMain/androidx/compose/foundation/text/input/TextFieldCharSequence.kt
+  commonMain/androidx/compose/foundation/text/input/TextFieldDecorator.kt
+  commonMain/androidx/compose/foundation/text/input/TextFieldLineLimits.kt
+  commonMain/androidx/compose/foundation/text/input/TextFieldState.kt
+  commonMain/androidx/compose/foundation/text/input/TextObfuscationMode.kt
+  commonMain/androidx/compose/foundation/text/input/TextUndoManager.kt
+  commonMain/androidx/compose/foundation/text/input/UndoState.kt
+  commonMain/androidx/compose/foundation/text/input/internal/ChangeTracker.kt
+  commonMain/androidx/compose/foundation/text/input/internal/CodepointTransformation.kt
+  commonMain/androidx/compose/foundation/text/input/internal/GapBuffer.kt
+  commonMain/androidx/compose/foundation/text/input/internal/OffsetMappingCalculator.kt
+  commonMain/androidx/compose/foundation/text/input/internal/TextFieldCoreModifier.kt
+  commonMain/androidx/compose/foundation/text/input/internal/TextFieldDecoratorModifier.kt
+  commonMain/androidx/compose/foundation/text/input/internal/TextFieldKeyEventHandler.kt
+  commonMain/androidx/compose/foundation/text/input/internal/TextFieldLayoutStateCache.kt
+  commonMain/androidx/compose/foundation/text/input/internal/TextFieldTextLayoutModifier.kt
+  commonMain/androidx/compose/foundation/text/input/internal/TextLayoutState.kt
+  commonMain/androidx/compose/foundation/text/input/internal/TransformedTextFieldState.kt
+  commonMain/androidx/compose/foundation/text/modifiers/TextAutoSizeLayoutScope.kt
+  jvmAndAndroidMain/androidx/compose/foundation/internal/PlatformOptimizedCancellationException.jvmAndAndroid.kt
+
+/*
+ * Copyright 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/foundation/gestures/Scrollable.android.kt
+  androidMain/androidx/compose/foundation/internal/PlatformUtils.android.kt
+  androidMain/androidx/compose/foundation/lazy/LazyList.android.kt
+  androidMain/androidx/compose/foundation/text/BasicSecureTextField.android.kt
+  androidMain/androidx/compose/foundation/text/ContextMenuIcons.android.kt
+  androidMain/androidx/compose/foundation/text/ContextMenuStrings.android.kt
+  androidMain/androidx/compose/foundation/text/TextFieldPointerModifier.android.kt
+  androidMain/androidx/compose/foundation/text/contextmenu/ProcessText.android.kt
+  androidMain/androidx/compose/foundation/text/contextmenu/builder/TextContextMenuBuilderScope.android.kt
+  androidMain/androidx/compose/foundation/text/contextmenu/internal/AndroidTextContextMenuToolbarProvider.android.kt
+  androidMain/androidx/compose/foundation/text/contextmenu/internal/DefaultTextContextMenuDropdownProvider.android.kt
+  androidMain/androidx/compose/foundation/text/contextmenu/internal/PlatformDefaultTextContextMenuProviders.android.kt
+  androidMain/androidx/compose/foundation/text/contextmenu/internal/TextContextMenuTextClassificationHelper.android.kt
+  androidMain/androidx/compose/foundation/text/contextmenu/modifier/TextContextMenuModifier.android.kt
+  androidMain/androidx/compose/foundation/text/modifiers/SelectionController.android.kt
+  androidMain/androidx/compose/foundation/text/selection/DefaultTextSelectionColors.android.kt
+  androidMain/androidx/compose/foundation/text/selection/PlatformSelectionBehaviors.android.kt
+  androidMain/androidx/compose/foundation/text/selection/SelectionGestures.android.kt
+  commonMain/androidx/compose/foundation/ScrollIndicator.kt
+  commonMain/androidx/compose/foundation/contextmenu/ContextMenuPopupPositionProvider.kt
+  commonMain/androidx/compose/foundation/gestures/IndirectPointerInputDragCycleDetector.kt
+  commonMain/androidx/compose/foundation/gestures/Scrollable2D.kt
+  commonMain/androidx/compose/foundation/gestures/Scrollable2DState.kt
+  commonMain/androidx/compose/foundation/internal/PlatformUtils.kt
+  commonMain/androidx/compose/foundation/lazy/LazyListCacheWindowStrategy.kt
+  commonMain/androidx/compose/foundation/lazy/grid/LazyGridCacheWindowStrategy.kt
+  commonMain/androidx/compose/foundation/lazy/layout/CacheWindowLogic.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutCacheWindow.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutMeasurePolicy.kt
+  commonMain/androidx/compose/foundation/pager/PagerCacheWindowLogic.kt
+  commonMain/androidx/compose/foundation/style/ResolvedStyle.kt
+  commonMain/androidx/compose/foundation/style/StyleScope.kt
+  commonMain/androidx/compose/foundation/style/StyleState.kt
+  commonMain/androidx/compose/foundation/text/ContextMenuIcons.kt
+  commonMain/androidx/compose/foundation/text/ContextMenuStrings.kt
+  commonMain/androidx/compose/foundation/text/TextFieldPointerModifier.common.kt
+  commonMain/androidx/compose/foundation/text/contextmenu/gestures/RightClickGestures.kt
+  commonMain/androidx/compose/foundation/text/contextmenu/internal/ProvideDefaultPlatformTextContextMenuProviders.kt
+  commonMain/androidx/compose/foundation/text/contextmenu/modifier/TextContextMenuGesturesModifier.kt
+  commonMain/androidx/compose/foundation/text/contextmenu/modifier/TextContextMenuToolbarHandlerModifier.kt
+  commonMain/androidx/compose/foundation/text/contextmenu/provider/BasicTextContextMenuProvider.kt
+  commonMain/androidx/compose/foundation/text/input/internal/CoreTextFieldSemanticsModifier.kt
+  commonMain/androidx/compose/foundation/text/input/internal/DragAndDropHoverInteraction.kt
+  commonMain/androidx/compose/foundation/text/modifiers/TextStyleProviderNode.kt
+  commonMain/androidx/compose/foundation/text/selection/PlatformSelectionBehaviors.kt
+  commonMain/androidx/compose/foundation/text/selection/SelectionHelpers.kt
+  jvmAndAndroidMain/androidx/compose/foundation/text/ClipboardEventsHandler.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/foundation/text/StringsHelpers.jvmAndAndroid.kt
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/foundation/ComposeFoundationFlags.android.kt
+  androidMain/androidx/compose/foundation/text/BasicTextField.android.kt
+  androidMain/androidx/compose/foundation/text/CoreTextField.android.kt
+  androidMain/androidx/compose/foundation/text/input/internal/TextFieldCoreModifier.android.kt
+  commonMain/androidx/compose/foundation/GestureNode.kt
+  commonMain/androidx/compose/foundation/border/BorderLogic.kt
+  commonMain/androidx/compose/foundation/gestures/AbstractScrollableNode.kt
+  commonMain/androidx/compose/foundation/gestures/DifferentialVelocityTracker.kt
+  commonMain/androidx/compose/foundation/gestures/NonTouchScrollingLogic.kt
+  commonMain/androidx/compose/foundation/gestures/TrackpadScrollingLogic.kt
+  commonMain/androidx/compose/foundation/internal/System.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutAnimateItemModifier.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutBringIntoViewSpec.kt
+  commonMain/androidx/compose/foundation/lazy/layout/LazyLayoutItemAnimatorModifier.kt
+  commonMain/androidx/compose/foundation/style/ExperimentalFoundationStyleApi.kt
+  commonMain/androidx/compose/foundation/style/Style.kt
+  commonMain/androidx/compose/foundation/style/StyleAnimations.kt
+  commonMain/androidx/compose/foundation/style/StyleModifier.kt
+  commonMain/androidx/compose/foundation/style/StyleProperties.kt
+  commonMain/androidx/compose/foundation/text/KeyModifiers.kt
+  commonMain/androidx/compose/foundation/text/input/TextFieldTextStyles.kt
+  commonMain/androidx/compose/foundation/text/input/TrackedRange.kt
+  commonMain/androidx/compose/foundation/text/input/internal/IntIntervalTree.kt
+  commonMain/androidx/compose/foundation/text/input/internal/Interval.kt
+  commonMain/androidx/compose/foundation/text/input/internal/TextStyleBuffer.kt
+  commonMain/androidx/compose/foundation/text/modifiers/SelectionModifierElement.kt
+  commonMain/androidx/compose/foundation/text/modifiers/SelectionModifierNode.kt
+  commonMain/androidx/compose/foundation/text/selection/SelectionState.kt
+  jvmAndAndroidMain/androidx/compose/foundation/internal/System.jvmAndAndroid.kt
+
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/foundation/text/HeightInLinesModifier.kt
+  commonMain/androidx/compose/foundation/text/TextFieldDefaultSizeModifier.kt
+
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */

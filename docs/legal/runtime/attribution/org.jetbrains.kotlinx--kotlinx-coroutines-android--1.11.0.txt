@@ -1,0 +1,2 @@
+Published source archive: https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-android/1.11.0/kotlinx-coroutines-android-1.11.0-sources.jar
+Source archive SHA-256: d2760d65fc99c28d140b345163560926975cfe6ca36386c8964041f86eb2f4b6

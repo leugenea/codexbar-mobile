@@ -1,0 +1,131 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-unit-android/1.12.1/ui-unit-android-1.12.1-sources.jar
+Source archive SHA-256: c6e2ea6314bfc45e27c5f28fda333afe2ed76748a004eec95f86cbdab099a6ff
+
+Source members:
+  commonMain/androidx/compose/ui/unit/Dp.kt
+
+/*
+ * Copyright 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/ui/unit/Constraints.kt
+  commonMain/androidx/compose/ui/unit/Density.kt
+  commonMain/androidx/compose/ui/unit/TextUnit.kt
+  commonMain/androidx/compose/ui/unit/Velocity.kt
+
+/*
+ * Copyright 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/unit/AndroidDensity.android.kt
+  commonMain/androidx/compose/ui/unit/ExperimentalUnitApi.kt
+  commonMain/androidx/compose/ui/unit/IntOffset.kt
+  commonMain/androidx/compose/ui/unit/IntRect.kt
+  commonMain/androidx/compose/ui/unit/IntSize.kt
+  commonMain/androidx/compose/ui/unit/LayoutDirection.kt
+
+/*
+ * Copyright 2020 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/ui/unit/internal/JvmDefaultWithCompatibility.kt
+
+/*
+ * Copyright 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/unit/FontScaling.android.kt
+  androidMain/androidx/compose/ui/unit/fontscaling/FontScaleConverter.android.kt
+  androidMain/androidx/compose/ui/unit/fontscaling/FontScaleConverterFactory.android.kt
+  androidMain/androidx/compose/ui/unit/fontscaling/FontScaleConverterTable.android.kt
+  androidMain/androidx/compose/ui/unit/fontscaling/MathUtils.android.kt
+  commonMain/androidx/compose/ui/unit/FontScaling.kt
+  commonMain/androidx/compose/ui/unit/InlineClassHelper.kt
+
+/*
+ * Copyright 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/ui/unit/ComposeUiUnitFlags.kt
+  jvmAndAndroidMain/androidx/compose/ui/unit/internal/JvmDefaultWithCompatibility.jvmAndAndroid.kt
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */

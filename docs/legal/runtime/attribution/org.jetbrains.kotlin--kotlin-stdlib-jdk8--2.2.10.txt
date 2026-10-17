@@ -1,0 +1,2 @@
+Published source archive: https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/2.2.10/kotlin-stdlib-jdk8-2.2.10-sources.jar
+Source archive SHA-256: 3cb6895054a0985bba591c165503fe4dd63a215af53263b67a071ccdc242bf6e

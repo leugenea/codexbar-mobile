@@ -1,3 +1,9 @@
 gradlew -text
 gradlew.bat -text
 gradle/wrapper/gradle-wrapper.jar binary
+
+# Preserve byte-identical upstream legal copies and their catalog hashes.
+# The LLVM license has a final blank line; the PSL license has trailing space.
+# Exempt only those whitespace categories on these two exact paths.
+docs/legal/runtime/graphics/LLVM-License-and-exceptions.txt whitespace=-blank-at-eof
+docs/legal/runtime/psl/PublicSuffixList-LICENSE.txt whitespace=-blank-at-eol

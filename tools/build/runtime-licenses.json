@@ -1,0 +1,2790 @@
+{
+  "components": [
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.concurrent--concurrent-futures--1.1.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "882baf86144215cefb53db68e59e7f9bb8c1301158163e5bca8eea4522c3c920",
+          "size": 1092,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures/1.1.0/concurrent-futures-1.1.0-sources.jar"
+        }
+      ],
+      "id": "androidx.concurrent:concurrent-futures:1.1.0",
+      "license": "Apache-2.0",
+      "name": "androidx.concurrent:concurrent-futures",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "cc06fb6045a6c066f50e237a3c2126bc88c16d358a57b3612ba633c9f530b0a0",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures/1.1.0/concurrent-futures-1.1.0-sources.jar"
+      },
+      "version": "1.1.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/com.google.guava--listenablefuture--1.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "72c67c0b9ceb923bc5be9c4a626baee776ffcf06ce1b40448abcf35605ebe912",
+          "size": 894,
+          "source": "https://repo.maven.apache.org/maven2/com/google/guava/listenablefuture/1.0/listenablefuture-1.0-sources.jar"
+        }
+      ],
+      "id": "com.google.guava:listenablefuture:1.0",
+      "license": "Apache-2.0",
+      "name": "com.google.guava:listenablefuture",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "3d1bd8d4a39b293612a40e547ec51d9ce34fa638d7adeae83871cdbe2923b161",
+        "url": "https://repo.maven.apache.org/maven2/com/google/guava/listenablefuture/1.0/listenablefuture-1.0-sources.jar"
+      },
+      "version": "1.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.activity--activity-compose--1.13.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "d66697a34a1aaf996b5e0cb6278ce678a3908c74f49a82a31c3b98996a30d235",
+          "size": 3868,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/activity/activity-compose/1.13.0/activity-compose-1.13.0-sources.jar"
+        }
+      ],
+      "id": "androidx.activity:activity-compose:1.13.0",
+      "license": "Apache-2.0",
+      "name": "androidx.activity:activity-compose",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "968cda8fb2bf4c80f952b442d05657773e6e373507700e621d1092d43b6751c5",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/activity/activity-compose/1.13.0/activity-compose-1.13.0-sources.jar"
+      },
+      "version": "1.13.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.activity--activity-ktx--1.13.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "9ab130bf7ff070a2eb1a34c6ea52a9b580ef427b9d8c22d6ac18effb45c45eca",
+          "size": 225,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/activity/activity-ktx/1.13.0/activity-ktx-1.13.0-sources.jar"
+        }
+      ],
+      "id": "androidx.activity:activity-ktx:1.13.0",
+      "license": "Apache-2.0",
+      "name": "androidx.activity:activity-ktx",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "e3201cf6c56fade2fc70e2f70408260992b83ddf0ccf4b69221a98ae26c02d74",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/activity/activity-ktx/1.13.0/activity-ktx-1.13.0-sources.jar"
+      },
+      "version": "1.13.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.activity--activity--1.13.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "046bede60b293c59278ef078458177a908fe27240b0cbbd324aa015d426467c7",
+          "size": 6709,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/activity/activity/1.13.0/activity-1.13.0-sources.jar"
+        }
+      ],
+      "id": "androidx.activity:activity:1.13.0",
+      "license": "Apache-2.0",
+      "name": "androidx.activity:activity",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "c7cf1b2e315e08867b10ef4505945d1993d90281445c65b929e81b9420216ce9",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/activity/activity/1.13.0/activity-1.13.0-sources.jar"
+      },
+      "version": "1.13.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.annotation--annotation-experimental--1.4.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "a88de7fe628467b9f51c505688e9046fccd5e7e736489b758b9235f0a135994a",
+          "size": 1690,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-experimental/1.4.1/annotation-experimental-1.4.1-sources.jar"
+        }
+      ],
+      "id": "androidx.annotation:annotation-experimental:1.4.1",
+      "license": "Apache-2.0",
+      "name": "androidx.annotation:annotation-experimental",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "783a221a7c1093ff8932053998a69a24489f7930806a32b55366108146d29c1d",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-experimental/1.4.1/annotation-experimental-1.4.1-sources.jar"
+      },
+      "version": "1.4.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.annotation--annotation-jvm--1.10.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "1662d3e2c92c4a942ad91cdc4ae3bcad0e1cddc3b72ef6beea5328576ea88b3b",
+          "size": 12589,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.10.0/annotation-jvm-1.10.0-sources.jar"
+        }
+      ],
+      "id": "androidx.annotation:annotation-jvm:1.10.0",
+      "license": "Apache-2.0",
+      "name": "androidx.annotation:annotation-jvm",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "4f093265c2f99d314a5e161d748100588c49663b098a8a031aa173315c530ef7",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation-jvm/1.10.0/annotation-jvm-1.10.0-sources.jar"
+      },
+      "version": "1.10.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.annotation--annotation--1.10.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "21de97c647fa57c237d57b26abcff77a4de36091be47c733d1d0ce522572ca4f",
+          "size": 6459,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation/1.10.0/annotation-1.10.0-sources.jar"
+        }
+      ],
+      "id": "androidx.annotation:annotation:1.10.0",
+      "license": "Apache-2.0",
+      "name": "androidx.annotation:annotation",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "fdbc7afaa8b82b8270731aa0fbfd6ae80106409033313f192d58e971b377b816",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/annotation/annotation/1.10.0/annotation-1.10.0-sources.jar"
+      },
+      "version": "1.10.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.arch.core--core-common--2.2.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "0de0ce00ccd780c90bc642885f8bf7d439f45721dc33deee7ad4f2a02dd67286",
+          "size": 1002,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-common/2.2.0/core-common-2.2.0-sources.jar"
+        }
+      ],
+      "id": "androidx.arch.core:core-common:2.2.0",
+      "license": "Apache-2.0",
+      "name": "androidx.arch.core:core-common",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "563d430880d847890029234386ef03adb95403c34f3c9dec3a7002e2f4007ae4",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-common/2.2.0/core-common-2.2.0-sources.jar"
+      },
+      "version": "2.2.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.arch.core--core-runtime--2.2.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "235295314257f758fa4b7658c4121bb8601f33fb1470f97253e8e5276278e025",
+          "size": 1017,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-runtime/2.2.0/core-runtime-2.2.0-sources.jar"
+        }
+      ],
+      "id": "androidx.arch.core:core-runtime:2.2.0",
+      "license": "Apache-2.0",
+      "name": "androidx.arch.core:core-runtime",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "4adaab3a8ab711634d566d2e239e199af8b5ac92c1de85540dc34c7040754e96",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/arch/core/core-runtime/2.2.0/core-runtime-2.2.0-sources.jar"
+      },
+      "version": "2.2.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.autofill--autofill--1.0.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "8d35d410a1a4816265d798ee0611438c528d6ec18f26695d12e5242bc8ccef5e",
+          "size": 888,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/autofill/autofill/1.0.0/autofill-1.0.0-sources.jar"
+        }
+      ],
+      "id": "androidx.autofill:autofill:1.0.0",
+      "license": "Apache-2.0",
+      "name": "androidx.autofill:autofill",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "05d18219a30b897f96b2eed2480329ce48da34cfba6416ecfde1289674a1f35f",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/autofill/autofill/1.0.0/autofill-1.0.0-sources.jar"
+      },
+      "version": "1.0.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.collection--collection-jvm--1.5.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "d6c258d6411f832b9215a4b12345fd60aa6bf58ffea08b8e3f1987658ea407ac",
+          "size": 7638,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/collection/collection-jvm/1.5.0/collection-jvm-1.5.0-sources.jar"
+        }
+      ],
+      "id": "androidx.collection:collection-jvm:1.5.0",
+      "license": "Apache-2.0",
+      "name": "androidx.collection:collection-jvm",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "bcc6197ec5fb349e86ae3ba6c94b164d3a9ac5a03d9f9c235d7c4eb24e5878b3",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection-jvm/1.5.0/collection-jvm-1.5.0-sources.jar"
+      },
+      "version": "1.5.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.collection--collection-ktx--1.5.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "11b2f553d00870fe260479ee889eab4f4fffa80ffb22f8a2e9d48047847c9d08",
+          "size": 229,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/collection/collection-ktx/1.5.0/collection-ktx-1.5.0-sources.jar"
+        }
+      ],
+      "id": "androidx.collection:collection-ktx:1.5.0",
+      "license": "Apache-2.0",
+      "name": "androidx.collection:collection-ktx",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "335a9cd93dcb4afab7c4daa34d5d4e24b38443ccef4ae5fffdfd6cf4f718b01e",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/collection/collection-ktx/1.5.0/collection-ktx-1.5.0-sources.jar"
+      },
+      "version": "1.5.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.animation--animation-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "814de5a918962ab9ef68399c2d3476de7c1a43ce2d670dcee3e40d8b61e6c7be",
+          "size": 6914,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/animation/animation-android/1.12.1/animation-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.animation:animation-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.animation:animation-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "4304de567bb8fedb46b266ee3d3b4abfaddf6b7cbb7e6857475ec7b436e47435",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/animation/animation-android/1.12.1/animation-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.animation--animation-core-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "7291f63ca98ccfee7e3614f9f76f864a024f72db4011d9e1b506076f211f8a49",
+          "size": 7510,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/animation/animation-core-android/1.12.1/animation-core-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.animation:animation-core-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.animation:animation-core-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "abe91405f6a604c16f50e66677b584faf2018cc64d236ad23ac0f1c154a89301",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/animation/animation-core-android/1.12.1/animation-core-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.foundation--foundation-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "e84c864a0f391ab0f28ddd70164e458ba778b0ac8dbffb1818961207773aebaf",
+          "size": 42160,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation-android/1.12.1/foundation-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.foundation:foundation-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.foundation:foundation-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "5b58cea5db2583142e4b4b39dce10cbd75722bd06ab35161f06f987be90a53f1",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation-android/1.12.1/foundation-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.foundation--foundation-layout-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "66ec7b3203217b0283fa3387c8ad3fcf21155a6bec496126953e8c806020e273",
+          "size": 8423,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation-layout-android/1.12.1/foundation-layout-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.foundation:foundation-layout-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.foundation:foundation-layout-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "479c11250bf673510788d95e40b971134cdba19599f9d5775d8f14780cfe1b44",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation-layout-android/1.12.1/foundation-layout-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.material3--material3-android--1.4.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "05f05aeb7af77b31b2c1d1c5278cdee15460361a5b0f2b8a69d7d058eafb5e3e",
+          "size": 20619,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-android/1.4.0/material3-android-1.4.0-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.material3:material3-android:1.4.0",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.material3:material3-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "3e3209422a382566a780e2c1410edd866e4474498098fdbcf942c690ade1ddaa",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/material3/material3-android/1.4.0/material3-android-1.4.0-sources.jar"
+      },
+      "version": "1.4.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.material--material-ripple-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "387ba6a67771c66caceaca73e958689ae4d5fc401e46655f0c5dd87ca1931939",
+          "size": 2613,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/material/material-ripple-android/1.12.1/material-ripple-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.material:material-ripple-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.material:material-ripple-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "65b50cad7a19b27d55e319536478069bef9e7b185c55a5363f8660fcef7bab93",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/material/material-ripple-android/1.12.1/material-ripple-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.runtime--runtime-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "642272256df83f8eaf2e0440ec6ce45da5a6e7069c00c5a3e5517b96c3136ba6",
+          "size": 23111,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-android/1.12.1/runtime-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.runtime:runtime-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.runtime:runtime-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "645edc8a6d5054f3de00cb097d3fc1f6d0d8e5a75a0f21cec04cbeb77c57d989",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-android/1.12.1/runtime-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.runtime--runtime-annotation-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "3551a9f4708b13901588534c82af3af283721583e6d73639e25c3922f15f2b7c",
+          "size": 1895,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-android/1.12.1/runtime-annotation-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.runtime:runtime-annotation-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.runtime:runtime-annotation-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "faddbe6240e43542fcccfb4106f15b36494facbd81dc18e58124c1327dfe4fb1",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-annotation-android/1.12.1/runtime-annotation-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.runtime--runtime-retain-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "2a59cc89fbb20dd1fe500ed63ad8b1ea6f392aa5a13e254d7703ee9980401556",
+          "size": 1779,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-retain-android/1.12.1/runtime-retain-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.runtime:runtime-retain-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.runtime:runtime-retain-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "6dab377d2582f7a2b7fcea90dda660ef49f6560081b899bb81e0b597cfa01dfc",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-retain-android/1.12.1/runtime-retain-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.runtime--runtime-saveable-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "8335f9383109fe33c21dbcf96c031661ffbf24346e2d26f87f6d0d34bd7134af",
+          "size": 2774,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-android/1.12.1/runtime-saveable-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.runtime:runtime-saveable-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.runtime:runtime-saveable-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "305dfb9a5cdad3c53ba6297db6f96ca9c0d9f1856f83874ee12cc7fb7d028699",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/runtime/runtime-saveable-android/1.12.1/runtime-saveable-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.ui--ui-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "ecb50019d4fa87827f156fe8afd416a60047a6125bfce58b64cc66e4a80c4f64",
+          "size": 30372,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-android/1.12.1/ui-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.ui:ui-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.ui:ui-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "8ddde80690da97cd840c6f8f59c608701f9e42c245f12f0eabc1434db57e0273",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-android/1.12.1/ui-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.ui--ui-geometry-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "773c82dc98b3cc645e57f3cdea39a2b3ef46de315576aabad650b1c3a6099ae3",
+          "size": 2587,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-geometry-android/1.12.1/ui-geometry-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.ui:ui-geometry-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.ui:ui-geometry-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "8b4ab7f4776d1e1d78fbdde46637bfe51f01e365d13d5253b905bf3f0361b0e0",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-geometry-android/1.12.1/ui-geometry-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.ui--ui-graphics-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "620c9a280cf7abda235034608bd8902ca04e73f9b2fed5da695f1e64824b5c63",
+          "size": 12474,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-graphics-android/1.12.1/ui-graphics-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.ui:ui-graphics-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.ui:ui-graphics-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "f488fa1e995113d6acf9011f66d347f8f0fb12db303460adab72f923de747591",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-graphics-android/1.12.1/ui-graphics-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.ui--ui-text-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "b9fa1fde48607cca0bdc6051ceb2d16ef8d404debf78419f4816250881f49779",
+          "size": 17003,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-text-android/1.12.1/ui-text-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.ui:ui-text-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.ui:ui-text-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "f40f267cc1bbf7315e37916d6baf818dd7791b42db6dc238303a8b48471aa292",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-text-android/1.12.1/ui-text-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.ui--ui-unit-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "0f44af110d3f6520c5311f2c5daffe93da31e37257ffd8e19ba045fff936235e",
+          "size": 5353,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-unit-android/1.12.1/ui-unit-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.ui:ui-unit-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.ui:ui-unit-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "c6e2ea6314bfc45e27c5f28fda333afe2ed76748a004eec95f86cbdab099a6ff",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-unit-android/1.12.1/ui-unit-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.compose.ui--ui-util-android--1.12.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "ba3c78c2069f23652fa0386d030162fe120f03f0291565ec9691fd983e345788",
+          "size": 4003,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-util-android/1.12.1/ui-util-android-1.12.1-sources.jar"
+        }
+      ],
+      "id": "androidx.compose.ui:ui-util-android:1.12.1",
+      "license": "Apache-2.0",
+      "name": "androidx.compose.ui:ui-util-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "78ecea99219f527b216dc744c4188735fdf5755055d0313f6ea78dcb8f060390",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-util-android/1.12.1/ui-util-android-1.12.1-sources.jar"
+      },
+      "version": "1.12.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.concurrent--concurrent-futures-ktx--1.2.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "6336e52138c4599f4790f1945b03ce85bcfbdd550a7570e76bd21587d198cfc6",
+          "size": 13738,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures-ktx/1.2.0/concurrent-futures-ktx-1.2.0-sources.jar"
+        }
+      ],
+      "id": "androidx.concurrent:concurrent-futures-ktx:1.2.0",
+      "license": "Apache-2.0",
+      "name": "androidx.concurrent:concurrent-futures-ktx",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "013580891bea31ace8ba6496bfae09279ef24b10e741ceed6444205fa95454b9",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures-ktx/1.2.0/concurrent-futures-ktx-1.2.0-sources.jar"
+      },
+      "version": "1.2.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.concurrent--concurrent-futures--1.2.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "2930bc2dce28646f7411cf8653da32fb8d27dda42b6526b73a2ed420c90449a3",
+          "size": 1092,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures/1.2.0/concurrent-futures-1.2.0-sources.jar"
+        }
+      ],
+      "id": "androidx.concurrent:concurrent-futures:1.2.0",
+      "license": "Apache-2.0",
+      "name": "androidx.concurrent:concurrent-futures",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "38b32cece3cce08eb0e3fb27595325f57e7a6272f085d74288f08417daf7b04f",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/concurrent/concurrent-futures/1.2.0/concurrent-futures-1.2.0-sources.jar"
+      },
+      "version": "1.2.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.core--core-ktx--1.18.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "572cd2cf6b507f601075c3941f56077225819a2545f544910a8b05c70f653bef",
+          "size": 7420,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/core/core-ktx/1.18.0/core-ktx-1.18.0-sources.jar"
+        }
+      ],
+      "id": "androidx.core:core-ktx:1.18.0",
+      "license": "Apache-2.0",
+      "name": "androidx.core:core-ktx",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "e6b9f543692cc8b0c2a1b1edbb16acf23dde1846e58bb431ac9066f73140221b",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/core/core-ktx/1.18.0/core-ktx-1.18.0-sources.jar"
+      },
+      "version": "1.18.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.core--core-viewtree--1.0.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "a4c318b85363f0ffda32d0d08165b0808401c89947da5744ea09cd44ac479719",
+          "size": 892,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/core/core-viewtree/1.0.0/core-viewtree-1.0.0-sources.jar"
+        }
+      ],
+      "id": "androidx.core:core-viewtree:1.0.0",
+      "license": "Apache-2.0",
+      "name": "androidx.core:core-viewtree",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "7026f2086f667720c43d4ca6bc58ab016d122ae0a404ca94e5fef6a7090e0984",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/core/core-viewtree/1.0.0/core-viewtree-1.0.0-sources.jar"
+      },
+      "version": "1.0.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.core--core--1.18.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "3839693c3dab7dd9631d9125ae0a72272cf49f884be07a550e0b44196dd6c14a",
+          "size": 32821,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/core/core/1.18.0/core-1.18.0-sources.jar"
+        }
+      ],
+      "id": "androidx.core:core:1.18.0",
+      "license": "Apache-2.0",
+      "name": "androidx.core:core",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "986522d59cd0b6b01b67c43ccd5bad9d36368372aeac35003b16942e37a88f4c",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/core/core/1.18.0/core-1.18.0-sources.jar"
+      },
+      "version": "1.18.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.customview--customview-poolingcontainer--1.0.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "5c812c257f2f983dc853064ed5801684f255081c5346c23edab47a310675422d",
+          "size": 948,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/customview/customview-poolingcontainer/1.0.0/customview-poolingcontainer-1.0.0-sources.jar"
+        }
+      ],
+      "id": "androidx.customview:customview-poolingcontainer:1.0.0",
+      "license": "Apache-2.0",
+      "name": "androidx.customview:customview-poolingcontainer",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "0715571baa86e8f7683fcc1d59fe2881c5e8603af9ff212c82423ae098d34c62",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/customview/customview-poolingcontainer/1.0.0/customview-poolingcontainer-1.0.0-sources.jar"
+      },
+      "version": "1.0.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.emoji2--emoji2--1.4.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "56514010f40ef51de61d6e0fc253a193e2540eca3f02223ac45681d093521e59",
+          "size": 2239,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/emoji2/emoji2/1.4.0/emoji2-1.4.0-sources.jar"
+        }
+      ],
+      "id": "androidx.emoji2:emoji2:1.4.0",
+      "license": "Apache-2.0",
+      "name": "androidx.emoji2:emoji2",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "5db44eec9cee653ba403f0e88a02ce41ab6301a0b7dd7cb35fc32f9747f2228b",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/emoji2/emoji2/1.4.0/emoji2-1.4.0-sources.jar"
+      },
+      "version": "1.4.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.graphics--graphics-path--1.0.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "11a6ba07ace7d1f353ccfb78978f372e905e4697ba1ec9ac1dee1f71341b945d",
+          "size": 1663,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/graphics/graphics-path/1.0.1/graphics-path-1.0.1-sources.jar"
+        }
+      ],
+      "id": "androidx.graphics:graphics-path:1.0.1",
+      "license": "Apache-2.0",
+      "name": "androidx.graphics:graphics-path",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "9f1b5995b9577a8876525c3411ebb2a49f9ef0e875f6aec3059e807596dc6ca6",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/graphics/graphics-path/1.0.1/graphics-path-1.0.1-sources.jar"
+      },
+      "version": "1.0.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.interpolator--interpolator--1.0.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "9d497a7dda39c1b24338e01b233a77fdab43134ecba7e7a05af9eeb7cd50c0b8",
+          "size": 1143,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/interpolator/interpolator/1.0.0/interpolator-1.0.0-sources.jar"
+        }
+      ],
+      "id": "androidx.interpolator:interpolator:1.0.0",
+      "license": "Apache-2.0",
+      "name": "androidx.interpolator:interpolator",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "fa13ada71fe7bd9461f622f418e7c16a18e85da7708fb505c75229a9b8830345",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/interpolator/interpolator/1.0.0/interpolator-1.0.0-sources.jar"
+      },
+      "version": "1.0.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.lifecycle--lifecycle-common-java8--2.9.4.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "a0444603798a87bd78acf27681d244183d510e4a211b8c89784d2e8c230877e6",
+          "size": 244,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-java8/2.9.4/lifecycle-common-java8-2.9.4-sources.jar"
+        }
+      ],
+      "id": "androidx.lifecycle:lifecycle-common-java8:2.9.4",
+      "license": "Apache-2.0",
+      "name": "androidx.lifecycle:lifecycle-common-java8",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "895e71679cd319db8140664d650af6695b0530f5896be9b8ecccd24cc4f6674f",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-java8/2.9.4/lifecycle-common-java8-2.9.4-sources.jar"
+      },
+      "version": "2.9.4"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.lifecycle--lifecycle-common-jvm--2.9.4.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "662cd69b365110bd959cee510d42786d9973d27a54afe816a8d7a5e20cd267a8",
+          "size": 3255,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-jvm/2.9.4/lifecycle-common-jvm-2.9.4-sources.jar"
+        }
+      ],
+      "id": "androidx.lifecycle:lifecycle-common-jvm:2.9.4",
+      "license": "Apache-2.0",
+      "name": "androidx.lifecycle:lifecycle-common-jvm",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "5764b2618dfb88b98668e5e84bec8e5af0e0c168d714687a0a3b3591f669846c",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-common-jvm/2.9.4/lifecycle-common-jvm-2.9.4-sources.jar"
+      },
+      "version": "2.9.4"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.lifecycle--lifecycle-livedata-core--2.9.4.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "ab9dbbefb336854693992aced8e616fc1969bde547e941c7c8e6569e92151036",
+          "size": 1661,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-livedata-core/2.9.4/lifecycle-livedata-core-2.9.4-sources.jar"
+        }
+      ],
+      "id": "androidx.lifecycle:lifecycle-livedata-core:2.9.4",
+      "license": "Apache-2.0",
+      "name": "androidx.lifecycle:lifecycle-livedata-core",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "c01b92cdc3d62ca3621ab3ffa98346253c4f6ccfa855bb57d53b654241a01a82",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-livedata-core/2.9.4/lifecycle-livedata-core-2.9.4-sources.jar"
+      },
+      "version": "2.9.4"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.lifecycle--lifecycle-process--2.9.4.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "4a9bdebb74df3a65285c55ff756f9bfb16fb9264efec6539a81166cb248bb554",
+          "size": 1704,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-process/2.9.4/lifecycle-process-2.9.4-sources.jar"
+        }
+      ],
+      "id": "androidx.lifecycle:lifecycle-process:2.9.4",
+      "license": "Apache-2.0",
+      "name": "androidx.lifecycle:lifecycle-process",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "3591d371c62f87ff407b3bc303689b33e1fd813aa5a799d02abbec92b8a4f2b0",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-process/2.9.4/lifecycle-process-2.9.4-sources.jar"
+      },
+      "version": "2.9.4"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.lifecycle--lifecycle-runtime-android--2.9.4.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "6b22fd56c7d71244e39cf682d93dcc87ab0f07e87ea7558f5dcaa797f9898af9",
+          "size": 4617,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-android/2.9.4/lifecycle-runtime-android-2.9.4-sources.jar"
+        }
+      ],
+      "id": "androidx.lifecycle:lifecycle-runtime-android:2.9.4",
+      "license": "Apache-2.0",
+      "name": "androidx.lifecycle:lifecycle-runtime-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "df2a5880a320144ece50e794a75fa45a87802d92a033fd3d283503c07a718b67",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-android/2.9.4/lifecycle-runtime-android-2.9.4-sources.jar"
+      },
+      "version": "2.9.4"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.lifecycle--lifecycle-runtime-compose-android--2.9.4.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "63e68401d4720d84e74d40edf626465904bbef7566cfb7ef0751ae31b7ee6bc2",
+          "size": 2532,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-android/2.9.4/lifecycle-runtime-compose-android-2.9.4-sources.jar"
+        }
+      ],
+      "id": "androidx.lifecycle:lifecycle-runtime-compose-android:2.9.4",
+      "license": "Apache-2.0",
+      "name": "androidx.lifecycle:lifecycle-runtime-compose-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "60f77ad98798c212db32fc534e3e481f7f517b002ab293a31ba36f749dc7e8d1",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-compose-android/2.9.4/lifecycle-runtime-compose-android-2.9.4-sources.jar"
+      },
+      "version": "2.9.4"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.lifecycle--lifecycle-runtime-ktx-android--2.9.4.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "060c855cf7374546a0c9df24757ba7c2cb3aaadd754670fb8c5f1bdd868e3308",
+          "size": 258,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-ktx-android/2.9.4/lifecycle-runtime-ktx-android-2.9.4-sources.jar"
+        }
+      ],
+      "id": "androidx.lifecycle:lifecycle-runtime-ktx-android:2.9.4",
+      "license": "Apache-2.0",
+      "name": "androidx.lifecycle:lifecycle-runtime-ktx-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "c5df5b7bfa9c6d61ef14047bd9de207db688188c0d5d7b5f5c4ad6613806b1fc",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-runtime-ktx-android/2.9.4/lifecycle-runtime-ktx-android-2.9.4-sources.jar"
+      },
+      "version": "2.9.4"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.lifecycle--lifecycle-viewmodel-android--2.9.4.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "2368813b8e6aac19066fab7eb773d26cf5be3fee75889c5fc2ff2735578af571",
+          "size": 7782,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-android/2.9.4/lifecycle-viewmodel-android-2.9.4-sources.jar"
+        }
+      ],
+      "id": "androidx.lifecycle:lifecycle-viewmodel-android:2.9.4",
+      "license": "Apache-2.0",
+      "name": "androidx.lifecycle:lifecycle-viewmodel-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "7fc71221f470885593b974fe086e5b14ee24669a94c010254de1c64fb4c2218d",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-android/2.9.4/lifecycle-viewmodel-android-2.9.4-sources.jar"
+      },
+      "version": "2.9.4"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.lifecycle--lifecycle-viewmodel-ktx--2.9.4.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "c00b6c87f766bfd76908e83e559239d22f0d05703ed479657a8ea9083bcbd50e",
+          "size": 246,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-ktx/2.9.4/lifecycle-viewmodel-ktx-2.9.4-sources.jar"
+        }
+      ],
+      "id": "androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.4",
+      "license": "Apache-2.0",
+      "name": "androidx.lifecycle:lifecycle-viewmodel-ktx",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "f15c9fbd9ade832f04d2deed9cdc1732697e63b8c34ffae0ada712197abcc6ec",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-ktx/2.9.4/lifecycle-viewmodel-ktx-2.9.4-sources.jar"
+      },
+      "version": "2.9.4"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.lifecycle--lifecycle-viewmodel-savedstate-android--2.9.4.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "0a0f2e46458b614c5f7479838b46a63516e591bca1a30ffde16e182878ffbe17",
+          "size": 4299,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-android/2.9.4/lifecycle-viewmodel-savedstate-android-2.9.4-sources.jar"
+        }
+      ],
+      "id": "androidx.lifecycle:lifecycle-viewmodel-savedstate-android:2.9.4",
+      "license": "Apache-2.0",
+      "name": "androidx.lifecycle:lifecycle-viewmodel-savedstate-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "743019a7d172beaa5823675df52affcef66ccc4ef8716e4494fd46bf5a315a13",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-savedstate-android/2.9.4/lifecycle-viewmodel-savedstate-android-2.9.4-sources.jar"
+      },
+      "version": "2.9.4"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.navigationevent--navigationevent-android--1.0.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "8bca376ece32d521530315c43f7e0020e6729e406fedc9a562a421d19ed52427",
+          "size": 2596,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-android/1.0.0/navigationevent-android-1.0.0-sources.jar"
+        }
+      ],
+      "id": "androidx.navigationevent:navigationevent-android:1.0.0",
+      "license": "Apache-2.0",
+      "name": "androidx.navigationevent:navigationevent-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "1771b427dc8974d4dc07975ddb52b611cd0d5bd8115de6e49a6fa8762e0f13a1",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-android/1.0.0/navigationevent-android-1.0.0-sources.jar"
+      },
+      "version": "1.0.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.navigationevent--navigationevent-compose-android--1.0.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "9d1f00bc94eda6e377a30a59f5461e80f972bc12def3603c4fa89856b78e46ae",
+          "size": 2018,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-compose-android/1.0.0/navigationevent-compose-android-1.0.0-sources.jar"
+        }
+      ],
+      "id": "androidx.navigationevent:navigationevent-compose-android:1.0.0",
+      "license": "Apache-2.0",
+      "name": "androidx.navigationevent:navigationevent-compose-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "0781754e368262504f08e63eabcf580e58cb73f6126c9484f64da6a1e0d1cfcf",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/navigationevent/navigationevent-compose-android/1.0.0/navigationevent-compose-android-1.0.0-sources.jar"
+      },
+      "version": "1.0.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.profileinstaller--profileinstaller--1.4.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "d875b2db7917f0d7020d0c784622cae0aa548122b47a92a2b5ec842e1a65cf59",
+          "size": 2803,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/profileinstaller/profileinstaller/1.4.0/profileinstaller-1.4.0-sources.jar"
+        }
+      ],
+      "id": "androidx.profileinstaller:profileinstaller:1.4.0",
+      "license": "Apache-2.0",
+      "name": "androidx.profileinstaller:profileinstaller",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "7b8637080b47188656fd54dab66e9270334242d277d2a8e3c46691c3afa152a0",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/profileinstaller/profileinstaller/1.4.0/profileinstaller-1.4.0-sources.jar"
+      },
+      "version": "1.4.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.savedstate--savedstate-android--1.3.2.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "d89f350341604e7e8b7521c7b4e97635995a4abeb9181d058cccbfd4e2f8c93b",
+          "size": 5560,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-android/1.3.2/savedstate-android-1.3.2-sources.jar"
+        }
+      ],
+      "id": "androidx.savedstate:savedstate-android:1.3.2",
+      "license": "Apache-2.0",
+      "name": "androidx.savedstate:savedstate-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "6749d720e67c3bcfef3380ba4b98ccafb6a9a57d9298d8abaa17242351a53224",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-android/1.3.2/savedstate-android-1.3.2-sources.jar"
+      },
+      "version": "1.3.2"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.savedstate--savedstate-compose-android--1.3.2.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "fa416fa5287afb6a794e56cb06457fc1b5a846facc8d5e470b7de6135ea5c0e7",
+          "size": 1964,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose-android/1.3.2/savedstate-compose-android-1.3.2-sources.jar"
+        }
+      ],
+      "id": "androidx.savedstate:savedstate-compose-android:1.3.2",
+      "license": "Apache-2.0",
+      "name": "androidx.savedstate:savedstate-compose-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "e5e73c5468cb23da524156e64051417342e21c9bcfdefc1ae3a939a54c7ad5f5",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-compose-android/1.3.2/savedstate-compose-android-1.3.2-sources.jar"
+      },
+      "version": "1.3.2"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.savedstate--savedstate-ktx--1.3.2.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "b44ac9db94eea0f7cc5d53bae174b4ca6ebbeb61244a4733ea5dfad0b60168fb",
+          "size": 229,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-ktx/1.3.2/savedstate-ktx-1.3.2-sources.jar"
+        }
+      ],
+      "id": "androidx.savedstate:savedstate-ktx:1.3.2",
+      "license": "Apache-2.0",
+      "name": "androidx.savedstate:savedstate-ktx",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "b1e8d78600a68fb3c0029793146ac07ea0335819f813554e85c568caa35cb5e4",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/savedstate/savedstate-ktx/1.3.2/savedstate-ktx-1.3.2-sources.jar"
+      },
+      "version": "1.3.2"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.startup--startup-runtime--1.2.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "e35dfa36c416596ed8b91a496becd85c5475f8e12785914575df707608402a54",
+          "size": 1063,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/startup/startup-runtime/1.2.0/startup-runtime-1.2.0-sources.jar"
+        }
+      ],
+      "id": "androidx.startup:startup-runtime:1.2.0",
+      "license": "Apache-2.0",
+      "name": "androidx.startup:startup-runtime",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "4b0fbeeb2255823f16a70315c64159d41ed6a752d823ff68e0132fd749c36f82",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/startup/startup-runtime/1.2.0/startup-runtime-1.2.0-sources.jar"
+      },
+      "version": "1.2.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.tracing--tracing--1.2.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "a2f204849d50a2a3f490cdc3819ab3bf6d9108635b341433119e8115a587664f",
+          "size": 954,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/tracing/tracing/1.2.0/tracing-1.2.0-sources.jar"
+        }
+      ],
+      "id": "androidx.tracing:tracing:1.2.0",
+      "license": "Apache-2.0",
+      "name": "androidx.tracing:tracing",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "3daf3a210e213f1675e6ea9ae2a9c0b9c837b42805835b65d999eca58fbddc90",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/tracing/tracing/1.2.0/tracing-1.2.0-sources.jar"
+      },
+      "version": "1.2.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.versionedparcelable--versionedparcelable--1.1.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "b67929fc2652fe227cdc367094716c154908ff1c641dbee6f91492fe80785865",
+          "size": 1417,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/versionedparcelable/versionedparcelable/1.1.1/versionedparcelable-1.1.1-sources.jar"
+        }
+      ],
+      "id": "androidx.versionedparcelable:versionedparcelable:1.1.1",
+      "license": "Apache-2.0",
+      "name": "androidx.versionedparcelable:versionedparcelable",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "135016af471acf4cd9583d36ceb779710c6b46812ccaaef7c526d5d60eae6b0b",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/versionedparcelable/versionedparcelable/1.1.1/versionedparcelable-1.1.1-sources.jar"
+      },
+      "version": "1.1.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.window--window-core-android--1.5.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "61c3648e135820f720007ea80a6643e47957bbae74f672d9213c39ae11b3f89e",
+          "size": 2460,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/window/window-core-android/1.5.0/window-core-android-1.5.0-sources.jar"
+        }
+      ],
+      "id": "androidx.window:window-core-android:1.5.0",
+      "license": "Apache-2.0",
+      "name": "androidx.window:window-core-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "df2d830a33d04300574b65d7a87904458a910b879af3d13022def0a627a22df6",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/window/window-core-android/1.5.0/window-core-android-1.5.0-sources.jar"
+      },
+      "version": "1.5.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/androidx.window--window--1.5.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "dbe372fa6d8e65c9c7dbfc32042923cfebe1b28da2acbd16a321f1fa623d97b6",
+          "size": 10192,
+          "source": "https://dl.google.com/dl/android/maven2/androidx/window/window/1.5.0/window-1.5.0-sources.jar"
+        }
+      ],
+      "id": "androidx.window:window:1.5.0",
+      "license": "Apache-2.0",
+      "name": "androidx.window:window",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "37d85fa5e68b3bc28c88b05dc2b0d5d7caf0af3d7692bd0bc0c56a8dc6ca6a33",
+        "url": "https://dl.google.com/dl/android/maven2/androidx/window/window/1.5.0/window-1.5.0-sources.jar"
+      },
+      "version": "1.5.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build. Apache/AOSP-derived source headers retained with candidate upstream notice sections; no exact historical genealogy or legal clearance asserted.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/com.squareup.okhttp3--okhttp-android--5.5.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "502e013676f9cd14eb7b2376f2423c405a13c4cb1807e1bf8db942d4b593bff0",
+          "size": 28812,
+          "source": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp-android/5.5.0/okhttp-android-5.5.0-sources.jar"
+        },
+        {
+          "path": "apache-imports/candidate-HttpComponents-Core-NOTICE.txt",
+          "role": "notice",
+          "scope": "Relevant candidate ASF Core and Android/Harmony notice sections, including Intel paragraph. Historical exact import revision/completeness unconfirmed; not a claim every aggregate project ships.",
+          "sha256": "0a827d3815c3f792f528dcf1e772c21db47895e406e36b3e6ea036572f96599b",
+          "size": 180,
+          "source": "https://android.googlesource.com/platform/libcore/+/03255f860520d940b42bba989145f8485d6e332e/NOTICE"
+        },
+        {
+          "path": "apache-imports/candidate-Android-Harmony-notice-sections.txt",
+          "role": "notice",
+          "scope": "Relevant candidate ASF Core and Android/Harmony notice sections, including Intel paragraph. Historical exact import revision/completeness unconfirmed; not a claim every aggregate project ships.",
+          "sha256": "f7c28deeb62d736cf0899d085fba3ae3512b05a07735d714ee4bd034c02e56a7",
+          "size": 1352,
+          "source": "https://android.googlesource.com/platform/libcore/+/03255f860520d940b42bba989145f8485d6e332e/NOTICE"
+        }
+      ],
+      "id": "com.squareup.okhttp3:okhttp-android:5.5.0",
+      "license": "Apache-2.0",
+      "name": "com.squareup.okhttp3:okhttp-android",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "a6f0fb39a3af37cc6ef02126466fd03c59437d75e2b175598d9b733c1e31afbf",
+        "url": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp-android/5.5.0/okhttp-android-5.5.0-sources.jar"
+      },
+      "version": "5.5.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/com.squareup.okhttp3--okhttp--5.5.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "87cc472b29589d4542b0831fdeb146b97b3ff8716ed8d9b1ca182fb72634cdad",
+          "size": 27531,
+          "source": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp/5.5.0/okhttp-5.5.0-sources.jar"
+        }
+      ],
+      "id": "com.squareup.okhttp3:okhttp:5.5.0",
+      "license": "Apache-2.0",
+      "name": "com.squareup.okhttp3:okhttp",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "d5215282d2725e1b5f5b2c55dd0602afce822ff96c0ff88281b50be56f182f91",
+        "url": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp/5.5.0/okhttp-5.5.0-sources.jar"
+      },
+      "version": "5.5.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build. Apache/AOSP-derived source headers retained with candidate upstream notice sections; no exact historical genealogy or legal clearance asserted.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/com.squareup.okio--okio-jvm--3.18.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "105e62d902519c5e74f48c254978cb20a5ab4cd67f416f4ef2622870aa50c8e7",
+          "size": 15544,
+          "source": "https://repo.maven.apache.org/maven2/com/squareup/okio/okio-jvm/3.18.1/okio-jvm-3.18.1-sources.jar"
+        },
+        {
+          "path": "apache-imports/candidate-HttpComponents-Core-NOTICE.txt",
+          "role": "notice",
+          "scope": "Relevant candidate ASF Core and Android/Harmony notice sections, including Intel paragraph. Historical exact import revision/completeness unconfirmed; not a claim every aggregate project ships.",
+          "sha256": "0a827d3815c3f792f528dcf1e772c21db47895e406e36b3e6ea036572f96599b",
+          "size": 180,
+          "source": "https://android.googlesource.com/platform/libcore/+/03255f860520d940b42bba989145f8485d6e332e/NOTICE"
+        },
+        {
+          "path": "apache-imports/candidate-Android-Harmony-notice-sections.txt",
+          "role": "notice",
+          "scope": "Relevant candidate ASF Core and Android/Harmony notice sections, including Intel paragraph. Historical exact import revision/completeness unconfirmed; not a claim every aggregate project ships.",
+          "sha256": "f7c28deeb62d736cf0899d085fba3ae3512b05a07735d714ee4bd034c02e56a7",
+          "size": 1352,
+          "source": "https://android.googlesource.com/platform/libcore/+/03255f860520d940b42bba989145f8485d6e332e/NOTICE"
+        }
+      ],
+      "id": "com.squareup.okio:okio-jvm:3.18.1",
+      "license": "Apache-2.0",
+      "name": "com.squareup.okio:okio-jvm",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "967a2e30e8504e48c2de60acfc96d091d2fd44671def26875896a37a1624a0f4",
+        "url": "https://repo.maven.apache.org/maven2/com/squareup/okio/okio-jvm/3.18.1/okio-jvm-3.18.1-sources.jar"
+      },
+      "version": "3.18.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/com.squareup.okio--okio--3.18.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "41c75752dbde544df1cd6f8d8d16e5110dc1d2911af65ca72fc32a1dba8f7f9d",
+          "size": 15658,
+          "source": "https://repo.maven.apache.org/maven2/com/squareup/okio/okio/3.18.1/okio-3.18.1-sources.jar"
+        }
+      ],
+      "id": "com.squareup.okio:okio:3.18.1",
+      "license": "Apache-2.0",
+      "name": "com.squareup.okio:okio",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "23b44d63a319960efcbd4d987cdccb2be8949e4b9cf5f0776af3f63c016c1775",
+        "url": "https://repo.maven.apache.org/maven2/com/squareup/okio/okio/3.18.1/okio-3.18.1-sources.jar"
+      },
+      "version": "3.18.1"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlin--kotlin-stdlib-jdk7--2.2.10.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "2675630afb211abfb3be8851b0316aa4874d71f3e9b82210564716795e6501d8",
+          "size": 237,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/2.2.10/kotlin-stdlib-jdk7-2.2.10-sources.jar"
+        }
+      ],
+      "id": "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.2.10",
+      "license": "Apache-2.0",
+      "name": "org.jetbrains.kotlin:kotlin-stdlib-jdk7",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "2534c8908432e06de73177509903d405b55f423dd4c2f747e16b92a2162611e6",
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk7/2.2.10/kotlin-stdlib-jdk7-2.2.10-sources.jar"
+      },
+      "version": "2.2.10"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlin--kotlin-stdlib-jdk8--2.2.10.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "f4ba8bb2f2ad70915e673c8647ab5320e265f54a51345ffe32c055f832a5ccf4",
+          "size": 237,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/2.2.10/kotlin-stdlib-jdk8-2.2.10-sources.jar"
+        }
+      ],
+      "id": "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.2.10",
+      "license": "Apache-2.0",
+      "name": "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "3cb6895054a0985bba591c165503fe4dd63a215af53263b67a071ccdc242bf6e",
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib-jdk8/2.2.10/kotlin-stdlib-jdk8-2.2.10-sources.jar"
+      },
+      "version": "2.2.10"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlin--kotlin-stdlib--2.4.20.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "72b2b92443956d4c246bed7159afa94c34a1096134d0990f599c80c695ceddbd",
+          "size": 23279,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.20/kotlin-stdlib-2.4.20-sources.jar"
+        },
+        {
+          "path": "kotlin/COPYRIGHT.txt",
+          "role": "attribution",
+          "scope": "Project copyright statement (not a claim that compiler projects ship)",
+          "sha256": "8f1a1700adb5490604c6094fb137bf73f6c28d3ee554b58f3ff8ef975a79672d",
+          "size": 647,
+          "source": "https://github.com/JetBrains/kotlin/blob/v2.4.20/license/COPYRIGHT.txt"
+        }
+      ],
+      "id": "org.jetbrains.kotlin:kotlin-stdlib:2.4.20",
+      "license": "Apache-2.0",
+      "name": "org.jetbrains.kotlin:kotlin-stdlib",
+      "noticeScope": "Source-JAR headers and explicit stdlib scope in Kotlin v2.4.20 license/README.md reviewed. Root NOTICE is explicitly for the compiler distribution, not asserted to apply to this stdlib APK.",
+      "sourceArchive": {
+        "sha256": "9a2ce1266925b3cb0ff361392b91c3e288d3e78ca0961bb39e33e27aa6d1749a",
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.20/kotlin-stdlib-2.4.20-sources.jar"
+      },
+      "version": "2.4.20"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlinx--kotlinx-coroutines-android--1.11.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "b9400d9f5c02386c16c9e35eaef2452eec23f85f87f4a5fef433d03fe8a5ff0c",
+          "size": 254,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-android/1.11.0/kotlinx-coroutines-android-1.11.0-sources.jar"
+        },
+        {
+          "path": "coroutines/NOTICE.txt",
+          "role": "notice",
+          "scope": "Exact 1.11.0 library NOTICE",
+          "sha256": "1ab6de67ef738bffae63f9aa6a8798a35e87341c83ea28d09c8dc8ca6993232a",
+          "size": 452,
+          "source": "https://github.com/Kotlin/kotlinx.coroutines/blob/1.11.0/license/NOTICE.txt"
+        },
+        {
+          "path": "coroutines/LICENSE.txt",
+          "role": "license",
+          "scope": "Exact library license",
+          "sha256": "b1febe6399dffb10d19d35e7663ab16300c93cb0476a94115df1cc0097a8ffd8",
+          "size": 11398,
+          "source": "https://github.com/Kotlin/kotlinx.coroutines/blob/1.11.0/LICENSE.txt"
+        }
+      ],
+      "id": "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0",
+      "license": "Apache-2.0",
+      "name": "org.jetbrains.kotlinx:kotlinx-coroutines-android",
+      "noticeScope": "1.11.0 project LICENSE.txt and license/NOTICE.txt retained; published source archives contain no copyright headers.",
+      "sourceArchive": {
+        "sha256": "d2760d65fc99c28d140b345163560926975cfe6ca36386c8964041f86eb2f4b6",
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-android/1.11.0/kotlinx-coroutines-android-1.11.0-sources.jar"
+      },
+      "version": "1.11.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlinx--kotlinx-coroutines-core-jvm--1.11.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "ef24c659203eb07f6c997742da85a8e00abf34e90ceed9b7e2f99fe52763618b",
+          "size": 256,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0-sources.jar"
+        },
+        {
+          "path": "coroutines/NOTICE.txt",
+          "role": "notice",
+          "scope": "Exact 1.11.0 library NOTICE",
+          "sha256": "1ab6de67ef738bffae63f9aa6a8798a35e87341c83ea28d09c8dc8ca6993232a",
+          "size": 452,
+          "source": "https://github.com/Kotlin/kotlinx.coroutines/blob/1.11.0/license/NOTICE.txt"
+        },
+        {
+          "path": "coroutines/LICENSE.txt",
+          "role": "license",
+          "scope": "Exact library license",
+          "sha256": "b1febe6399dffb10d19d35e7663ab16300c93cb0476a94115df1cc0097a8ffd8",
+          "size": 11398,
+          "source": "https://github.com/Kotlin/kotlinx.coroutines/blob/1.11.0/LICENSE.txt"
+        }
+      ],
+      "id": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.11.0",
+      "license": "Apache-2.0",
+      "name": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm",
+      "noticeScope": "1.11.0 project LICENSE.txt and license/NOTICE.txt retained; published source archives contain no copyright headers.",
+      "sourceArchive": {
+        "sha256": "3e0847c0b463965404d5b6fe5d6868000a220b050180dec68501801e9439976a",
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core-jvm/1.11.0/kotlinx-coroutines-core-jvm-1.11.0-sources.jar"
+      },
+      "version": "1.11.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlinx--kotlinx-serialization-core-jvm--1.11.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "dacb17d0ac24b0cb44bac943a05f2078ee7da0661ac2c2108bbc2318c507fd0c",
+          "size": 4342,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.11.0/kotlinx-serialization-core-jvm-1.11.0-sources.jar"
+        },
+        {
+          "path": "serialization/NOTICE.txt",
+          "role": "notice",
+          "scope": "Exact serialization v1.11.0 project text (original spelling retained)",
+          "sha256": "ec77bba5c852830abfdefcdefbf4a22577ff4df79ec323a898d5100ca1d6f8d6",
+          "size": 497,
+          "source": "https://github.com/Kotlin/kotlinx.serialization/blob/v1.11.0/license/NOTICE.txt"
+        },
+        {
+          "path": "serialization/LICENSE.txt",
+          "role": "license",
+          "scope": "Exact serialization v1.11.0 project text (original spelling retained)",
+          "sha256": "0eec219eba99cd8da85c3c781732a515fba284c55e9531739f11762c80a754b4",
+          "size": 601,
+          "source": "https://github.com/Kotlin/kotlinx.serialization/blob/v1.11.0/license/LICENSE.txt"
+        }
+      ],
+      "id": "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.11.0",
+      "license": "Apache-2.0",
+      "name": "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm",
+      "noticeScope": "Published source headers and exact v1.11.0 library license/NOTICE.txt retained.",
+      "sourceArchive": {
+        "sha256": "9c9b7d4aabc03e671b5297ca5d50931f7c961f3d7e36a67ce945921b08a7be40",
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core-jvm/1.11.0/kotlinx-serialization-core-jvm-1.11.0-sources.jar"
+      },
+      "version": "1.11.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlinx--kotlinx-serialization-core--1.11.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "c5d23686c7aaaa330e0cbb22d9a2681af44e8d15529f93aeaf02dff7f01de8da",
+          "size": 4219,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core/1.11.0/kotlinx-serialization-core-1.11.0-sources.jar"
+        },
+        {
+          "path": "serialization/NOTICE.txt",
+          "role": "notice",
+          "scope": "Exact serialization v1.11.0 project text (original spelling retained)",
+          "sha256": "ec77bba5c852830abfdefcdefbf4a22577ff4df79ec323a898d5100ca1d6f8d6",
+          "size": 497,
+          "source": "https://github.com/Kotlin/kotlinx.serialization/blob/v1.11.0/license/NOTICE.txt"
+        },
+        {
+          "path": "serialization/LICENSE.txt",
+          "role": "license",
+          "scope": "Exact serialization v1.11.0 project text (original spelling retained)",
+          "sha256": "0eec219eba99cd8da85c3c781732a515fba284c55e9531739f11762c80a754b4",
+          "size": 601,
+          "source": "https://github.com/Kotlin/kotlinx.serialization/blob/v1.11.0/license/LICENSE.txt"
+        }
+      ],
+      "id": "org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0",
+      "license": "Apache-2.0",
+      "name": "org.jetbrains.kotlinx:kotlinx-serialization-core",
+      "noticeScope": "Published source headers and exact v1.11.0 library license/NOTICE.txt retained.",
+      "sourceArchive": {
+        "sha256": "aea7121eef1207bb71f489cb1f32337922d92441d31f4669c299f57043e6aaea",
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-core/1.11.0/kotlinx-serialization-core-1.11.0-sources.jar"
+      },
+      "version": "1.11.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlinx--kotlinx-serialization-json-jvm--1.11.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "93ac6232fade6aa6f3dabe24a55dc3ac3934b62150bf9936bd4425fa42859404",
+          "size": 3517,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.11.0/kotlinx-serialization-json-jvm-1.11.0-sources.jar"
+        },
+        {
+          "path": "serialization/NOTICE.txt",
+          "role": "notice",
+          "scope": "Exact serialization v1.11.0 project text (original spelling retained)",
+          "sha256": "ec77bba5c852830abfdefcdefbf4a22577ff4df79ec323a898d5100ca1d6f8d6",
+          "size": 497,
+          "source": "https://github.com/Kotlin/kotlinx.serialization/blob/v1.11.0/license/NOTICE.txt"
+        },
+        {
+          "path": "serialization/LICENSE.txt",
+          "role": "license",
+          "scope": "Exact serialization v1.11.0 project text (original spelling retained)",
+          "sha256": "0eec219eba99cd8da85c3c781732a515fba284c55e9531739f11762c80a754b4",
+          "size": 601,
+          "source": "https://github.com/Kotlin/kotlinx.serialization/blob/v1.11.0/license/LICENSE.txt"
+        }
+      ],
+      "id": "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.11.0",
+      "license": "Apache-2.0",
+      "name": "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm",
+      "noticeScope": "Published source headers and exact v1.11.0 library license/NOTICE.txt retained.",
+      "sourceArchive": {
+        "sha256": "8a0eae6ac1a42a0fbe1b850ea4e21ad71d2a8aa896ee2257b1492b471bd5c5fe",
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.11.0/kotlinx-serialization-json-jvm-1.11.0-sources.jar"
+      },
+      "version": "1.11.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlinx--kotlinx-serialization-json--1.11.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "f91e3915f75155e5d1979ed3867a54cd9672b692fed6ea005039f1b2ebb29069",
+          "size": 3741,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json/1.11.0/kotlinx-serialization-json-1.11.0-sources.jar"
+        },
+        {
+          "path": "serialization/NOTICE.txt",
+          "role": "notice",
+          "scope": "Exact serialization v1.11.0 project text (original spelling retained)",
+          "sha256": "ec77bba5c852830abfdefcdefbf4a22577ff4df79ec323a898d5100ca1d6f8d6",
+          "size": 497,
+          "source": "https://github.com/Kotlin/kotlinx.serialization/blob/v1.11.0/license/NOTICE.txt"
+        },
+        {
+          "path": "serialization/LICENSE.txt",
+          "role": "license",
+          "scope": "Exact serialization v1.11.0 project text (original spelling retained)",
+          "sha256": "0eec219eba99cd8da85c3c781732a515fba284c55e9531739f11762c80a754b4",
+          "size": 601,
+          "source": "https://github.com/Kotlin/kotlinx.serialization/blob/v1.11.0/license/LICENSE.txt"
+        }
+      ],
+      "id": "org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0",
+      "license": "Apache-2.0",
+      "name": "org.jetbrains.kotlinx:kotlinx-serialization-json",
+      "noticeScope": "Published source headers and exact v1.11.0 library license/NOTICE.txt retained.",
+      "sourceArchive": {
+        "sha256": "b3dd36abd8d06dd2e08eb74cd38dacc6b45182e191f5b8fe51cb5eab7666ba07",
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-serialization-json/1.11.0/kotlinx-serialization-json-1.11.0-sources.jar"
+      },
+      "version": "1.11.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains--annotations--23.0.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "961a30b1136c33d24ca748aafac02c731bc90439554085f88c48eb961f3a85c1",
+          "size": 2810,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0-sources.jar"
+        }
+      ],
+      "id": "org.jetbrains:annotations:23.0.0",
+      "license": "Apache-2.0",
+      "name": "org.jetbrains:annotations",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "ff2309b42f7584520497bb48bc609aca04c9886cf48708f14be83f00423ec144",
+        "url": "https://repo.maven.apache.org/maven2/org/jetbrains/annotations/23.0.0/annotations-23.0.0-sources.jar"
+      },
+      "version": "23.0.0"
+    },
+    {
+      "disclosure": "Source attribution, not a legal warranty or reconstructed historical build.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/org.jspecify--jspecify--1.0.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "9a38526becb2b78d32f7ca9aa13234ca9fe8cbc8178441d85059e71d535bf84f",
+          "size": 1672,
+          "source": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0-sources.jar"
+        }
+      ],
+      "id": "org.jspecify:jspecify:1.0.0",
+      "license": "Apache-2.0",
+      "name": "org.jspecify:jspecify",
+      "noticeScope": "Published versioned source archive legal members and source headers preserved. No claim about absence of every historical notice.",
+      "sourceArchive": {
+        "sha256": "adf0898191d55937fb3192ba971826f4f294292c4a960740f3c27310e7b70296",
+        "url": "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0-sources.jar"
+      },
+      "version": "1.0.0"
+    }
+  ],
+  "embedded": [
+    {
+      "disclosure": "Exact embedded JAR identity; standalone version unknown. AndroidX release source documents Noto bundling/relocation. Preserved candidate Google 2008 BSD and Apache/AOSP headers are scoped evidence, not exact historical reconstruction.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "emoji2/candidate-Utf8Safe-BSD-3-Clause.txt",
+          "role": "attribution",
+          "scope": "Candidate FlatBuffers 1.12.0 source headers plus generated Noto/AOSP headers. Exact historical embedded standalone revision unknown; not asserted byte-identical imported source.",
+          "sha256": "2f706d67271d8db967046638e30f7887a5ba6e49593e6395e8145a7c9feab96a",
+          "size": 1659,
+          "source": "https://github.com/google/flatbuffers/tree/6df40a2471737b27271bdd9b900ab5f3aec746c7"
+        },
+        {
+          "path": "emoji2/candidate-COPYRIGHT-AND-SOURCE-NOTICES.txt",
+          "role": "attribution",
+          "scope": "Candidate FlatBuffers 1.12.0 source headers plus generated Noto/AOSP headers. Exact historical embedded standalone revision unknown; not asserted byte-identical imported source.",
+          "sha256": "79a60dbf07cd4edf042e2fb7dfcab4ae67f9ceee7460d092471610fd91e45cec",
+          "size": 16407,
+          "source": "https://github.com/google/flatbuffers/tree/6df40a2471737b27271bdd9b900ab5f3aec746c7"
+        }
+      ],
+      "id": "androidx.emoji2:emoji2:1.4.0#flatbuffers",
+      "license": "Apache-2.0 AND BSD-3-Clause",
+      "name": "Relocated FlatBuffers and generated emoji metadata",
+      "noticeScope": "Preserved scoped source texts; unknown standalone version is not inferred.",
+      "parent": "androidx.emoji2:emoji2:1.4.0",
+      "selector": {
+        "members": [
+          {
+            "member": "libs/repackaged.jar",
+            "sha256": "de10d78b35a33c1ade2607b63c29b3b70a856cad821b5bc711a9018eed9a43ab"
+          }
+        ]
+      },
+      "version": null
+    },
+    {
+      "disclosure": "Native libraries and reviewed source/include scope only. Android/Bionic and LLVM headers are not claims that unrelated NDK notice-aggregate projects ship.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "graphics/source-headers.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers in exact release native source files",
+          "sha256": "393694af3d945cfdd4aa06dd65a539a45de10af1249233f85947a44fd5f3a247",
+          "size": 6359,
+          "source": "https://android.googlesource.com/platform/frameworks/support/+/8a05a22af450d589ef911d772a001a49dcb05b71/graphics/graphics-path/src/main/cpp/"
+        },
+        {
+          "path": "graphics/toolchains_llvm_prebuilt_linux-x86_64_sysroot_usr_include_android_api-level.h.license-header.txt",
+          "role": "license",
+          "scope": "NDK 25.2.9519653 inline-header and LLVM license/exception material applicable to reviewed native source scope",
+          "sha256": "695731bda1c73c7f88c0d04d76ae94efa1eb1cc820b9e97fc384d274571a20d1",
+          "size": 1397,
+          "source": "https://android.googlesource.com/toolchain/prebuilts/ndk/r25/+/e9d5e5c8446a599b20fe03bcb548a5fb7e161b4d/"
+        },
+        {
+          "path": "graphics/toolchains_llvm_prebuilt_linux-x86_64_sysroot_usr_include_bits_get_device_api_level_inlines.h.license-header.txt",
+          "role": "license",
+          "scope": "NDK 25.2.9519653 inline-header and LLVM license/exception material applicable to reviewed native source scope",
+          "sha256": "db61b6672d0624c416edee75a8551a26c9a72a638849f99b04557ab63a8fa624",
+          "size": 1397,
+          "source": "https://android.googlesource.com/toolchain/prebuilts/ndk/r25/+/e9d5e5c8446a599b20fe03bcb548a5fb7e161b4d/"
+        },
+        {
+          "path": "graphics/LLVM-License-and-exceptions.txt",
+          "role": "license",
+          "scope": "NDK 25.2.9519653 inline-header and LLVM license/exception material applicable to reviewed native source scope",
+          "sha256": "29b1fd8f5c323af5f89b86d549ee291ce205009865cc4961aaf7c138b26e691d",
+          "size": 12495,
+          "source": "https://android.googlesource.com/toolchain/prebuilts/ndk/r25/+/e9d5e5c8446a599b20fe03bcb548a5fb7e161b4d/"
+        }
+      ],
+      "id": "androidx.graphics:graphics-path:1.0.1#native",
+      "license": "Apache-2.0 AND BSD-2-Clause AND (Apache-2.0 WITH LLVM-exception)",
+      "name": "Graphics path native implementation and inline headers",
+      "noticeScope": "Preserved scoped source texts; unknown standalone version is not inferred.",
+      "parent": "androidx.graphics:graphics-path:1.0.1",
+      "selector": {
+        "members": [
+          {
+            "member": "jni/x86_64/libandroidx.graphics.path.so",
+            "sha256": "4e56c996f13670e70082658de7880c4020eabf4f25e43387f88ed78a713fc9f0"
+          },
+          {
+            "member": "jni/arm64-v8a/libandroidx.graphics.path.so",
+            "sha256": "41e9a793c43a0f4fddb19e33f346bace464f30f888ba7b9eaf96294ea115bfb6"
+          },
+          {
+            "member": "jni/armeabi-v7a/libandroidx.graphics.path.so",
+            "sha256": "41399eba6fc2a60f6f14642375c1824f3cf25eb8fec7397d753730a3ceda3e2b"
+          },
+          {
+            "member": "jni/x86/libandroidx.graphics.path.so",
+            "sha256": "eb0570b41fd3bff25d8204a967c03bd7550719e768b791f680cc40cbe35f29af"
+          }
+        ]
+      },
+      "version": "1.0.1"
+    },
+    {
+      "disclosure": "The exact derivative release headers are retained. Candidate upstream NOTICE texts are supplementary scoped attribution, not assertions of exact imported revision or unrelated shipped projects.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/com.squareup.okhttp3--okhttp-android--5.5.0.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "502e013676f9cd14eb7b2376f2423c405a13c4cb1807e1bf8db942d4b593bff0",
+          "size": 28812,
+          "source": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp-android/5.5.0/okhttp-android-5.5.0-sources.jar"
+        },
+        {
+          "path": "apache-imports/candidate-HttpComponents-Core-NOTICE.txt",
+          "role": "notice",
+          "scope": "Relevant candidate ASF Core and Android/Harmony notice sections, including Intel paragraph. Historical exact import revision/completeness unconfirmed; not a claim every aggregate project ships.",
+          "sha256": "0a827d3815c3f792f528dcf1e772c21db47895e406e36b3e6ea036572f96599b",
+          "size": 180,
+          "source": "https://android.googlesource.com/platform/libcore/+/03255f860520d940b42bba989145f8485d6e332e/NOTICE"
+        },
+        {
+          "path": "apache-imports/candidate-Android-Harmony-notice-sections.txt",
+          "role": "notice",
+          "scope": "Relevant candidate ASF Core and Android/Harmony notice sections, including Intel paragraph. Historical exact import revision/completeness unconfirmed; not a claim every aggregate project ships.",
+          "sha256": "f7c28deeb62d736cf0899d085fba3ae3512b05a07735d714ee4bd034c02e56a7",
+          "size": 1352,
+          "source": "https://android.googlesource.com/platform/libcore/+/03255f860520d940b42bba989145f8485d6e332e/NOTICE"
+        }
+      ],
+      "id": "com.squareup.okhttp3:okhttp-android:5.5.0#apache-android-portions",
+      "license": "Apache-2.0",
+      "name": "Apache/Android-derived source portions",
+      "noticeScope": "Preserved scoped source texts; unknown standalone version is not inferred.",
+      "parent": "com.squareup.okhttp3:okhttp-android:5.5.0",
+      "selector": {
+        "classPrefixes": [
+          "okhttp3.internal.http.HttpStatusCodes",
+          "okhttp3.internal.http.DateFormatting",
+          "okhttp3.internal.tls.OkHostnameVerifier"
+        ]
+      },
+      "version": null
+    },
+    {
+      "disclosure": "Exact corresponding source reproduces the embedded member byte-for-byte; no invented copyright owner.",
+      "evidence": [
+        {
+          "path": "psl/PublicSuffixList-LICENSE.txt",
+          "role": "license",
+          "scope": "Exact corresponding source/notice for embedded PublicSuffixDatabase.list; original rule/comment content preserved",
+          "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172",
+          "size": 16727,
+          "source": "https://raw.githubusercontent.com/publicsuffix/list/bf32ba1ae6228a185ebf297d636f1c6541149c45/LICENSE"
+        },
+        {
+          "path": "psl/NOTICE.txt",
+          "role": "notice",
+          "scope": "Exact corresponding source/notice for embedded PublicSuffixDatabase.list; original rule/comment content preserved",
+          "sha256": "362ad8b05fc7042f86ac08a5747452052fe422d35cd19a36a28da3f42efffa01",
+          "size": 223,
+          "source": "https://raw.githubusercontent.com/lysine-dev/okhttp/a94bdf152084d11acecd44dcd09ffef203f4f0aa/okhttp/src/jvmTest/resources/okhttp3/internal/publicsuffix/NOTICE"
+        },
+        {
+          "path": "psl/public_suffix_list.dat",
+          "role": "source",
+          "scope": "Exact corresponding source/notice for embedded PublicSuffixDatabase.list; original rule/comment content preserved",
+          "sha256": "986879fc41f0a5cc65f5e7d88fa68f6f0d9c366bb620418b8b8045f61a134077",
+          "size": 317157,
+          "source": "https://raw.githubusercontent.com/lysine-dev/okhttp/a94bdf152084d11acecd44dcd09ffef203f4f0aa/okhttp/src/jvmTest/resources/okhttp3/internal/publicsuffix/public_suffix_list.dat"
+        },
+        {
+          "path": "psl/PublicSuffixListGenerator.kt",
+          "role": "source",
+          "scope": "Exact corresponding source/notice for embedded PublicSuffixDatabase.list; original rule/comment content preserved",
+          "sha256": "574a20481be095db417a88a18ea1041bf4ed54b55aed8a711e6b068ad01e3fb8",
+          "size": 6212,
+          "source": "https://raw.githubusercontent.com/lysine-dev/okhttp/a94bdf152084d11acecd44dcd09ffef203f4f0aa/okhttp/src/jvmTest/kotlin/okhttp3/internal/publicsuffix/PublicSuffixListGenerator.kt"
+        },
+        {
+          "path": "psl/SOURCE.txt",
+          "role": "notice",
+          "scope": "Recipient corresponding-source directions",
+          "sha256": "991ccbdb1faa0f46fba4e24891f1e1bb53c7d998af3864a5c0383ace0d24c3a1",
+          "size": 422,
+          "source": "https://raw.githubusercontent.com/lysine-dev/okhttp/a94bdf152084d11acecd44dcd09ffef203f4f0aa/okhttp/src/jvmTest/resources/okhttp3/internal/publicsuffix/public_suffix_list.dat"
+        }
+      ],
+      "id": "com.squareup.okhttp3:okhttp-android:5.5.0#public-suffix-list",
+      "license": "MPL-2.0",
+      "name": "Public Suffix List data",
+      "noticeScope": "Preserved scoped source texts; unknown standalone version is not inferred.",
+      "parent": "com.squareup.okhttp3:okhttp-android:5.5.0",
+      "selector": {
+        "members": [
+          {
+            "member": "assets/PublicSuffixDatabase.list",
+            "sha256": "c75ab827afd7ffff59a51b14729c25dbfc3b45237eb40ccf02bec7b7d44304a4"
+          }
+        ]
+      },
+      "version": "bf32ba1ae6228a185ebf297d636f1c6541149c45"
+    },
+    {
+      "disclosure": "Generated Unicode 15.1.0 data; not an independently resolved Maven library.",
+      "evidence": [
+        {
+          "path": "unicode/LICENSE.txt",
+          "role": "license",
+          "scope": "Full contemporaneous Unicode 15.1 IDNA data license; upstream data byte identity was checked in bounded source research",
+          "sha256": "9ba0dc030e14ab692310b5395ea4f3a4921bcdbc1b9dbcebb1f81d83eb08f4e6",
+          "size": 1995,
+          "source": "https://github.com/unicode-org/unicodetools/blob/0b73daa897e978a95a6071538d77cbb4bfffc352/LICENSE"
+        }
+      ],
+      "id": "com.squareup.okhttp3:okhttp-android:5.5.0#unicode-idna",
+      "license": "Unicode-3.0",
+      "name": "Unicode IDNA mapping data",
+      "noticeScope": "Preserved scoped source texts; unknown standalone version is not inferred.",
+      "parent": "com.squareup.okhttp3:okhttp-android:5.5.0",
+      "selector": {
+        "classPrefixes": [
+          "okhttp3.internal.idn."
+        ]
+      },
+      "version": "15.1.0"
+    },
+    {
+      "disclosure": "The exact derivative release headers are retained. Candidate upstream NOTICE texts are supplementary scoped attribution, not assertions of exact imported revision or unrelated shipped projects.",
+      "evidence": [
+        {
+          "path": "Apache-2.0.txt",
+          "role": "license",
+          "scope": "Full Apache License 2.0",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+        },
+        {
+          "path": "attribution/com.squareup.okio--okio-jvm--3.18.1.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "105e62d902519c5e74f48c254978cb20a5ab4cd67f416f4ef2622870aa50c8e7",
+          "size": 15544,
+          "source": "https://repo.maven.apache.org/maven2/com/squareup/okio/okio-jvm/3.18.1/okio-jvm-3.18.1-sources.jar"
+        },
+        {
+          "path": "apache-imports/candidate-HttpComponents-Core-NOTICE.txt",
+          "role": "notice",
+          "scope": "Relevant candidate ASF Core and Android/Harmony notice sections, including Intel paragraph. Historical exact import revision/completeness unconfirmed; not a claim every aggregate project ships.",
+          "sha256": "0a827d3815c3f792f528dcf1e772c21db47895e406e36b3e6ea036572f96599b",
+          "size": 180,
+          "source": "https://android.googlesource.com/platform/libcore/+/03255f860520d940b42bba989145f8485d6e332e/NOTICE"
+        },
+        {
+          "path": "apache-imports/candidate-Android-Harmony-notice-sections.txt",
+          "role": "notice",
+          "scope": "Relevant candidate ASF Core and Android/Harmony notice sections, including Intel paragraph. Historical exact import revision/completeness unconfirmed; not a claim every aggregate project ships.",
+          "sha256": "f7c28deeb62d736cf0899d085fba3ae3512b05a07735d714ee4bd034c02e56a7",
+          "size": 1352,
+          "source": "https://android.googlesource.com/platform/libcore/+/03255f860520d940b42bba989145f8485d6e332e/NOTICE"
+        }
+      ],
+      "id": "com.squareup.okio:okio-jvm:3.18.1#apache-android-portions",
+      "license": "Apache-2.0",
+      "name": "Apache/Android-derived source portions",
+      "noticeScope": "Preserved scoped source texts; unknown standalone version is not inferred.",
+      "parent": "com.squareup.okio:okio-jvm:3.18.1",
+      "selector": {
+        "classPrefixes": [
+          "okio.Buffer",
+          "okio.SegmentedByteString"
+        ]
+      },
+      "version": null
+    },
+    {
+      "disclosure": "Source-embedded portions, not a separately resolved Maven dependency. Standalone imported version unknown.",
+      "evidence": [
+        {
+          "path": "kotlin/boost_LICENSE.txt",
+          "role": "license",
+          "scope": "Kotlin v2.4.20 explicitly maps this license to the corresponding stdlib source portion",
+          "sha256": "8d8291caf1cee26d23acf3eb67c9f9a2d58f1c681b16a4fbe8cbfb9e3c0b5a9b",
+          "size": 1337,
+          "source": "https://github.com/JetBrains/kotlin/blob/v2.4.20/license/third_party/boost_LICENSE.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlin--kotlin-stdlib--2.4.20.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "72b2b92443956d4c246bed7159afa94c34a1096134d0990f599c80c695ceddbd",
+          "size": 23279,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.20/kotlin-stdlib-2.4.20-sources.jar"
+        }
+      ],
+      "id": "org.jetbrains.kotlin:kotlin-stdlib:2.4.20#boost-math",
+      "license": "BSL-1.0",
+      "name": "Boost-derived inverse hyperbolic math",
+      "noticeScope": "Preserved scoped source texts; unknown standalone version is not inferred.",
+      "parent": "org.jetbrains.kotlin:kotlin-stdlib:2.4.20",
+      "selector": {
+        "classPrefixes": [
+          "kotlin.math.MathKt__MathJVMKt"
+        ]
+      },
+      "version": null
+    },
+    {
+      "disclosure": "Source-embedded portions, not a separately resolved Maven dependency. Standalone imported version unknown.",
+      "evidence": [
+        {
+          "path": "kotlin/guava_license.txt",
+          "role": "license",
+          "scope": "Kotlin v2.4.20 explicitly maps this license to the corresponding stdlib source portion",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://github.com/JetBrains/kotlin/blob/v2.4.20/license/third_party/guava_license.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlin--kotlin-stdlib--2.4.20.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "72b2b92443956d4c246bed7159afa94c34a1096134d0990f599c80c695ceddbd",
+          "size": 23279,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.20/kotlin-stdlib-2.4.20-sources.jar"
+        }
+      ],
+      "id": "org.jetbrains.kotlin:kotlin-stdlib:2.4.20#guava-unsigned",
+      "license": "Apache-2.0",
+      "name": "Guava-derived unsigned arithmetic",
+      "noticeScope": "Preserved scoped source texts; unknown standalone version is not inferred.",
+      "parent": "org.jetbrains.kotlin:kotlin-stdlib:2.4.20",
+      "selector": {
+        "classPrefixes": [
+          "kotlin.UnsignedKt"
+        ]
+      },
+      "version": null
+    },
+    {
+      "disclosure": "Source-embedded portions, not a separately resolved Maven dependency. Standalone imported version unknown.",
+      "evidence": [
+        {
+          "path": "kotlin/gwt_license.txt",
+          "role": "license",
+          "scope": "Kotlin v2.4.20 explicitly maps this license to the corresponding stdlib source portion",
+          "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+          "size": 11358,
+          "source": "https://github.com/JetBrains/kotlin/blob/v2.4.20/license/third_party/gwt_license.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlin--kotlin-stdlib--2.4.20.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "72b2b92443956d4c246bed7159afa94c34a1096134d0990f599c80c695ceddbd",
+          "size": 23279,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.20/kotlin-stdlib-2.4.20-sources.jar"
+        }
+      ],
+      "id": "org.jetbrains.kotlin:kotlin-stdlib:2.4.20#gwt",
+      "license": "Apache-2.0",
+      "name": "GWT-derived collection portions",
+      "noticeScope": "Preserved scoped source texts; unknown standalone version is not inferred.",
+      "parent": "org.jetbrains.kotlin:kotlin-stdlib:2.4.20",
+      "selector": {
+        "classPrefixes": [
+          "kotlin.collections.AbstractList",
+          "kotlin.collections.AbstractMap"
+        ]
+      },
+      "version": null
+    },
+    {
+      "disclosure": "Source-embedded portions, not a separately resolved Maven dependency. Standalone imported version unknown.",
+      "evidence": [
+        {
+          "path": "kotlin/threetenbp_license.txt",
+          "role": "license",
+          "scope": "Kotlin v2.4.20 explicitly maps this license to the corresponding stdlib source portion",
+          "sha256": "d1bc53b493a3ab387b42717ed5c4b1976a5048996f81154278100bff86d39331",
+          "size": 1520,
+          "source": "https://github.com/JetBrains/kotlin/blob/v2.4.20/license/third_party/threetenbp_license.txt"
+        },
+        {
+          "path": "attribution/org.jetbrains.kotlin--kotlin-stdlib--2.4.20.txt",
+          "role": "attribution",
+          "scope": "Full copyright/license headers and legal members in this exact published source archive; source-set scope can exceed the Android payload, not proof that every source file ships.",
+          "sha256": "72b2b92443956d4c246bed7159afa94c34a1096134d0990f599c80c695ceddbd",
+          "size": 23279,
+          "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlin/kotlin-stdlib/2.4.20/kotlin-stdlib-2.4.20-sources.jar"
+        }
+      ],
+      "id": "org.jetbrains.kotlin:kotlin-stdlib:2.4.20#threetenbp",
+      "license": "BSD-3-Clause",
+      "name": "ThreeTenBP-derived time portions",
+      "noticeScope": "Preserved scoped source texts; unknown standalone version is not inferred.",
+      "parent": "org.jetbrains.kotlin:kotlin-stdlib:2.4.20",
+      "selector": {
+        "classPrefixes": [
+          "kotlin.time.Instant"
+        ]
+      },
+      "version": null
+    }
+  ],
+  "kind": "runtime-attribution-catalog",
+  "policy": "Owner-approved bounded attribution: exact selected artifacts and known embedded identities; preserved full relevant source-backed notices; unknown standalone versions explicit. No legal warranty, universal historical completeness proof, signing or publication admission.",
+  "schema": 1
+}

@@ -1,0 +1,525 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-android/1.12.1/ui-android-1.12.1-sources.jar
+Source archive SHA-256: 8ddde80690da97cd840c6f8f59c608701f9e42c245f12f0eabc1434db57e0273
+
+Source members:
+  androidMain/androidx/compose/ui/autofill/AndroidAutofill.android.kt
+  androidMain/androidx/compose/ui/graphics/vector/compat/AndroidVectorResources.android.kt
+  androidMain/androidx/compose/ui/graphics/vector/compat/XmlVectorParser.android.kt
+  androidMain/androidx/compose/ui/input/pointer/MotionEventAdapter.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidComposeView.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidFontResourceLoader.android.kt
+  androidMain/androidx/compose/ui/res/ColorResources.android.kt
+  androidMain/androidx/compose/ui/res/ImageResources.android.kt
+  androidMain/androidx/compose/ui/res/PrimitiveResources.android.kt
+  androidMain/androidx/compose/ui/res/StringResources.android.kt
+  androidMain/androidx/compose/ui/res/VectorResources.android.kt
+  androidMain/androidx/compose/ui/text/input/InputState.android.kt
+  androidMain/androidx/compose/ui/text/input/RecordingInputConnection.android.kt
+  androidMain/androidx/compose/ui/text/input/TextInputServiceAndroid.android.kt
+  commonMain/androidx/compose/ui/Alignment.kt
+  commonMain/androidx/compose/ui/Modifier.kt
+  commonMain/androidx/compose/ui/autofill/Autofill.kt
+  commonMain/androidx/compose/ui/autofill/AutofillTree.kt
+  commonMain/androidx/compose/ui/draw/DrawModifier.kt
+  commonMain/androidx/compose/ui/graphics/vector/ImageVector.kt
+  commonMain/androidx/compose/ui/graphics/vector/Vector.kt
+  commonMain/androidx/compose/ui/input/pointer/InternalPointerInput.kt
+  commonMain/androidx/compose/ui/input/pointer/PointerInputTestUtil.kt
+  commonMain/androidx/compose/ui/input/pointer/util/VelocityTracker.kt
+  commonMain/androidx/compose/ui/layout/IntrinsicMeasurable.kt
+  commonMain/androidx/compose/ui/node/LayoutNode.kt
+  commonMain/androidx/compose/ui/platform/DebugUtils.kt
+  commonMain/androidx/compose/ui/platform/InspectionMode.kt
+  commonMain/androidx/compose/ui/platform/TestTag.kt
+  commonMain/androidx/compose/ui/semantics/SemanticsConfiguration.kt
+  commonMain/androidx/compose/ui/semantics/SemanticsNode.kt
+  commonMain/androidx/compose/ui/semantics/SemanticsOwner.kt
+  commonMain/androidx/compose/ui/semantics/SemanticsProperties.kt
+
+/*
+ * Copyright 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/autofill/AndroidAutofillType.android.kt
+  androidMain/androidx/compose/ui/hapticfeedback/PlatformHapticFeedback.android.kt
+  androidMain/androidx/compose/ui/input/key/Key.android.kt
+  androidMain/androidx/compose/ui/input/key/KeyEvent.android.kt
+  androidMain/androidx/compose/ui/input/pointer/InternalPointerEvent.android.kt
+  androidMain/androidx/compose/ui/input/pointer/PointerEvent.android.kt
+  androidMain/androidx/compose/ui/input/pointer/PointerInputEvent.android.kt
+  androidMain/androidx/compose/ui/input/pointer/PointerInteropFilter.android.kt
+  androidMain/androidx/compose/ui/input/pointer/PointerInteropUtils.android.kt
+  androidMain/androidx/compose/ui/node/UiApplier.android.kt
+  androidMain/androidx/compose/ui/node/ViewInterop.android.kt
+  androidMain/androidx/compose/ui/platform/AccessibilityIterators.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidClipboardManager.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidComposeViewAccessibilityDelegateCompat.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidCompositionLocals.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidTextToolbar.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidUriHandler.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidViewConfiguration.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidViewsHandler.android.kt
+  androidMain/androidx/compose/ui/platform/ComposeView.android.kt
+  androidMain/androidx/compose/ui/platform/DeviceRenderNode.android.kt
+  androidMain/androidx/compose/ui/platform/DisposableSaveableStateRegistry.android.kt
+  androidMain/androidx/compose/ui/platform/GlobalSnapshotManager.android.kt
+  androidMain/androidx/compose/ui/platform/OutlineResolver.android.kt
+  androidMain/androidx/compose/ui/platform/RenderNodeApi23.android.kt
+  androidMain/androidx/compose/ui/platform/RenderNodeApi29.android.kt
+  androidMain/androidx/compose/ui/platform/RenderNodeLayer.android.kt
+  androidMain/androidx/compose/ui/platform/ViewCompositionStrategy.android.kt
+  androidMain/androidx/compose/ui/platform/ViewLayer.android.kt
+  androidMain/androidx/compose/ui/platform/ViewLayerContainer.android.kt
+  androidMain/androidx/compose/ui/platform/ViewRootForTest.android.kt
+  androidMain/androidx/compose/ui/platform/WindowRecomposer.android.kt
+  androidMain/androidx/compose/ui/platform/Wrapper.android.kt
+  androidMain/androidx/compose/ui/platform/actionmodecallback/FloatingTextActionModeCallback.android.kt
+  androidMain/androidx/compose/ui/platform/actionmodecallback/PrimaryTextActionModeCallback.android.kt
+  androidMain/androidx/compose/ui/platform/actionmodecallback/TextActionModeCallback.android.kt
+  androidMain/androidx/compose/ui/res/FontResources.android.kt
+  androidMain/androidx/compose/ui/res/PainterResources.android.kt
+  androidMain/androidx/compose/ui/viewinterop/AndroidView.android.kt
+  androidMain/androidx/compose/ui/viewinterop/AndroidViewHolder.android.kt
+  androidMain/androidx/compose/ui/window/AndroidDialog.android.kt
+  androidMain/androidx/compose/ui/window/AndroidPopup.android.kt
+  androidMain/androidx/compose/ui/window/SecureFlagPolicy.android.kt
+  commonMain/androidx/compose/ui/ComposedModifier.kt
+  commonMain/androidx/compose/ui/ZIndexModifier.kt
+  commonMain/androidx/compose/ui/autofill/AutofillType.kt
+  commonMain/androidx/compose/ui/draganddrop/DragAndDropManager.kt
+  commonMain/androidx/compose/ui/draw/Alpha.kt
+  commonMain/androidx/compose/ui/draw/Clip.kt
+  commonMain/androidx/compose/ui/draw/PainterModifier.kt
+  commonMain/androidx/compose/ui/draw/Rotate.kt
+  commonMain/androidx/compose/ui/draw/Scale.kt
+  commonMain/androidx/compose/ui/draw/Shadow.kt
+  commonMain/androidx/compose/ui/focus/FocusChangedModifier.kt
+  commonMain/androidx/compose/ui/focus/FocusEventModifierNode.kt
+  commonMain/androidx/compose/ui/focus/FocusManager.kt
+  commonMain/androidx/compose/ui/focus/FocusModifier.kt
+  commonMain/androidx/compose/ui/focus/FocusOrderModifier.kt
+  commonMain/androidx/compose/ui/focus/FocusRequester.kt
+  commonMain/androidx/compose/ui/focus/FocusRequesterModifierNode.kt
+  commonMain/androidx/compose/ui/focus/FocusState.kt
+  commonMain/androidx/compose/ui/focus/FocusTraversal.kt
+  commonMain/androidx/compose/ui/graphics/GraphicsLayerModifier.kt
+  commonMain/androidx/compose/ui/graphics/GraphicsLayerScope.kt
+  commonMain/androidx/compose/ui/graphics/TransformOrigin.kt
+  commonMain/androidx/compose/ui/graphics/vector/DrawCache.kt
+  commonMain/androidx/compose/ui/graphics/vector/VectorCompose.kt
+  commonMain/androidx/compose/ui/graphics/vector/VectorPainter.kt
+  commonMain/androidx/compose/ui/hapticfeedback/HapticFeedback.kt
+  commonMain/androidx/compose/ui/hapticfeedback/HapticFeedbackType.kt
+  commonMain/androidx/compose/ui/input/key/Key.kt
+  commonMain/androidx/compose/ui/input/key/KeyEvent.kt
+  commonMain/androidx/compose/ui/input/key/KeyInputModifier.kt
+  commonMain/androidx/compose/ui/input/nestedscroll/NestedScrollModifier.kt
+  commonMain/androidx/compose/ui/input/pointer/HitPathTracker.kt
+  commonMain/androidx/compose/ui/input/pointer/PointerEvent.kt
+  commonMain/androidx/compose/ui/input/pointer/PointerInputEventProcessor.kt
+  commonMain/androidx/compose/ui/input/pointer/SuspendingPointerInputFilter.kt
+  commonMain/androidx/compose/ui/layout/AlignmentLine.kt
+  commonMain/androidx/compose/ui/layout/ContentScale.kt
+  commonMain/androidx/compose/ui/layout/IntrinsicMeasureScope.kt
+  commonMain/androidx/compose/ui/layout/Layout.kt
+  commonMain/androidx/compose/ui/layout/LayoutCoordinates.kt
+  commonMain/androidx/compose/ui/layout/LayoutId.kt
+  commonMain/androidx/compose/ui/layout/LayoutInfo.kt
+  commonMain/androidx/compose/ui/layout/LayoutModifier.kt
+  commonMain/androidx/compose/ui/layout/Measurable.kt
+  commonMain/androidx/compose/ui/layout/MeasureScope.kt
+  commonMain/androidx/compose/ui/layout/Measured.kt
+  commonMain/androidx/compose/ui/layout/OnGloballyPositionedModifier.kt
+  commonMain/androidx/compose/ui/layout/OnRemeasuredModifier.kt
+  commonMain/androidx/compose/ui/layout/ParentDataModifier.kt
+  commonMain/androidx/compose/ui/layout/Placeable.kt
+  commonMain/androidx/compose/ui/layout/RemeasurementModifier.kt
+  commonMain/androidx/compose/ui/layout/RootMeasurePolicy.kt
+  commonMain/androidx/compose/ui/layout/ScaleFactor.kt
+  commonMain/androidx/compose/ui/layout/SubcomposeLayout.kt
+  commonMain/androidx/compose/ui/layout/TestModifierUpdater.kt
+  commonMain/androidx/compose/ui/node/DepthSortedSet.kt
+  commonMain/androidx/compose/ui/node/InternalCoreApi.kt
+  commonMain/androidx/compose/ui/node/LayoutNodeDrawScope.kt
+  commonMain/androidx/compose/ui/node/LayoutNodeLayoutDelegate.kt
+  commonMain/androidx/compose/ui/node/LayoutTreeConsistencyChecker.kt
+  commonMain/androidx/compose/ui/node/MeasureAndLayoutDelegate.kt
+  commonMain/androidx/compose/ui/node/MeasureBlocks.kt
+  commonMain/androidx/compose/ui/node/OnPositionedDispatcher.kt
+  commonMain/androidx/compose/ui/node/OwnedLayer.kt
+  commonMain/androidx/compose/ui/node/Owner.kt
+  commonMain/androidx/compose/ui/node/OwnerScope.kt
+  commonMain/androidx/compose/ui/node/OwnerSnapshotObserver.kt
+  commonMain/androidx/compose/ui/node/Ref.kt
+  commonMain/androidx/compose/ui/node/SortedSet.kt
+  commonMain/androidx/compose/ui/platform/AtomicInt.kt
+  commonMain/androidx/compose/ui/platform/ClassHelpers.kt
+  commonMain/androidx/compose/ui/platform/ClipboardManager.kt
+  commonMain/androidx/compose/ui/platform/CompositionLocals.kt
+  commonMain/androidx/compose/ui/platform/InspectableValue.kt
+  commonMain/androidx/compose/ui/platform/Subcomposition.kt
+  commonMain/androidx/compose/ui/platform/TextToolbar.kt
+  commonMain/androidx/compose/ui/platform/TextToolbarStatus.kt
+  commonMain/androidx/compose/ui/platform/UriHandler.kt
+  commonMain/androidx/compose/ui/platform/ViewConfiguration.kt
+  commonMain/androidx/compose/ui/semantics/SemanticsModifier.kt
+  commonMain/androidx/compose/ui/state/ToggleableState.kt
+  commonMain/androidx/compose/ui/window/Popup.kt
+  jvmAndAndroidMain/androidx/compose/ui/node/JvmTreeSet.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/ui/platform/JvmActuals.jvmAndAndroid.kt
+
+/*
+ * Copyright 2020 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/input/pointer/PointerIcon.android.kt
+  androidMain/androidx/compose/ui/layout/GraphicLayerInfo.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidAccessibilityManager.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidUiDispatcher.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidUiFrameClock.android.kt
+  androidMain/androidx/compose/ui/platform/LayerMatrixCache.android.kt
+  androidMain/androidx/compose/ui/platform/ViewRootForInspector.android.kt
+  androidMain/androidx/compose/ui/platform/WeakCache.android.kt
+  androidMain/androidx/compose/ui/platform/accessibility/CollectionInfo.android.kt
+  androidMain/androidx/compose/ui/text/input/InputEventCallback2.android.kt
+  androidMain/androidx/compose/ui/text/input/InputMethodManager.android.kt
+  commonMain/androidx/compose/ui/UiComposable.kt
+  commonMain/androidx/compose/ui/draw/Blur.kt
+  commonMain/androidx/compose/ui/focus/FocusProperties.kt
+  commonMain/androidx/compose/ui/focus/FocusTransactions.kt
+  commonMain/androidx/compose/ui/focus/OneDimensionalFocusSearch.kt
+  commonMain/androidx/compose/ui/focus/TwoDimensionalFocusSearch.kt
+  commonMain/androidx/compose/ui/graphics/vector/VectorComposable.kt
+  commonMain/androidx/compose/ui/input/InputModeManager.kt
+  commonMain/androidx/compose/ui/input/pointer/PointerIcon.kt
+  commonMain/androidx/compose/ui/input/rotary/RotaryInputModifier.kt
+  commonMain/androidx/compose/ui/input/rotary/RotaryScrollEvent.kt
+  commonMain/androidx/compose/ui/layout/MeasurePolicy.kt
+  commonMain/androidx/compose/ui/layout/OnPlacedModifier.kt
+  commonMain/androidx/compose/ui/modifier/ModifierLocal.kt
+  commonMain/androidx/compose/ui/modifier/ModifierLocalConsumer.kt
+  commonMain/androidx/compose/ui/modifier/ModifierLocalProvider.kt
+  commonMain/androidx/compose/ui/node/ComposeUiNode.kt
+  commonMain/androidx/compose/ui/node/HitTestResult.kt
+  commonMain/androidx/compose/ui/node/IntrinsicsPolicy.kt
+  commonMain/androidx/compose/ui/node/LayoutNodeAlignmentLines.kt
+  commonMain/androidx/compose/ui/node/RootForTest.kt
+  commonMain/androidx/compose/ui/platform/AccessibilityManager.kt
+  commonMain/androidx/compose/ui/platform/InfiniteAnimationPolicy.kt
+  commonMain/androidx/compose/ui/platform/InvertMatrix.kt
+  commonMain/androidx/compose/ui/platform/ShapeContainingUtil.kt
+  commonMain/androidx/compose/ui/platform/SoftwareKeyboardController.kt
+  commonMain/androidx/compose/ui/platform/Synchronization.kt
+  commonMain/androidx/compose/ui/platform/WindowInfo.kt
+
+/*
+ * Copyright 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/platform/NestedScrollInteropConnection.android.kt
+  androidMain/androidx/compose/ui/res/Resources.android.kt
+  androidMain/androidx/compose/ui/semantics/SemanticsProperties.android.kt
+  androidMain/androidx/compose/ui/text/input/CursorAnchorInfoBuilder.android.kt
+  commonMain/androidx/compose/ui/Expect.kt
+  commonMain/androidx/compose/ui/MotionDurationScale.kt
+  commonMain/androidx/compose/ui/focus/BeyondBoundsLayout.kt
+  commonMain/androidx/compose/ui/focus/FocusInvalidationManager.kt
+  commonMain/androidx/compose/ui/focus/FocusOwner.kt
+  commonMain/androidx/compose/ui/input/nestedscroll/NestedScrollNode.kt
+  commonMain/androidx/compose/ui/internal/JvmDefaultWithCompatibility.kt
+  commonMain/androidx/compose/ui/layout/BeyondBoundsLayout.kt
+  commonMain/androidx/compose/ui/layout/LookaheadLayoutCoordinates.kt
+  commonMain/androidx/compose/ui/layout/LookaheadScope.kt
+  commonMain/androidx/compose/ui/layout/MultiContentMeasurePolicy.kt
+  commonMain/androidx/compose/ui/layout/PinnableContainer.kt
+  commonMain/androidx/compose/ui/layout/Ruler.kt
+  commonMain/androidx/compose/ui/modifier/ModifierLocalManager.kt
+  commonMain/androidx/compose/ui/modifier/ModifierLocalModifierNode.kt
+  commonMain/androidx/compose/ui/node/BackwardsCompatNode.kt
+  commonMain/androidx/compose/ui/node/DelegatableNode.kt
+  commonMain/androidx/compose/ui/node/DelegatingNode.kt
+  commonMain/androidx/compose/ui/node/DrawModifierNode.kt
+  commonMain/androidx/compose/ui/node/GlobalPositionAwareModifierNode.kt
+  commonMain/androidx/compose/ui/node/InnerNodeCoordinator.kt
+  commonMain/androidx/compose/ui/node/LayoutAwareModifierNode.kt
+  commonMain/androidx/compose/ui/node/LayoutModifierNode.kt
+  commonMain/androidx/compose/ui/node/LayoutModifierNodeCoordinator.kt
+  commonMain/androidx/compose/ui/node/LookaheadDelegate.kt
+  commonMain/androidx/compose/ui/node/MeasureScopeWithLayoutNode.kt
+  commonMain/androidx/compose/ui/node/ModifierNodeElement.kt
+  commonMain/androidx/compose/ui/node/MutableVectorWithMutationTracking.kt
+  commonMain/androidx/compose/ui/node/MyersDiff.kt
+  commonMain/androidx/compose/ui/node/NodeChain.kt
+  commonMain/androidx/compose/ui/node/NodeCoordinator.kt
+  commonMain/androidx/compose/ui/node/NodeKind.kt
+  commonMain/androidx/compose/ui/node/ObserverModifierNode.kt
+  commonMain/androidx/compose/ui/node/ParentDataModifierNode.kt
+  commonMain/androidx/compose/ui/node/PointerInputModifierNode.kt
+  commonMain/androidx/compose/ui/node/SemanticsModifierNode.kt
+  commonMain/androidx/compose/ui/text/TextMeasurerHelper.kt
+  jvmAndAndroidMain/androidx/compose/ui/internal/JvmDefaultWithCompatibility.jvmAndAndroid.kt
+
+/*
+ * Copyright 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/draganddrop/ComposeDragShadowBuilder.android.kt
+  androidMain/androidx/compose/ui/draganddrop/DragAndDrop.android.kt
+  androidMain/androidx/compose/ui/focus/FocusInteropUtils.android.kt
+  androidMain/androidx/compose/ui/input/rotary/RotaryScrollEvent.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidPlatformTextInputSession.android.kt
+  androidMain/androidx/compose/ui/platform/ClipboardExtensions.android.kt
+  androidMain/androidx/compose/ui/platform/PlatformTextInputMethodRequest.android.kt
+  androidMain/androidx/compose/ui/platform/PlatformTextInputSession.android.kt
+  androidMain/androidx/compose/ui/platform/coreshims/AutofillIdCompat.java
+  androidMain/androidx/compose/ui/platform/coreshims/ContentCaptureSessionCompat.java
+  androidMain/androidx/compose/ui/platform/coreshims/ViewCompatShims.java
+  androidMain/androidx/compose/ui/platform/coreshims/ViewStructureCompat.java
+  androidMain/androidx/compose/ui/text/input/CursorAnchorInfoController.android.kt
+  androidMain/androidx/compose/ui/text/input/NullableInputConnectionWrapper.android.kt
+  androidMain/androidx/compose/ui/viewinterop/InteropView.android.kt
+  androidMain/androidx/compose/ui/viewinterop/InteropViewFactoryHolder.android.kt
+  commonMain/androidx/compose/ui/AtomicReference.kt
+  commonMain/androidx/compose/ui/SessionMutex.kt
+  commonMain/androidx/compose/ui/draganddrop/DragAndDrop.kt
+  commonMain/androidx/compose/ui/draganddrop/DragAndDropNode.kt
+  commonMain/androidx/compose/ui/focus/FocusDirection.kt
+  commonMain/androidx/compose/ui/focus/FocusEventModifier.kt
+  commonMain/androidx/compose/ui/focus/FocusOwnerImpl.kt
+  commonMain/androidx/compose/ui/focus/FocusPropertiesModifierNode.kt
+  commonMain/androidx/compose/ui/focus/FocusRequesterModifier.kt
+  commonMain/androidx/compose/ui/focus/FocusRestorer.kt
+  commonMain/androidx/compose/ui/focus/FocusTargetModifierNode.kt
+  commonMain/androidx/compose/ui/focus/FocusTargetNode.kt
+  commonMain/androidx/compose/ui/input/key/KeyInputModifierNode.kt
+  commonMain/androidx/compose/ui/input/key/SoftKeyboardInterceptionModifierNode.kt
+  commonMain/androidx/compose/ui/input/key/SoftwareKeyboardInterceptionModifier.kt
+  commonMain/androidx/compose/ui/input/pointer/util/PointerIdArray.kt
+  commonMain/androidx/compose/ui/input/rotary/RotaryInputModifierNode.kt
+  commonMain/androidx/compose/ui/internal/InlineClassHelper.kt
+  commonMain/androidx/compose/ui/layout/PlacementScopeMarker.kt
+  commonMain/androidx/compose/ui/node/CompositionLocalConsumerModifierNode.kt
+  commonMain/androidx/compose/ui/node/InteroperableComposeUiNode.kt
+  commonMain/androidx/compose/ui/node/TraversableNode.kt
+  commonMain/androidx/compose/ui/node/WeakReference.kt
+  commonMain/androidx/compose/ui/platform/PlatformTextInputMethodRequest.kt
+  commonMain/androidx/compose/ui/platform/PlatformTextInputModifierNode.kt
+  commonMain/androidx/compose/ui/semantics/SemanticsSort.kt
+  commonMain/androidx/compose/ui/viewinterop/InteropView.kt
+  commonMain/androidx/compose/ui/viewinterop/InteropViewFactoryHolder.kt
+  jvmAndAndroidMain/androidx/compose/ui/AtomicReference.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/ui/node/WeakReference.jvmAndAndroid.kt
+
+/*
+ * Copyright 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/Actual.android.kt
+  androidMain/androidx/compose/ui/autofill/AndroidAutofillManager.android.kt
+  androidMain/androidx/compose/ui/autofill/AutofillUtils.android.kt
+  androidMain/androidx/compose/ui/autofill/ContentDataType.android.kt
+  androidMain/androidx/compose/ui/autofill/ContentType.android.kt
+  androidMain/androidx/compose/ui/autofill/PlatformAutofillManager.android.kt
+  androidMain/androidx/compose/ui/autofill/PopulateViewStructure.android.kt
+  androidMain/androidx/compose/ui/contentcapture/AndroidContentCaptureManager.android.kt
+  androidMain/androidx/compose/ui/contentcapture/ContentCaptureManager.android.kt
+  androidMain/androidx/compose/ui/contentcapture/ContentCaptureSessionWrapper.android.kt
+  androidMain/androidx/compose/ui/draganddrop/AndroidDragAndDropManager.android.kt
+  androidMain/androidx/compose/ui/layout/LayoutInfo.android.kt
+  androidMain/androidx/compose/ui/layout/WindowInsetsRulers.android.kt
+  androidMain/androidx/compose/ui/node/DelegatableNode.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidClipboard.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidWindowInfo.android.kt
+  androidMain/androidx/compose/ui/platform/GraphicsLayerOwnerLayer.android.kt
+  androidMain/androidx/compose/ui/platform/HapticFeedback.android.kt
+  androidMain/androidx/compose/ui/platform/SemanticsUtils.android.kt
+  androidMain/androidx/compose/ui/platform/Synchronization.android.kt
+  androidMain/androidx/compose/ui/scrollcapture/ComposeScrollCaptureCallback.android.kt
+  androidMain/androidx/compose/ui/scrollcapture/ScrollCapture.android.kt
+  androidMain/androidx/compose/ui/semantics/SemanticsRegion.android.kt
+  androidMain/androidx/compose/ui/spatial/RectListDebugger.android.kt
+  androidMain/androidx/compose/ui/viewinterop/FocusGroupNode.android.kt
+  commonMain/androidx/compose/ui/ComposeUiFlags.kt
+  commonMain/androidx/compose/ui/SensitiveContent.kt
+  commonMain/androidx/compose/ui/autofill/AutofillManager.kt
+  commonMain/androidx/compose/ui/autofill/ContentDataType.kt
+  commonMain/androidx/compose/ui/autofill/ContentType.kt
+  commonMain/androidx/compose/ui/focus/Focusability.kt
+  commonMain/androidx/compose/ui/internal/PlatformOptimizedCancellationException.kt
+  commonMain/androidx/compose/ui/layout/ApproachLayoutModifierNode.kt
+  commonMain/androidx/compose/ui/layout/ApproachMeasureScope.kt
+  commonMain/androidx/compose/ui/layout/OnGlobalLayoutListener.kt
+  commonMain/androidx/compose/ui/layout/OnLayoutRectChangedModifier.kt
+  commonMain/androidx/compose/ui/layout/RectRulers.kt
+  commonMain/androidx/compose/ui/node/LookaheadPassDelegate.kt
+  commonMain/androidx/compose/ui/node/MeasurePassDelegate.kt
+  commonMain/androidx/compose/ui/node/TouchBoundsExpansion.kt
+  commonMain/androidx/compose/ui/platform/Clipboard.kt
+  commonMain/androidx/compose/ui/relocation/BringIntoViewModifierNode.kt
+  commonMain/androidx/compose/ui/semantics/SemanticsInfo.kt
+  commonMain/androidx/compose/ui/semantics/SemanticsListener.kt
+  commonMain/androidx/compose/ui/semantics/SemanticsRegion.kt
+  commonMain/androidx/compose/ui/spatial/RectList.kt
+  commonMain/androidx/compose/ui/spatial/RectManager.kt
+  commonMain/androidx/compose/ui/spatial/RelativeLayoutBounds.kt
+  commonMain/androidx/compose/ui/spatial/ThrottledCallbacks.kt
+  commonMain/androidx/compose/ui/window/Dialog.kt
+  jvmAndAndroidMain/androidx/compose/ui/input/pointer/SuspendingPointerInputFilter.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/ui/internal/PlatformOptimizedCancellationException.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/ui/semantics/SemanticsModifier.jvmAndAndroid.kt
+
+/*
+ * Copyright 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/autofill/FillableData.android.kt
+  androidMain/androidx/compose/ui/input/indirect/AndroidIndirectPointerEvent.android.kt
+  androidMain/androidx/compose/ui/input/pointer/util/PlatformVelocityTracker.android.kt
+  androidMain/androidx/compose/ui/layout/ValueInsets.android.kt
+  androidMain/androidx/compose/ui/platform/AutoClearFocusBehavior.android.kt
+  androidMain/androidx/compose/ui/platform/ComposeViewContext.android.kt
+  androidMain/androidx/compose/ui/platform/LifecycleRetainedValuesStoreOwner.android.kt
+  androidMain/androidx/compose/ui/semantics/SemanticsNode.android.kt
+  commonMain/androidx/compose/ui/FrameRate.kt
+  commonMain/androidx/compose/ui/FrameRateCategory.kt
+  commonMain/androidx/compose/ui/KeepScreenOn.kt
+  commonMain/androidx/compose/ui/autofill/AutofillModifier.kt
+  commonMain/androidx/compose/ui/autofill/FillableData.kt
+  commonMain/androidx/compose/ui/focus/FocusListener.kt
+  commonMain/androidx/compose/ui/focus/PlatformFocusOwner.kt
+  commonMain/androidx/compose/ui/focus/RequestChildFocus.kt
+  commonMain/androidx/compose/ui/input/indirect/IndirectPointerEvent.kt
+  commonMain/androidx/compose/ui/input/indirect/IndirectPointerInputModifierNode.kt
+  commonMain/androidx/compose/ui/input/pointer/util/PlatformVelocityTracker.kt
+  commonMain/androidx/compose/ui/layout/LayoutBoundsHolder.kt
+  commonMain/androidx/compose/ui/layout/OnFirstVisibleModifier.kt
+  commonMain/androidx/compose/ui/layout/OnVisibilityChangedModifier.kt
+  commonMain/androidx/compose/ui/layout/WindowInsetsRulers.kt
+  commonMain/androidx/compose/ui/node/MeasuredSizeAwareModifierNode.kt
+  commonMain/androidx/compose/ui/node/OutOfFrameExecutor.kt
+  commonMain/androidx/compose/ui/node/UnplacedAwareModifierNode.kt
+  jvmAndAndroidMain/androidx/compose/ui/Actual.jvmAndAndroid.kt
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/AndroidComposeUiFlags.android.kt
+  androidMain/androidx/compose/ui/adaptive/MediaQuery.android.kt
+  androidMain/androidx/compose/ui/graphics/MeshGradientRenderer.android.kt
+  androidMain/androidx/compose/ui/graphics/MeshGradientRendererImpl.android.kt
+  androidMain/androidx/compose/ui/platform/AndroidSoundEffect.android.kt
+  androidMain/androidx/compose/ui/platform/SoundEffectOnInteraction.android.kt
+  androidMain/androidx/compose/ui/platform/ViewTreeHostDefaultProvider.android.kt
+  commonMain/androidx/compose/ui/MediaQuery.kt
+  commonMain/androidx/compose/ui/graphics/MeshGradient.kt
+  commonMain/androidx/compose/ui/graphics/MeshGradientConfig.kt
+  commonMain/androidx/compose/ui/graphics/MeshGradientRenderer.kt
+  commonMain/androidx/compose/ui/platform/SoundEffect.kt
+
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */

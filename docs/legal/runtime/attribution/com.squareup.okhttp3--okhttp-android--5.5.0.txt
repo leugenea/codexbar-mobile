@@ -1,0 +1,709 @@
+Published source archive: https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp-android/5.5.0/okhttp-android-5.5.0-sources.jar
+Source archive SHA-256: a6f0fb39a3af37cc6ef02126466fd03c59437d75e2b175598d9b733c1e31afbf
+
+Source members:
+  commonJvmAndroid/okhttp3/Connection.kt
+  commonJvmAndroid/okhttp3/ConnectionPool.kt
+  commonJvmAndroid/okhttp3/Headers.kt
+  commonJvmAndroid/okhttp3/internal/-HeadersCommon.kt
+  commonJvmAndroid/okhttp3/internal/cache/CacheInterceptor.kt
+  commonJvmAndroid/okhttp3/internal/connection/ConnectInterceptor.kt
+  commonJvmAndroid/okhttp3/internal/connection/RealConnection.kt
+  commonJvmAndroid/okhttp3/internal/connection/RealConnectionPool.kt
+  commonJvmAndroid/okhttp3/internal/http/BridgeInterceptor.kt
+  commonJvmAndroid/okhttp3/internal/tls/CertificateChainCleaner.kt
+  commonJvmAndroid/okhttp3/internal/tls/OkHostnameVerifier.kt
+
+/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the "License"); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/internal/http/HttpStatusCodes.kt
+
+/*
+ * ====================================================================
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ * ====================================================================
+ *
+ * This software consists of voluntary contributions made by many
+ * individuals on behalf of the Apache Software Foundation.  For more
+ * information on the Apache Software Foundation, please see
+ * <http://www.apache.org/>.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/Cache.kt
+
+/*
+ * Copyright (C) 2010 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/internal/cache/DiskLruCache.kt
+  commonJvmAndroid/okhttp3/internal/http/DateFormatting.kt
+  commonJvmAndroid/okhttp3/internal/http2/Http2Connection.kt
+  commonJvmAndroid/okhttp3/internal/http2/Http2Reader.kt
+  commonJvmAndroid/okhttp3/internal/http2/Http2Stream.kt
+  commonJvmAndroid/okhttp3/internal/http2/Http2Writer.kt
+
+/*
+ * Copyright (C) 2011 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/Dns.kt
+  commonJvmAndroid/okhttp3/OkHttpClient.kt
+  commonJvmAndroid/okhttp3/internal/connection/RouteSelector.kt
+  commonJvmAndroid/okhttp3/internal/dns/InetAddressDns.kt
+  commonJvmAndroid/okhttp3/internal/http2/Settings.kt
+
+/*
+ * Copyright (C) 2012 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/internal/platform/Platform.kt
+
+/*
+ * Copyright (C) 2012 Square, Inc.
+ * Copyright (C) 2012 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/Address.kt
+  commonJvmAndroid/okhttp3/internal/-NormalizeJvm.kt
+  commonJvmAndroid/okhttp3/internal/-UtilJvm.kt
+  commonJvmAndroid/okhttp3/internal/http/ExchangeCodec.kt
+  commonJvmAndroid/okhttp3/internal/http/HttpHeaders.kt
+  commonJvmAndroid/okhttp3/internal/http1/HeadersReader.kt
+  commonJvmAndroid/okhttp3/internal/http1/Http1ExchangeCodec.kt
+  commonJvmAndroid/okhttp3/internal/http2/Http2ExchangeCodec.kt
+
+/*
+ * Copyright (C) 2012 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/Dispatcher.kt
+  commonJvmAndroid/okhttp3/Handshake.kt
+  commonJvmAndroid/okhttp3/MediaType.kt
+  commonJvmAndroid/okhttp3/Request.kt
+  commonJvmAndroid/okhttp3/Response.kt
+  commonJvmAndroid/okhttp3/Route.kt
+  commonJvmAndroid/okhttp3/internal/authenticator/JavaNetAuthenticator.kt
+  commonJvmAndroid/okhttp3/internal/cache/CacheStrategy.kt
+  commonJvmAndroid/okhttp3/internal/connection/RouteDatabase.kt
+  commonJvmAndroid/okhttp3/internal/http/RequestLine.kt
+  commonJvmAndroid/okhttp3/internal/http2/ErrorCode.kt
+  commonJvmAndroid/okhttp3/internal/http2/Hpack.kt
+  commonJvmAndroid/okhttp3/internal/http2/Http2.kt
+
+/*
+ * Copyright (C) 2013 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/Callback.kt
+  commonJvmAndroid/okhttp3/CertificatePinner.kt
+  commonJvmAndroid/okhttp3/Challenge.kt
+  commonJvmAndroid/okhttp3/CipherSuite.kt
+  commonJvmAndroid/okhttp3/ConnectionSpec.kt
+  commonJvmAndroid/okhttp3/Credentials.kt
+  commonJvmAndroid/okhttp3/FormBody.kt
+  commonJvmAndroid/okhttp3/Interceptor.kt
+  commonJvmAndroid/okhttp3/MultipartBody.kt
+  commonJvmAndroid/okhttp3/OkHttp.kt
+  commonJvmAndroid/okhttp3/Protocol.kt
+  commonJvmAndroid/okhttp3/RequestBody.kt
+  commonJvmAndroid/okhttp3/ResponseBody.kt
+  commonJvmAndroid/okhttp3/TlsVersion.kt
+  commonJvmAndroid/okhttp3/internal/cache/CacheRequest.kt
+  commonJvmAndroid/okhttp3/internal/connection/RealCall.kt
+  commonJvmAndroid/okhttp3/internal/http/HttpMethod.kt
+  commonJvmAndroid/okhttp3/internal/http/RealResponseBody.kt
+  commonJvmAndroid/okhttp3/internal/http2/Header.kt
+  commonJvmAndroid/okhttp3/internal/http2/PushObserver.kt
+  commonJvmAndroid/okhttp3/internal/ws/WebSocketProtocol.kt
+  commonJvmAndroid/okhttp3/internal/ws/WebSocketReader.kt
+  commonJvmAndroid/okhttp3/internal/ws/WebSocketWriter.kt
+
+/*
+ * Copyright (C) 2014 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/Authenticator.kt
+  commonJvmAndroid/okhttp3/Cookie.kt
+  commonJvmAndroid/okhttp3/CookieJar.kt
+  commonJvmAndroid/okhttp3/HttpUrl.kt
+  commonJvmAndroid/okhttp3/internal/IsProbablyUtf8.kt
+  commonJvmAndroid/okhttp3/internal/cache/FaultHidingSink.kt
+  commonJvmAndroid/okhttp3/internal/connection/RealRoutePlanner.kt
+  commonJvmAndroid/okhttp3/internal/connection/RoutePlanner.kt
+  commonJvmAndroid/okhttp3/internal/connection/SequentialExchangeFinder.kt
+
+/*
+ * Copyright (C) 2015 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/okhttp3/internal/platform/Android10Platform.kt
+  androidMain/okhttp3/internal/platform/AndroidPlatform.kt
+  commonJvmAndroid/okhttp3/WebSocket.kt
+  commonJvmAndroid/okhttp3/WebSocketListener.kt
+  commonJvmAndroid/okhttp3/internal/http/CallServerInterceptor.kt
+  commonJvmAndroid/okhttp3/internal/http/RealInterceptorChain.kt
+  commonJvmAndroid/okhttp3/internal/http/RetryAndFollowUpInterceptor.kt
+  commonJvmAndroid/okhttp3/internal/http2/ConnectionShutdownException.kt
+  commonJvmAndroid/okhttp3/internal/http2/StreamResetException.kt
+  commonJvmAndroid/okhttp3/internal/platform/Jdk9Platform.kt
+  commonJvmAndroid/okhttp3/internal/tls/BasicCertificateChainCleaner.kt
+  commonJvmAndroid/okhttp3/internal/tls/BasicTrustRootIndex.kt
+  commonJvmAndroid/okhttp3/internal/tls/TrustRootIndex.kt
+  commonJvmAndroid/okhttp3/internal/ws/RealWebSocket.kt
+
+/*
+ * Copyright (C) 2016 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/EventListener.kt
+  commonJvmAndroid/okhttp3/internal/connection/ConnectionListener.kt
+  commonJvmAndroid/okhttp3/internal/publicsuffix/PublicSuffixDatabase.kt
+
+/*
+ * Copyright (C) 2017 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/internal/proxy/NullProxySelector.kt
+
+/*
+ * Copyright (C) 2018 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/okhttp3/internal/platform/android/Android10SocketAdapter.kt
+  androidMain/okhttp3/internal/platform/android/AndroidCertificateChainCleaner.kt
+  androidMain/okhttp3/internal/platform/android/AndroidLog.kt
+  androidMain/okhttp3/internal/platform/android/AndroidSocketAdapter.kt
+  androidMain/okhttp3/internal/platform/android/BouncyCastleSocketAdapter.kt
+  androidMain/okhttp3/internal/platform/android/ConscryptSocketAdapter.kt
+  androidMain/okhttp3/internal/platform/android/DeferredSocketAdapter.kt
+  androidMain/okhttp3/internal/platform/android/SocketAdapter.kt
+  androidMain/okhttp3/internal/platform/android/StandardAndroidSocketAdapter.kt
+  commonJvmAndroid/okhttp3/CacheControl.kt
+  commonJvmAndroid/okhttp3/internal/NativeImageTestsAccessors.kt
+  commonJvmAndroid/okhttp3/internal/concurrent/Task.kt
+  commonJvmAndroid/okhttp3/internal/concurrent/TaskLogger.kt
+  commonJvmAndroid/okhttp3/internal/concurrent/TaskQueue.kt
+  commonJvmAndroid/okhttp3/internal/concurrent/TaskRunner.kt
+  commonJvmAndroid/okhttp3/internal/connection/Exchange.kt
+  commonJvmAndroid/okhttp3/internal/internal.kt
+
+/*
+ * Copyright (C) 2019 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/MultipartReader.kt
+  commonJvmAndroid/okhttp3/internal/SuppressSignatureCheck.kt
+  commonJvmAndroid/okhttp3/internal/ws/MessageDeflater.kt
+  commonJvmAndroid/okhttp3/internal/ws/MessageInflater.kt
+  commonJvmAndroid/okhttp3/internal/ws/WebSocketExtensions.kt
+
+/*
+ * Copyright (C) 2020 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/internal/-CacheControlCommon.kt
+  commonJvmAndroid/okhttp3/internal/-HostnamesCommon.kt
+  commonJvmAndroid/okhttp3/internal/-UtilCommon.kt
+
+/*
+ * Copyright (C) 2021 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/internal/-InternalVersion.kt
+  commonJvmAndroid/okhttp3/internal/connection/ConnectPlan.kt
+  commonJvmAndroid/okhttp3/internal/connection/RetryTlsHandshake.kt
+
+/*
+ * Copyright (C) 2022 Block, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/internal/UnreadableResponseBody.kt
+  commonJvmAndroid/okhttp3/internal/connection/ExchangeFinder.kt
+  commonJvmAndroid/okhttp3/internal/connection/FailedPlan.kt
+  commonJvmAndroid/okhttp3/internal/connection/FastFallbackExchangeFinder.kt
+  commonJvmAndroid/okhttp3/internal/connection/InetAddressOrder.kt
+  commonJvmAndroid/okhttp3/internal/connection/ReusePlan.kt
+  commonJvmAndroid/okhttp3/internal/idn/Punycode.kt
+  commonJvmAndroid/okhttp3/internal/url/-Url.kt
+
+/*
+ * Copyright (C) 2022 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/internal/http2/FlowControlListener.kt
+
+/*
+ * Copyright (C) 2023 Block, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/internal/http2/flowcontrol/WindowCounter.kt
+  commonJvmAndroid/okhttp3/internal/idn/IdnaMappingTable.kt
+
+/*
+ * Copyright (C) 2023 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/okhttp3/internal/platform/ContextAwarePlatform.kt
+  androidMain/okhttp3/internal/platform/PlatformInitializer.kt
+  androidMain/okhttp3/internal/platform/PlatformRegistry.kt
+  androidMain/okhttp3/internal/publicsuffix/AssetPublicSuffixList.kt
+  androidMain/okhttp3/internal/publicsuffix/PublicSuffixList.android.kt
+  commonJvmAndroid/okhttp3/internal/platform/PlatformRegistry.kt
+  commonJvmAndroid/okhttp3/internal/publicsuffix/BasePublicSuffixList.kt
+  commonJvmAndroid/okhttp3/internal/publicsuffix/PublicSuffixList.kt
+  commonJvmAndroid/okhttp3/internal/publicsuffix/ResourcePublicSuffixList.kt
+
+/*
+ * Copyright (C) 2024 Block, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/internal/connection/AddressPolicy.kt
+
+/*
+ * Copyright (C) 2024 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/okhttp3/OkHttp.android.kt
+  commonJvmAndroid/okhttp3/internal/concurrent/Lockable.kt
+
+/*
+ * Copyright (C) 2025 Block, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/TrailersSource.kt
+  commonJvmAndroid/okhttp3/internal/Tags.kt
+  commonJvmAndroid/okhttp3/internal/connection/BufferedSocket.kt
+  commonJvmAndroid/okhttp3/internal/http/GzipRequestBody.kt
+
+/*
+ * Copyright (C) 2025 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/internal/http/StatusLine.kt
+
+/*
+ * Copyright (c) 2022 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/Call.kt
+
+/*
+ * Copyright (c) 2022 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/CompressionInterceptor.kt
+  commonJvmAndroid/okhttp3/Gzip.kt
+
+/*
+ * Copyright (c) 2025 Block, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/okhttp3/android/AndroidDns.kt
+  androidMain/okhttp3/internal/platform/android/Android17SocketAdapter.kt
+  commonJvmAndroid/okhttp3/DnsCache.kt
+  commonJvmAndroid/okhttp3/internal/OkHttpInternalApi.kt
+  commonJvmAndroid/okhttp3/internal/dns/-DnsMessage.kt
+  commonJvmAndroid/okhttp3/internal/dns/-DnsMessageReader.kt
+  commonJvmAndroid/okhttp3/internal/dns/-DnsMessageWriter.kt
+  commonJvmAndroid/okhttp3/internal/dns/-ExecuteDns.kt
+  commonJvmAndroid/okhttp3/internal/dns/-StateMachineDnsCall.kt
+  commonJvmAndroid/okhttp3/internal/dns/DnsQuery.kt
+  commonJvmAndroid/okhttp3/internal/dns/LookupDnsCall.kt
+  commonJvmAndroid/okhttp3/internal/dns/MemoryCache.kt
+  commonJvmAndroid/okhttp3/internal/dns/RealDnsCache.kt
+  commonJvmAndroid/okhttp3/internal/ech/EchRejectedException.kt
+  commonJvmAndroid/okhttp3/internal/ech/EchRetryPlan.kt
+  commonJvmAndroid/okhttp3/internal/ech/EchUntrustedException.kt
+
+/*
+ * Copyright (c) 2026 OkHttp Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonJvmAndroid/okhttp3/internal/http2/Huffman.kt
+
+/*
+ * Copyright 2013 Twitter, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */

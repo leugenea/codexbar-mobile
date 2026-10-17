@@ -67,7 +67,8 @@ class WorkflowContracts(unittest.TestCase):
         self.assertIn(f'timeout --signal=TERM --kill-after=10s 3m {python} -m pip install', setup)
         for flag in ("--require-hashes", "--no-deps", "--no-cache-dir", "--disable-pip-version-check", "--timeout 30", "--retries 1"):
             self.assertIn(flag, setup)
-        self.assertEqual(re.findall(r"-r\s+(\S+)", setup), [".github/requirements-metrics.txt"])
+        self.assertEqual(re.findall(r"-r\s+(\S+)", setup),
+                         [".github/requirements-metrics.txt", "tools/research/requirements.txt"])
         consumer = steps[discovery]["run"].replace("\\\n", " ")
         self.assertIn(f"{python} -B -m unittest discover -s tools/build -p 'test_*.py' -v", consumer)
         self.assertNotIn("-m pip", consumer)
@@ -103,6 +104,7 @@ class WorkflowContracts(unittest.TestCase):
             ('python3 -m venv "$RUNNER_TEMP/android-build-contract-venv" &&', 'true &&'),
             ('--require-hashes', ''), ('--no-deps', ''),
             ('-r .github/requirements-metrics.txt', '-r .github/requirements-policy.txt'),
+            ('-r tools/research/requirements.txt', ''),
             ('android-build-contract-venv/bin/python" -B', 'other-venv/bin/python" -B'),
             ('timeout --signal=TERM --kill-after=10s 3m', ''),
             ('--timeout 30', ''), ('--retries 1', ''),
@@ -536,7 +538,7 @@ class WorkflowContracts(unittest.TestCase):
                 self.assertNotIn(unsafe, command)
         self.assertEqual(re.findall(r":app:(\w+)", strict), [
             "verifyResolvedToolchain", "lintDebug", "assembleDebug", "lintRelease", "assembleRelease", "processReleaseManifest", "compileDebugUnitTestKotlin",
-            "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest",
+            "compileDebugAndroidTestKotlin", "testDebugUnitTest", "assembleDebugAndroidTest", "collectReleaseRuntimeInventory",
         ])
         self.assertEqual(re.findall(r":app:(\w+)", connected), [
             "verifyResolvedToolchain", "processReleaseManifest", "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",

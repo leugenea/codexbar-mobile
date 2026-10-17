@@ -1,0 +1,2 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/activity/activity-ktx/1.13.0/activity-ktx-1.13.0-sources.jar
+Source archive SHA-256: e3201cf6c56fade2fc70e2f70408260992b83ddf0ccf4b69221a98ae26c02d74

@@ -1,0 +1,607 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "apk": {
+      "additionalProperties": false,
+      "properties": {
+        "filename": {
+          "pattern": "^[A-Za-z0-9_.+-]+\\.apk$",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "filename",
+        "size",
+        "sha256"
+      ],
+      "type": "object"
+    },
+    "artifacts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "classInputSha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "component": {
+            "pattern": "^[A-Za-z0-9_.:+#-]+$",
+            "type": "string"
+          },
+          "definedClasses": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "filename": {
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)(?!.*//)[A-Za-z0-9_.!/-]+$",
+            "type": "string"
+          },
+          "mergedInputs": {
+            "items": {
+              "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)(?!.*//)[A-Za-z0-9_.!+/-]+$",
+              "type": "string"
+            },
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nested": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "member": {
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)(?!.*//)[A-Za-z0-9_.!/-]+$",
+                  "type": "string"
+                },
+                "sha256": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "size": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "member",
+                "size",
+                "sha256"
+              ],
+              "type": "object"
+            },
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "size": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "component",
+          "filename",
+          "size",
+          "sha256",
+          "nested",
+          "mergedInputs",
+          "definedClasses",
+          "classInputSha256"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "attribution": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "disclosure": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)(?!.*//)[A-Za-z0-9_.!/-]+$",
+                  "type": "string"
+                },
+                "role": {
+                  "enum": [
+                    "license",
+                    "notice",
+                    "attribution",
+                    "source"
+                  ]
+                },
+                "scope": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "sha256": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "size": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "source": {
+                  "pattern": "^https://",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "sha256",
+                "size",
+                "source",
+                "scope",
+                "role"
+              ],
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "id": {
+            "pattern": "^[A-Za-z0-9_.:+#-]+$",
+            "type": "string"
+          },
+          "license": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "noticeScope": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "parent": {
+            "pattern": "^[A-Za-z0-9_.:+#-]+$",
+            "type": "string"
+          },
+          "selector": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "members": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "member": {
+                          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)(?!.*//)[A-Za-z0-9_.!/-]+$",
+                          "type": "string"
+                        },
+                        "sha256": {
+                          "pattern": "^[0-9a-f]{64}$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "member",
+                        "sha256"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "members"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "classPrefixes": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "classPrefixes"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "sourceArchive": {
+            "additionalProperties": false,
+            "properties": {
+              "sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "url": {
+                "pattern": "^https://",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url",
+              "sha256"
+            ],
+            "type": "object"
+          },
+          "version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "license",
+          "evidence",
+          "noticeScope",
+          "disclosure"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "buildInputs": {
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "enum": [
+            "dev",
+            "rc",
+            "stable"
+          ]
+        },
+        "debugPackage": {
+          "const": "io.github.leugenea.codexbarmobile.dev"
+        },
+        "releasePackage": {
+          "const": "io.github.leugenea.codexbarmobile"
+        },
+        "source": {
+          "additionalProperties": false,
+          "properties": {
+            "sha": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            },
+            "tree": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "sha",
+            "tree"
+          ],
+          "type": "object"
+        },
+        "tag": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "versionCode": {
+          "maximum": 2100000000,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "versionName": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "target",
+        "channel",
+        "tag",
+        "versionName",
+        "versionCode",
+        "debugPackage",
+        "releasePackage"
+      ],
+      "type": "object"
+    },
+    "classes": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "pattern": "^[A-Za-z0-9_.:+#-]+$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "runtime-input",
+              "project",
+              "generated-resource-class",
+              "d8-synthetic",
+              "unresolved"
+            ]
+          },
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "component"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "kind": {
+      "const": "release-runtime"
+    },
+    "members": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "inputs": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "component": {
+                  "pattern": "^[A-Za-z0-9_.:+#-]+$",
+                  "type": "string"
+                },
+                "member": {
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)(?!.*//)[A-Za-z0-9_.!/-]+$",
+                  "type": "string"
+                },
+                "sha256": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "size": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "component",
+                "member",
+                "size",
+                "sha256"
+              ],
+              "type": "object"
+            },
+            "minItems": 0,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "kind": {
+            "enum": [
+              "runtime-input",
+              "android-resource-merge",
+              "dex-output",
+              "android-generated",
+              "unresolved"
+            ]
+          },
+          "path": {
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)(?!.*//)[A-Za-z0-9_.!/-]+$",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "size": {
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path",
+          "size",
+          "sha256",
+          "kind",
+          "inputs"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true
+    },
+    "resolution": {
+      "additionalProperties": false,
+      "properties": {
+        "components": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "copiedMembers": {
+                "items": {
+                  "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?/)(?!.*\\\\)(?!.*//)[A-Za-z0-9_.!/-]+$",
+                  "type": "string"
+                },
+                "minItems": 0,
+                "type": "array",
+                "uniqueItems": true
+              },
+              "definedClassCount": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "id": {
+                "pattern": "^[A-Za-z0-9_.:+#-]+$",
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "observed",
+                  "merged-contributor",
+                  "constraint-only",
+                  "resolved-no-packaged-payload"
+                ]
+              },
+              "variants": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "attributes": {
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "type": "object"
+                    },
+                    "capabilities": {
+                      "items": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "minItems": 0,
+                      "type": "array",
+                      "uniqueItems": true
+                    },
+                    "name": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "attributes",
+                    "capabilities"
+                  ],
+                  "type": "object"
+                },
+                "minItems": 0,
+                "type": "array",
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "definedClassCount",
+              "copiedMembers",
+              "variants"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "configuration": {
+          "const": "releaseRuntimeClasspath"
+        },
+        "edges": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "constraint": {
+                "type": "boolean"
+              },
+              "from": {
+                "pattern": "^[A-Za-z0-9_.:+#-]+$",
+                "type": "string"
+              },
+              "to": {
+                "pattern": "^[A-Za-z0-9_.:+#-]+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "from",
+              "to",
+              "constraint"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "variant": {
+          "const": "release"
+        }
+      },
+      "required": [
+        "variant",
+        "configuration",
+        "components",
+        "edges"
+      ],
+      "type": "object"
+    },
+    "schema": {
+      "const": 1
+    },
+    "scope": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "unresolved": {
+      "maxItems": 0,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "kind",
+    "buildInputs",
+    "apk",
+    "scope",
+    "resolution",
+    "artifacts",
+    "classes",
+    "members",
+    "unresolved",
+    "attribution"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,324 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui-text-android/1.12.1/ui-text-android-1.12.1-sources.jar
+Source archive SHA-256: f40f267cc1bbf7315e37916d6baf818dd7791b42db6dc238303a8b48471aa292
+
+Source members:
+  androidMain/androidx/compose/ui/text/android/BoringLayoutFactory.android.kt
+  androidMain/androidx/compose/ui/text/android/StaticLayoutFactory.android.kt
+  androidMain/androidx/compose/ui/text/android/TextLayout.android.kt
+  androidMain/androidx/compose/ui/text/android/style/LetterSpacingSpanEm.android.kt
+  androidMain/androidx/compose/ui/text/android/style/TypefaceSpan.android.kt
+  commonMain/androidx/compose/ui/text/font/Font.kt
+  commonMain/androidx/compose/ui/text/font/FontFamily.kt
+  commonMain/androidx/compose/ui/text/font/FontMatcher.kt
+  commonMain/androidx/compose/ui/text/font/FontStyle.kt
+  commonMain/androidx/compose/ui/text/style/ResolvedTextDirection.kt
+  commonMain/androidx/compose/ui/text/style/TextAlign.kt
+  commonMain/androidx/compose/ui/text/style/TextOverflow.kt
+
+/*
+ * Copyright 2018 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/text/ParagraphIntrinsics.android.kt
+  androidMain/androidx/compose/ui/text/android/CharSequenceCharacterIterator.android.kt
+  androidMain/androidx/compose/ui/text/android/LayoutCompat.android.kt
+  androidMain/androidx/compose/ui/text/android/LayoutIntrinsics.android.kt
+  androidMain/androidx/compose/ui/text/android/selection/WordBoundary.android.kt
+  androidMain/androidx/compose/ui/text/android/selection/WordIterator.android.kt
+  androidMain/androidx/compose/ui/text/android/style/BaselineShiftSpan.android.kt
+  androidMain/androidx/compose/ui/text/android/style/FontFeatureSpan.android.kt
+  androidMain/androidx/compose/ui/text/android/style/LineHeightSpan.android.kt
+  androidMain/androidx/compose/ui/text/android/style/LineHeightStyleSpan.android.kt
+  androidMain/androidx/compose/ui/text/android/style/ShadowSpan.android.kt
+  androidMain/androidx/compose/ui/text/android/style/SkewXSpan.android.kt
+  androidMain/androidx/compose/ui/text/intl/AndroidLocaleDelegate.android.kt
+  androidMain/androidx/compose/ui/text/platform/AndroidParagraphHelper.android.kt
+  androidMain/androidx/compose/ui/text/platform/AndroidStringDelegate.android.kt
+  commonMain/androidx/compose/ui/text/AnnotatedString.kt
+  commonMain/androidx/compose/ui/text/MultiParagraph.kt
+  commonMain/androidx/compose/ui/text/MultiParagraphIntrinsics.kt
+  commonMain/androidx/compose/ui/text/Paragraph.kt
+  commonMain/androidx/compose/ui/text/ParagraphIntrinsics.kt
+  commonMain/androidx/compose/ui/text/ParagraphStyle.kt
+  commonMain/androidx/compose/ui/text/SpanStyle.kt
+  commonMain/androidx/compose/ui/text/String.kt
+  commonMain/androidx/compose/ui/text/TextLayoutResult.kt
+  commonMain/androidx/compose/ui/text/TextMeasurer.kt
+  commonMain/androidx/compose/ui/text/TextPainter.kt
+  commonMain/androidx/compose/ui/text/TextRange.kt
+  commonMain/androidx/compose/ui/text/TextStyle.kt
+  commonMain/androidx/compose/ui/text/font/FontSynthesis.kt
+  commonMain/androidx/compose/ui/text/font/FontWeight.kt
+  commonMain/androidx/compose/ui/text/input/EditCommand.kt
+  commonMain/androidx/compose/ui/text/input/EditProcessor.kt
+  commonMain/androidx/compose/ui/text/input/EditingBuffer.kt
+  commonMain/androidx/compose/ui/text/input/GapBuffer.kt
+  commonMain/androidx/compose/ui/text/input/ImeAction.kt
+  commonMain/androidx/compose/ui/text/input/InputEventCallback.kt
+  commonMain/androidx/compose/ui/text/input/KeyboardType.kt
+  commonMain/androidx/compose/ui/text/input/TextFieldValue.kt
+  commonMain/androidx/compose/ui/text/input/TextInputService.kt
+  commonMain/androidx/compose/ui/text/input/VisualTransformation.kt
+  commonMain/androidx/compose/ui/text/intl/Locale.kt
+  commonMain/androidx/compose/ui/text/intl/LocaleList.kt
+  commonMain/androidx/compose/ui/text/intl/PlatformLocale.kt
+  commonMain/androidx/compose/ui/text/style/BaselineShift.kt
+  commonMain/androidx/compose/ui/text/style/TextDecoration.kt
+  commonMain/androidx/compose/ui/text/style/TextDirection.kt
+  commonMain/androidx/compose/ui/text/style/TextGeometricTransform.kt
+  commonMain/androidx/compose/ui/text/style/TextIndent.kt
+
+/*
+ * Copyright 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/text/android/InternalPlatformTextApi.android.kt
+  androidMain/androidx/compose/ui/text/android/LayoutHelper.android.kt
+  androidMain/androidx/compose/ui/text/android/style/PlaceholderSpan.android.kt
+  androidMain/androidx/compose/ui/text/font/AndroidTypeface.android.kt
+  androidMain/androidx/compose/ui/text/intl/AndroidPlatformLocale.android.kt
+  androidMain/androidx/compose/ui/text/platform/AndroidAccessibilitySpannableString.android.kt
+  androidMain/androidx/compose/ui/text/platform/AndroidDefaultTypeface.android.kt
+  androidMain/androidx/compose/ui/text/platform/AndroidFontListTypeface.android.kt
+  androidMain/androidx/compose/ui/text/platform/AndroidGenericFontFamilyTypeface.android.kt
+  androidMain/androidx/compose/ui/text/platform/AndroidTextPaint.android.kt
+  androidMain/androidx/compose/ui/text/platform/AndroidTypeface.android.kt
+  androidMain/androidx/compose/ui/text/platform/AndroidTypefaceWrapper.android.kt
+  androidMain/androidx/compose/ui/text/platform/extensions/LocaleExtensions.android.kt
+  androidMain/androidx/compose/ui/text/platform/extensions/PlaceholderExtensions.android.kt
+  androidMain/androidx/compose/ui/text/platform/extensions/SpannableExtensions.android.kt
+  androidMain/androidx/compose/ui/text/platform/extensions/TextPaintExtensions.android.kt
+  androidMain/androidx/compose/ui/text/platform/extensions/TtsAnnotationExtensions.android.kt
+  commonMain/androidx/compose/ui/text/ExperimentalTextApi.kt
+  commonMain/androidx/compose/ui/text/InternalTextApi.kt
+  commonMain/androidx/compose/ui/text/Placeholder.kt
+  commonMain/androidx/compose/ui/text/TtsAnnotation.kt
+  commonMain/androidx/compose/ui/text/font/Typeface.kt
+  commonMain/androidx/compose/ui/text/input/ImeOptions.kt
+  commonMain/androidx/compose/ui/text/input/KeyboardCapitalization.kt
+  commonMain/androidx/compose/ui/text/platform/PlatformString.kt
+  jvmAndAndroidMain/androidx/compose/ui/text/JvmAnnotatedString.jvmAndAndroid.kt
+
+/*
+ * Copyright 2020 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/text/CharHelpers.android.kt
+  androidMain/androidx/compose/ui/text/android/ListUtils.android.kt
+  androidMain/androidx/compose/ui/text/android/SpannedExtensions.android.kt
+  androidMain/androidx/compose/ui/text/android/style/TextDecorationSpan.android.kt
+  androidMain/androidx/compose/ui/text/font/AndroidFont.android.kt
+  androidMain/androidx/compose/ui/text/font/AndroidFontUtils.android.kt
+  androidMain/androidx/compose/ui/text/font/FontSynthesis.android.kt
+  androidMain/androidx/compose/ui/text/font/PlatformFontFamilyTypefaceAdapter.android.kt
+  commonMain/androidx/compose/ui/text/AtomicReference.kt
+  commonMain/androidx/compose/ui/text/CharHelpers.kt
+  commonMain/androidx/compose/ui/text/Savers.kt
+  commonMain/androidx/compose/ui/text/font/FontFamilyResolver.kt
+  commonMain/androidx/compose/ui/text/font/FontFamilyTypefaceAdapter.kt
+  commonMain/androidx/compose/ui/text/font/FontListFontFamilyTypefaceAdapter.kt
+  commonMain/androidx/compose/ui/text/font/FontLoadingStrategy.kt
+  commonMain/androidx/compose/ui/text/input/OffsetMapping.kt
+  commonMain/androidx/compose/ui/text/platform/Synchronization.kt
+
+/*
+ * Copyright 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/text/AndroidParagraph.android.kt
+  androidMain/androidx/compose/ui/text/AndroidTextStyle.android.kt
+  androidMain/androidx/compose/ui/text/EmojiSupportMatch.android.kt
+  androidMain/androidx/compose/ui/text/android/PaintExtensions.android.kt
+  androidMain/androidx/compose/ui/text/android/TextAndroidCanvas.android.kt
+  androidMain/androidx/compose/ui/text/android/style/IndentationFixSpan.android.kt
+  androidMain/androidx/compose/ui/text/font/AndroidFontLoader.android.kt
+  androidMain/androidx/compose/ui/text/font/AndroidFontResolveInterceptor.android.kt
+  androidMain/androidx/compose/ui/text/font/AndroidPreloadedFont.android.kt
+  androidMain/androidx/compose/ui/text/font/DelegatingFontLoaderForDeprecatedUsage.android.kt
+  androidMain/androidx/compose/ui/text/font/DeviceFontFamilyNameFont.android.kt
+  androidMain/androidx/compose/ui/text/font/FontFamilyResolver.android.kt
+  androidMain/androidx/compose/ui/text/font/PlatformTypefaces.android.kt
+  androidMain/androidx/compose/ui/text/platform/AndroidMultiParagraphDraw.android.kt
+  androidMain/androidx/compose/ui/text/platform/EmojiCompatStatus.android.kt
+  androidMain/androidx/compose/ui/text/platform/style/DrawStyleSpan.android.kt
+  androidMain/androidx/compose/ui/text/platform/style/ShaderBrushSpan.android.kt
+  androidMain/androidx/compose/ui/text/style/LineBreak.android.kt
+  androidMain/androidx/compose/ui/text/style/TextMotion.android.kt
+  commonMain/androidx/compose/ui/text/PlatformTextStyle.kt
+  commonMain/androidx/compose/ui/text/UrlAnnotation.kt
+  commonMain/androidx/compose/ui/text/font/DelegatingFontLoaderForDeprecatedUsage.kt
+  commonMain/androidx/compose/ui/text/font/FontVariation.kt
+  commonMain/androidx/compose/ui/text/internal/JvmDefaultWithCompatibility.kt
+  commonMain/androidx/compose/ui/text/platform/PlatformMultiParagraphDraw.kt
+  commonMain/androidx/compose/ui/text/style/Hyphens.kt
+  commonMain/androidx/compose/ui/text/style/LineBreak.kt
+  commonMain/androidx/compose/ui/text/style/LineHeightStyle.kt
+  commonMain/androidx/compose/ui/text/style/TextForegroundStyle.kt
+  commonMain/androidx/compose/ui/text/style/TextMotion.kt
+  jvmAndAndroidMain/androidx/compose/ui/text/input/GapBuffer.jvmAndAndroid.kt
+
+/*
+ * Copyright 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/text/android/InlineClassUtils.android.kt
+  androidMain/androidx/compose/ui/text/input/PlatformImeOptions.android.kt
+  androidMain/androidx/compose/ui/text/platform/URLSpanCache.android.kt
+  commonMain/androidx/compose/ui/text/LinkAnnotation.kt
+  commonMain/androidx/compose/ui/text/input/MathUtils.kt
+  commonMain/androidx/compose/ui/text/input/PlatformImeOptions.kt
+  commonMain/androidx/compose/ui/text/internal/InlineClassHelper.kt
+  commonMain/androidx/compose/ui/text/platform/Dispatcher.kt
+
+/*
+ * Copyright 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/text/Html.android.kt
+  androidMain/androidx/compose/ui/text/Savers.android.kt
+  androidMain/androidx/compose/ui/text/android/TextLayoutGetRangeForRectExtensions.android.kt
+  androidMain/androidx/compose/ui/text/android/selection/SegmentFinder.android.kt
+  androidMain/androidx/compose/ui/text/platform/Synchronization.android.kt
+  androidMain/androidx/compose/ui/text/platform/style/BulletSpan.android.kt
+  commonMain/androidx/compose/ui/text/Bullet.kt
+  commonMain/androidx/compose/ui/text/LinkInteractionListener.kt
+  commonMain/androidx/compose/ui/text/StringAnnotation.kt
+  commonMain/androidx/compose/ui/text/TextGranularity.kt
+  commonMain/androidx/compose/ui/text/TextInclusionStrategy.kt
+  commonMain/androidx/compose/ui/text/TextLinkStyles.kt
+
+/*
+ * Copyright 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/text/font/PlatformFontVariationSettings.android.kt
+  jvmAndAndroidMain/androidx/compose/ui/text/ActualAtomicReferenceJvm.jvmAndAndroid.kt
+  jvmAndAndroidMain/androidx/compose/ui/text/internal/JvmDefaultWithCompatibility.jvmAndAndroid.kt
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/ui/text/AndroidComposeUiTextFlags.android.kt
+  androidMain/androidx/compose/ui/text/Paragraph.android.kt
+  jvmAndAndroidMain/androidx/compose/ui/text/intl/Locale.jvmAndAndroid.kt
+
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */

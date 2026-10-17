@@ -1,0 +1,200 @@
+Published source archive: https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation-layout-android/1.12.1/foundation-layout-android-1.12.1-sources.jar
+Source archive SHA-256: 479c11250bf673510788d95e40b971134cdba19599f9d5775d8f14780cfe1b44
+
+Source members:
+  commonMain/androidx/compose/foundation/layout/AlignmentLine.kt
+  commonMain/androidx/compose/foundation/layout/AspectRatio.kt
+  commonMain/androidx/compose/foundation/layout/Box.kt
+  commonMain/androidx/compose/foundation/layout/Intrinsic.kt
+  commonMain/androidx/compose/foundation/layout/LayoutScopeMarker.kt
+  commonMain/androidx/compose/foundation/layout/Padding.kt
+  commonMain/androidx/compose/foundation/layout/RowColumnImpl.kt
+  commonMain/androidx/compose/foundation/layout/Size.kt
+  commonMain/androidx/compose/foundation/layout/Spacer.kt
+
+/*
+ * Copyright 2019 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/foundation/layout/Arrangement.kt
+  commonMain/androidx/compose/foundation/layout/Column.kt
+  commonMain/androidx/compose/foundation/layout/ExperimentalLayoutApi.kt
+  commonMain/androidx/compose/foundation/layout/Offset.kt
+  commonMain/androidx/compose/foundation/layout/Row.kt
+
+/*
+ * Copyright 2020 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/foundation/layout/BoxWithConstraints.kt
+
+/*
+ * Copyright 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  androidMain/androidx/compose/foundation/layout/WindowInsets.android.kt
+  androidMain/androidx/compose/foundation/layout/WindowInsetsConnection.android.kt
+  androidMain/androidx/compose/foundation/layout/WindowInsetsPadding.android.kt
+  commonMain/androidx/compose/foundation/layout/RowColumnMeasurePolicy.kt
+  commonMain/androidx/compose/foundation/layout/WindowInsets.kt
+  commonMain/androidx/compose/foundation/layout/WindowInsetsPadding.kt
+  commonMain/androidx/compose/foundation/layout/WindowInsetsSize.kt
+  commonMain/androidx/compose/foundation/layout/internal/JvmDefaultWithCompatibility.kt
+  jvmAndAndroidMain/androidx/compose/foundation/layout/internal/JvmDefaultWithCompatibility.jvmAndAndroid.kt
+
+/*
+ * Copyright 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/foundation/layout/ContextualFlowLayout.kt
+  commonMain/androidx/compose/foundation/layout/FlowLayout.kt
+  commonMain/androidx/compose/foundation/layout/FlowLayoutOverflow.kt
+  commonMain/androidx/compose/foundation/layout/internal/InlineClassHelper.kt
+
+/*
+ * Copyright 2023 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/foundation/layout/FlowLayoutBuildingBlocks.kt
+
+/*
+ * Copyright 2024 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/foundation/layout/ComposeFoundationLayoutFlags.kt
+  commonMain/androidx/compose/foundation/layout/FlexBox.kt
+  commonMain/androidx/compose/foundation/layout/RulerAlignment.kt
+  commonMain/androidx/compose/foundation/layout/Visible.kt
+
+/*
+ * Copyright 2025 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/foundation/layout/ExperimentalFlexBoxApi.kt
+  commonMain/androidx/compose/foundation/layout/ExperimentalGridApi.kt
+
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+Source members:
+  commonMain/androidx/compose/foundation/layout/Grid.kt
+
+/*
+ * Copyright 2026 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
