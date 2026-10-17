@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792136758910,
+  "lastUpdate": 1792246051388,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2029,6 +2029,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/50774ef3ac90c5e42d8295d892ee4bdaab7e5bfe"
         },
         "date": 1792136755802,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "18e6f64ef29a14ce2846afd93439e64b01ecc5f4",
+          "message": "feat(release): generate runtime SBOM and attribution bundles (#152)\n\n* feat(release): add runtime SBOM and attribution bundles\n\n* fix(release): canonicalize runtime artifact observations\n\n* fix(release): validate flat inventory uniqueness efficiently",
+          "timestamp": "2026-10-17T17:07:06+03:00",
+          "tree_id": "0ed27fdb4ae4a97fd7ca8c2fa2782c9cc0ef6d06",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/18e6f64ef29a14ce2846afd93439e64b01ecc5f4"
+        },
+        "date": 1792246050739,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
