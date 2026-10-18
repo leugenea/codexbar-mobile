@@ -69,24 +69,28 @@ def main():
             private = Path(private_dir)
             private.chmod(0o700)
             key = private / 'fixture.jks'
-            passfile = private / 'fixture.pass'
-            passfile.write_bytes(password + b'\n')
-            passfile.chmod(0o600)
+            store_pass = private / 'store.pass'
+            key_pass = private / 'key.pass'
+            # apksigner consumes successive lines when both password options share a file.
+            # PKCS12 uses the same value, but each option needs its own single-line file.
+            for passfile in (store_pass, key_pass):
+                passfile.write_bytes(password + b'\n')
+                passfile.chmod(0o600)
             # Fixture generation is deliberately not reachable from release_signing.sign().
             private_command(['keytool', '-genkeypair', '-storetype', 'PKCS12', '-keyalg', 'RSA', '-keysize', '2048',
                              '-sigalg', 'SHA256withRSA', '-validity', '2', '-alias', 'fixture', '-dname', 'CN=Hosted Fixture',
-                             '-keystore', key, '-storepass:file', passfile, '-keypass:file', passfile])
+                             '-keystore', key, '-storepass:file', store_pass, '-keypass:file', key_pass])
             key.chmod(0o600)
             certificate = private / 'public.der'
             private_command(['keytool', '-exportcert', '-keystore', key, '-alias', 'fixture',
-                             '-storepass:file', passfile, '-file', certificate])
+                             '-storepass:file', store_pass, '-file', certificate])
             pin = hashlib.sha256(certificate.read_bytes()).hexdigest()  # Independent DER pin, not apksigner output.
             (reports / 'certificate.der').write_bytes(certificate.read_bytes())
             (reports / 'certificate.sha256').write_text(pin + '\n')
             key_bytes = key.read_bytes()
             signed = reports / apk_name
             sign(ROOT, expected, unsigned_apk, unsigned / 'bundle', unsigned_digest, pin, sdk,
-                 reports / 'signing-inspection', signed, reports / 'final-bundle', (key, 'fixture', passfile, passfile))
+                 reports / 'signing-inspection', signed, reports / 'final-bundle', (key, 'fixture', store_pass, key_pass))
         if private.exists():
             raise ValueError('Fixture private directory still exists')
         assets = package_assets(signed, reports / 'final-bundle', {

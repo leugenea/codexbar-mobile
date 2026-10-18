@@ -68,6 +68,72 @@ class SigningTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'archive member'):
                 fixture.assert_excluded([evidence, cache], [b'synthetic-private-sentinel'])
 
+    def test_hosted_fixture_uses_separate_private_password_files_and_cleans_up_on_sign_failure(self):
+        import hosted_signed_release_fixture as fixture
+        password = 'synthetic-fixture-password'
+        certificate = b'SYNTHETIC public DER, not a certificate'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'VERSION').write_text('0.1.0\n')
+            runner_temp = root / 'runner-temp'
+            runner_temp.mkdir()
+            env = {'GITHUB_ACTIONS': 'true', 'RUNNER_TEMP': str(runner_temp), 'ANDROID_HOME': str(root / 'sdk')}
+
+            def command(cwd, *args):
+                if args[:2] == ('git', 'clone'):
+                    source = Path(args[-1])
+                    source.mkdir()
+                    (source / 'VERSION').write_text('0.1.0\n')
+
+            def build_case(source, name, environment, reports):
+                capsule = reports / 'bundle'
+                capsule.mkdir(parents=True)
+                (capsule / 'bundle-manifest.json').write_bytes(b'synthetic accepted capsule')
+                return EXPECTED
+
+            def keytool(command):
+                self.assertEqual(command[0], 'keytool')
+                if '-genkeypair' in command:
+                    self.assertEqual(command[command.index('-storetype') + 1], 'PKCS12')
+                    for option in ('-storepass:file', '-keypass:file'):
+                        self.assertEqual(command[command.index(option) + 1].read_bytes(), password.encode() + b'\n')
+                    command[command.index('-keystore') + 1].write_bytes(b'SYNTHETIC not a keystore')
+                else:
+                    self.assertIn('-exportcert', command)
+                    command[command.index('-file') + 1].write_bytes(certificate)
+
+            def sign(*args):
+                key, alias, store_pass, key_pass = args[-1]
+                self.assertEqual(alias, 'fixture')
+                self.assertEqual(store_pass.parent, key.parent)
+                self.assertEqual(key_pass.parent, key.parent)
+                self.assertEqual(key.parent.parent, runner_temp)
+                self.assertEqual(key.parent.stat().st_mode & 0o777, 0o700)
+                self.assertNotEqual(store_pass.resolve(), key_pass.resolve())
+                for path in (key, store_pass, key_pass):
+                    self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+                # Each apksigner file: input starts at its own first line, not shared EOF.
+                self.assertEqual(store_pass.read_bytes(), password.encode() + b'\n')
+                self.assertEqual(key_pass.read_bytes(), store_pass.read_bytes())
+                self.assertEqual(args[5], runtime.fingerprint(certificate)['sha256'])
+                raise RuntimeError('synthetic stop before real signing')
+
+            with patch.dict(os.environ, env, clear=True), patch.object(fixture, 'ROOT', root), \
+                    patch.object(fixture, 'command', side_effect=command) as commands, patch.object(fixture, 'git', return_value=''), \
+                    patch.object(fixture, 'build_case', side_effect=build_case), \
+                    patch.object(fixture.secrets, 'token_hex', return_value=password), \
+                    patch.object(fixture, 'private_command', side_effect=keytool) as private, \
+                    patch.object(fixture, 'sign', side_effect=sign) as signer:
+                with self.assertRaisesRegex(RuntimeError, 'synthetic stop'):
+                    fixture.main()
+                signer.assert_called_once()
+                self.assertEqual(private.call_count, 2)
+                self.assertEqual(commands.call_count, 3)
+            self.assertEqual(list(runner_temp.iterdir()), [])
+            self.assertEqual((root / 'evidence/signed-release-fixture/certificate.der').read_bytes(), certificate)
+            self.assertEqual(fixture.assert_excluded([root / 'evidence'], [password.encode(), b'SYNTHETIC not a keystore']),
+                             {'evidenceFiles': 3, 'cacheFiles': 0})
+
     def test_private_command_output_and_timeout_never_disclose_arguments(self):
         with patch.object(signing.subprocess, 'run', side_effect=subprocess.TimeoutExpired(['secret-value'], 60)):
             with self.assertRaises(ValueError) as caught:
