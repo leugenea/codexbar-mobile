@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792322886912,
+  "lastUpdate": 1792322890218,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -4173,6 +4173,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/18e6f64ef29a14ce2846afd93439e64b01ecc5f4"
         },
         "date": 1792246053546,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0.13162618164413067,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 1,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e99dd3fa56bf08b6800a7c574fe5188ab032a6af",
+          "message": "feat(release): add guarded signing and publication workflow (#154)\n\n* feat(release): add guarded signing and publication workflow (#147)\n\n* fix(release): give apksigner separate fixture password files\n\n* fix(release): allow compare endpoints while rejecting path traversal",
+          "timestamp": "2026-10-18T14:27:38+03:00",
+          "tree_id": "ea5bff990ce53545344933fc362f9db39c79df6f",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/e99dd3fa56bf08b6800a7c574fe5188ab032a6af"
+        },
+        "date": 1792322889520,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
