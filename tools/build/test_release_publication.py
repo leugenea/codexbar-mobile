@@ -152,6 +152,19 @@ class PublicationTests(unittest.TestCase):
 
 
 class TransportTests(unittest.TestCase):
+    def test_unsafe_and_foreign_endpoints_deny_before_transport(self):
+        def transport(*args):
+            self.fail('Rejected endpoint reached transport')
+        api = GitHub('fixture/repository', 'synthetic-token', transport)
+        for suffix in ('/../x', '/a/../../b', '/a/..', '/./releases', '/a/.',
+                       '/a/../releases?name=safe', '/releases#fragment', '/https://evil.invalid'):
+            with self.subTest(suffix=suffix), self.assertRaisesRegex(ValueError, 'Unsafe API endpoint'):
+                api.request('GET', api.prefix + suffix)
+        for path in ('https://evil.invalid/repos/fixture/repository/releases',
+                     '/repos/other/repository/releases', api.prefix + '-other/releases'):
+            with self.subTest(path=path), self.assertRaisesRegex(ValueError, 'Foreign repository endpoint'):
+                api.request('GET', path)
+
     def test_pagination_all_pages_and_repeated_or_incomplete_rows_deny(self):
         calls = []
         def transport(method, url, headers, data):

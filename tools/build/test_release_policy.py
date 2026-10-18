@@ -6,8 +6,10 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 import release_policy as policy
+from release_publication import GitHub
 from release_runtime import canonical
 
 
@@ -105,6 +107,40 @@ class ActivationTests(unittest.TestCase):
             self.assertEqual(policy.admit(PolicyAPI(record), record, context(record))[0]['versionCode'], 10)
         with self.assertRaises(ValueError):
             policy.activation(json.dumps(authorization('rc')), 'stable')
+
+    def test_admission_through_real_wrapper_reaches_compare_for_both_operations_and_channels(self):
+        for channel in ('rc', 'stable'):
+            for operation in ('prepare', 'publish'):
+                with self.subTest(channel=channel, operation=operation):
+                    record = authorization(channel, operation)
+                    model = PolicyAPI(record)
+                    prefix = '/repos/' + record['repository']
+                    def transport(method, url, headers, data):
+                        parsed = urlsplit(url)
+                        self.assertEqual((method, parsed.scheme, parsed.netloc, data),
+                                         ('GET', 'https', 'api.github.com', None))
+                        self.assertEqual(headers['Authorization'], 'Bearer synthetic-token')
+                        self.assertTrue(parsed.path.startswith(prefix))
+                        path = parsed.path[len(prefix):]
+                        query = parse_qsl(parsed.query)
+                        paginated = ('page', '1') in query
+                        query = [(key, value) for key, value in query if key not in ('page', 'per_page')]
+                        if query:
+                            path += '?' + urlencode(query)
+                        if paginated:
+                            key = 'branch_policies' if 'deployment-branch-policies' in path else 'workflow_runs'
+                            rows = model.pages(path, key)
+                            response = {'total_count': len(rows), key: rows}
+                        else:
+                            response = model.get(path)
+                        return 200, {}, canonical(response)
+                    api = GitHub(record['repository'], 'synthetic-token', transport, read_only=True)
+                    expected, origin = policy.admit(api, record, context(record))
+                    self.assertIn('/compare/' + record['sourceSha'] + '...' + record['controllerSha'], model.calls)
+                    self.assertEqual(expected['channel'], channel)
+                    self.assertEqual(expected['source'], {'sha': record['sourceSha'], 'tree': record['sourceTree']})
+                    self.assertEqual(expected['versionCode'], 10 if operation == 'prepare' else 9)
+                    self.assertEqual(None if origin is None else origin['id'], None if operation == 'prepare' else 90)
 
     def test_missing_unknown_duplicate_types_noncanonical_and_publish_pins_deny(self):
         from jsonschema import ValidationError

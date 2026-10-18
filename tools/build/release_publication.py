@@ -49,7 +49,9 @@ class GitHub:
 
     def request(self, method, path, data=None, *, binary=False, upload=False):
         require(path.startswith(self.prefix + '/') or path == self.prefix, 'Foreign repository endpoint')
-        require('://' not in path and '..' not in path and '#' not in path, 'Unsafe API endpoint')
+        segments = path.split('?', 1)[0].split('/')
+        require('://' not in path and '#' not in path and not any(part in ('.', '..') for part in segments),
+                'Unsafe API endpoint')
         require(not self.read_only or method == 'GET', 'GET-only admission transport')
         host = 'uploads.github.com' if upload else 'api.github.com'
         headers = {'Authorization': 'Bearer ' + self.token, 'X-GitHub-Api-Version': API_VERSION,
