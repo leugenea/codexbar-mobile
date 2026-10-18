@@ -1,0 +1,197 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Inactive exact-run release activation",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "repository": {
+      "const": "leugenea/codexbar-mobile"
+    },
+    "repositoryId": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "workflowId": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "workflowPath": {
+      "const": ".github/workflows/release.yml"
+    },
+    "controllerSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "controllerRef": {
+      "const": "refs/heads/main"
+    },
+    "operation": {
+      "enum": [
+        "prepare",
+        "publish"
+      ]
+    },
+    "runId": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "runNumber": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2100000000
+    },
+    "channel": {
+      "enum": [
+        "rc",
+        "stable"
+      ]
+    },
+    "tagRef": {
+      "type": "string",
+      "pattern": "^refs/tags/v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-rc\\.[1-9][0-9]*)?$"
+    },
+    "sourceSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sourceTree": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "certificateSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "trustMode": {
+      "const": "hosted-environment"
+    },
+    "signingEnvironment": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "publicationEnvironment": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "previous": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "emptyHistory"
+          ],
+          "properties": {
+            "emptyHistory": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "releaseId",
+            "versionCode",
+            "bundleManifestSha256"
+          ],
+          "properties": {
+            "releaseId": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "versionCode": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2100000000
+            },
+            "bundleManifestSha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      ]
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId",
+        "runAttempt",
+        "artifactId",
+        "artifactSha256",
+        "bundleManifestSha256"
+      ],
+      "properties": {
+        "runId": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "runAttempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "artifactId": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "artifactSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bundleManifestSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "repository",
+    "repositoryId",
+    "workflowId",
+    "workflowPath",
+    "controllerSha",
+    "controllerRef",
+    "operation",
+    "runId",
+    "runNumber",
+    "channel",
+    "tagRef",
+    "sourceSha",
+    "sourceTree",
+    "certificateSha256",
+    "trustMode",
+    "signingEnvironment",
+    "publicationEnvironment",
+    "previous"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "const": "publish"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "candidate"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "candidate"
+          ]
+        }
+      }
+    }
+  ]
+}

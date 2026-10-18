@@ -9,7 +9,9 @@ LINT = ('lintAnalyzeDebug', 'lintAnalyzeDebugUnitTest', 'lintAnalyzeDebugAndroid
 NATIVE = ('connectedDebugAndroidTest', 'collectDebugCoverageInputs', 'jacocoDebugReport',
           'jacocoDebugCoverageVerification')
 RELEASE_LINT = ('lintAnalyzeRelease', 'lintReportRelease', 'lintRelease')
-REQUIRED = {'build': COMMON + LINT + RELEASE_LINT + ('collectReleaseRuntimeInventory',), 'native': COMMON + NATIVE}
+REQUIRED = {'build': COMMON + LINT + RELEASE_LINT + ('collectReleaseRuntimeInventory',),
+            'native': COMMON + NATIVE,
+            'release': ('verifyResolvedToolchain',) + RELEASE_LINT + ('collectReleaseRuntimeInventory',)}
 STATES = {'SUCCESS', 'FAILED', 'FROM_CACHE', 'UP_TO_DATE', 'SKIPPED', 'NO_SOURCE'}
 
 

@@ -170,7 +170,11 @@ def contains_secrets_context(value):
 
 def job_permission_policy(filename, name, job, default_permissions):
     permission = job.get("permissions", default_permissions)
-    if filename == "code-metrics.yml" and name in WRITERS:
+    if filename == 'release.yml':
+        require(name in {'admit', 'remote-state', 'unsigned', 'sign', 'publish'}, 'Unknown release job')
+        expected = {'contents': 'write' if name in ('remote-state', 'publish') else 'read', 'actions': 'read'}
+        require(permission == expected, name + ': unexpected release permissions')
+    elif filename == "code-metrics.yml" and name in WRITERS:
         expected, condition = WRITERS[name]
         require(permission == expected, f"{name}: unexpected writer permissions")
         require(job.get("if") == condition, f"{name}: writer must run only on push to main")
@@ -179,6 +183,54 @@ def job_permission_policy(filename, name, job, default_permissions):
                 "CodeQL analysis requires only contents: read and security-events: write")
     else:
         require(permission in ({}, {"contents": "read"}), f"{name}: job permissions must be read-only")
+
+def release_workflow_policy(workflow):
+    require(set(workflow['on']) == {'workflow_dispatch'}, 'Release is manual only')
+    require(workflow.get('concurrency') == {'group': 'official-android-release', 'cancel-in-progress': False},
+            'Official release operations need one noncanceling mutex')
+    jobs = workflow['jobs']
+    require(set(jobs) == {'admit', 'remote-state', 'unsigned', 'sign', 'publish'}, 'Release job boundary changed')
+    base = "${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'leugenea/codexbar-mobile'"
+    conditions = {'admit': base + ' }}',
+                  'remote-state': base + " && needs.admit.outputs.allow == 'true' }}",
+                  'unsigned': base + " && needs.remote-state.outputs.allow == 'true' && needs.remote-state.outputs.noop == 'false' && inputs.operation == 'prepare' }}",
+                  'sign': base + " && needs.remote-state.outputs.allow == 'true' && needs.remote-state.outputs.noop == 'false' && needs.unsigned.result == 'success' && inputs.operation == 'prepare' }}",
+                  'publish': base + " && needs.remote-state.outputs.allow == 'true' && inputs.operation == 'publish' }}"}
+    dependencies = {'admit': None, 'remote-state': ['admit'], 'unsigned': ['admit', 'remote-state'],
+                    'sign': ['admit', 'remote-state', 'unsigned'], 'publish': ['admit', 'remote-state']}
+    for name, job in jobs.items():
+        require(job.get('if') == conditions[name] and job.get('needs') == dependencies[name],
+                name + ': release event/ref/admission/dependencies changed')
+        expected_environment = ('${{ needs.admit.outputs.' + ('signing_environment' if name == 'sign' else 'publication_environment') + ' }}')
+        require(job.get('environment') == (expected_environment if name in ('sign', 'publish') else None),
+                name + ': environment must be selected only after admission')
+        require('continue-on-error' not in job, 'Release cannot ignore failures')
+        for step in job.get('steps', []):
+            require('continue-on-error' not in step, 'Release step cannot ignore failures')
+            if contains_secrets_context(step):
+                require(name == 'sign' and step.get('id') == 'gate', 'Secrets only in admitted signing step')
+                expected_secrets = {key: '${{ secrets.' + key + ' }}' for key in (
+                    'ANDROID_RELEASE_KEYSTORE_BASE64', 'ANDROID_RELEASE_KEY_ALIAS',
+                    'ANDROID_RELEASE_STORE_PASSWORD', 'ANDROID_RELEASE_KEY_PASSWORD')}
+                actual = {k: v for k, v in step.get('env', {}).items() if contains_secrets_context(v)}
+                require(actual == expected_secrets, 'Unexpected signing secret interface')
+                clean = {k: v for k, v in step.items() if k != 'env'}
+                require(not contains_secrets_context(clean), 'Secrets cannot enter commands/Action inputs')
+                require(step.get('run') == '"$RUNNER_TEMP/release-venv/bin/python" tools/build/release_controller.py sign --work "$RUNNER_TEMP/release"',
+                        'Signing secrets must enter only the trusted signing controller')
+            if action_identity(str(step.get('uses', ''))) == 'actions/checkout':
+                options = step['with']
+                source = name == 'unsigned' and options.get('path') == 'source'
+                require(options.get('ref') == ('${{ steps.gate.outputs.source }}' if source else '${{ github.workflow_sha }}')
+                        and options.get('path') == ('source' if source else 'controller')
+                        and options.get('fetch-depth') == 0 and 'repository' not in options,
+                        'Release checkouts must pin approved controller/source without credentials')
+        clean_job = {k: v for k, v in job.items() if k != 'steps'}
+        require(not contains_secrets_context(clean_job) and not contains_key(clean_job, 'secrets'),
+                'No job-wide release secrets')
+    clean_workflow = {k: v for k, v in workflow.items() if k != 'jobs'}
+    require(not contains_secrets_context(clean_workflow), 'No workflow-wide release secrets')
+
 
 def workflow_policy(text, filename):
     workflow = load_yaml(text)
@@ -194,6 +246,8 @@ def workflow_policy(text, filename):
                 "PR workflow must not use secrets")
     jobs = workflow.get("jobs")
     require(isinstance(jobs, dict) and jobs, "workflow must have jobs")
+    if filename == 'release.yml':
+        release_workflow_policy(workflow)
     for name, job in jobs.items():
         require(isinstance(job, dict), f"{name}: job must be a mapping")
         runner = job.get("runs-on")

@@ -53,9 +53,11 @@ ShellCheck and actionlint. It does not build Android or install an SDK/emulator.
 It fetches the pinned schema unless `DEPENDABOT_SCHEMA` supplies a checksum-valid
 offline copy. Hash locks cover the supported wheel platform, not every platform.
 
-CI-first is the default. Gradle build, lint and JVM tests are allowed locally when
-useful; do not repeat a heavy local ladder merely to publish a draft. With the
-JDK/SDK installed, this non-emulator invocation is available:
+CI-first is the default. Under the current owner host policy, local work is limited
+to quick static/pure tooling checks and compilation/assembly when separately useful;
+all Android/JVM tests, lint, JaCoCo, SDK probes and emulators are hosted-only. Do not
+repeat a heavy local ladder merely to publish a draft. The hosted non-emulator
+build graph includes:
 
 ```sh
 ./gradlew --no-daemon --dependency-verification strict \
@@ -302,11 +304,12 @@ All outcomes are retained in the existing build artifact for seven days, includi
 `evidence/release/` and `evidence/release-fixtures/`. These APKs are non-distributable
 signing inputs, not signed candidates or published releases.
 
-Signing, production counters, candidate activation and publication remain separate
-owner-gated work. A later signed candidate must be verified as actual signed bytes;
-publication must use those exact accepted bytes, not an unreviewed rebuild. Physical
-phone/live acceptance and an explicit owner GO remain necessary. Issue 145 provides
-no key, secret, signing, public tag, Release or publication action.
+Signing, the dedicated official workflow counter and candidate/publication admission
+are implemented as [default-off guarded machinery](docs/releasing.md). Production
+custody, activation and publication remain owner-gated in issue 148. Publication
+must use the exact accepted signed bytes, not an unreviewed rebuild. Physical phone/
+live acceptance and explicit owner GO remain separate; ordinary CI fixture signatures
+and mock publication are not production evidence.
 
 ### APK-bound runtime SBOM and notices
 
@@ -393,9 +396,12 @@ commands retain the same explicit version/tag/counter inputs as the original bui
 `final-signed` means a verified byte binding, **not publication/activation GO**;
 `distributionApproval` is always false. Unsigned capsules are never distributable.
 Pure synthetic signature/ZIP controls prove parser/orchestration behavior, not a real
-signature. Actual signed-candidate execution, trusted counters, key custody and
-publication remain issues 147/148 and owner-gated. No local Android/JVM tests, lint,
-coverage, emulator or SDK probes are authorized by this sidecar tooling change.
+signature. Ordinary hosted CI additionally requires a disposable signed RC, complete
+mock publication/download and production install/pull/launch on the existing emulator;
+see the [guarded release runbook](docs/releasing.md) for the mandatory evidence and
+inactive manual prepare/publish interface. Actual SDK/native results require hosted
+execution. No private production identity or publication authority is configured.
+Production custody/trust/activation and owner operational GO remain issue 148.
 
 For the default-to-advanced CodeQL rollout, the owner explicitly approved parent
 disabling default setup after publishing the executable replacement and before

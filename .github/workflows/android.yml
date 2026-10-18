@@ -246,6 +246,17 @@ jobs:
           build-scan-publish: false
           add-job-summary: always
           add-job-summary-as-pr-comment: never
+      - name: Prepare native release parser environment
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/native-release-venv"
+          timeout --signal=TERM --kill-after=10s 3m "$RUNNER_TEMP/native-release-venv/bin/python" -m pip install \
+            --require-hashes --no-deps --no-cache-dir --disable-pip-version-check --timeout 30 --retries 1 \
+            -r tools/research/requirements.txt
+      - name: Prepare disposable signed RC and mock download
+        timeout-minutes: 15
+        run: '"$RUNNER_TEMP/native-release-venv/bin/python" tools/build/hosted_signed_release_fixture.py'
       - name: Prepare hosted emulator client library
         timeout-minutes: 5
         run: |
