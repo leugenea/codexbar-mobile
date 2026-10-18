@@ -1,0 +1,382 @@
+name: Guarded release
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        options: [prepare, publish]
+        required: true
+      channel:
+        type: choice
+        options: [rc, stable]
+        required: true
+      tag:
+        type: string
+        required: true
+      source_sha:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-android-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+    working-directory: controller
+
+env:
+  REQUEST_OPERATION: ${{ inputs.operation }}
+  REQUEST_CHANNEL: ${{ inputs.channel }}
+  REQUEST_TAG: ${{ inputs.tag }}
+  REQUEST_SOURCE_SHA: ${{ inputs.source_sha }}
+  CHANNEL_ACTIVATION: ${{ inputs.channel == 'rc' && vars.RELEASE_RC_ACTIVATION || inputs.channel == 'stable' && vars.RELEASE_STABLE_ACTIVATION || '' }}
+
+jobs:
+  admit:
+    name: Admit exact release authority
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'leugenea/codexbar-mobile' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      allow: ${{ steps.gate.outputs.allow }}
+      signing_environment: ${{ steps.gate.outputs.signing_environment }}
+      publication_environment: ${{ steps.gate.outputs.publication_environment }}
+    steps:
+      - name: Check out trusted controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: controller
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up release parser Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Prepare hash-pinned release parser
+        timeout-minutes: 5
+        run: |
+          python -m venv "$RUNNER_TEMP/release-venv"
+          timeout --signal=TERM --kill-after=10s 3m "$RUNNER_TEMP/release-venv/bin/python" -m pip install \
+            --require-hashes --no-deps --no-cache-dir --disable-pip-version-check --timeout 30 --retries 1 \
+            -r tools/research/requirements.txt
+      - name: Admit exact public authorization
+        id: gate
+        timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$RUNNER_TEMP/release-venv/bin/python" tools/build/release_controller.py admit --work "$RUNNER_TEMP/release"'
+
+  remote-state:
+    name: Inspect complete official release history
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'leugenea/codexbar-mobile' && needs.admit.outputs.allow == 'true' }}
+    runs-on: ubuntu-24.04
+    needs: [admit]
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    outputs:
+      allow: ${{ steps.gate.outputs.allow }}
+      previous: ${{ steps.gate.outputs.previous }}
+      noop: ${{ steps.gate.outputs.noop }}
+    steps:
+      - name: Check out trusted controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: controller
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up release parser Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Prepare hash-pinned release parser
+        timeout-minutes: 5
+        run: |
+          python -m venv "$RUNNER_TEMP/release-venv"
+          timeout --signal=TERM --kill-after=10s 3m "$RUNNER_TEMP/release-venv/bin/python" -m pip install \
+            --require-hashes --no-deps --no-cache-dir --disable-pip-version-check --timeout 30 --retries 1 \
+            -r tools/research/requirements.txt
+      - name: Set up Temurin JDK 17
+        timeout-minutes: 5
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+          overwrite-settings: false
+      - name: Select isolated Android SDK
+        run: |
+          mkdir -p "$RUNNER_TEMP/android-sdk"
+          printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' \
+            "$RUNNER_TEMP/android-sdk" "$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
+      - name: Set up Android command-line tools
+        timeout-minutes: 5
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          cmdline-tools-version: '15859902' # tools 22.0
+          packages: ''
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+      - name: Install named project SDK packages
+        timeout-minutes: 12
+        run: |
+          timeout --signal=TERM --kill-after=30s 10m "$ANDROID_HOME/cmdline-tools/22.0/bin/sdkmanager" \
+            --sdk_root="$ANDROID_HOME" --channel=0 --install 'platforms;android-37.0' 'build-tools;36.0.0'
+      - name: Read complete draft-capable official history
+        id: gate
+        timeout-minutes: 15
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$RUNNER_TEMP/release-venv/bin/python" tools/build/release_controller.py remote-state --work "$RUNNER_TEMP/release"'
+
+  unsigned:
+    name: Build accepted unsigned release
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'leugenea/codexbar-mobile' && needs.remote-state.outputs.allow == 'true' && needs.remote-state.outputs.noop == 'false' && inputs.operation == 'prepare' }}
+    runs-on: ubuntu-24.04
+    needs: [admit, remote-state]
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+    env:
+      ACCEPTED_PREVIOUS_CODE: ${{ needs.remote-state.outputs.previous }}
+      GRADLE_USER_HOME: ${{ github.workspace }}/../android-gradle-release
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+      bundle_digest: ${{ steps.capsule.outputs.bundle_digest }}
+    steps:
+      - name: Check out trusted controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: controller
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up release parser Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Prepare hash-pinned release parser
+        timeout-minutes: 5
+        run: |
+          python -m venv "$RUNNER_TEMP/release-venv"
+          timeout --signal=TERM --kill-after=10s 3m "$RUNNER_TEMP/release-venv/bin/python" -m pip install \
+            --require-hashes --no-deps --no-cache-dir --disable-pip-version-check --timeout 30 --retries 1 \
+            -r tools/research/requirements.txt
+      - name: Set up Temurin JDK 17
+        timeout-minutes: 5
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+          overwrite-settings: false
+      - name: Select isolated Android SDK
+        run: |
+          mkdir -p "$RUNNER_TEMP/android-sdk"
+          printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' \
+            "$RUNNER_TEMP/android-sdk" "$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
+      - name: Set up Android command-line tools
+        timeout-minutes: 5
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          cmdline-tools-version: '15859902' # tools 22.0
+          packages: ''
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+      - name: Install named project SDK packages
+        timeout-minutes: 12
+        run: |
+          timeout --signal=TERM --kill-after=30s 10m "$ANDROID_HOME/cmdline-tools/22.0/bin/sdkmanager" \
+            --sdk_root="$ANDROID_HOME" --channel=0 --install 'platforms;android-37.0' 'build-tools;36.0.0'
+      - name: Validate official unsigned build inputs
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$RUNNER_TEMP/release-venv/bin/python" tools/build/release_controller.py unsigned-inputs --work "$RUNNER_TEMP/release"'
+      - name: Check out accepted source without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.gate.outputs.source }}
+          path: source
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Build and fully lint accepted unsigned release
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/release"
+          cd "$GITHUB_WORKSPACE/source"
+          timeout --signal=TERM --kill-after=30s 15m ./gradlew --no-daemon --dependency-verification strict \
+            --build-cache --no-configuration-cache --stacktrace --info --console=plain \
+            -Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
+            -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
+            :app:lintRelease :app:assembleRelease :app:collectReleaseRuntimeInventory \
+            2>&1 | tee "$RUNNER_TEMP/release/strict.log"
+          python "$GITHUB_WORKSPACE/controller/tools/build/verify_gradle_execution.py" release "$RUNNER_TEMP/release/strict.log"
+      - name: Re-derive and bind accepted unsigned capsule
+        id: capsule
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$RUNNER_TEMP/release-venv/bin/python" tools/build/release_controller.py unsigned --source "$GITHUB_WORKSPACE/source" --work "$RUNNER_TEMP/release"'
+      - name: Retain exact unsigned signing input
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release/unsigned/
+          retention-days: 7
+          if-no-files-found: error
+          include-hidden-files: false
+
+  sign:
+    name: Sign accepted release candidate
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'leugenea/codexbar-mobile' && needs.remote-state.outputs.allow == 'true' && needs.remote-state.outputs.noop == 'false' && needs.unsigned.result == 'success' && inputs.operation == 'prepare' }}
+    runs-on: ubuntu-24.04
+    needs: [admit, remote-state, unsigned]
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    environment: ${{ needs.admit.outputs.signing_environment }}
+    env:
+      ACCEPTED_PREVIOUS_CODE: ${{ needs.remote-state.outputs.previous }}
+    steps:
+      - name: Check out trusted controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: controller
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up release parser Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Prepare hash-pinned release parser
+        timeout-minutes: 5
+        run: |
+          python -m venv "$RUNNER_TEMP/release-venv"
+          timeout --signal=TERM --kill-after=10s 3m "$RUNNER_TEMP/release-venv/bin/python" -m pip install \
+            --require-hashes --no-deps --no-cache-dir --disable-pip-version-check --timeout 30 --retries 1 \
+            -r tools/research/requirements.txt
+      - name: Set up Temurin JDK 17
+        timeout-minutes: 5
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+          overwrite-settings: false
+      - name: Select isolated Android SDK
+        run: |
+          mkdir -p "$RUNNER_TEMP/android-sdk"
+          printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' \
+            "$RUNNER_TEMP/android-sdk" "$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
+      - name: Set up Android command-line tools
+        timeout-minutes: 5
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          cmdline-tools-version: '15859902' # tools 22.0
+          packages: ''
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+      - name: Install named project SDK packages
+        timeout-minutes: 12
+        run: |
+          timeout --signal=TERM --kill-after=30s 10m "$ANDROID_HOME/cmdline-tools/22.0/bin/sdkmanager" \
+            --sdk_root="$ANDROID_HOME" --channel=0 --install 'platforms;android-37.0' 'build-tools;36.0.0'
+      - name: Sign accepted bytes using existing owner identity
+        id: gate
+        timeout-minutes: 15
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UNSIGNED_ARTIFACT_ID: ${{ needs.unsigned.outputs.artifact_id }}
+          UNSIGNED_ARTIFACT_DIGEST: ${{ needs.unsigned.outputs.artifact_digest }}
+          UNSIGNED_BUNDLE_DIGEST: ${{ needs.unsigned.outputs.bundle_digest }}
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: '"$RUNNER_TEMP/release-venv/bin/python" tools/build/release_controller.py sign --work "$RUNNER_TEMP/release"'
+      - name: Retain exact signed candidate (private files already removed)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: signed-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release/candidate/
+          retention-days: 7
+          if-no-files-found: error
+          include-hidden-files: false
+
+  publish:
+    name: Publish accepted release candidate
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'leugenea/codexbar-mobile' && needs.remote-state.outputs.allow == 'true' && inputs.operation == 'publish' }}
+    runs-on: ubuntu-24.04
+    needs: [admit, remote-state]
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    environment: ${{ needs.admit.outputs.publication_environment }}
+    env:
+      ACCEPTED_PREVIOUS_CODE: ${{ needs.remote-state.outputs.previous }}
+    steps:
+      - name: Check out trusted controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: controller
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up release parser Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Prepare hash-pinned release parser
+        timeout-minutes: 5
+        run: |
+          python -m venv "$RUNNER_TEMP/release-venv"
+          timeout --signal=TERM --kill-after=10s 3m "$RUNNER_TEMP/release-venv/bin/python" -m pip install \
+            --require-hashes --no-deps --no-cache-dir --disable-pip-version-check --timeout 30 --retries 1 \
+            -r tools/research/requirements.txt
+      - name: Set up Temurin JDK 17
+        timeout-minutes: 5
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+          overwrite-settings: false
+      - name: Select isolated Android SDK
+        run: |
+          mkdir -p "$RUNNER_TEMP/android-sdk"
+          printf 'ANDROID_HOME=%s\nANDROID_SDK_ROOT=%s\n' \
+            "$RUNNER_TEMP/android-sdk" "$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
+      - name: Set up Android command-line tools
+        timeout-minutes: 5
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          cmdline-tools-version: '15859902' # tools 22.0
+          packages: ''
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+      - name: Install named project SDK packages
+        timeout-minutes: 12
+        run: |
+          timeout --signal=TERM --kill-after=30s 10m "$ANDROID_HOME/cmdline-tools/22.0/bin/sdkmanager" \
+            --sdk_root="$ANDROID_HOME" --channel=0 --install 'platforms;android-37.0' 'build-tools;36.0.0'
+      - name: Publish only exact accepted candidate bytes
+        id: gate
+        timeout-minutes: 15
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$RUNNER_TEMP/release-venv/bin/python" tools/build/release_controller.py publish --work "$RUNNER_TEMP/release"'

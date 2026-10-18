@@ -13,8 +13,8 @@
 - Coverage minimum: **90%** JaCoCo **INSTRUCTION**, compatible JVM + instrumented
   union; never weaken the threshold or handwritten denominator/exclusions.
 - CI-first: run quick `bash tools/check.sh` with the external hash-pinned Python
-  environment documented in CONTRIBUTING. Local Gradle build/lint/JVM tests are
-  allowed when useful; emulator/instrumented execution is hosted-only, never NAS.
+  environment documented in CONTRIBUTING. Owner host policy keeps Android/JVM
+  tests, lint, coverage, SDK probes and emulators hosted-only, never on the NAS.
 - New/updated Gradle dependencies require a reviewed checksum delta in
   `gradle/verification-metadata.xml` plus the dependency-integrity digest update
   in `tools/build/test_dependency_integrity.py`, in the same PR. This includes

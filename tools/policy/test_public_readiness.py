@@ -86,6 +86,8 @@ def check_contexts(table, workflows):
     for file, name, category in rows:
         if file == "code-metrics.yml":
             allowed = {"Informational", "Main-only; not required for PRs"}
+        elif file == "release.yml":
+            allowed = {"Manual default-off; not required for PRs"}
         elif file == "codeql.yml":
             allowed = {"Code-scanning rule; not a required status check"}
         elif (file, name) in REQUIRED_CHECK_CONTEXTS:

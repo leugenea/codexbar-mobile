@@ -465,7 +465,7 @@ class WorkflowContracts(unittest.TestCase):
                     with self.subTest(workflow=path.name, action=action):
                         self.assertEqual((sha, version), pins[action])
                     counts[action] += 1
-        self.assertEqual(counts, {'actions/checkout': 9, 'actions/upload-artifact': 4})
+        self.assertEqual(counts, {'actions/checkout': 15, 'actions/upload-artifact': 6})
 
     def assert_hosted_build_memory_scope(self, workflow, properties, codeql, native):
         steps = self.android_build_steps(workflow)
@@ -1288,7 +1288,14 @@ else:
                  'adb="$ANDROID_HOME/platform-tools/adb"\n'
                  f'test_status={graph_exit}\nmanifest_status=0\nnative_report_status=0\njvm_report_status=0\n'
                  + block)
+        # The debug oracle remains unchanged; the separate release observer has its own
+        # synthetic protocol tests. Stub only that new boundary in this debug harness.
+        parser = self.directory / 'native-release-venv/bin/python'
+        parser.parent.mkdir(parents=True, exist_ok=True)
+        parser.write_text(f'#!{sys.executable}\nimport os, sys\nsys.exit(27 if os.environ["SYNTHETIC_MUTATION"] == "release-observation-failure" else 0)\n')
+        parser.chmod(0o755)
         environment = dict(os.environ, ANDROID_HOME=str(sdk), ANDROID_SERIAL='SYNTHETIC-serial',
+                           RUNNER_TEMP=str(self.directory),
                            SYNTHETIC_MUTATION=mutation, PATH=str(sdk / 'bin') + os.pathsep + os.environ['PATH'])
         result = subprocess.run(['bash', '-c', shell], cwd=self.directory, env=environment,
                                 text=True, capture_output=True, timeout=10)
@@ -1336,6 +1343,13 @@ else:
                     self.assertFalse(any(' dumpsys ' in line for line in events))
         result, _, _ = self.run_synthetic_installed_observation('missing-package', graph_exit=23)
         self.assertEqual(result.returncode, 23, 'Original graph failure takes precedence')
+
+    def test_release_observer_failure_is_mandatory_but_preserves_original_debug_graph_error(self):
+        result, _, statuses = self.run_synthetic_installed_observation('release-observation-failure')
+        self.assertTrue(all(value == '0' for value in statuses.values()), statuses)
+        self.assertNotEqual(result.returncode, 0)
+        result, _, _ = self.run_synthetic_installed_observation('release-observation-failure', graph_exit=23)
+        self.assertEqual(result.returncode, 23)
 
     def test_installed_path_requires_nonempty_exact_package(self):
         valid = f'package:/data/app/~~synthetic/{PACKAGE}-synthetic/base.apk\n'

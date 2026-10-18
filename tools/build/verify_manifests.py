@@ -165,8 +165,10 @@ def check_apk_dump(permissions: str, xmltree: str, package=DEBUG_PACKAGE) -> lis
     return result
 
 
-def check_installed_dump(text: str) -> list[str]:
-    if len(re.findall(r"(?m)^\s*Package \[" + re.escape(DEBUG_PACKAGE) + r"\]", text)) != 1:
+def check_installed_dump(text: str, package: str = DEBUG_PACKAGE) -> list[str]:
+    if package not in (PACKAGE, DEBUG_PACKAGE):
+        raise ValueError("Unsupported installed package")
+    if len(re.findall(r"(?m)^\s*Package \[" + re.escape(package) + r"\]", text)) != 1:
         raise ValueError("Missing installed package identity")
     sections = re.findall(r"(?m)^([ \t]*)requested permissions:[ \t]*$", text)
     if len(sections) != 1:
@@ -181,7 +183,7 @@ def check_installed_dump(text: str) -> list[str]:
         if len(line) - len(line.lstrip()) <= indent:
             break
         names.append(line.strip())
-    result = check_permissions(names)
+    result = check_permissions(names, permissions_for(package))
     # dumpsys does not expose FLAG_USES_CLEARTEXT_TRAFFIC in its flag-name table.
     # Installed cleartext/protection-level observations are asserted by androidTest.
     return result

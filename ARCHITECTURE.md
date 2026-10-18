@@ -1248,8 +1248,10 @@ See [SECURITY](SECURITY.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
 
 VERSION and complete local Git history supply Gradle's explicit dev/RC/stable inputs.
 Normal tagged checkouts remain dev; official fixture builds need exact clean tagged
-source and increasing positive caller-supplied counters. No signing or allocator is
-implemented. The strict build job adds real release assembly/full lint and independent
+source and increasing positive caller-supplied fixture counters. The separate
+[guarded manual release workflow](docs/releasing.md) uses its own authenticated
+GitHub run_number, exact public source/controller activation and verified accepted
+history; it remains default-off. The strict build job adds real release assembly/full lint and independent
 unsigned APK inspection/inventory/reverification. Temporary hosted clones exercise
 actual tagged dev/RC/stable builds without public tags. Each job owns its checkout and
 ordinary selected SDK setup; inventories are retained evidence, never build admission.
@@ -1258,7 +1260,8 @@ compiles both app variants and debug test sources without task-output cache reus
 Its analysis output, all existing debug/native/capture cases and compatible >=90%
 whole-handwritten INSTRUCTION union still need exact-candidate hosted acceptance.
 [CONTRIBUTING](CONTRIBUTING.md) defines inputs, artifact policy and the parent-owned
-approved CodeQL migration; signing/publication and owner GO remain successor work.
+approved CodeQL migration. Production custody/activation/publication and owner GO
+remain owner operations; controlled fixture signatures are not production evidence.
 
 The release-only runtime observer additionally resolves the selected release graph
 and original AAR/JAR hashes, then reconciles actual APK class definitions and payload
@@ -1279,3 +1282,26 @@ trusted hosted Gradle builds remain the build boundary; no historical compiler-b
 reconstruction, generic decompiler or exhaustive notice-genealogy system is introduced.
 See [capsule commands and limits](CONTRIBUTING.md#apk-bound-runtime-sbom-and-notices)
 and [preserved attribution scope](docs/legal/runtime/README.md).
+
+## Guarded signed release boundary
+
+The inactive manual controller separates public exact-run/source/channel admission,
+draft-capable remote inventory, credential-free source compilation, protected
+existing-key signing and separately approved exact-byte publication. GitHub's dedicated
+run_number is the official prepare code; reruns preserve it and verified accepted RC/
+stable history provides the floor. Unset/stale activation, unknown state, tag/source
+or workflow-tree drift and unprotected/missing environments deny admission. Only the
+remote GET job and publisher request Contents write, with the former's real token
+capability explicitly reserved for owner trust approval. No settings are activated.
+
+One additional secret-free hosted RC build uses a runner-temp disposable fixture key,
+independent public DER pin, actual SDK verification, existing final binder and a
+localhost mock of the same publisher protocol. Its exact downloaded signed APK is
+installed/pulled/inspected/launched after debug observations on the same existing
+emulator, outside all coverage retries; production-package cleanup preserves graph
+failure precedence. No app source, dependency, UI/test identity, coverage denominator,
+threshold or native retry/resource budget changes are made. Actual SDK/native timing
+and evidence are hosted acceptance, not established by pure tooling tests. The
+[owner runbook](docs/releasing.md) freezes the public interfaces, custody alternatives,
+byte allowlist/readback and partial-state recovery; production custody/activation,
+phone/live evidence and final GO remain owner-gated.

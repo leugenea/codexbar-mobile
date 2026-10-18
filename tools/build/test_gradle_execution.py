@@ -55,7 +55,8 @@ class ExecutionEvidenceTests(unittest.TestCase):
             log = Path(temporary) / 'SYNTHETIC-gradle.log'
             for graph in REQUIRED:
                 for state in ('SUCCESS', 'UP_TO_DATE'):
-                    log.write_text(successful_log(graph).replace('testDebugUnitTest SUCCESS', f'testDebugUnitTest {state}'))
+                    name = 'testDebugUnitTest' if 'testDebugUnitTest' in REQUIRED[graph] else REQUIRED[graph][0]
+                    log.write_text(successful_log(graph).replace(f'{name} SUCCESS', f'{name} {state}'))
                     result = subprocess.run([sys.executable, '-B', str(ROOT / 'tools/build/verify_gradle_execution.py'),
                                              graph, str(log)], text=True, capture_output=True, timeout=5)
                     self.assertEqual(result.returncode == 0, state == 'SUCCESS', result.stdout + result.stderr)

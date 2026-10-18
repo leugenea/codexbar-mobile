@@ -281,8 +281,14 @@ printf 'apk_hash_exit=%s\naapt_exit=%s\napk_xmltree_exit=%s\napk_policy_exit=%s\
   "$apk_hash_status" "$aapt_status" "$apk_xmltree_status" "$apk_policy_status" "$install_hash_status" "$install_status" "$installed_path_status" \
   "$installed_path_policy_status" "$installed_dump_status" "$permission_status" "$uninstall_status" \
   > evidence/native/installed-observation-status.txt
+# Mandatory signed release observation on this SAME emulator, outside all coverage retries.
+timeout --signal=TERM --kill-after=15s 4m "$RUNNER_TEMP/native-release-venv/bin/python" \
+  tools/build/verify_release_installation.py --assets evidence/signed-release-fixture/downloaded \
+  --reports evidence/native/release-installation
+release_observation_status=$?
+printf 'release_observation_exit=%s\n' "$release_observation_status" > evidence/native/release-observation-exit.txt
 set -e
 # Preserve the original graph failure, rather than masking it with cleanup/parsers.
 if (( test_status != 0 )); then exit "$test_status"; fi
-(( manifest_status == 0 && native_report_status == 0 && jvm_report_status == 0 && apk_hash_status == 0 && aapt_status == 0 && apk_xmltree_status == 0 && apk_policy_status == 0 && install_hash_status == 0 && install_status == 0 && installed_path_status == 0 && installed_path_policy_status == 0 && installed_dump_status == 0 && permission_status == 0 && uninstall_status == 0 ))
+(( manifest_status == 0 && native_report_status == 0 && jvm_report_status == 0 && apk_hash_status == 0 && aapt_status == 0 && apk_xmltree_status == 0 && apk_policy_status == 0 && install_hash_status == 0 && install_status == 0 && installed_path_status == 0 && installed_path_policy_status == 0 && installed_dump_status == 0 && permission_status == 0 && uninstall_status == 0 && release_observation_status == 0 ))
 printf '%s\n' 'boundary=native-tests-and-apk-permissions-pass' >> evidence/native/boundaries.txt
