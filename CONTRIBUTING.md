@@ -305,8 +305,10 @@ All outcomes are retained in the existing build artifact for seven days, includi
 signing inputs, not signed candidates or published releases.
 
 Signing, the dedicated official workflow counter and candidate/publication admission
-are implemented as [default-off guarded machinery](docs/releasing.md). Production
-custody, activation and publication remain owner-gated in issue 148. Publication
+are implemented as [guarded machinery](docs/releasing.md): one static `RELEASE_CONFIG`
+sets the certificate/environments and enabled channels (stable disabled initially).
+Source/run/history are derived and verified; each release needs a tag, prepare and
+publish dispatches, and the owner's separate environment confirmations. Publication
 must use the exact accepted signed bytes, not an unreviewed rebuild. Physical phone/
 live acceptance and explicit owner GO remain separate; ordinary CI fixture signatures
 and mock publication are not production evidence.
@@ -399,9 +401,9 @@ Pure synthetic signature/ZIP controls prove parser/orchestration behavior, not a
 signature. Ordinary hosted CI additionally requires a disposable signed RC, complete
 mock publication/download and production install/pull/launch on the existing emulator;
 see the [guarded release runbook](docs/releasing.md) for the mandatory evidence and
-inactive manual prepare/publish interface. Actual SDK/native results require hosted
-execution. No private production identity or publication authority is configured.
-Production custody/trust/activation and owner operational GO remain issue 148.
+manual prepare/publish interface. Actual SDK/native results require hosted
+execution. Source changes write no private production identity or publication settings.
+Production custody/configuration and owner operational GO remain owner operations.
 
 For the default-to-advanced CodeQL rollout, the owner explicitly approved parent
 disabling default setup after publishing the executable replacement and before

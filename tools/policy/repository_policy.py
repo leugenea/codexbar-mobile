@@ -186,6 +186,8 @@ def job_permission_policy(filename, name, job, default_permissions):
 
 def release_workflow_policy(workflow):
     require(set(workflow['on']) == {'workflow_dispatch'}, 'Release is manual only')
+    require(workflow.get('run-name') == '${{ inputs.operation }} ${{ inputs.channel }} ${{ inputs.tag }}',
+            'Prepare identity must use the trusted operation/channel/tag run title')
     require(workflow.get('concurrency') == {'group': 'official-android-release', 'cancel-in-progress': False},
             'Official release operations need one noncanceling mutex')
     jobs = workflow['jobs']

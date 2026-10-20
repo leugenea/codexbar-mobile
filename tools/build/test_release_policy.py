@@ -1,4 +1,4 @@
-"""Pure exact-run/activation/history controls; all remote and SDK observations are synthetic."""
+"""Pure config/source/run/history controls; all remote and SDK observations are synthetic."""
 import base64
 import copy
 import json
@@ -10,39 +10,31 @@ from urllib.parse import parse_qsl, urlencode, urlsplit
 
 import release_policy as policy
 from release_publication import GitHub
-from release_runtime import canonical
+from release_runtime import canonical, fingerprint
+from release_signing import zip_bytes
 
 
-def authorization(channel='rc', operation='prepare'):
-    tag = 'v0.1.0' + ('-rc.1' if channel == 'rc' else '')
-    record = {'schema': 1, 'repository': 'leugenea/codexbar-mobile', 'repositoryId': 7, 'workflowId': 8,
-              'workflowPath': policy.WORKFLOW, 'controllerSha': 'c' * 40, 'controllerRef': 'refs/heads/main',
-              'operation': operation, 'runId': 100, 'runNumber': 10, 'channel': channel, 'tagRef': 'refs/tags/' + tag,
-              'sourceSha': 'a' * 40, 'sourceTree': 'b' * 40, 'certificateSha256': 'd' * 64,
-              'trustMode': 'hosted-environment', 'signingEnvironment': 'release-sign',
-              'publicationEnvironment': 'release-publish', 'previous': {'emptyHistory': True}}
-    if operation == 'publish':
-        record['candidate'] = {'runId': 90, 'runAttempt': 2, 'artifactId': 80,
-                               'artifactSha256': 'e' * 64, 'bundleManifestSha256': 'f' * 64}
-    return record
+def configuration(stable=False):
+    return {'schema': 2, 'certificateSha256': 'd' * 64, 'signingEnvironment': 'release-signing',
+            'publicationEnvironment': 'release-publication', 'rcEnabled': True, 'stableEnabled': stable}
 
 
-def context(record):
-    return {'repository': record['repository'], 'repositoryId': 7, 'event': 'workflow_dispatch',
-            'ref': 'refs/heads/main', 'sha': record['controllerSha'], 'workflowSha': record['controllerSha'],
-            'workflowRef': record['repository'] + '/' + policy.WORKFLOW + '@refs/heads/main',
-            'runId': 100, 'runNumber': 10, 'operation': record['operation'], 'channel': record['channel'],
-            'sourceSha': record['sourceSha'], 'tag': record['tagRef'][10:]}
+def context(channel='rc', operation='prepare'):
+    return {'repository': 'leugenea/codexbar-mobile', 'repositoryId': 7, 'event': 'workflow_dispatch',
+            'ref': 'refs/heads/main', 'sha': 'c' * 40, 'workflowSha': 'c' * 40,
+            'workflowRef': 'leugenea/codexbar-mobile/' + policy.WORKFLOW + '@refs/heads/main',
+            'runId': 100, 'runNumber': 10, 'operation': operation, 'channel': channel,
+            'prepareRunId': '90' if operation == 'publish' else '',
+            'tag': 'v0.1.0' + ('-rc.1' if channel == 'rc' else '')}
 
 
 class PolicyAPI:
     repository = 'leugenea/codexbar-mobile'
+    prefix = '/repos/' + repository
 
-    def __init__(self, record):
-        self.record = record
-        self.overrides = {}
-        self.records = []
-        self.calls = []
+    def __init__(self, ctx=None):
+        self.ctx = ctx or context()
+        self.overrides, self.records, self.calls = {}, [], []
 
     def get(self, path):
         self.calls.append(path)
@@ -59,7 +51,8 @@ class PolicyAPI:
             run_id = int(path.split('/')[3])
             return {'id': run_id, 'workflow_id': 8, 'event': 'workflow_dispatch', 'head_branch': 'main',
                     'path': policy.WORKFLOW, 'repository': {'full_name': self.repository}, 'head_sha': 'c' * 40,
-                    'run_number': 10 if run_id == 100 else 9, 'run_attempt': 2, 'status': 'completed', 'conclusion': 'success'}
+                    'run_number': 10 if run_id == 100 else 9, 'run_attempt': 2, 'status': 'completed',
+                    'conclusion': 'success', 'display_title': f'prepare {self.ctx["channel"]} {self.ctx["tag"]}'}
         if path == '/git/ref/heads/main':
             return {'object': {'sha': 'c' * 40}}
         if path.startswith('/git/ref/tags/'):
@@ -99,137 +92,200 @@ class PolicyAPI:
         return copy.deepcopy(self.records)
 
 
-class ActivationTests(unittest.TestCase):
-    def test_both_channels_require_their_own_exact_record(self):
-        for channel in ('rc', 'stable'):
-            record = authorization(channel)
-            self.assertEqual(policy.activation(json.dumps(record), channel), record)
-            self.assertEqual(policy.admit(PolicyAPI(record), record, context(record))[0]['versionCode'], 10)
-        with self.assertRaises(ValueError):
-            policy.activation(json.dumps(authorization('rc')), 'stable')
+def wrapper(model):
+    def transport(method, url, headers, data):
+        parsed = urlsplit(url)
+        assert (method, parsed.scheme, parsed.netloc, data) == ('GET', 'https', 'api.github.com', None)
+        assert headers['Authorization'] == 'Bearer synthetic-token'
+        assert parsed.path.startswith(model.prefix)
+        path = parsed.path[len(model.prefix):]
+        if path.endswith('/zip'):
+            return 200, {}, model.archive
+        query = parse_qsl(parsed.query)
+        paginated = ('page', '1') in query
+        query = [(key, value) for key, value in query if key not in ('page', 'per_page')]
+        if query:
+            path += '?' + urlencode(query)
+        if paginated and path == '/releases':
+            return 200, {}, canonical(model.releases())
+        if paginated:
+            key = ('branch_policies' if 'deployment-branch-policies' in path else
+                   'artifacts' if path.endswith('/artifacts') else 'workflow_runs')
+            rows = model.pages(path, key)
+            response = {'total_count': len(rows), key: rows}
+        else:
+            response = model.get(path)
+        return 200, {}, canonical(response)
+    return GitHub(model.repository, 'synthetic-token', transport, read_only=True)
 
-    def test_admission_through_real_wrapper_reaches_compare_for_both_operations_and_channels(self):
+
+class ConfigurationTests(unittest.TestCase):
+    def test_only_static_config_and_explicit_channel_enablement(self):
+        config = configuration()
+        self.assertEqual(policy.configuration(json.dumps(config), 'rc'), config)
+        for channel in ('stable', 'dev'):
+            with self.assertRaises(ValueError):
+                policy.configuration(json.dumps(config), channel)
+        for channel in ('rc', 'stable'):
+            disabled = {**configuration(True), channel + 'Enabled': False}
+            with self.assertRaises(ValueError):
+                policy.configuration(json.dumps(disabled), channel)
+        self.assertEqual(policy.configuration(json.dumps(configuration(True)), 'stable'), configuration(True))
+
+    def test_missing_unknown_duplicate_types_and_noncanonical_config_deny(self):
+        from jsonschema import ValidationError
+        for text in ('', ' ', '{}', 'null', '{"schema":2,"schema":2}'):
+            with self.subTest(text=text), self.assertRaises((ValueError, ValidationError)):
+                policy.configuration(text, 'rc')
+        for key, value in [('schema', True), ('schema', 2.0), ('schema', 1), ('extra', 'x'),
+                           ('certificateSha256', 'D' * 64), ('certificateSha256', 'd' * 64 + '\n'),
+                           ('signingEnvironment', ''), ('publicationEnvironment', ' release-publication'),
+                           ('rcEnabled', 1), ('stableEnabled', 'false')]:
+            with self.subTest(key=key, value=value), self.assertRaises((ValueError, ValidationError)):
+                policy.configuration(json.dumps({**configuration(), key: value}), 'rc')
+        for key in configuration():
+            bad = configuration()
+            del bad[key]
+            with self.assertRaises(ValidationError):
+                policy.configuration(json.dumps(bad), 'rc')
+
+    def test_admission_through_real_github_wrapper_both_operations_and_channels(self):
         for channel in ('rc', 'stable'):
             for operation in ('prepare', 'publish'):
                 with self.subTest(channel=channel, operation=operation):
-                    record = authorization(channel, operation)
-                    model = PolicyAPI(record)
-                    prefix = '/repos/' + record['repository']
-                    def transport(method, url, headers, data):
-                        parsed = urlsplit(url)
-                        self.assertEqual((method, parsed.scheme, parsed.netloc, data),
-                                         ('GET', 'https', 'api.github.com', None))
-                        self.assertEqual(headers['Authorization'], 'Bearer synthetic-token')
-                        self.assertTrue(parsed.path.startswith(prefix))
-                        path = parsed.path[len(prefix):]
-                        query = parse_qsl(parsed.query)
-                        paginated = ('page', '1') in query
-                        query = [(key, value) for key, value in query if key not in ('page', 'per_page')]
-                        if query:
-                            path += '?' + urlencode(query)
-                        if paginated:
-                            key = 'branch_policies' if 'deployment-branch-policies' in path else 'workflow_runs'
-                            rows = model.pages(path, key)
-                            response = {'total_count': len(rows), key: rows}
-                        else:
-                            response = model.get(path)
-                        return 200, {}, canonical(response)
-                    api = GitHub(record['repository'], 'synthetic-token', transport, read_only=True)
-                    expected, origin = policy.admit(api, record, context(record))
-                    self.assertIn('/compare/' + record['sourceSha'] + '...' + record['controllerSha'], model.calls)
+                    ctx = context(channel, operation)
+                    model = PolicyAPI(ctx)
+                    record, expected, origin = policy.admit(wrapper(model), configuration(True), ctx)
+                    self.assertIn('/compare/' + 'a' * 40 + '...' + 'c' * 40, model.calls)
+                    self.assertEqual(record['sourceSha'], 'a' * 40)
+                    self.assertEqual(expected['source'], {'sha': 'a' * 40, 'tree': 'b' * 40})
                     self.assertEqual(expected['channel'], channel)
-                    self.assertEqual(expected['source'], {'sha': record['sourceSha'], 'tree': record['sourceTree']})
                     self.assertEqual(expected['versionCode'], 10 if operation == 'prepare' else 9)
                     self.assertEqual(None if origin is None else origin['id'], None if operation == 'prepare' else 90)
 
-    def test_missing_unknown_duplicate_types_noncanonical_and_publish_pins_deny(self):
-        from jsonschema import ValidationError
-        for text in ('', ' ', '{}', 'null', '{"schema":1,"schema":1}'):
-            with self.subTest(text=text), self.assertRaises((ValueError, ValidationError)):
-                policy.activation(text, 'rc')
-        for key, value in [('schema', True), ('schema', 1.0), ('runId', 0), ('runNumber', '10'),
-                           ('runId', 100.0), ('repositoryId', True), ('sourceSha', 'A' * 40),
-                           ('certificateSha256', 'D' * 64), ('certificateSha256', 'd' * 64 + '\n'),
-                           ('sourceSha', 'a' * 40 + '\n'), ('trustMode', 'auto'), ('extra', 'x'),
-                           ('signingEnvironment', ''), ('controllerRef', 'refs/tags/v0.1.0')]:
-            bad = {**authorization(), key: value}
-            with self.subTest(key=key, value=value), self.assertRaises((ValueError, ValidationError)):
-                policy.activation(json.dumps(bad), 'rc')
-        bad = authorization(operation='publish')
-        del bad['candidate']
-        with self.assertRaises(ValidationError):
-            policy.activation(json.dumps(bad), 'rc')
-
-    def test_event_controller_run_tag_source_gate_and_environment_drift_deny(self):
-        record = authorization()
+    def test_event_controller_source_green_ci_and_environment_drift_deny(self):
         for key, value in [('event', 'pull_request'), ('ref', 'refs/heads/feature'), ('repository', 'fork/repo'),
-                           ('runId', 101), ('runNumber', 11), ('sha', 'e' * 40), ('workflowSha', 'f' * 40),
-                           ('workflowRef', 'wrong'), ('sourceSha', 'f' * 40), ('tag', 'v0.1.0-rc.2')]:
+                           ('repositoryId', 9), ('runNumber', 11), ('sha', 'e' * 40), ('workflowSha', 'f' * 40),
+                           ('workflowRef', 'wrong'), ('operation', 'sign'), ('tag', 'v0.2.0-rc.1'),
+                           ('tag', 'v0.1.0'), ('prepareRunId', '90')]:
             with self.subTest(key=key), self.assertRaises(ValueError):
-                policy.admit(PolicyAPI(record), record, {**context(record), key: value})
+                policy.admit(wrapper(PolicyAPI()), configuration(), {**context(), key: value})
         for path, response in [('/git/ref/heads/main', {'object': {'sha': 'e' * 40}}),
-                               ('/git/ref/tags/v0.1.0-rc.1', {'object': {'type': 'commit', 'sha': 'f' * 40}}),
-                               ('/git/commits/' + 'a' * 40, {'tree': {'sha': 'f' * 40}}),
                                ('/git/trees/' + 'b' * 40, {'truncated': True, 'tree': []}),
                                ('/compare/' + 'a' * 40 + '...' + 'c' * 40, {'status': 'diverged'}),
-                               ('/actions/workflows/8', {'id': 8, 'path': 'other.yml', 'state': 'active'}),
-                               ('/environments/release-sign', OSError('unknown remote state'))]:
-            api = PolicyAPI(record)
+                               ('/actions/workflows/release.yml', {'id': 8, 'path': 'other.yml', 'state': 'active'}),
+                               ('/environments/release-signing', OSError('unknown remote state'))]:
+            api = PolicyAPI()
             api.overrides[path] = response
             with self.subTest(path=path), self.assertRaises((ValueError, OSError)):
-                policy.admit(api, record, context(record))
+                policy.admit(wrapper(api), configuration(), context())
         for filename in policy.SOURCE_GATES:
-            api = PolicyAPI(record)
+            api = PolicyAPI()
             path = '/actions/workflows/' + filename + '/runs?head_sha=' + 'a' * 40 + '&event=push'
             for rows in ([], [{**api.pages(path)[0], 'conclusion': 'failure'}],
                          [{**api.pages(path)[0], 'event': 'pull_request'}]):
                 api.overrides[path] = rows
                 with self.subTest(filename=filename), self.assertRaises(ValueError):
-                    policy.admit(api, record, context(record))
-        for policies in ([], [{'id': 1, 'name': '*', 'type': 'branch'}]):
-            api = PolicyAPI(record)
-            api.overrides['/environments/release-sign/deployment-branch-policies'] = policies
-            with self.subTest(policies=policies), self.assertRaises(ValueError):
-                policy.admit(api, record, context(record))
-
-    def test_publish_uses_origin_run_number_not_new_dispatch_and_rerun_is_stable(self):
-        record = authorization(operation='publish')
-        expected, _ = policy.admit(PolicyAPI(record), record, context(record))
-        self.assertEqual(expected['versionCode'], 9)
-        record = authorization()
-        api = PolicyAPI(record)
-        first = policy.admit(api, record, context(record))[0]
-        api.overrides['/actions/runs/100'] = {**api.get('/actions/runs/100'), 'run_attempt': 3}
-        self.assertEqual(first, policy.admit(api, record, context(record))[0])
-
-    def test_environment_reviewers_allow_owner_self_approval_or_prevent_it(self):
-        record = authorization()
-        for prevent_self_review in (False, True):
-            api = PolicyAPI(record)
-            for name in (record['signingEnvironment'], record['publicationEnvironment']):
-                path = '/environments/' + name
-                api.overrides[path] = {**api.get(path), 'protection_rules': [
-                    {'type': 'required_reviewers', 'prevent_self_review': prevent_self_review,
-                     'reviewers': [{'type': 'User'}]}]}
-            with self.subTest(prevent_self_review=prevent_self_review):
-                self.assertEqual(policy.admit(api, record, context(record))[0]['versionCode'], 10)
-
-    def test_missing_or_unprotected_environment_never_defaults_to_approval(self):
-        record = authorization()
+                    policy.admit(wrapper(api), configuration(), context())
         for change in ({'protection_rules': []}, {'protection_rules': [{'type': 'required_reviewers', 'reviewers': []}]},
-                       {'protection_rules': [{'type': 'required_reviewers', 'reviewers': [{'type': 'User'}]}] * 2},
                        {'deployment_branch_policy': None}):
-            api = PolicyAPI(record)
-            api.overrides['/environments/release-sign'] = {**api.get('/environments/release-sign'), **change}
+            api = PolicyAPI()
+            path = '/environments/release-signing'
+            api.overrides[path] = {**api.get(path), **change}
             with self.assertRaises(ValueError):
-                policy.admit(api, record, context(record))
+                policy.admit(wrapper(api), configuration(), context())
+        api = PolicyAPI()
+        api.overrides['/environments/release-signing/deployment-branch-policies'] = [{'id': 1, 'name': '*', 'type': 'branch'}]
+        with self.assertRaises(ValueError):
+            policy.admit(wrapper(api), configuration(), context())
+
+    def test_environment_self_review_policy_does_not_substitute_for_required_reviewer(self):
+        for prevent in (False, True):
+            api = PolicyAPI()
+            path = '/environments/release-signing'
+            api.overrides[path] = {**api.get(path), 'protection_rules': [
+                {'type': 'required_reviewers', 'prevent_self_review': prevent, 'reviewers': [{'type': 'User'}]}]}
+            self.assertEqual(policy.admit(wrapper(api), configuration(), context())[1]['versionCode'], 10)
+        api.overrides[path]['protection_rules'] *= 2
+        with self.assertRaises(ValueError):
+            policy.admit(wrapper(api), configuration(), context())
+
+    def test_wrong_foreign_failed_prepare_runs_and_invalid_counters_deny(self):
+        ctx = context(operation='publish')
+        for change in ({'workflow_id': 9}, {'event': 'push'}, {'head_branch': 'feature'}, {'path': 'other.yml'},
+                       {'repository': {'full_name': 'fork/repo'}}, {'conclusion': 'failure'}, {'status': 'in_progress'},
+                       {'display_title': 'publish rc v0.1.0-rc.1'}, {'display_title': 'prepare rc v0.1.0-rc.2'},
+                       {'display_title': 'prepare stable v0.1.0'}, {'run_number': 0}, {'run_number': 2100000001}):
+            api = PolicyAPI(ctx)
+            api.overrides['/actions/runs/90'] = {**api.get('/actions/runs/90'), **change}
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                policy.admit(wrapper(api), configuration(), ctx)
+        for run_id in ('', '090', '-1', '1.0', '100'):
+            with self.subTest(run_id=run_id), self.assertRaises(ValueError):
+                policy.admit(wrapper(PolicyAPI(ctx)), configuration(), {**ctx, 'prepareRunId': run_id})
+        for code in (0, 2100000001, 10.0, True):
+            api = PolicyAPI()
+            api.overrides['/actions/runs/100'] = {**api.get('/actions/runs/100'), 'run_number': code}
+            with self.assertRaises(ValueError):
+                policy.admit(wrapper(api), configuration(), context())
+
+
+class CandidateTests(unittest.TestCase):
+    def setUp(self):
+        self.ctx = context(operation='publish')
+        self.model = PolicyAPI(self.ctx)
+        self.api = wrapper(self.model)
+        self.record, self.expected, self.origin = policy.admit(self.api, configuration(), self.ctx)
+        self.model.archive = zip_bytes({'release-manifest.json': b'SYNTHETIC not a real signature'})
+        self.artifact = {'id': 80, 'name': 'signed-90-2', 'expired': False,
+                         'digest': 'sha256:' + fingerprint(self.model.archive)['sha256'],
+                         'workflow_run': {'id': 90, 'head_sha': 'c' * 40}}
+        self.model.overrides['/actions/runs/90/artifacts'] = [self.artifact]
+        self.model.overrides['/actions/artifacts/80'] = self.artifact
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.path = Path(self.temp.name)
+
+    def read(self):
+        return policy.candidate_assets(self.api, self.record, self.expected, self.origin, self.path, self.path)
+
+    def test_real_wrapper_resolves_retained_candidate_and_independent_verifier_inputs(self):
+        with patch.object(policy, 'verify_assets', return_value=({'buildInputs': self.expected}, None)) as verify:
+            self.assertEqual(self.read(), {'release-manifest.json': b'SYNTHETIC not a real signature'})
+            self.assertEqual(verify.call_args.kwargs, {'expected_certificate': 'd' * 64,
+                'expected_authority': {'repository': self.api.repository, 'workflowId': 8,
+                                      'controllerSha': 'c' * 40, 'runId': 90, 'runAttempt': 2}})
+        for key, value in [('tag', 'v0.1.0-rc.2'), ('channel', 'stable'), ('source', {'sha': 'e' * 40, 'tree': 'b' * 40}),
+                           ('versionCode', 10)]:
+            with self.subTest(key=key), patch.object(policy, 'verify_assets',
+                    return_value=({'buildInputs': {**self.expected, key: value}}, None)), self.assertRaises(ValueError):
+                self.read()
+        with patch.object(policy, 'verify_assets', side_effect=ValueError('wrong certificate')), self.assertRaises(ValueError):
+            self.read()
+
+    def test_missing_ambiguous_expired_foreign_attempt_digest_and_bytes_deny_before_verification(self):
+        for rows in ([], [self.artifact, {**self.artifact, 'id': 81}], [{**self.artifact, 'name': 'signed-90-1'}]):
+            self.model.overrides['/actions/runs/90/artifacts'] = rows
+            with self.assertRaises(ValueError):
+                self.read()
+        self.model.overrides['/actions/runs/90/artifacts'] = [self.artifact]
+        for key, value in [('expired', True), ('name', 'signed-90-1'), ('digest', 'sha256:' + 'e' * 64),
+                           ('workflow_run', {'id': 91, 'head_sha': 'c' * 40}),
+                           ('workflow_run', {'id': 90, 'head_sha': 'e' * 40})]:
+            self.model.overrides['/actions/artifacts/80'] = {**self.artifact, key: value}
+            with self.subTest(key=key), patch.object(policy, 'verify_assets') as verify, self.assertRaises(ValueError):
+                self.read()
+            verify.assert_not_called()
+        self.model.overrides['/actions/artifacts/80'] = self.artifact
+        self.model.archive += b'drift'
+        with self.assertRaises(ValueError):
+            self.read()
 
 
 class HistoryTests(unittest.TestCase):
     def setUp(self):
-        self.record = authorization()
-        self.api = PolicyAPI(self.record)
-        self.expected = policy.admit(self.api, self.record, context(self.record))[0]
+        self.api = PolicyAPI()
+        self.record, self.expected, _ = policy.admit(self.api, configuration(), context())
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.reports = Path(self.temp.name)
@@ -237,11 +293,8 @@ class HistoryTests(unittest.TestCase):
     def read(self):
         return policy.history(self.api, self.record, self.expected, self.reports, self.reports)
 
-    def test_empty_inventory_requires_explicit_bootstrap_and_unknown_read_is_not_zero(self):
+    def test_complete_empty_inventory_is_derived_but_unknown_read_is_not_zero(self):
         self.assertEqual(self.read(), (0, False))
-        self.record['previous'] = {'releaseId': 1, 'versionCode': 9, 'bundleManifestSha256': 'f' * 64}
-        with self.assertRaises(ValueError):
-            self.read()
         with patch.object(self.api, 'releases', side_effect=OSError('offline')), self.assertRaises(OSError):
             self.read()
 
@@ -249,52 +302,50 @@ class HistoryTests(unittest.TestCase):
         expected = {**self.expected, 'versionCode': code, 'tag': tag, 'versionName': tag[1:]}
         assets = {'release-manifest.json': b'synthetic manifest, not a real signature'}
         from release_publication import marker
-        release = {'id': 5, 'tag_name': tag, 'target_commitish': 'a' * 40, 'name': tag[1:],
-                   'body': marker(assets), 'draft': False, 'prerelease': True}
-        manifest = {'buildInputs': expected, 'bundleManifestSha256': 'f' * 64,
-                    'authority': {'repository': self.api.repository, 'workflowId': 8, 'controllerSha': 'c' * 40,
-                                  'runId': run_id, 'runAttempt': 2}}
-        self.api.records = [release]
-        return assets, manifest
+        self.api.records = [{'id': 5, 'tag_name': tag, 'target_commitish': 'a' * 40, 'name': tag[1:],
+                             'body': marker(assets), 'draft': False, 'prerelease': True}]
+        return assets, {'buildInputs': expected, 'bundleManifestSha256': 'f' * 64,
+                        'authority': {'repository': self.api.repository, 'workflowId': 8, 'controllerSha': 'c' * 40,
+                                      'runId': run_id, 'runAttempt': 2}}
 
-    def test_history_anchor_floor_gaps_reset_same_run_noop_and_new_run_same_tag_conflict(self):
+    def test_history_floor_gaps_reset_same_run_noop_and_new_run_same_tag_conflict(self):
         assets, manifest = self.published()
-        self.record['previous'] = {'releaseId': 5, 'versionCode': 9, 'bundleManifestSha256': 'f' * 64}
         with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_assets', return_value=(manifest, None)):
             self.assertEqual(self.read(), (9, False))
             self.expected['versionCode'] = 9
             with self.assertRaises(ValueError):
                 self.read()
-            self.expected['versionCode'] = 100  # gaps are legal; never infer a contiguous counter.
+            self.expected['versionCode'] = 100
             self.assertEqual(self.read(), (9, False))
-            self.record['previous']['bundleManifestSha256'] = 'e' * 64
-            with self.assertRaises(ValueError):
-                self.read()
         self.expected['versionCode'] = 10
         assets, manifest = self.published(10, self.expected['tag'], 100)
-        self.record['previous'] = {'emptyHistory': True}
         with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_assets', return_value=(manifest, None)):
             self.assertEqual(self.read(), (0, True))
             manifest['authority']['runId'] = 90
             with self.assertRaises(ValueError):
                 self.read()
 
+    def test_publish_history_requires_same_origin_attempt_for_readonly_noop(self):
+        self.record, self.expected, _ = policy.admit(self.api, configuration(), context(operation='publish'))
+        assets, manifest = self.published(9, self.expected['tag'], 90)
+        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_assets', return_value=(manifest, None)):
+            self.assertEqual(self.read(), (0, True))
+            manifest['authority']['runAttempt'] = 1
+            with self.assertRaises(ValueError):
+                self.read()
+
     def test_retained_official_candidate_reserves_tag_and_expired_unknown_blocks(self):
-        from release_signing import zip_bytes
-        from release_runtime import fingerprint
         raw = zip_bytes({'release-manifest.json': b'synthetic'})
         path = '/actions/workflows/8/runs?event=workflow_dispatch'
         run = {'id': 90, 'status': 'completed', 'conclusion': 'success', 'path': policy.WORKFLOW,
                'event': 'workflow_dispatch', 'head_branch': 'main', 'repository': {'id': 7},
                'head_sha': 'c' * 40, 'run_number': 9}
         self.api.overrides[path] = [run]
-        artifact = {'id': 80, 'name': 'signed-90-2', 'expired': False,
-                    'digest': 'sha256:' + fingerprint(raw)['sha256']}
+        artifact = {'id': 80, 'name': 'signed-90-2', 'expired': False, 'digest': 'sha256:' + fingerprint(raw)['sha256']}
         self.api.overrides['/actions/runs/90/artifacts'] = [artifact]
         manifest = {'buildInputs': {**self.expected, 'versionCode': 9},
                     'authority': {'runId': 90, 'workflowId': 8, 'repository': self.api.repository,
                                   'controllerSha': 'c' * 40, 'runAttempt': 2}}
-        self.api.prefix = '/repos/' + self.api.repository
         with patch.object(self.api, 'request', return_value=raw, create=True), \
                 patch.object(policy, 'verify_assets', return_value=(manifest, None)):
             with self.assertRaisesRegex(ValueError, 'Tag already admitted'):
@@ -305,7 +356,7 @@ class HistoryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Expired unresolved'):
                 self.read()
         self.api.overrides[path] = [dict(run, status='queued')]
-        self.assertEqual(self.read(), (0, False))  # A queued dispatch is not a reservation/ordering promise.
+        self.assertEqual(self.read(), (0, False))
 
     def test_partial_unknown_drafts_duplicates_and_sdk_history_failures_deny(self):
         self.api.records = [{'id': 1, 'tag_name': self.expected['tag'], 'draft': True}]
@@ -314,7 +365,7 @@ class HistoryTests(unittest.TestCase):
         self.api.records *= 2
         with self.assertRaises(ValueError):
             self.read()
-        assets, manifest = self.published()
+        assets, _ = self.published()
         with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_assets', side_effect=ValueError('bad signature')):
             with self.assertRaises(ValueError):
                 self.read()

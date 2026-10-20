@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Static guarded release configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "certificateSha256", "signingEnvironment", "publicationEnvironment", "rcEnabled", "stableEnabled"],
+  "properties": {
+    "schema": {"const": 2},
+    "certificateSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "signingEnvironment": {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"},
+    "publicationEnvironment": {"type": "string", "pattern": "^[A-Za-z0-9_-]+$"},
+    "rcEnabled": {"type": "boolean"},
+    "stableEnabled": {"type": "boolean"}
+  }
+}

@@ -1,4 +1,5 @@
 name: Guarded release
+run-name: ${{ inputs.operation }} ${{ inputs.channel }} ${{ inputs.tag }}
 
 on:
   workflow_dispatch:
@@ -14,9 +15,10 @@ on:
       tag:
         type: string
         required: true
-      source_sha:
+      prepare_run_id:
+        description: Successful prepare run ID (publish only)
         type: string
-        required: true
+        required: false
 
 permissions:
   contents: read
@@ -34,12 +36,12 @@ env:
   REQUEST_OPERATION: ${{ inputs.operation }}
   REQUEST_CHANNEL: ${{ inputs.channel }}
   REQUEST_TAG: ${{ inputs.tag }}
-  REQUEST_SOURCE_SHA: ${{ inputs.source_sha }}
-  CHANNEL_ACTIVATION: ${{ inputs.channel == 'rc' && vars.RELEASE_RC_ACTIVATION || inputs.channel == 'stable' && vars.RELEASE_STABLE_ACTIVATION || '' }}
+  REQUEST_PREPARE_RUN_ID: ${{ inputs.prepare_run_id }}
+  RELEASE_CONFIG: ${{ vars.RELEASE_CONFIG }}
 
 jobs:
   admit:
-    name: Admit exact release authority
+    name: Admit release and show owner confirmation
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'leugenea/codexbar-mobile' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -69,7 +71,7 @@ jobs:
           timeout --signal=TERM --kill-after=10s 3m "$RUNNER_TEMP/release-venv/bin/python" -m pip install \
             --require-hashes --no-deps --no-cache-dir --disable-pip-version-check --timeout 30 --retries 1 \
             -r tools/research/requirements.txt
-      - name: Admit exact public authorization
+      - name: Validate configuration and show tag, source and versionCode before approval
         id: gate
         timeout-minutes: 5
         env:

@@ -12,8 +12,7 @@ import test_release_policy as fixtures
 
 class PublicationTests(unittest.TestCase):
     def setUp(self):
-        record = fixtures.authorization()
-        self.expected = fixtures.policy.admit(fixtures.PolicyAPI(record), record, fixtures.context(record))[0]
+        self.expected = fixtures.policy.admit(fixtures.PolicyAPI(), fixtures.configuration(), fixtures.context())[1]
         self.assets = {'candidate.apk': b'SYNTHETIC not an APK', 'release-manifest.json': b'SYNTHETIC manifest',
                        'SHA256SUMS': b'SYNTHETIC checksums'}
         self.model = ReleaseAPI()
