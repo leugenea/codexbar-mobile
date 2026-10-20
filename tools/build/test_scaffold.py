@@ -22,8 +22,8 @@ class ToolchainContract(unittest.TestCase):
             self.assertEqual(hashlib.sha256((ROOT / path).read_bytes()).hexdigest(), digest, path)
         self.assertTrue((ROOT / "gradlew").stat().st_mode & 0o111)
         wrapper = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()
-        self.assertIn("distributionUrl=https\\://services.gradle.org/distributions/gradle-9.8.1-bin.zip", wrapper)
-        self.assertIn("distributionSha256Sum=dce76f55f8e251a3a1f130eb120f30b3d271de2b76c9b0729d316b5a1b6dc01f", wrapper)
+        self.assertIn("distributionUrl=https\\://services.gradle.org/distributions/gradle-9.8.2-bin.zip", wrapper)
+        self.assertIn("distributionSha256Sum=21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607", wrapper)
 
     def test_current_toolchain_and_install_policy(self):
         baseline = json.loads((ROOT / "docs/research/m0/toolchain.json").read_text())
@@ -53,7 +53,7 @@ class ToolchainContract(unittest.TestCase):
 
     def test_runtime_toolchain_assertions_and_lint_remain_strict(self):
         inventory = (ROOT / "tools/build/toolchain.init.gradle").read_text()
-        self.assertIn("assert receipt.gradle == '9.8.1'", inventory)
+        self.assertIn("assert receipt.gradle == '9.8.2'", inventory)
         self.assertIn("assert receipt.agp == '9.4.1'", inventory)
         for module in ("kotlin-gradle-plugin", "kotlin-compiler-embeddable",
                        "kotlin-compose-compiler-plugin-embeddable"):
