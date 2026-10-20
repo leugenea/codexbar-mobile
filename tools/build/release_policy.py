@@ -232,8 +232,8 @@ def history(api, record, expected, sdk, reports):
         if tag == expected['tag']:
             require(identity == expected and authority['runId'] == (record.get('prepareRunId') or record['runId']),
                     'Tag already belongs to a different allocation')
-            if record['operation'] == 'publish':
-                require(authority['runAttempt'] == record['prepareAttempt'], 'Accepted candidate attempt differs')
+            # The verified manifest's successful exact origin attempt is authoritative;
+            # a later prepare no-op rerun does not replace the published candidate.
             same = True
         accepted[tag] = identity['versionCode']
     codes = list(accepted.values())

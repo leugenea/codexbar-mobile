@@ -325,7 +325,7 @@ class HistoryTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.read()
 
-    def test_publish_history_requires_same_origin_attempt_for_readonly_noop(self):
+    def test_publish_history_requires_verified_exact_origin_attempt_for_readonly_noop(self):
         self.record, self.expected, _ = policy.admit(self.api, configuration(), context(operation='publish'))
         assets, manifest = self.published(9, self.expected['tag'], 90)
         with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_assets', return_value=(manifest, None)):
@@ -333,6 +333,38 @@ class HistoryTests(unittest.TestCase):
             manifest['authority']['runAttempt'] = 1
             with self.assertRaises(ValueError):
                 self.read()
+
+    def test_real_wrapper_published_noop_survives_successful_prepare_rerun(self):
+        model = self.api
+        api = wrapper(model)
+        prepare_ctx = {**context(), 'runId': 90, 'runNumber': 9}
+        record, expected, _ = policy.admit(api, configuration(), prepare_ctx)
+        self.assertEqual(policy.history(api, record, expected, self.reports, self.reports), (0, False))
+        publish_ctx = context(operation='publish')
+        record, expected, _ = policy.admit(api, configuration(), publish_ctx)
+        assets, manifest = self.published(9, expected['tag'], 90)
+        published = copy.deepcopy(model.records)
+        # Synthetic accepted-release/signature observations; GitHub reads use the real wrapper.
+        with patch.object(policy, 'read_assets', return_value=assets), \
+                patch.object(policy, 'verify_assets', return_value=(manifest, None)):
+            self.assertEqual(policy.history(api, record, expected, self.reports, self.reports), (0, True))
+            original = model.get('/actions/runs/90')
+            model.overrides['/actions/runs/90/attempts/2'] = copy.deepcopy(original)
+            model.overrides['/actions/runs/90'] = {**original, 'run_attempt': 3}
+            record, prepare_expected, _ = policy.admit(api, configuration(), prepare_ctx)
+            self.assertEqual(prepare_expected, expected)
+            self.assertEqual(policy.history(api, record, expected, self.reports, self.reports), (0, True))
+            record, publish_expected, _ = policy.admit(api, configuration(), publish_ctx)
+            self.assertEqual(publish_expected, expected)
+            self.assertEqual(record['prepareAttempt'], 3)
+            self.assertEqual(manifest['authority']['runAttempt'], 2)
+            self.assertEqual(policy.history(api, record, expected, self.reports, self.reports), (0, True))
+            self.assertEqual(model.records, published)
+            self.assertIn('/actions/runs/90/attempts/2', model.calls)
+            self.assertFalse(any('/artifacts' in path for path in model.calls))
+            model.overrides['/actions/runs/90/attempts/2'] = {**original, 'conclusion': 'failure'}
+            with self.assertRaisesRegex(ValueError, 'History origin attempt not accepted'):
+                policy.history(api, record, expected, self.reports, self.reports)
 
     def test_retained_official_candidate_reserves_tag_and_expired_unknown_blocks(self):
         raw = zip_bytes({'release-manifest.json': b'synthetic'})
