@@ -9,6 +9,11 @@ created by this change. Issue 148 owns custody/trust configuration, exact activa
 initial history reconciliation and actual publication approval. Physical-phone and
 live-account acceptance, followed by explicit owner GO, remain separate.
 
+In this single-owner repository, the owner chose hosted-environment custody and
+accepted same-account dispatch and approval in issue 148. Environment approval is
+an owner confirmation pause: a deliberate manual step before signing/publication,
+not independent review by a second person. This decision does not activate releases.
+
 The implemented proposed hosted boundary uses ordinary GitHub-hosted runners:
 
 | Job | Capability | Admission |
@@ -53,8 +58,9 @@ Each authorization pins these public fields (no production values are supplied):
   signer certificate. The independent pin must not be discovered from the supplied
   private key or copied from the APK being admitted.
 - `trustMode=hosted-environment`, `signingEnvironment`, `publicationEnvironment`.
-  Both must already exist, require independent reviewers with self-review disabled,
-  and allow exactly custom branch policy `main` (type `branch`). Missing environment
+  Both must already exist, have exactly one `required_reviewers` rule with a
+  non-empty reviewers list (self-review may be allowed or prevented), and allow
+  exactly custom branch policy `main` (type `branch`). Missing environment
   inspection fails before any environment job is scheduled; this avoids GitHub's
   implicit creation of a missing, unprotected environment. The GET interface does
   not expose the UI administrator-bypass setting: the owner must audit that setting,
@@ -66,8 +72,8 @@ Each authorization pins these public fields (no production values are supplied):
   signed `artifactId`, Actions ZIP `artifactSha256`, and `bundleManifestSha256`.
   It does not allocate a second versionCode.
 
-The first inactive dispatch can reveal its run ID/number; after independent owner
-approval, activation can pin that run and it can be rerun. A rerun keeps its original
+The first inactive dispatch can reveal its run ID/number; after owner approval,
+activation can pin that run and it can be rerun. A rerun keeps its original
 code; a new run/controller/source/tag is not authorized by that record. Controller
 SHA must still equal current `main`; source must be accepted `main` history with
 successful exact-source main push runs of Android, repository policy, research and
@@ -162,7 +168,7 @@ Retained `signed-<prepare_run_id>-<prepare_run_attempt>` contains exactly six as
 The final bundle retains clearly labeled unsigned acceptance evidence, not the
 unsigned APK. `distributionApproval=false` remains unchanged: byte/attribution
 verification is not owner publication GO. No keys/passwords/debug APKs enter the
-allowlist. Owner independent acceptance must record exact digests and artifact ID,
+allowlist. Owner acceptance must record exact digests and artifact ID,
 not just a retained artifact name. Expired/missing unaccepted artifacts require a
 stop; they never authorize rebuilding accepted bytes. An already accepted exact
 published candidate can instead be verified as a read-only no-op from its Release

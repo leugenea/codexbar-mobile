@@ -89,8 +89,8 @@ def protected_environment(api, name):
     # The GET response exposes reviewer/ref rules, not the UI's administrator-bypass setting.
     # Owner custody approval must audit that setting; do not fabricate an API observation.
     reviewers = [r for r in environment['protection_rules'] if r['type'] == 'required_reviewers']
-    require(len(reviewers) == 1 and reviewers[0].get('prevent_self_review') is True
-            and bool(reviewers[0].get('reviewers')), 'Independent environment reviewer protection required')
+    require(len(reviewers) == 1 and bool(reviewers[0].get('reviewers')),
+            'Environment reviewer protection required')
     require(environment['deployment_branch_policy'] == {'protected_branches': False, 'custom_branch_policies': True},
             'Environment needs exact main-only custom branch policy')
     policies = api.pages(path + '/deployment-branch-policies', 'branch_policies')

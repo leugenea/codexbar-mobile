@@ -75,7 +75,7 @@ class PolicyAPI:
             return {'encoding': 'base64', 'content': base64.b64encode(b'0.1.0\n').decode()}
         if path.startswith('/environments/'):
             return {'name': path.split('/')[2], 'protection_rules': [
-                {'type': 'required_reviewers', 'prevent_self_review': True, 'reviewers': [{'type': 'User'}]}],
+                {'type': 'required_reviewers', 'prevent_self_review': False, 'reviewers': [{'type': 'User'}]}],
                 'deployment_branch_policy': {'protected_branches': False, 'custom_branch_policies': True}}
         raise AssertionError(path)
 
@@ -186,10 +186,11 @@ class ActivationTests(unittest.TestCase):
                 api.overrides[path] = rows
                 with self.subTest(filename=filename), self.assertRaises(ValueError):
                     policy.admit(api, record, context(record))
-        api = PolicyAPI(record)
-        api.overrides['/environments/release-sign/deployment-branch-policies'] = [{'id': 1, 'name': '*', 'type': 'branch'}]
-        with self.assertRaises(ValueError):
-            policy.admit(api, record, context(record))
+        for policies in ([], [{'id': 1, 'name': '*', 'type': 'branch'}]):
+            api = PolicyAPI(record)
+            api.overrides['/environments/release-sign/deployment-branch-policies'] = policies
+            with self.subTest(policies=policies), self.assertRaises(ValueError):
+                policy.admit(api, record, context(record))
 
     def test_publish_uses_origin_run_number_not_new_dispatch_and_rerun_is_stable(self):
         record = authorization(operation='publish')
@@ -201,9 +202,22 @@ class ActivationTests(unittest.TestCase):
         api.overrides['/actions/runs/100'] = {**api.get('/actions/runs/100'), 'run_attempt': 3}
         self.assertEqual(first, policy.admit(api, record, context(record))[0])
 
+    def test_environment_reviewers_allow_owner_self_approval_or_prevent_it(self):
+        record = authorization()
+        for prevent_self_review in (False, True):
+            api = PolicyAPI(record)
+            for name in (record['signingEnvironment'], record['publicationEnvironment']):
+                path = '/environments/' + name
+                api.overrides[path] = {**api.get(path), 'protection_rules': [
+                    {'type': 'required_reviewers', 'prevent_self_review': prevent_self_review,
+                     'reviewers': [{'type': 'User'}]}]}
+            with self.subTest(prevent_self_review=prevent_self_review):
+                self.assertEqual(policy.admit(api, record, context(record))[0]['versionCode'], 10)
+
     def test_missing_or_unprotected_environment_never_defaults_to_approval(self):
         record = authorization()
         for change in ({'protection_rules': []}, {'protection_rules': [{'type': 'required_reviewers', 'reviewers': []}]},
+                       {'protection_rules': [{'type': 'required_reviewers', 'reviewers': [{'type': 'User'}]}] * 2},
                        {'deployment_branch_policy': None}):
             api = PolicyAPI(record)
             api.overrides['/environments/release-sign'] = {**api.get('/environments/release-sign'), **change}
