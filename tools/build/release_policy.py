@@ -1,4 +1,4 @@
-"""Fail-closed exact-run source/channel admission and verified official Release history."""
+"""Static configuration, derived source/run admission and verified official Release history."""
 import base64
 import json
 from pathlib import Path
@@ -6,7 +6,7 @@ import re
 import urllib.parse
 
 from release_publication import identifier, marker, read_assets, release_binding, require
-from release_runtime import canonical, fingerprint, load, members
+from release_runtime import fingerprint, load, members
 from release_signing import _unique, verify_assets
 from version_identity import MAX_CODE, official_inputs, parse_tag, target_version
 
@@ -15,26 +15,17 @@ WORKFLOW = '.github/workflows/release.yml'
 SOURCE_GATES = ('android.yml', 'repository-policy.yml', 'research-contract.yml', 'codeql.yml')
 
 
-def activation(text, channel):
+def configuration(text, channel):
     from jsonschema import Draft7Validator
     require(channel in ('rc', 'stable'), 'Unknown release channel')
-    require(isinstance(text, str) and bool(text.strip()), 'Channel activation is unset; release denied')
-    record = json.loads(text, object_pairs_hook=_unique)
-    Draft7Validator(load(ROOT / 'tools/build/schemas/release-activation.schema.json')).validate(record)
-    require(record['channel'] == channel, 'RC and stable authorizations cannot be shared')
-    for values in (record, record['previous'], record.get('candidate', {})):
-        require(all(not isinstance(value, str) or (value == value.strip() and '\n' not in value and '\r' not in value)
-                    for value in values.values()), 'Activation strings must be canonical single-line values')
-    if 'emptyHistory' in record['previous']:
-        require(record['previous']['emptyHistory'] is True, 'Explicit Boolean empty-history acknowledgment required')
-    # JSON Schema numeric equality allows 1.0; IDs/counters must be actual JSON integers.
-    for key in ('schema', 'repositoryId', 'workflowId', 'runId', 'runNumber'):
-        require(type(record[key]) is int, 'Activation requires canonical integer ' + key)
-    for value in (record.get('candidate', {}), record['previous']):
-        for key in ('runId', 'runAttempt', 'artifactId', 'releaseId', 'versionCode'):
-            if key in value:
-                require(type(value[key]) is int, 'Activation requires canonical integer ' + key)
-    return record
+    require(isinstance(text, str) and bool(text.strip()), 'RELEASE_CONFIG is unset; release denied')
+    config = json.loads(text, object_pairs_hook=_unique)
+    Draft7Validator(load(ROOT / 'tools/build/schemas/release-config.schema.json')).validate(config)
+    require(type(config['schema']) is int, 'Configuration schema must be a canonical integer')
+    require(all(not isinstance(value, str) or (value == value.strip() and '\n' not in value and '\r' not in value)
+                for value in config.values()), 'Configuration strings must be canonical single-line values')
+    require(config[channel + 'Enabled'] is True, 'Release channel is disabled')
+    return config
 
 
 def tag_source(api, tag):
@@ -89,8 +80,8 @@ def protected_environment(api, name):
     # The GET response exposes reviewer/ref rules, not the UI's administrator-bypass setting.
     # Owner custody approval must audit that setting; do not fabricate an API observation.
     reviewers = [r for r in environment['protection_rules'] if r['type'] == 'required_reviewers']
-    require(len(reviewers) == 1 and reviewers[0].get('prevent_self_review') is True
-            and bool(reviewers[0].get('reviewers')), 'Independent environment reviewer protection required')
+    require(len(reviewers) == 1 and bool(reviewers[0].get('reviewers')),
+            'Environment reviewer protection required')
     require(environment['deployment_branch_policy'] == {'protected_branches': False, 'custom_branch_policies': True},
             'Environment needs exact main-only custom branch policy')
     policies = api.pages(path + '/deployment-branch-policies', 'branch_policies')
@@ -98,68 +89,98 @@ def protected_environment(api, name):
             'Environment ref restriction must be exactly branch main')
 
 
-def admit(api, record, context):
-    comparisons = {'repository': 'repository', 'repositoryId': 'repositoryId', 'controllerSha': 'sha',
-                   'controllerRef': 'ref', 'operation': 'operation', 'runId': 'runId', 'runNumber': 'runNumber',
-                   'channel': 'channel', 'sourceSha': 'sourceSha'}
-    for field, key in comparisons.items():
-        require(record[field] == context[key] and type(record[field]) is type(context[key]), 'Activation mismatch: ' + field)
+def admit(api, config, context):
     require(context['event'] == 'workflow_dispatch' and context['ref'] == 'refs/heads/main'
-            and context['workflowSha'] == record['controllerSha']
-            and context['workflowRef'] == record['repository'] + '/' + WORKFLOW + '@refs/heads/main'
-            and record['tagRef'] == 'refs/tags/' + context['tag'], 'Untrusted event/controller/tag')
+            and context['operation'] in ('prepare', 'publish')
+            and context['repository'] == api.repository == 'leugenea/codexbar-mobile'
+            and context['workflowSha'] == context['sha']
+            and context['workflowRef'] == api.repository + '/' + WORKFLOW + '@refs/heads/main',
+            'Untrusted event/controller')
     repository = api.get('')
-    require(repository['id'] == record['repositoryId'] and repository['full_name'] == record['repository']
+    require(repository['id'] == context['repositoryId'] and repository['full_name'] == api.repository
             and repository['default_branch'] == 'main' and repository['fork'] is False, 'Repository identity differs')
-    workflow = api.get('/actions/workflows/' + identifier(record['workflowId']))
-    require(workflow['id'] == record['workflowId'] and workflow['path'] == WORKFLOW and workflow['state'] == 'active',
-            'Workflow identity reset/inactive')
-    run_identity(api, record['runId'], record['workflowId'], sha=record['controllerSha'], number=record['runNumber'])
+    workflow = api.get('/actions/workflows/release.yml')
+    require(workflow['path'] == WORKFLOW and workflow['state'] == 'active', 'Workflow identity inactive')
+    run_identity(api, context['runId'], workflow['id'], sha=context['sha'], number=context['runNumber'])
     main = api.get('/git/ref/heads/main')['object']['sha']
-    require(main == record['controllerSha'], 'Controller activation is stale against current main')
-    require(tag_source(api, context['tag']) == record['sourceSha'], 'Tag/source drift')
-    commit = api.get('/git/commits/' + record['sourceSha'])
-    require(commit['tree']['sha'] == record['sourceTree'], 'Source tree differs')
-    comparison = api.get('/compare/' + record['sourceSha'] + '...' + main)
+    require(main == context['sha'], 'Controller is stale against current main')
+    source = tag_source(api, context['tag'])
+    tree = api.get('/git/commits/' + source)['tree']['sha']
+    comparison = api.get('/compare/' + source + '...' + main)
     require(comparison['status'] in ('ahead', 'identical'), 'Source must be accepted main history')
-    require(workflow_tree(api, record['sourceSha']) == workflow_tree(api, main),
+    require(workflow_tree(api, source) == workflow_tree(api, main),
             'Workflow subtree drift requires Workflows-write; GITHUB_TOKEN release denied')
-    content = api.get('/contents/VERSION?ref=' + record['sourceSha'])
+    content = api.get('/contents/VERSION?ref=' + source)
     require(content['encoding'] == 'base64', 'Unsupported VERSION encoding')
     target = target_version(base64.b64decode(content['content']).decode())
-    # Explicit known workflows, exact source, push/main, latest attempt outcome. No arbitrary green run.
+    # Exact-source main push gates, including the latest attempt outcome.
     for filename in SOURCE_GATES:
-        runs = api.pages('/actions/workflows/' + filename + '/runs?head_sha=' + record['sourceSha'] + '&event=push', 'workflow_runs')
-        valid = [r for r in runs if r['head_sha'] == record['sourceSha'] and r['head_branch'] == 'main'
+        runs = api.pages('/actions/workflows/' + filename + '/runs?head_sha=' + source + '&event=push', 'workflow_runs')
+        valid = [r for r in runs if r['head_sha'] == source and r['head_branch'] == 'main'
                  and r['event'] == 'push' and r['path'] == '.github/workflows/' + filename
-                 and r['repository']['id'] == record['repositoryId']]
+                 and r['repository']['id'] == context['repositoryId']]
         require(bool(valid), 'Exact-source main gates missing: ' + filename)
         latest = max(valid, key=lambda r: r['id'])
         require(latest['status'] == 'completed' and latest['conclusion'] == 'success', 'Source gate not accepted: ' + filename)
-    for name in (record['signingEnvironment'], record['publicationEnvironment']):
+    for name in (config['signingEnvironment'], config['publicationEnvironment']):
         protected_environment(api, name)
-    code = record['runNumber']
-    origin = None
-    if record['operation'] == 'publish':
-        candidate = record['candidate']
-        origin = run_identity(api, candidate['runId'], record['workflowId'], attempt=candidate['runAttempt'])
-        require(origin['status'] == 'completed' and origin['conclusion'] == 'success', 'Prepare attempt not successful')
+    record = {**config, **context, 'controllerSha': main, 'workflowId': workflow['id'],
+              'sourceSha': source, 'sourceTree': tree}
+    code, origin = context['runNumber'], None
+    if context['operation'] == 'publish':
+        prepare = context['prepareRunId']
+        require(isinstance(prepare, str) and re.fullmatch('[1-9][0-9]*', prepare), 'Canonical prepare_run_id required')
+        origin = run_identity(api, int(prepare), workflow['id'])
+        require(origin['id'] != context['runId'] and origin['status'] == 'completed' and origin['conclusion'] == 'success'
+                and origin['display_title'] == f'prepare {context["channel"]} {context["tag"]}',
+                'Successful prepare run for this tag/channel required')
+        record['prepareRunId'] = origin['id']
+        record['prepareAttempt'] = origin['run_attempt']
         code = origin['run_number']
-    env = {'RELEASE_CHANNEL': record['channel'], 'RELEASE_TAG': context['tag'],
-           'RELEASE_VERSION_CODE': str(code), 'RELEASE_PREVIOUS_VERSION_CODE': '0'}
-    official_inputs(target, record['channel'], env)
-    expected = {'source': {'sha': record['sourceSha'], 'tree': record['sourceTree']}, 'target': target,
-                'channel': record['channel'], 'tag': context['tag'], 'versionName': context['tag'][1:],
+    else:
+        require(not context['prepareRunId'], 'prepare_run_id is only valid for publish')
+    official_inputs(target, context['channel'], {'RELEASE_TAG': context['tag'],
+                    'RELEASE_VERSION_CODE': str(code), 'RELEASE_PREVIOUS_VERSION_CODE': '0'})
+    expected = {'source': {'sha': source, 'tree': tree}, 'target': target,
+                'channel': context['channel'], 'tag': context['tag'], 'versionName': context['tag'][1:],
                 'versionCode': code, 'debugPackage': 'io.github.leugenea.codexbarmobile.dev',
                 'releasePackage': 'io.github.leugenea.codexbarmobile'}
-    return expected, origin
+    return record, expected, origin
+
+
+def artifact_assets(api, artifact):
+    require(artifact['expired'] is False, 'Expired unresolved signed candidate; reconcile before another allocation')
+    digest = artifact['digest']
+    require(isinstance(digest, str) and re.fullmatch('sha256:[0-9a-f]{64}', digest), 'Candidate archive digest missing')
+    raw = api.request('GET', api.prefix + '/actions/artifacts/' + identifier(artifact['id']) + '/zip', binary=True)
+    require('sha256:' + fingerprint(raw)['sha256'] == digest, 'Candidate archive differs')
+    return members(raw)
+
+
+def candidate_assets(api, record, expected, origin, sdk, reports):
+    """Resolve the retained prepare artifact, then reverify its bytes and signed identity."""
+    name = f'signed-{origin["id"]}-{origin["run_attempt"]}'
+    artifacts = api.pages('/actions/runs/' + identifier(origin['id']) + '/artifacts', 'artifacts')
+    matches = [a for a in artifacts if a['name'] == name]
+    require(len(matches) == 1, 'Exactly one retained prepare artifact required')
+    artifact = api.get('/actions/artifacts/' + identifier(matches[0]['id']))
+    require(artifact['id'] == matches[0]['id'] and artifact['name'] == name and artifact['expired'] is False
+            and artifact['workflow_run']['id'] == origin['id']
+            and artifact['workflow_run']['head_sha'] == origin['head_sha'], 'Prepare artifact provenance differs/expired')
+    assets = artifact_assets(api, artifact)
+    expected_authority = {'repository': api.repository, 'workflowId': record['workflowId'],
+                          'controllerSha': origin['head_sha'], 'runId': origin['id'], 'runAttempt': origin['run_attempt']}
+    manifest, _ = verify_assets(ROOT, assets, sdk, reports, expected_certificate=record['certificateSha256'],
+                                expected_authority=expected_authority)
+    require(manifest['buildInputs'] == expected, 'Prepare tag/source/channel/counter differs')
+    return assets
 
 
 def prepared_tags(api, record, expected, accepted_runs, sdk, reports):
     """Retained official candidates reserve their tag; ordinary CI artifacts never allocate."""
     runs = api.pages('/actions/workflows/' + identifier(record['workflowId'])
                      + '/runs?event=workflow_dispatch', 'workflow_runs')
-    own_run = record.get('candidate', {}).get('runId', record['runId'])
+    own_run = record.get('prepareRunId') or record['runId']
     for run in runs:
         if run['id'] in accepted_runs or run['id'] == own_run or run['status'] != 'completed':
             continue
@@ -171,12 +192,7 @@ def prepared_tags(api, record, expected, accepted_runs, sdk, reports):
         for artifact in api.pages('/actions/runs/' + identifier(run['id']) + '/artifacts', 'artifacts'):
             if not re.fullmatch(r'signed-' + str(run['id']) + r'-[1-9][0-9]*', artifact['name']):
                 continue
-            require(artifact['expired'] is False, 'Expired unresolved signed candidate; reconcile before another allocation')
-            digest = artifact['digest']
-            require(isinstance(digest, str) and re.fullmatch(r'sha256:[0-9a-f]{64}', digest), 'Candidate archive digest missing')
-            raw = api.request('GET', api.prefix + '/actions/artifacts/' + identifier(artifact['id']) + '/zip', binary=True)
-            require('sha256:' + fingerprint(raw)['sha256'] == digest, 'Retained candidate archive differs')
-            candidate, _ = verify_assets(ROOT, members(raw), sdk, reports / identifier(artifact['id']),
+            candidate, _ = verify_assets(ROOT, artifact_assets(api, artifact), sdk, reports / identifier(artifact['id']),
                                          expected_certificate=record['certificateSha256'])
             origin = candidate['authority']
             require(origin['runId'] == run['id'] and origin['workflowId'] == record['workflowId']
@@ -188,7 +204,7 @@ def prepared_tags(api, record, expected, accepted_runs, sdk, reports):
 
 def history(api, record, expected, sdk, reports):
     """Draft-capable GET token required by caller. A failed/partial read is never empty history."""
-    accepted, same = [], False
+    accepted, same = {}, False
     accepted_runs = set()
     releases = api.releases()
     require(len({r['tag_name'] for r in releases}) == len(releases), 'Duplicate release tags')
@@ -214,23 +230,18 @@ def history(api, record, expected, sdk, reports):
                         'RELEASE_VERSION_CODE': str(identity['versionCode']), 'RELEASE_PREVIOUS_VERSION_CODE': '0'})
         release_binding(release, identity, marker(assets))
         if tag == expected['tag']:
-            candidate = record.get('candidate', {'runId': record['runId']})
-            require(identity == expected and authority['runId'] == candidate['runId'], 'Tag already belongs to a different allocation')
-            if record['operation'] == 'publish':
-                require(authority['runAttempt'] == candidate['runAttempt']
-                        and manifest['bundleManifestSha256'] == candidate['bundleManifestSha256'], 'Accepted candidate differs')
+            require(identity == expected and authority['runId'] == (record.get('prepareRunId') or record['runId']),
+                    'Tag already belongs to a different allocation')
+            # The verified manifest's successful exact origin attempt is authoritative;
+            # a later prepare no-op rerun does not replace the published candidate.
             same = True
-        accepted.append({'releaseId': release['id'], 'versionCode': identity['versionCode'],
-                         'bundleManifestSha256': manifest['bundleManifestSha256'], 'tag': tag})
-    codes = [r['versionCode'] for r in accepted]
+        accepted[tag] = identity['versionCode']
+    codes = list(accepted.values())
     require(len(set(codes)) == len(codes), 'Reused official versionCode')
-    older = [r for r in accepted if r['tag'] != expected['tag']]
-    floor = max(older, key=lambda r: r['versionCode']) if older else None
-    anchor = {'emptyHistory': True} if floor is None else {k: floor[k] for k in ('releaseId', 'versionCode', 'bundleManifestSha256')}
-    require(record['previous'] == anchor, 'Accepted history anchor is stale/missing; owner reconciliation required')
-    require(expected['versionCode'] > (floor['versionCode'] if floor else 0), 'Counter reset/non-increasing candidate')
+    floor = max((code for tag, code in accepted.items() if tag != expected['tag']), default=0)
+    require(expected['versionCode'] > floor, 'Counter reset/non-increasing candidate')
     prepared_tags(api, record, expected, accepted_runs, sdk, reports / 'prepared')
-    return (floor['versionCode'] if floor else 0), same
+    return floor, same
 
 
 def authority(record, attempt):

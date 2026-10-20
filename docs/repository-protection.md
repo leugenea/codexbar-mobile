@@ -49,7 +49,7 @@ separately by its `code_scanning` rule.
 | `code-metrics.yml` | `Code duplication (jscpd)` | Informational |
 | `code-metrics.yml` | `Publish code metric history` | Main-only; not required for PRs |
 | `code-metrics.yml` | `Deploy code metric chart` | Main-only; not required for PRs |
-| `release.yml` | `Admit exact release authority` | Manual default-off; not required for PRs |
+| `release.yml` | `Admit release and show owner confirmation` | Manual default-off; not required for PRs |
 | `release.yml` | `Inspect complete official release history` | Manual default-off; not required for PRs |
 | `release.yml` | `Build accepted unsigned release` | Manual default-off; not required for PRs |
 | `release.yml` | `Sign accepted release candidate` | Manual default-off; not required for PRs |
@@ -86,24 +86,23 @@ The historical default-setup [first run on October 10, 2026](https://github.com/
 scanned 69 of 150 Kotlin files without test extraction; it does not establish coverage
 for the replacement workflow.
 
-## Inactive release trust proposal
+## Guarded release trust boundary
 
 The [guarded release workflow](../.github/workflows/release.yml) adds no required PR
-context or repository-setting change. Its exact main-only manual admission and
-channel-specific activation must succeed before protected environment jobs can be
-scheduled. Signing and publication environments, reviewers/ref restrictions,
-certificate/key custody, exact source/run authorization and initial history bootstrap
-remain owner decisions in issue 148. None are configured here.
+context or repository-setting writes. Main-only manual admission validates static
+`RELEASE_CONFIG`, derives source/run/history and checks protected environments before
+scheduling signing/publication. The single owner accepts self-approval as a
+confirmation pause, not independent review; the summary shows tag/source/code before
+approval. Stable remains disabled in the initial configuration.
 
-The `remote-state` job deliberately requests Contents write for push-capable draft
-visibility, although its controller helper performs GETs only. This is a real token
-capability, not a platform-enforced read-only token. The owner must explicitly accept
-or reject it before activation. `publish` is a distinct protected-environment writer;
-`sign` receives only Contents/Actions read and four step-scoped signing secrets.
-All other workflows retain existing permission/PR-no-secrets policy. Missing or
-uninspectable environments fail public preflight rather than being auto-created.
-See the [runbook](releasing.md) for revocation/cancellation limits, owner-local custody,
-workflow-tree drift denial and immutable/partial-state recovery.
+The `remote-state` job deliberately requests Contents write for draft visibility,
+although its helper performs GETs only. The owner accepted this real token capability,
+not a platform-enforced read-only token. `publish` is a distinct protected-environment
+writer; `sign` receives only Contents/Actions read and four step-scoped signing
+secrets. All other workflows retain existing permission/PR-no-secrets policy. Missing
+or uninspectable environments fail preflight rather than being auto-created. See the
+[runbook](releasing.md) for setup, revocation/cancellation limits and partial-state
+recovery.
 
 ## Recommended changes and retained safeguards
 

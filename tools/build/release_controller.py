@@ -1,10 +1,8 @@
 """Trusted manual workflow entrypoints. Source compilation runs only in the unprivileged job."""
 import argparse
-import json
 import os
 from pathlib import Path
 import shutil
-import tempfile
 
 import release_artifact
 import release_bundle
@@ -21,14 +19,14 @@ def context(env):
             'workflowSha': env['GITHUB_WORKFLOW_SHA'], 'workflowRef': env['GITHUB_WORKFLOW_REF'],
             'runId': int(env['GITHUB_RUN_ID']), 'runNumber': int(env['GITHUB_RUN_NUMBER']),
             'operation': env['REQUEST_OPERATION'], 'channel': env['REQUEST_CHANNEL'],
-            'tag': env['REQUEST_TAG'], 'sourceSha': env['REQUEST_SOURCE_SHA']}
+            'tag': env['REQUEST_TAG'], 'prepareRunId': env.get('REQUEST_PREPARE_RUN_ID', '')}
 
 
 def admitted(env, *, reader=True):
     ctx = context(env)
-    record = policy.activation(env.get('CHANNEL_ACTIVATION', ''), ctx['channel'])
+    config = policy.configuration(env.get('RELEASE_CONFIG', ''), ctx['channel'])
     api = GitHub(ctx['repository'], env['GH_TOKEN'], read_only=reader)
-    expected, origin = policy.admit(api, record, ctx)
+    record, expected, origin = policy.admit(api, config, ctx)
     return api, record, expected, origin
 
 
@@ -91,11 +89,15 @@ def main():
         output(allow='true', signing_environment=record['signingEnvironment'],
                publication_environment=record['publicationEnvironment'])
         with open(env['GITHUB_STEP_SUMMARY'], 'a') as stream:
-            stream.write('## Public exact-run authorization\n```json\n' + canonical(record).decode() + '```\n')
+            summary = {key: expected[key] for key in ('channel', 'tag', 'source', 'versionCode')}
+            stream.write('## Owner confirmation — check before Approve\n```json\n' + canonical(summary).decode() + '```\n')
+        print('Owner confirmation:', canonical(summary).decode())
         return
     if args.operation == 'remote-state':
         # This GET-only helper has a technically Contents-write job token for draft visibility.
         floor, same = policy.history(api, record, expected, sdk, args.work / 'history')
+        if origin is not None and not same:
+            policy.candidate_assets(api, record, expected, origin, sdk, args.work / 'candidate-verification')
         output(allow='true', previous=str(floor), noop=str(same).lower())
         return
     previous = env.get('ACCEPTED_PREVIOUS_CODE', '')
@@ -137,7 +139,6 @@ def main():
         for name, data in assets.items():
             (destination / name).write_bytes(data)
         return
-    candidate = record['candidate']
     _, accepted = policy.history(api, record, expected, sdk, args.work / 'publish-history')
     if accepted:
         matches = [r for r in api.releases() if r['tag_name'] == expected['tag'] and r['draft'] is False]
@@ -146,16 +147,7 @@ def main():
             require(api.get('/releases/latest')['id'] == matches[0]['id'], 'Accepted stable latest readback differs')
         print('Exact accepted Release verified without rebuilding/replacing:', matches[0]['id'])
         return
-    destination = args.work / 'candidate'
-    assets = download_artifact(api, candidate['artifactId'], candidate['artifactSha256'], candidate['runId'],
-                               candidate['runAttempt'], f'signed-{candidate["runId"]}-{candidate["runAttempt"]}',
-                               origin['head_sha'], destination)
-    authority = {'repository': record['repository'], 'workflowId': record['workflowId'],
-                 'controllerSha': origin['head_sha'], 'runId': candidate['runId'], 'runAttempt': candidate['runAttempt']}
-    manifest, _ = verify_assets(policy.ROOT, assets, sdk, args.work / 'verify',
-                                expected_certificate=record['certificateSha256'], expected_authority=authority)
-    require(manifest['buildInputs'] == expected and manifest['bundleManifestSha256'] == candidate['bundleManifestSha256'],
-            'Pinned signed candidate differs')
+    assets = policy.candidate_assets(api, record, expected, origin, sdk, args.work / 'verify')
     def recheck():
         fresh_api, fresh_record, fresh_expected, _ = admitted(env, reader=False)
         require(fresh_record == record and fresh_expected == expected, 'Authorization drift')

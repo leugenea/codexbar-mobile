@@ -181,7 +181,7 @@ def publish(api, expected, assets, recheck):
             api.assets(release_id)  # Includes starter assets; no DELETE and no automatic POST retry.
             raise
     require(read_assets(api, release_id, assets) == assets, 'Draft asset inventory incomplete')
-    recheck()  # Fresh activation/tag/history immediately before the final mutation.
+    recheck()  # Fresh configuration/tag/history immediately before the final mutation.
     flags = {'draft': False, 'prerelease': expected['channel'] == 'rc',
              'make_latest': 'false' if expected['channel'] == 'rc' else 'true'}
     try:

@@ -19,10 +19,10 @@ class GuardedReleaseWorkflowTests(unittest.TestCase):
         workflow_policy(self.text, 'release.yml')
         self.assertEqual(set(self.workflow['on']), {'workflow_dispatch'})
         self.assertEqual(self.workflow['on']['workflow_dispatch']['inputs']['operation']['options'], ['prepare', 'publish'])
-        activation = self.workflow['env']['CHANNEL_ACTIVATION']
-        self.assertIn('vars.RELEASE_RC_ACTIVATION', activation)
-        self.assertIn('vars.RELEASE_STABLE_ACTIVATION', activation)
-        self.assertIn("inputs.channel == 'stable'", activation)
+        self.assertEqual(self.workflow['env']['RELEASE_CONFIG'], '${{ vars.RELEASE_CONFIG }}')
+        self.assertEqual(set(self.workflow['on']['workflow_dispatch']['inputs']),
+                         {'operation', 'channel', 'tag', 'prepare_run_id'})
+        self.assertEqual(self.workflow['run-name'], '${{ inputs.operation }} ${{ inputs.channel }} ${{ inputs.tag }}')
         self.assertNotIn('secrets.', str(self.workflow['jobs']['publish']))
         for name in ('admit', 'unsigned', 'sign'):
             self.assertEqual(self.workflow['jobs'][name]['permissions'], {'contents': 'read', 'actions': 'read'})
@@ -42,7 +42,7 @@ class GuardedReleaseWorkflowTests(unittest.TestCase):
                          ('      contents: read\n      actions: read', '      contents: write\n      actions: read'),
                          ('  workflow_dispatch:\n', '  push:\n  workflow_dispatch:\n'),
                          ('  cancel-in-progress: false', '  cancel-in-progress: true'),
-                         ('          ref: ${{ github.workflow_sha }}', '          ref: ${{ inputs.source_sha }}')]:
+                         ('          ref: ${{ github.workflow_sha }}', '          ref: ${{ inputs.tag }}')]:
             self.assertIn(old, self.text)
             with self.subTest(old=old), self.assertRaises(ValueError):
                 workflow_policy(self.text.replace(old, new, 1), 'release.yml')

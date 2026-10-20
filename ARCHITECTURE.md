@@ -1250,8 +1250,8 @@ VERSION and complete local Git history supply Gradle's explicit dev/RC/stable in
 Normal tagged checkouts remain dev; official fixture builds need exact clean tagged
 source and increasing positive caller-supplied fixture counters. The separate
 [guarded manual release workflow](docs/releasing.md) uses its own authenticated
-GitHub run_number, exact public source/controller activation and verified accepted
-history; it remains default-off. The strict build job adds real release assembly/full lint and independent
+GitHub run_number, static channel/certificate configuration and derived source/controller
+admission with verified accepted history; unset configuration denies release. The strict build job adds real release assembly/full lint and independent
 unsigned APK inspection/inventory/reverification. Temporary hosted clones exercise
 actual tagged dev/RC/stable builds without public tags. Each job owns its checkout and
 ordinary selected SDK setup; inventories are retained evidence, never build admission.
@@ -1285,14 +1285,19 @@ and [preserved attribution scope](docs/legal/runtime/README.md).
 
 ## Guarded signed release boundary
 
-The inactive manual controller separates public exact-run/source/channel admission,
-draft-capable remote inventory, credential-free source compilation, protected
-existing-key signing and separately approved exact-byte publication. GitHub's dedicated
-run_number is the official prepare code; reruns preserve it and verified accepted RC/
-stable history provides the floor. Unset/stale activation, unknown state, tag/source
-or workflow-tree drift and unprotected/missing environments deny admission. Only the
-remote GET job and publisher request Contents write, with the former's real token
-capability explicitly reserved for owner trust approval. No settings are activated.
+The manual controller separates static `RELEASE_CONFIG` validation and derived
+source/run admission, draft-capable remote inventory, credential-free compilation,
+protected existing-key signing and separately approved exact-byte publication.
+The dedicated run_number is the prepare code; publish selects a successful prepare
+run by ID and reverifies its retained artifact without rebuilding or reallocating.
+Verified accepted RC/stable history supplies the floor, including derived empty
+history. Missing/invalid configuration, disabled channels, unknown state, source
+outside green main history, workflow-tree drift and unprotected environments deny.
+Before environment approval the summary shows channel, tag, source SHA and code.
+Approval is the owner's confirmation pause, not independent review or a per-commit
+variable pin. Only the remote GET job and publisher request Contents write; the
+owner accepts the former's real write-token capability for draft visibility. This
+source change writes no production settings.
 
 One additional secret-free hosted RC build uses a runner-temp disposable fixture key,
 independent public DER pin, actual SDK verification, existing final binder and a
@@ -1302,6 +1307,6 @@ emulator, outside all coverage retries; production-package cleanup preserves gra
 failure precedence. No app source, dependency, UI/test identity, coverage denominator,
 threshold or native retry/resource budget changes are made. Actual SDK/native timing
 and evidence are hosted acceptance, not established by pure tooling tests. The
-[owner runbook](docs/releasing.md) freezes the public interfaces, custody alternatives,
-byte allowlist/readback and partial-state recovery; production custody/activation,
+[owner runbook](docs/releasing.md) defines static configuration, owner confirmation,
+byte allowlist/readback and partial-state recovery; production custody/configuration,
 phone/live evidence and final GO remain owner-gated.

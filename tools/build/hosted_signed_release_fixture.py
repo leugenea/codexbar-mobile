@@ -10,6 +10,7 @@ import zipfile
 
 from hosted_release_fixtures import ROOT, build_case, command, reject
 from release_mock import ReleaseAPI
+from release_policy import configuration
 from release_publication import GitHub, publish, read_assets
 from release_runtime import canonical, fingerprint
 from release_signing import asset_names, package_assets, private_command, sign, verify_assets
@@ -85,6 +86,10 @@ def main():
             private_command(['keytool', '-exportcert', '-keystore', key, '-alias', 'fixture',
                              '-storepass:file', store_pass, '-file', certificate])
             pin = hashlib.sha256(certificate.read_bytes()).hexdigest()  # Independent DER pin, not apksigner output.
+            config = configuration(json.dumps({'schema': 2, 'certificateSha256': pin,
+                'signingEnvironment': 'fixture-signing', 'publicationEnvironment': 'fixture-publication',
+                'rcEnabled': True, 'stableEnabled': False}), 'rc')
+            pin = config['certificateSha256']
             (reports / 'certificate.der').write_bytes(certificate.read_bytes())
             (reports / 'certificate.sha256').write_text(pin + '\n')
             key_bytes = key.read_bytes()
