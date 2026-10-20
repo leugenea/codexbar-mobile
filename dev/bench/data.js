@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792529345598,
+  "lastUpdate": 1792529348937,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -4241,6 +4241,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/e99dd3fa56bf08b6800a7c574fe5188ab032a6af"
         },
         "date": 1792322889520,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0.13162618164413067,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 1,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d63a78ec1d5885660e5a23d6b5b2c350d06f6863",
+          "message": "chore(gradle): bump wrapper to 9.8.2 (#158)",
+          "timestamp": "2026-10-20T23:48:38+03:00",
+          "tree_id": "f626babe1412919bb3e38797bcdbf40beb5ed93a",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/d63a78ec1d5885660e5a23d6b5b2c350d06f6863"
+        },
+        "date": 1792529348365,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
