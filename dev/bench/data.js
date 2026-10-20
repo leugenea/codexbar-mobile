@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792533640909,
+  "lastUpdate": 1792533643687,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -4309,6 +4309,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/d63a78ec1d5885660e5a23d6b5b2c350d06f6863"
         },
         "date": 1792529348365,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0.13162618164413067,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 1,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "296e030c68e79235397d7e4d082aaf463ce95f7e",
+          "message": "feat(release): single-owner approval and static release configuration (#156)\n\n* fix(release): accept single-owner environment approval (#148)\n\n* feat(release): replace per-run activation with static RELEASE_CONFIG (#148)\n\n* fix(release): keep published allocation verification across prepare reruns (#148)",
+          "timestamp": "2026-10-21T01:00:13+03:00",
+          "tree_id": "30353f7174afd47b5e62d676e434bcffa1aafefb",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/296e030c68e79235397d7e4d082aaf463ce95f7e"
+        },
+        "date": 1792533643029,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
