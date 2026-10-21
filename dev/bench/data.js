@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792609986695,
+  "lastUpdate": 1792609990016,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -4450,6 +4450,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Duplication",
             "value": 0.13162618164413067,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 1,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d9b7298e5e68fb599f8d2e3f83ac9f2ed3c65cbb",
+          "message": "fix(usage): accept reset differences within one minute for all windows (#162)\n\n* fix(usage): accept reset differences within one minute for all windows (#160)\n\n* test: register renamed and added reset tolerance tests (#160)",
+          "timestamp": "2026-10-21T22:12:41+03:00",
+          "tree_id": "5244f167e8bbc238ce8b758d8448eb7a8185df55",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/d9b7298e5e68fb599f8d2e3f83ac9f2ed3c65cbb"
+        },
+        "date": 1792609989747,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0.13164193393968407,
             "unit": "%"
           },
           {
