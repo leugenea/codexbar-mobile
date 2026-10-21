@@ -39,6 +39,8 @@ class ReleaseAPI:
             self.records.append(record)
             return 201, {}, canonical(record)
         if suffix.startswith('/assets/'):
+            if headers.get('Accept') != 'application/octet-stream':
+                return 415, {}, b'Release asset download requires application/octet-stream'
             asset_id = int(suffix.rsplit('/', 1)[1])
             row, content = self.files[asset_id]
             return 200, {}, content
@@ -69,7 +71,8 @@ class ReleaseAPI:
             def serve(self):
                 data = self.rfile.read(int(self.headers.get('Content-Length', '0'))) or None
                 host = 'uploads.github.com' if self.command == 'POST' and '/assets?' in self.path else 'api.github.com'
-                status, headers, body = model.transport(self.command, 'https://' + host + self.path, {}, data)
+                status, headers, body = model.transport(self.command, 'https://' + host + self.path,
+                                                       {'Accept': self.headers.get('Accept', '')}, data)
                 self.send_response(status)
                 for key, value in headers.items():
                     self.send_header(key, value)
@@ -86,7 +89,8 @@ class ReleaseAPI:
                 raise ValueError('Mock cannot access remote origins')
             # No real credential is ever forwarded, even to localhost.
             request = urllib.request.Request(f'http://127.0.0.1:{server.server_port}' + parsed.path
-                                             + ('?' + parsed.query if parsed.query else ''), data=data, method=method)
+                                             + ('?' + parsed.query if parsed.query else ''), data=data,
+                                             headers={'Accept': headers['Accept']}, method=method)
             with urllib.request.urlopen(request, timeout=10) as response:
                 return response.status, dict(response.headers), response.read()
         try:

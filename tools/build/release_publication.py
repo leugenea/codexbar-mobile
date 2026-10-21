@@ -54,8 +54,10 @@ class GitHub:
                 'Unsafe API endpoint')
         require(not self.read_only or method == 'GET', 'GET-only admission transport')
         host = 'uploads.github.com' if upload else 'api.github.com'
+        # Actions archive downloads require JSON Accept before redirecting to binary storage.
+        artifact_zip = path.startswith(self.prefix + '/actions/artifacts/') and segments[-1] == 'zip'
         headers = {'Authorization': 'Bearer ' + self.token, 'X-GitHub-Api-Version': API_VERSION,
-                   'Accept': 'application/octet-stream' if binary else 'application/vnd.github+json',
+                   'Accept': 'application/octet-stream' if binary and not artifact_zip else 'application/vnd.github+json',
                    'Content-Type': 'application/octet-stream' if upload else 'application/json'}
         encoded = data if upload else (None if data is None else canonical(data))
         status, response_headers, body = self.transport(method, 'https://' + host + path, headers, encoded)

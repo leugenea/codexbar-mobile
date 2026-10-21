@@ -17,30 +17,26 @@ class ArtifactTests(unittest.TestCase):
     def test_artifact_id_digest_origin_attempt_expiry_and_archive_bytes_are_all_required(self):
         archive = zip_bytes({'candidate.apk': b'SYNTHETIC no signature', 'legal/source.kt': b'synthetic source'})
         digest = fingerprint(archive)['sha256']
-        class API:
-            prefix = '/repos/fixture/repository'
-            record = {'id': 1, 'name': 'signed-10-2', 'expired': False, 'digest': 'sha256:' + digest,
-                      'workflow_run': {'id': 10, 'head_sha': 'c' * 40}}
-            def get(self, path):
-                self.path = path
-                return copy.deepcopy(self.record)
-            def request(self, method, path, **kwargs):
-                self.download = method, path, kwargs
-                return archive
-        api = API()
+        from test_release_policy import PolicyAPI, wrapper
+        model = PolicyAPI()
+        model.archive = archive
+        record = {'id': 1, 'name': 'signed-10-2', 'expired': False, 'digest': 'sha256:' + digest,
+                  'workflow_run': {'id': 10, 'head_sha': 'c' * 40}}
+        model.overrides['/actions/artifacts/1'] = record
+        api = wrapper(model)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             files = controller.download_artifact(api, 1, digest, 10, 2, 'signed-10-2', 'c' * 40, root / 'download')
             self.assertEqual(set(files), {'candidate.apk', 'legal/source.kt'})
             self.assertEqual((root / 'download/candidate.apk').read_bytes(), b'SYNTHETIC no signature')
-            original = copy.deepcopy(api.record)
+            original = copy.deepcopy(record)
             for key, value in [('id', 2), ('name', 'signed-10-1'), ('expired', True), ('digest', 'sha256:' + 'f' * 64),
                                ('workflow_run', {'id': 11, 'head_sha': 'c' * 40}),
                                ('workflow_run', {'id': 10, 'head_sha': 'd' * 40})]:
-                api.record = {**original, key: value}
+                model.overrides['/actions/artifacts/1'] = {**original, key: value}
                 with self.subTest(key=key), self.assertRaises(ValueError):
                     controller.download_artifact(api, 1, digest, 10, 2, 'signed-10-2', 'c' * 40, root / 'rejected')
-            api.record = original
+            model.overrides['/actions/artifacts/1'] = original
             with self.assertRaises(ValueError):
                 controller.download_artifact(api, 1, 'e' * 64, 10, 2, 'signed-10-2', 'c' * 40, root / 'corrupt')
 
