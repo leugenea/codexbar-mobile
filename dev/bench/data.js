@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792533643687,
+  "lastUpdate": 1792567236366,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2165,6 +2165,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/296e030c68e79235397d7e4d082aaf463ce95f7e"
         },
         "date": 1792533640512,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e20afff53f44075e1e461b0fefa937d96f77c48c",
+          "message": "fix(release): request artifact archives with the JSON Accept header (#159)",
+          "timestamp": "2026-10-21T10:20:08+03:00",
+          "tree_id": "f05620365f94e1f55179f40e85dbf3a4e6803d47",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/e20afff53f44075e1e461b0fefa937d96f77c48c"
+        },
+        "date": 1792567235958,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
