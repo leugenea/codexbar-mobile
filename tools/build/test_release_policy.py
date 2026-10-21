@@ -95,12 +95,18 @@ class PolicyAPI:
 def wrapper(model):
     def transport(method, url, headers, data):
         parsed = urlsplit(url)
+        storage = 'https://fixture.blob.core.windows.net/artifact.zip'
+        if url == storage:
+            assert (method, headers, data) == ('GET', {'Accept': 'application/octet-stream'}, None)
+            return 200, {}, model.archive
         assert (method, parsed.scheme, parsed.netloc, data) == ('GET', 'https', 'api.github.com', None)
         assert headers['Authorization'] == 'Bearer synthetic-token'
         assert parsed.path.startswith(model.prefix)
         path = parsed.path[len(model.prefix):]
-        if path.endswith('/zip'):
-            return 200, {}, model.archive
+        if path.startswith('/actions/artifacts/') and path.endswith('/zip'):
+            if headers.get('Accept') != 'application/vnd.github+json':
+                return 415, {}, b'Actions artifact download requires application/vnd.github+json'
+            return 302, {'location': storage}, b''
         query = parse_qsl(parsed.query)
         paginated = ('page', '1') in query
         query = [(key, value) for key, value in query if key not in ('page', 'per_page')]

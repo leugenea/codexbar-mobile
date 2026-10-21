@@ -151,6 +151,40 @@ class PublicationTests(unittest.TestCase):
 
 
 class TransportTests(unittest.TestCase):
+    def test_artifact_zip_uses_json_accept_then_unauthenticated_binary_storage(self):
+        model = fixtures.PolicyAPI()
+        model.archive = b'SYNTHETIC artifact archive bytes'
+        api = fixtures.wrapper(model)
+        url = 'https://api.github.com' + api.prefix + '/actions/artifacts/1/zip'
+        self.assertEqual(api.transport('GET', url, {'Authorization': 'Bearer synthetic-token',
+                         'Accept': 'application/octet-stream'}, None)[0], 415)
+        calls = []
+        real = api.transport
+        def transport(method, url, headers, data):
+            calls.append((method, url, headers, data))
+            return real(method, url, headers, data)
+        api.transport = transport
+        self.assertEqual(api.request('GET', api.prefix + '/actions/artifacts/1/zip', binary=True), model.archive)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0][1], url)
+        self.assertEqual(calls[0][2]['Accept'], 'application/vnd.github+json')
+        self.assertEqual(calls[0][2]['Authorization'], 'Bearer synthetic-token')
+        self.assertEqual(calls[1], ('GET', 'https://fixture.blob.core.windows.net/artifact.zip',
+                                    {'Accept': 'application/octet-stream'}, None))
+
+    def test_release_asset_keeps_octet_stream_accept_in_memory_and_localhost(self):
+        model = ReleaseAPI()
+        content = b'SYNTHETIC release asset bytes'
+        asset = {'id': 1, 'state': 'uploaded', 'size': len(content)}
+        model.files[1] = asset, content
+        url = 'https://api.github.com/repos/fixture/repository/releases/assets/1'
+        self.assertEqual(model.transport('GET', url, {'Accept': 'application/vnd.github+json'}, None)[0], 415)
+        api = GitHub('fixture/repository', 'synthetic-token', model.transport)
+        self.assertEqual(api.download(asset), content)
+        with model.localhost() as transport:
+            api = GitHub('fixture/repository', 'not-forwarded', transport)
+            self.assertEqual(api.download(asset), content)
+
     def test_unsafe_and_foreign_endpoints_deny_before_transport(self):
         def transport(*args):
             self.fail('Rejected endpoint reached transport')
