@@ -32,16 +32,20 @@ class CurrentHistoryPeriodTest {
         assertEquals(BaselineEligibility.BEFORE_NOMINAL_START, period(usage.copy(observedAt = SyntheticHistory.at.minusSeconds(20000)), SyntheticHistory.at.minusSeconds(18000)).unavailable)
         assertEquals(BaselineEligibility.AMBIGUOUS_WINDOW, period(SyntheticHistory.usage(secondary = SyntheticHistory.window())).unavailable)
         for (window in listOf(SyntheticHistory.window(absolute = Input.Missing, relative = Input.Value(3600L)),
-            SyntheticHistory.window(absolute = Input.Value("invalid")), SyntheticHistory.window(relative = Input.Value(3601L)))) {
+            SyntheticHistory.window(absolute = Input.Value("invalid")), SyntheticHistory.window(relative = Input.Value(3661L)))) {
             assertEquals(BaselineEligibility.UNKEYED_RESET, period(SyntheticHistory.usage(window)).unavailable)
         }
     }
 
-    @Test fun weeklyToleranceKeepsAbsoluteOriginalAndChangedResetGetsANewQueryKey() {
+    @Test fun periodicToleranceKeepsAbsoluteOriginalAndChangedResetGetsANewQueryKey() {
         val absolute = 1_800_003_600L
-        fun weekly(relative: Long) = SyntheticHistory.usage(SyntheticHistory.window(duration = Input.Value(604800L), relative = Input.Value(relative)))
-        assertEquals(Instant.ofEpochSecond(absolute), period(weekly(3660), kind = WindowKind.WEEKLY).window!!.resetAt)
-        assertNull(period(weekly(3661), kind = WindowKind.WEEKLY).window)
+        for ((kind, seconds) in listOf(WindowKind.FIVE_HOUR to 18000L, WindowKind.WEEKLY to 604800L)) {
+            fun usage(relative: Long) = SyntheticHistory.usage(SyntheticHistory.window(duration = Input.Value(seconds), relative = Input.Value(relative)))
+            for (relative in listOf(3540L, 3599L, 3660L)) {
+                assertEquals("$kind relative=$relative", Instant.ofEpochSecond(absolute), period(usage(relative), kind = kind).window!!.resetAt)
+            }
+            assertNull("$kind beyond tolerance", period(usage(3661), kind = kind).window)
+        }
         val old = period(SyntheticHistory.usage()).window
         val changed = period(SyntheticHistory.usage(SyntheticHistory.window(absolute = Input.Value(absolute + 1)))).window
         assertNotEquals(old, changed)

@@ -149,7 +149,7 @@ class EvenDistributionTest {
     @Test fun unknownMalformedUnsupportedAndRelativeOnlyResetCannotCreateAReference() {
         val inputs = listOf(window(absolute = Input.Missing), window(absolute = Input.Null), window(absolute = Input.Invalid),
             window(absolute = Input.Value("tomorrow")), window(absolute = Input.Missing, relative = Input.Value(3600L)),
-            window(relative = Input.Value(3599L)))
+            window(relative = Input.Value(3539L)))
         for (input in inputs) {
             val source = five(append(usage = usage(input)))
             assertIneligible(source, BaselineEligibility.UNKEYED_RESET)

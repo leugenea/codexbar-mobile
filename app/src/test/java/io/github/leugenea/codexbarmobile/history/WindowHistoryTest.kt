@@ -142,6 +142,37 @@ class WindowHistoryTest {
         }
     }
 
+    @Test fun fiveHourToleranceKeepsOriginalAbsoluteIdentityAndRecordsFractionalMeasurements() {
+        val cases = listOf(at to 3600L, at.plusNanos(250000000) to 3600L,
+            at.plusNanos(250000000) to 3599L, at to 3540L, at to 3660L)
+        for ((observed, relative) in cases) {
+            val result = append(usage = usage(window(relative = Input.Value(relative)), observedAt = observed))
+            val source = five(result)
+            val context = "observed=$observed relative=$relative"
+            assertEquals(context, ResetProvenance.ABSOLUTE, source.reset.provenance)
+            assertFalse(context, source.reset.facts!!.discrepant)
+            assertEquals(context, observed.plusSeconds(relative), source.reset.facts.relativeDerived.value)
+            assertEquals(context, WindowIdentity(partition, WindowKind.FIVE_HOUR, 18000,
+                Instant.ofEpochSecond(1_800_003_600)), source.point!!.segment.window)
+            assertEquals(context, observed, source.point.observedAt)
+            assertEquals(context, BigDecimal("12.375"), source.point.usedPercent)
+            assertEquals(context, BaselineEligibility.ELIGIBLE, source.baseline)
+        }
+    }
+
+    @Test fun fiveHourDifferenceBeyondSixtySecondsLeavesHistoryUnkeyedInBothDirections() {
+        val cases = listOf(at.plusNanos(1) to 3660L, at.minusNanos(1) to 3540L)
+        for ((observed, relative) in cases) {
+            val source = five(append(usage = usage(window(relative = Input.Value(relative)), observedAt = observed)))
+            val context = "observed=$observed relative=$relative"
+            assertEquals(context, ResetProvenance.DISCREPANT, source.reset.provenance)
+            assertTrue(context, source.reset.facts!!.discrepant)
+            assertNull(context, source.point!!.segment.window)
+            assertEquals(context, BigDecimal("12.375"), source.point.usedPercent)
+            assertEquals(context, BaselineEligibility.UNKEYED_RESET, source.baseline)
+        }
+    }
+
     @Test fun absoluteResetIdentityIsExactAndRetainsIndependentMalformedRelativeSibling() {
         val source = usage(window(relative = Input.Invalid))
         val result = append(usage = source)

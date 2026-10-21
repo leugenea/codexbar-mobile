@@ -122,10 +122,10 @@ class UsageNormalizerTest {
         assertEquals(now.plusSeconds(59), reset.relativeDerived.value)
         assertFalse(reset.discrepant)
         assertEquals(false, reset.due)
-        val conflict = window(normalize(M0Fixtures.usage(M0Fixtures.window(absolute = value(1791154801), relative = value(59))))).reset
+        val conflict = window(normalize(M0Fixtures.usage(M0Fixtures.window(absolute = value(1791154801), relative = value(62))))).reset
         assertTrue(conflict.discrepant)
         assertEquals(now.plusSeconds(1), conflict.absolute.value)
-        assertEquals(now.plusSeconds(59), conflict.relativeDerived.value)
+        assertEquals(now.plusSeconds(62), conflict.relativeDerived.value)
         assertNull(conflict.due)
     }
 
@@ -143,7 +143,7 @@ class UsageNormalizerTest {
         assertNull(UsageNormalizer.normalize(input).observedAt)
     }
 
-    @Test fun weeklyPrecisionComparesFullInstantsInBothDirectionsAndSlotsWithoutChangingFacts() {
+    @Test fun periodicPrecisionComparesFullInstantsInBothDirectionsAndSlotsWithoutChangingFacts() {
         val absolute = Instant.ofEpochSecond(1791331200)
         val cases = listOf(
             Triple(now, 176400L, false),
@@ -158,36 +158,43 @@ class UsageNormalizerTest {
             Triple(now, 176461L, true),
             Triple(now, 176339L, true),
         )
-        for (slot in Slot.entries) for ((observed, relative, conflict) in cases) {
-            val input = M0Fixtures.window(BigDecimal("12.345678901234567890"), 604800,
+        for (seconds in listOf(18000, 604800)) for (slot in Slot.entries) for ((observed, relative, conflict) in cases) {
+            val input = M0Fixtures.window(BigDecimal("12.345678901234567890"), seconds,
                 value(1791331200), value(relative))
             val result = normalize(if (slot == Slot.PRIMARY) M0Fixtures.usage(input, Input.Null)
                 else M0Fixtures.usage(Input.Null, input), observed, observed)
-            val weekly = result.weekly.candidates.single()
-            val context = "$slot observed=$observed relative=$relative"
-            assertEquals(context, SelectionState.KNOWN, result.weekly.state)
-            assertEquals(context, slot, weekly.slot)
+            val selected = if (seconds == 18000) result.fiveHour else result.weekly
+            val window = selected.candidates.single()
+            val context = "duration=$seconds $slot observed=$observed relative=$relative"
+            assertEquals(context, SelectionState.KNOWN, selected.state)
+            assertEquals(context, slot, window.slot)
             assertEquals(context, observed, result.observedAt)
-            assertEquals(context, BigDecimal("12.345678901234567890"), weekly.usedPercent.value)
-            assertEquals(context, Field(Knowledge.KNOWN, absolute), weekly.reset.absolute)
-            assertEquals(context, Field(Knowledge.KNOWN, relative), weekly.reset.relativeSeconds)
-            assertEquals(context, Field(Knowledge.KNOWN, observed.plusSeconds(relative)), weekly.reset.relativeDerived)
-            assertEquals(context, conflict, weekly.reset.discrepant)
-            assertEquals(context, if (conflict) null else false, weekly.reset.due)
-            assertEquals(context, SelectionState.UNAVAILABLE, result.fiveHour.state)
+            assertEquals(context, BigDecimal("12.345678901234567890"), window.usedPercent.value)
+            assertEquals(context, Field(Knowledge.KNOWN, absolute), window.reset.absolute)
+            assertEquals(context, Field(Knowledge.KNOWN, relative), window.reset.relativeSeconds)
+            assertEquals(context, Field(Knowledge.KNOWN, observed.plusSeconds(relative)), window.reset.relativeDerived)
+            assertEquals(context, conflict, window.reset.discrepant)
+            assertEquals(context, if (conflict) null else false, window.reset.due)
+            assertEquals(context, SelectionState.UNAVAILABLE, (if (seconds == 18000) result.weekly else result.fiveHour).state)
         }
     }
 
-    @Test fun weeklyPrecisionDoesNotApplyToOtherOrUnusableDurations() {
-        val durations = listOf(value(18000), value(3600), value(604799), value(604801),
+    @Test fun resetPrecisionAlsoAppliesToUnsupportedAndUnusableDurations() {
+        val durations = listOf(value(3600), value(604799), value(604801),
             Input.Missing, Input.Null, Input.Invalid, value("604800"), value(true),
             value(604800.5), value(-604800))
-        for (duration in durations) {
+        val cases = listOf(0L to false, 1L to false, -1L to false,
+            60_000_000_000L to false, -60_000_000_000L to false,
+            60_000_000_001L to true, -60_000_000_001L to true)
+        for (duration in durations) for ((nanos, conflict) in cases) {
             val result = normalize(UsageInput(primary = Input.Value(WindowInput(
-                duration, value(22), value(1791331200), value(176400)))), now.plusNanos(1), now)
+                duration, value(22), value(1791331200), value(176400)))), now.plusNanos(nanos), now)
             val reset = result.slots.first().window.value!!.reset
-            assertTrue("duration=$duration must keep exact comparison", reset.discrepant)
-            assertNull(reset.due)
+            val context = "duration=$duration nanos=$nanos"
+            assertEquals(context, conflict, reset.discrepant)
+            assertEquals(context, if (conflict) null else false, reset.due)
+            assertEquals(context, Instant.ofEpochSecond(1791331200), reset.absolute.value)
+            assertEquals(context, now.plusNanos(nanos).plusSeconds(176400), reset.relativeDerived.value)
         }
     }
 
@@ -288,8 +295,8 @@ class UsageNormalizerTest {
         assertEquals(Knowledge.KNOWN, reset.absolute.knowledge)
         assertEquals(0L, reset.relativeSeconds.value)
         assertEquals(first, reset.relativeDerived.value)
-        assertTrue(reset.discrepant)
-        assertNull(reset.due)
+        assertFalse(reset.discrepant)
+        assertEquals(true, reset.due)
     }
 
     @Test fun invalidObservationClocksCannotAuthorizeRelativeResetDerivation() {

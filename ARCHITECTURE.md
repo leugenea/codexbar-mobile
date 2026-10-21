@@ -184,14 +184,14 @@ activation/purchase request or new owner is introduced. Retirement discards ever
 entitlement fact; the existing A10/B2 generation path rejects late inventory results.
 The gate retains explicit read/session-refresh controls and sign-in-again action.
 
-A1 applies the owner-selected app precision policy only to recognized weekly windows
-(604800 seconds), in either source slot: two valid absolute/relative-derived reset
+A1 applies the owner-selected app precision policy to all window durations,
+in either source slot: two valid absolute/relative-derived reset
 instants are discrepant only when their full difference exceeds 60 seconds in either
 direction. Exactly 60 seconds is accepted; 60 seconds plus one nanosecond is not.
 This is an application policy, not a provider sampling, rounding or latency guarantee.
 Accepted pairs keep the exact original absolute reset as the effective target; original
 relative seconds, derived instant and observation clocks retain their precision.
-Five-hour, unknown/unsupported-duration, single-source, malformed/overflow and clock
+Single-source, malformed/overflow and clock
 handling are unchanged. B1 still formats/counts down from the original target.
 
 B2's `UsageRefresh` is a subordinate scheduler in that same owner scope/lane, not
@@ -839,7 +839,7 @@ typed absence in its existing display context. The existing evaluation clock and
 absolute-reset rule qualify the active period. Missing/ambiguous/unkeyed live
 facts, lost/backwards evaluation clocks, before-start or expired periods show
 unavailable rather than choosing an archived reset. Stale successes and independent
-endpoint errors retain their existing metadata. Weekly reset tolerance and absolute
+endpoint errors retain their existing metadata. All-window reset tolerance and absolute
 originals remain the normalizer's policy, never a second graph normalization.
 
 Current queries carry `currentOnly` plus the exact partition/kind/duration/reset key.
@@ -961,7 +961,7 @@ separate.
 ## Current-period integration (issue 134)
 
 `CurrentHistoryPeriodTest` and `CurrentHistoryReadTest` cover normalized slot-independent
-identity, exact weekly reset policy, expiry/unknown/ambiguous/discrepant/backwards clocks,
+identity, exact all-window reset policy, expiry/unknown/ambiguous/discrepant/backwards clocks,
 fresh authority despite held delivery, selection beyond archived pages, real lookahead,
 ordinal-hole isolation, empty/retention/errors and exact values. `CurrentWindowHistoryTest`
 and `CurrentWindowRetirementTest` add actual MainActivity/production-owner current charts,
