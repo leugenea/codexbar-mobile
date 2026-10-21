@@ -51,7 +51,7 @@ CURRENT_HISTORY_JVM = {
     "io.github.leugenea.codexbarmobile.history.CurrentHistoryPeriodTest": {
         "normalizedDurationSelectionUsesExactAbsoluteIdentityAndExistingEvaluationClock",
         "expiryClockLossBeforeStartAmbiguityAndRelativeDiscrepantMalformedResetNeverFallback",
-        "weeklyToleranceKeepsAbsoluteOriginalAndChangedResetGetsANewQueryKey",
+        "periodicToleranceKeepsAbsoluteOriginalAndChangedResetGetsANewQueryKey",
         "staleAndEndpointFailureRemainIndependentOfKnownUnexpiredIdentity",
         "freshHostAuthorityRejectsHeldPeriodOnExpiryClockLossResetChangeAndAccountRetirement",
     },
@@ -329,6 +329,7 @@ DASHBOARD_NATIVE = {
         'dashboardShowsBothCurrentWindowsWithoutHistoryNavigationAndRetainsMeasuredReferencePixels',
         'drawerHasExactTwoLabelsBackPrecedenceAndDetailsReturnToDashboard',
         'dashboardKnownPercentPreservesMalformedResetAndIndependentCurrentSiblingWarning',
+        'fiveHourFractionalResetPairPopulatesDashboardButBeyondToleranceRemainsUnavailable',
     },
 }
 DASHBOARD_NATIVE_COUNT = sum(map(len, DASHBOARD_NATIVE.values()))

@@ -125,12 +125,12 @@ class DashboardUiTest {
             compose.onNodeWithTag("history-chart-five-hour-equivalent").assertTextEquals("One recorded observation · no observed trend")
             fixture.transport.usageBody = """{"rate_limit":{"primary_window":{"limit_window_seconds":18000,"used_percent":12.375,"reset_at":1800003600,"reset_after_seconds":3659}}}"""
             fixture.transport.advance(1000); owner.readUsage()
-            await("60.25-second reset discrepancy removes current five-hour identity") {
-                owner.currentHistoryDisplayContext()?.periods?.fiveHour?.window == null && !owner.state.value.refresh.refreshing
+            await("60.25-second reset discrepancy removes current five-hour identity and shows dashboard absence") {
+                owner.currentHistoryDisplayContext()?.periods?.fiveHour?.window == null && !owner.state.value.refresh.refreshing &&
+                    compose.onAllNodesWithTag("dashboard-no-info-FIVE_HOUR").fetchSemanticsNodes().size == 1
             }
-            compose.onNodeWithTag("live-five-hour-reset-relative").assertTextEquals("Reset: Conflicting time information")
             compose.onNodeWithTag("live-five-hour-reset-absolute").assertDoesNotExist()
-            compose.onNodeWithTag("dashboard-no-info-FIVE_HOUR").assertExists()
+            compose.onNodeWithTag("dashboard-no-info-FIVE_HOUR").assertTextEquals("No current information.")
             compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertDoesNotExist()
         }
     }
