@@ -24,7 +24,7 @@ object UsageNormalizer {
         val duration = PrimitiveNormalizer.integer(it.durationSeconds, 1)
         PrimitiveNormalizer.known(UsageWindow(
             slot, kind(duration), duration, PrimitiveNormalizer.percent(it.usedPercent),
-            reset(it, duration.value, observedAt, evaluatedAt),
+            reset(it, observedAt, evaluatedAt),
         ))
     })
 
@@ -51,22 +51,21 @@ object UsageNormalizer {
         window.reset.relativeSeconds.knowledge, window.reset.relativeDerived.knowledge,
     ).any { it == Knowledge.MALFORMED }
 
-    private fun reset(input: WindowInput, durationSeconds: Long?, observedAt: Instant?, evaluatedAt: Instant?): ResetTime {
+    private fun reset(input: WindowInput, observedAt: Instant?, evaluatedAt: Instant?): ResetTime {
         val absolute = PrimitiveNormalizer.epoch(input.resetAt)
         val relative = PrimitiveNormalizer.integer(input.resetAfterSeconds)
         val derived = derive(relative, observedAt)
-        val conflict = discrepant(absolute.value, derived.value, durationSeconds)
+        val conflict = discrepant(absolute.value, derived.value)
         // Conflict has no single trustworthy instant to evaluate; retain both originals.
         val effective = if (conflict) null else absolute.value ?: derived.value
         val due = effective?.let { instant -> evaluatedAt?.let { instant <= it } }
         return ResetTime(absolute, relative, derived, conflict, due)
     }
 
-    private fun discrepant(absolute: Instant?, derived: Instant?, durationSeconds: Long?): Boolean = when {
+    private fun discrepant(absolute: Instant?, derived: Instant?): Boolean = when {
         absolute == null || derived == null -> false
-        // Owner-selected weekly app precision, not a provider rounding or latency guarantee.
-        durationSeconds == 604800L -> Duration.between(absolute, derived).abs() > Duration.ofSeconds(60)
-        else -> absolute != derived
+        // Owner-selected app precision for all durations, not a provider rounding or latency guarantee.
+        else -> Duration.between(absolute, derived).abs() > Duration.ofSeconds(60)
     }
 
     private fun derive(relative: Field<Long>, observedAt: Instant?): Field<Instant> {

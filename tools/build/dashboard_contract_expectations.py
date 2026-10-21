@@ -37,6 +37,7 @@ EXPECTED_DASHBOARD_NATIVE = {
         "dashboardShowsBothCurrentWindowsWithoutHistoryNavigationAndRetainsMeasuredReferencePixels",
         "drawerHasExactTwoLabelsBackPrecedenceAndDetailsReturnToDashboard",
         "dashboardKnownPercentPreservesMalformedResetAndIndependentCurrentSiblingWarning",
+        "fiveHourFractionalResetPairPopulatesDashboardButBeyondToleranceRemainsUnavailable",
     },
 }
 SCANNER_CLASS = "io.github.leugenea.codexbarmobile.history.CurrentHistoryReadTest"
@@ -99,5 +100,5 @@ EXPECTED_DASHBOARD_LAYOUTS = {
 EXPECTED_CURRENT_HOST = {"context": "MATCH", "selection": "MATCH", "periods": "MATCH", "projection": "MATCH"}
 
 # Literal review budgets, independently checked against the enumerated sets.
-EXPECTED_DASHBOARD_NATIVE_COUNT = 13
+EXPECTED_DASHBOARD_NATIVE_COUNT = 14
 EXPECTED_DASHBOARD_JVM_COUNT = 11

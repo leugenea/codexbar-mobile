@@ -146,10 +146,10 @@ class UsageResponseParserTest {
         assertEquals(true, passed.reset.due)
         assertEquals(BigDecimal(83), passed.usedPercent.value)
         assertEquals(reset.absolute, passed.reset.absolute)
-        val conflict = parse(text.replace("1791154859", "1791154860")).fiveHour.candidates.single().reset
+        val conflict = parse(text.replace("1791154859", "1791154920")).fiveHour.candidates.single().reset
         assertTrue(conflict.discrepant)
         assertNull(conflict.due)
-        assertEquals(now.plusSeconds(60), conflict.absolute.value)
+        assertEquals(now.plusSeconds(120), conflict.absolute.value)
         assertEquals(now.plusSeconds(59), conflict.relativeDerived.value)
         val relativeText = payload(window(reset = ",\"reset_after_seconds\":59"))
         val unknown = parse(relativeText, observed = null).fiveHour.candidates.single().reset
