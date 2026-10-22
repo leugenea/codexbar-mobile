@@ -29,8 +29,7 @@ internal object HistoryExport {
 
     fun decode(text: String, partition: HistoryPartition): HistoryExportDocument {
         val root = json.parseToJsonElement(text).jsonObject
-        val version = root.getValue("formatVersion").jsonPrimitive
-        require(!version.isString && version.int == 1) { "Unsupported history format version" }
+        require(root.getValue("formatVersion").strictLong() == 1L) { "Unsupported history format version" }
         require(root.getValue("appVersion").jsonPrimitive.isString)
         require(root.getValue("exportedAt").jsonPrimitive.isString)
         val reader = HistoryJsonReader(partition)

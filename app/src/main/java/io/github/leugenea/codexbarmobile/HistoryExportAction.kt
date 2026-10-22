@@ -15,17 +15,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
-
-/** Process-memory only: retain a user-requested snapshot across SAF/Activity recreation, never Bundle it. */
-internal class HistoryExportRequest {
-    var pending: String? = null
-    val busy = MutableStateFlow(false)
-    fun clear() { pending = null; busy.value = false }
-}
 
 internal data class HistoryExporter(val busy: Boolean, val start: () -> Unit)
 
@@ -37,34 +28,13 @@ internal fun historyExporter(controller: ConnectionController): HistoryExporter 
     val request = controller.historyExportRequest
     val busy by request.busy.collectAsState()
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        val captured = request.pending
-        request.pending = null
-        scope.launch {
-            try {
-                if (uri != null) exportMessage(context, writeHistoryDocument(context, uri, captured))
-            } finally {
-                request.clear()
-            }
+        request.finish(scope) { captured ->
+            if (uri != null) exportMessage(context, writeHistoryDocument(context, uri, captured))
         }
     }
     return HistoryExporter(busy) {
-        if (!request.busy.value) {
-            request.busy.value = true
-            scope.launch {
-                try {
-                    request.pending = prepareHistoryDocument(context, controller)
-                    if (request.pending == null) exportMessage(context, false)
-                    else launcher.launch("codexbar-history-v1.json")
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: RuntimeException) {
-                    request.clear()
-                    exportMessage(context, false)
-                } finally {
-                    if (request.pending == null) request.clear()
-                }
-            }
-        }
+        request.start(scope, prepare = { prepareHistoryDocument(context, controller) },
+            launch = { launcher.launch("codexbar-history-v1.json") }, failure = { exportMessage(context, false) })
     }
 }
 

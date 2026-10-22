@@ -19,6 +19,18 @@ EXPECTED_JVM = {
         "unknownFieldsAtEveryObjectLevelAreIgnoredAndDestinationPartitionIsExplicit",
         "newerVersionAndMalformedKnownFieldsAreRejectedWithoutStorageWrites",
         "explicitOutputAllowlistNeverIncludesSecretsAccountPlanOrLocalPartition",
+        "integerMembersRejectMalformedExponentAndNonIntegerTokens",
+        "integerMembersRejectExponentNotationIncludingPrecisionLoss",
+        "integerMembersRejectQuotedIntegers",
+        "integerMembersPreserveExactLongsAndRejectOverflow",
+        "enumMembersRequireQuotedStringsIncludingNullableFieldsAndBreakArrays",
+    },
+    "io.github.leugenea.codexbarmobile.HistoryExportRequestTest": {
+        "startCancellationBeforeFirstDispatchReleasesBusyAndAllowsRetry",
+        "resultCancellationBeforeFirstDispatchClearsConsumedSnapshotAndAllowsRetry",
+        "pendingPickerSurvivesScopeCancellationAndDuplicateStartUntilNewScopeResult",
+        "alreadyCancelledScopeCannotPrepareOrStrandConsumedResult",
+        "preparationAndPickerFailuresReleaseBusyWithoutRetainingSnapshot",
     },
 }
 EXPECTED_NATIVE = {

@@ -345,6 +345,18 @@ HISTORY_EXPORT_JVM = {
         "unknownFieldsAtEveryObjectLevelAreIgnoredAndDestinationPartitionIsExplicit",
         "newerVersionAndMalformedKnownFieldsAreRejectedWithoutStorageWrites",
         "explicitOutputAllowlistNeverIncludesSecretsAccountPlanOrLocalPartition",
+        "integerMembersRejectMalformedExponentAndNonIntegerTokens",
+        "integerMembersRejectExponentNotationIncludingPrecisionLoss",
+        "integerMembersRejectQuotedIntegers",
+        "integerMembersPreserveExactLongsAndRejectOverflow",
+        "enumMembersRequireQuotedStringsIncludingNullableFieldsAndBreakArrays",
+    },
+    "io.github.leugenea.codexbarmobile.HistoryExportRequestTest": {
+        "startCancellationBeforeFirstDispatchReleasesBusyAndAllowsRetry",
+        "resultCancellationBeforeFirstDispatchClearsConsumedSnapshotAndAllowsRetry",
+        "pendingPickerSurvivesScopeCancellationAndDuplicateStartUntilNewScopeResult",
+        "alreadyCancelledScopeCannotPrepareOrStrandConsumedResult",
+        "preparationAndPickerFailuresReleaseBusyWithoutRetainingSnapshot",
     },
 }
 HISTORY_EXPORT_NATIVE = {

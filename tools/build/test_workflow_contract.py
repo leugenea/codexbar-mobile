@@ -858,7 +858,7 @@ class SyntheticReportTests(unittest.TestCase):
                 with self.subTest(kind=kind, container_depth=depth):
                     self.write_report(kind, container_depth=depth)
                     result = verify_reports(self.directory, kind)
-                    self.assertEqual(result["testCount"], 149 if kind == "native" else 57)
+                    self.assertEqual(result["testCount"], 149 if kind == "native" else 67)
 
     def test_rejects_missing_tests(self):
         for kind in EXPECTED:

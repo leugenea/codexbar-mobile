@@ -83,6 +83,47 @@ class HistoryExportTest {
         assertThrows(IllegalArgumentException::class.java) { HistoryExport.decode(impossibleTail.toString(), partition) }
     }
 
+    @Test fun integerMembersRejectMalformedExponentAndNonIntegerTokens() {
+        for (token in listOf("7e", "0.0", "01", "+1", "-01")) {
+            assertIntegerTokensRejected { token }
+        }
+    }
+
+    @Test fun integerMembersRejectExponentNotationIncludingPrecisionLoss() {
+        assertIntegerTokensRejected { "${it}e0" }
+        val source = HistoryExport.encode(document(emptyList(), HistoryDiskState(HistoryCursor(partition))))
+        val rounded = source.replace("\"highWaterOrdinal\":0", "\"highWaterOrdinal\":9007199254740993e0")
+        assertThrows(Exception::class.java) { HistoryExport.decode(rounded, partition) }
+    }
+
+    @Test fun integerMembersRejectQuotedIntegers() {
+        assertIntegerTokensRejected { "\"$it\"" }
+    }
+
+    @Test fun integerMembersPreserveExactLongsAndRejectOverflow() {
+        for (ordinal in listOf(9_007_199_254_740_993L, Long.MAX_VALUE)) {
+            val original = document(emptyList(), HistoryDiskState(HistoryCursor(partition, ordinal)))
+            roundTrip(original)
+            assertEquals(ordinal, HistoryExport.decode(HistoryExport.encode(original), partition).state.cursor.lastOrdinal)
+        }
+        assertIntegerTokensRejected { "9223372036854775808" }
+        assertIntegerTokensRejected { "-9223372036854775809" }
+    }
+
+    @Test fun enumMembersRequireQuotedStringsIncludingNullableFieldsAndBreakArrays() {
+        val token = Regex("\"[A-Z][A-Z_]*\"")
+        for (source in typedSources()) {
+            val matches = token.findAll(source).toList()
+            assertTrue(matches.isNotEmpty())
+            for (match in matches) {
+                val malformed = source.replaceRange(match.range, match.value.removeSurrounding("\""))
+                assertThrows("Unquoted enum ${match.value} at ${match.range}", Exception::class.java) {
+                    HistoryExport.decode(malformed, partition)
+                }
+            }
+        }
+    }
+
     @Test fun explicitOutputAllowlistNeverIncludesSecretsAccountPlanOrLocalPartition() {
         val input = SyntheticHistory.usage().copy(planType = io.github.leugenea.codexbarmobile.usage.Field(
             io.github.leugenea.codexbarmobile.usage.Knowledge.KNOWN, "synthetic-plan-must-not-leak"))
@@ -94,6 +135,36 @@ class HistoryExportTest {
         assertTrue(keys.none { key -> forbidden.any { it in key } })
         assertFalse(text.contains(partition.value.toString()))
         assertEquals(setOf("formatVersion", "appVersion", "exportedAt", "entries", "continuation"), Json.parseToJsonElement(text).jsonObject.keys)
+    }
+
+    private fun typedSources(): List<String> {
+        val first = SyntheticHistory.append(usage = SyntheticHistory.usage(
+            primary = SyntheticHistory.window(relative = Input.Value(3600L))))
+        val gap = WindowHistory.append(first.cursor, HistoryAdmission(partition, ObservationId(2),
+            HistoryClock(SyntheticHistory.epoch, 2000), HistoryEvent.Gap(HistoryGap.READ_ERROR))) as HistoryReduction.Applied
+        val next = SyntheticHistory.append(gap.cursor, SyntheticHistory.usage(observedAt = at.plusSeconds(2)), 3000)
+        val status = SyntheticHistory.append(next.cursor, SyntheticHistory.usage(
+            primary = SyntheticHistory.window(percent = Input.Missing, relative = Input.Value(3600L)),
+            observedAt = at.plusSeconds(3)), 4000)
+        val state = HistoryDiskState(status.cursor, HistoryAgeAnchor(at, first.entry.clock), true,
+            mapOf(HistoryTruncation.OBSERVATION_CAP to HistoryEvictionCutoff(1)), status.entry.clock)
+        val rich = HistoryExport.encode(document(listOf(gap.entry, next.entry, status.entry), state))
+        val fixture = Json.parseToJsonElement(javaClass.getResource("/history-export-v1.json")!!.readText()).toString()
+        return listOf(rich, fixture).onEach { HistoryExport.decode(it, partition) }
+    }
+
+    private fun assertIntegerTokensRejected(replacement: (String) -> String) {
+        val token = Regex("""(?<=:)-?(0|[1-9][0-9]*)(?=[,}])""")
+        for (source in typedSources()) {
+            val matches = token.findAll(source).toList()
+            assertTrue(matches.isNotEmpty())
+            for (match in matches) {
+                val malformed = source.replaceRange(match.range, replacement(match.value))
+                assertThrows("Invalid integer ${match.value} at ${match.range}", Exception::class.java) {
+                    HistoryExport.decode(malformed, partition)
+                }
+            }
+        }
     }
 
     private fun document(entries: List<HistoryEntry>, state: HistoryDiskState) = HistoryExportDocument("test-v1", at, entries, state)
