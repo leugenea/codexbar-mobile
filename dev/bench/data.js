@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792701708231,
+  "lastUpdate": 1792701712858,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -4654,6 +4654,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Duplication",
             "value": 0.13164193393968407,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 1,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b7db13794a5db2eafd81835ccee9f31be0cf4ace",
+          "message": "feat(history): JSON export format v1 and export to file (#169)\n\n* feat(history): JSON export format v1 and export to file (#167)\n\n* fix(history): keep export action below existing history controls (#167)\n\n* test(history): account for the refresh on activity recreation in export test (#167)\n\n* docs(history): drop hand-written export JSON Schema; prose + v1 fixture define the format (#167)\n\n* fix(history): cancellation-safe export request; strict integers and enums in export reader (#167)",
+          "timestamp": "2026-10-22T23:41:17+03:00",
+          "tree_id": "c1052317a4cb83bef9153249dd0de0d3a27635b3",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/b7db13794a5db2eafd81835ccee9f31be0cf4ace"
+        },
+        "date": 1792701712010,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0.12578616352201258,
             "unit": "%"
           },
           {
