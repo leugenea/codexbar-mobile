@@ -37,11 +37,21 @@ class HistoryExportLifecycleTest {
         }
         instrumentation.addMonitor(monitor)
         try {
+            // Keep foreground eligibility across recreation: this oracle isolates local export
+            // from the activated owner's intentional STOP/START provider refresh.
+            fixture.owner.usageForeground(fixture.observer, true)
+            settleConnectionCommands(compose, fixture.owner, "export fixture foreground receipt")
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 awaitConnectionScreen(compose, fixture.owner)
                 fixture.owner.connect()
-                compose.waitUntil(10_000) { fixture.owner.state.value.phase == ConnectionPhase.OBSERVED }
-                compose.waitUntil(10_000) { recordedHistory(fixture.owner).storage?.entries?.size == 1 }
+                try {
+                    compose.waitUntil(10_000) {
+                        fixture.owner.state.value.let { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing } &&
+                            recordedHistory(fixture.owner).storage?.entries?.size == 1
+                    }
+                } catch (error: ComposeTimeoutException) {
+                    throw AssertionError("Export initial read/history settled: last=${fixture.owner.state.value}, history=${recordedHistory(fixture.owner)}", error)
+                }
                 fixture.seedLocalPage()
                 val ready = fixture.owner.session.snapshot() as SessionResult.Ready
                 val access = requireNotNull(fixture.owner.historyCapability(ready.envelope.generation))
@@ -61,6 +71,7 @@ class HistoryExportLifecycleTest {
                 assertNull(request.pending)
                 compose.onNodeWithTag("history-export").assertIsEnabled()
                 verifyDocument(access)
+                assertEquals("local export and document writes add no provider requests", requests, fixture.transport.requests.get())
                 request.pending = "detached-before-recreation"
                 request.busy.value = true
                 scenario.recreate()
@@ -70,7 +81,8 @@ class HistoryExportLifecycleTest {
                 openDetailRoute(compose, fixture.owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
                 compose.onNodeWithTag("history-export").performScrollTo().assertIsNotEnabled()
                 request.clear()
-                assertEquals(requests, fixture.transport.requests.get())
+                assertEquals("local export/recreation adds no provider requests with continuous foreground eligibility",
+                    requests, fixture.transport.requests.get())
                 access.revoke()
                 assertNull(access.exportHistory("test", Instant.EPOCH))
             }
