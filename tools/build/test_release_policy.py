@@ -25,6 +25,7 @@ def context(channel='rc', operation='prepare'):
             'workflowRef': 'leugenea/codexbar-mobile/' + policy.WORKFLOW + '@refs/heads/main',
             'runId': 100, 'runNumber': 10, 'operation': operation, 'channel': channel,
             'prepareRunId': '90' if operation == 'publish' else '',
+            'notes': 'Stable changes' if channel == 'stable' and operation == 'publish' else '',
             'tag': 'v0.1.0' + ('-rc.1' if channel == 'rc' else '')}
 
 
@@ -168,6 +169,17 @@ class ConfigurationTests(unittest.TestCase):
                     self.assertEqual(expected['channel'], channel)
                     self.assertEqual(expected['versionCode'], 10 if operation == 'prepare' else 9)
                     self.assertEqual(None if origin is None else origin['id'], None if operation == 'prepare' else 90)
+
+    def test_notes_admission_requires_stable_publish_and_rejects_prepare_notes_or_invalid_text(self):
+        for channel, operation, notes in [('stable', 'publish', ''), ('stable', 'publish', ' \n\t'),
+                                          ('rc', 'prepare', 'Changes'), ('stable', 'prepare', 'Changes'),
+                                          ('rc', 'publish', 'bad\0text'), ('rc', 'publish', 'x' * 20001),
+                                          ('rc', 'publish', None)]:
+            ctx = {**context(channel, operation), 'notes': notes}
+            model = PolicyAPI(ctx)
+            with self.subTest(channel=channel, operation=operation, notes=notes), self.assertRaises(ValueError):
+                policy.admit(wrapper(model), configuration(True), ctx)
+            self.assertEqual(model.calls, [])
 
     def test_event_controller_source_green_ci_and_environment_drift_deny(self):
         for key, value in [('event', 'pull_request'), ('ref', 'refs/heads/feature'), ('repository', 'fork/repo'),
@@ -313,6 +325,53 @@ class HistoryTests(unittest.TestCase):
         return assets, {'buildInputs': expected, 'bundleManifestSha256': 'f' * 64,
                         'authority': {'repository': self.api.repository, 'workflowId': 8, 'controllerSha': 'c' * 40,
                                       'runId': run_id, 'runAttempt': 2}}
+
+    def published_api(self, assets, manifest, notes=''):
+        from release_mock import ReleaseAPI
+        from release_publication import publish
+        remote = ReleaseAPI()
+        api = GitHub(self.api.repository, 'synthetic-token', remote.transport)
+        publish(api, manifest['buildInputs'], assets, lambda: None, notes=notes)
+        policy_transport = wrapper(self.api).transport
+        def transport(method, url, headers, data):
+            if '/releases' in urlsplit(url).path:
+                return remote.transport(method, url, headers, data)
+            return policy_transport(method, url, headers, data)
+        return GitHub(self.api.repository, 'synthetic-token', transport, read_only=True), remote
+
+    def test_real_wrapper_history_accepts_both_body_shapes_and_rejects_marker_tampering(self):
+        for channel, tag in [('rc', 'v0.1.0-rc.2'), ('stable', 'v0.1.0')]:
+            assets, manifest = self.published(tag=tag)
+            manifest['buildInputs']['channel'] = channel
+            for notes in ('', '## Changes\n- Fix usage display'):
+                api, remote = self.published_api(assets, manifest, notes)
+                body = remote.records[0]['body']
+                wrong_digest = body[:-1] + ('0' if body[-1] != '0' else '1')
+                remote.calls.clear()
+                with self.subTest(channel=channel, notes=notes), \
+                        patch.object(policy, 'verify_assets', return_value=(manifest, None)):
+                    self.assertEqual(policy.history(api, self.record, self.expected, self.reports, self.reports), (9, False))
+                    for bad in ('No marker', wrong_digest, body + '\n', body + '\nNot last',
+                                body.replace('\n\n', '\n') if notes else 'Notes\n' + body, None):
+                        remote.records[0]['body'] = bad
+                        with self.subTest(body=bad), self.assertRaisesRegex(ValueError, 'marker'):
+                            policy.history(api, self.record, self.expected, self.reports, self.reports)
+                self.assertTrue(all(call[0] == 'GET' for call in remote.calls))
+
+    def test_real_wrapper_accepted_publish_requires_same_notes_without_retained_artifact(self):
+        ctx = {**context(operation='publish'), 'notes': '## Changes\n- Fix usage display'}
+        self.record, self.expected, _ = policy.admit(wrapper(self.api), configuration(), ctx)
+        assets, manifest = self.published(9, self.expected['tag'], 90)
+        api, remote = self.published_api(assets, manifest, ctx['notes'])
+        remote.calls.clear()
+        with patch.object(policy, 'verify_assets', return_value=(manifest, None)):
+            self.assertEqual(policy.history(api, self.record, self.expected, self.reports, self.reports), (0, True))
+            for notes in ('', 'Different notes'):
+                self.record['notes'] = notes
+                with self.subTest(notes=notes), self.assertRaisesRegex(ValueError, 'Release binding'):
+                    policy.history(api, self.record, self.expected, self.reports, self.reports)
+        self.assertTrue(all(call[0] == 'GET' for call in remote.calls))
+        self.assertFalse(any('/artifacts' in path for path in self.api.calls))
 
     def test_history_floor_gaps_reset_same_run_noop_and_new_run_same_tag_conflict(self):
         assets, manifest = self.published()

@@ -19,6 +19,10 @@ on:
         description: Successful prepare run ID (publish only)
         type: string
         required: false
+      notes:
+        description: Release notes (publish only; required for stable)
+        type: string
+        required: false
 
 permissions:
   contents: read
@@ -37,6 +41,7 @@ env:
   REQUEST_CHANNEL: ${{ inputs.channel }}
   REQUEST_TAG: ${{ inputs.tag }}
   REQUEST_PREPARE_RUN_ID: ${{ inputs.prepare_run_id }}
+  REQUEST_NOTES: ${{ inputs.notes }}
   RELEASE_CONFIG: ${{ vars.RELEASE_CONFIG }}
 
 jobs:

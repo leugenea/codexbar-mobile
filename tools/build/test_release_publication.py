@@ -42,9 +42,27 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(self.published(), release_id)
         self.assertEqual(self.writes(), [])
 
+    def test_notes_create_readback_and_exact_rerun_binding(self):
+        notes = '  ## Changes\n- Fix usage display\n- Keep `$(not shell)` literal  \n'
+        release_id = publish(self.api, self.expected, self.assets, self.recheck, notes=notes)
+        expected_body = notes.strip() + '\n\n' + marker(self.assets)
+        self.assertEqual(json.loads(self.writes()[0][2])['body'], expected_body)
+        self.assertEqual(self.api.get('/releases/' + str(release_id))['body'], expected_body)
+        self.model.calls.clear()
+        self.assertEqual(publish(self.api, self.expected, self.assets, self.recheck, notes=notes.strip()), release_id)
+        self.assertEqual(self.writes(), [])
+        for changed in ('', 'Different notes'):
+            with self.subTest(notes=changed), self.assertRaisesRegex(ValueError, 'Release binding'):
+                publish(self.api, self.expected, self.assets, self.recheck, notes=changed)
+            self.assertEqual(self.writes(), [])
+
+    def test_whitespace_only_rc_notes_keep_marker_only_body(self):
+        release_id = publish(self.api, self.expected, self.assets, self.recheck, notes=' \n\t')
+        self.assertEqual(self.api.get('/releases/' + str(release_id))['body'], marker(self.assets))
+
     def test_stable_flags_are_explicit_not_inherited_from_rc(self):
         self.expected.update(channel='stable', tag='v0.1.0', versionName='0.1.0')
-        self.published()
+        publish(self.api, self.expected, self.assets, self.recheck, notes='Stable changes')
         self.assertIs(json.loads(self.writes()[0][2])['prerelease'], False)
         self.assertEqual(json.loads(self.writes()[-1][2]), {'draft': False, 'prerelease': False, 'make_latest': 'true'})
 

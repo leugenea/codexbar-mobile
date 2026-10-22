@@ -119,6 +119,24 @@ def marker(assets):
     return 'guarded-android-release sha256:' + fingerprint(assets['release-manifest.json'])['sha256']
 
 
+def notes_text(notes):
+    require(isinstance(notes, str) and len(notes) <= 20000 and '\0' not in notes,
+            'Release notes must be text of at most 20000 characters without NUL')
+    return notes.strip()
+
+
+def release_body(assets, notes=''):
+    notes = notes_text(notes)
+    return notes + '\n\n' + marker(assets) if notes else marker(assets)
+
+
+def history_body(body, assets):
+    expected_marker = marker(assets)
+    require(isinstance(body, str) and (body == expected_marker or body.endswith('\n\n' + expected_marker)),
+            'History Release marker must be the exact last line')
+    return body
+
+
 def release_binding(record, expected, body):
     require(type(record['id']) is int and record['id'] > 0 and record['tag_name'] == expected['tag']
             and record['target_commitish'] == expected['source']['sha'] and record['name'] == expected['versionName']
@@ -138,12 +156,12 @@ def read_assets(api, release_id, wanted=None):
     return result
 
 
-def publish(api, expected, assets, recheck):
+def publish(api, expected, assets, recheck, notes=''):
     """Only matching partial drafts can resume. Unknown writes are read back, never blindly retried."""
     recheck()
     matches = [r for r in api.releases() if r['tag_name'] == expected['tag']]
     require(len(matches) <= 1, 'Ambiguous draft/published tag')
-    body = marker(assets)
+    body = release_body(assets, notes)
     if not matches:
         payload = {'tag_name': expected['tag'], 'target_commitish': expected['source']['sha'],
                    'name': expected['versionName'], 'body': body, 'draft': True,

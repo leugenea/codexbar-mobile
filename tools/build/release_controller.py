@@ -19,7 +19,8 @@ def context(env):
             'workflowSha': env['GITHUB_WORKFLOW_SHA'], 'workflowRef': env['GITHUB_WORKFLOW_REF'],
             'runId': int(env['GITHUB_RUN_ID']), 'runNumber': int(env['GITHUB_RUN_NUMBER']),
             'operation': env['REQUEST_OPERATION'], 'channel': env['REQUEST_CHANNEL'],
-            'tag': env['REQUEST_TAG'], 'prepareRunId': env.get('REQUEST_PREPARE_RUN_ID', '')}
+            'tag': env['REQUEST_TAG'], 'prepareRunId': env.get('REQUEST_PREPARE_RUN_ID', ''),
+            'notes': env.get('REQUEST_NOTES', '')}
 
 
 def admitted(env, *, reader=True):
@@ -90,6 +91,7 @@ def main():
                publication_environment=record['publicationEnvironment'])
         with open(env['GITHUB_STEP_SUMMARY'], 'a') as stream:
             summary = {key: expected[key] for key in ('channel', 'tag', 'source', 'versionCode')}
+            summary['notes'] = record['notes'].strip()
             stream.write('## Owner confirmation — check before Approve\n```json\n' + canonical(summary).decode() + '```\n')
         print('Owner confirmation:', canonical(summary).decode())
         return
@@ -152,7 +154,7 @@ def main():
         fresh_api, fresh_record, fresh_expected, _ = admitted(env, reader=False)
         require(fresh_record == record and fresh_expected == expected, 'Authorization drift')
         policy.history(fresh_api, record, expected, sdk, args.work / 'current-history')
-    release_id = publish(api, expected, assets, recheck)
+    release_id = publish(api, expected, assets, recheck, notes=record['notes'])
     print('Exact Release ID verified:', release_id)
 
 

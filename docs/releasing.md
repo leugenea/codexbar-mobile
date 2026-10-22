@@ -60,6 +60,8 @@ and deleted/distributed history require owner reconciliation.
    **Approve** publication. It locates that run's retained signed artifact, verifies
    source/channel/counter/certificate/bundle again and publishes those exact six
    assets. There is no rebuild, resign or second versionCode.
+   Supply `notes` for publish (required for stable, optional for RC; empty for prepare); review them before approval.
+   Notes precede the final integrity marker; publish reruns must supply the same notes (outer whitespace is stripped).
 6. Verify the final Release ID, flags and downloaded assets. RC is prerelease and
    not latest; stable is non-prerelease and latest.
 
