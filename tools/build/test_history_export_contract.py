@@ -86,7 +86,9 @@ class HistoryExportContracts(unittest.TestCase):
         self.assertIn('openOutputStream(uri, "wt")', action)
         self.assertIn("withContext(Dispatchers.IO)", action)
         self.assertIn("val exporter = historyExporter(controller)", root)
-        self.assertIn("HistoryExportAction(exporter)", root)
+        details = root.split("DashboardRoute.LOCAL_HISTORY_DETAILS -> {", 1)[1].split(
+            "DashboardRoute.CONNECTION_DETAILS ->", 1)[0]
+        self.assertLess(details.index("StoredHistoryContent("), details.index("HistoryExportAction(exporter)"))
         self.assertNotIn("readUsage", action)
         self.assertNotIn("rememberSaveable", action)
         writer = (main / "history/HistoryJsonWriter.kt").read_text()

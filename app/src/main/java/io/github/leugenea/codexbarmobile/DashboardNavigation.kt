@@ -108,8 +108,8 @@ private fun RouteContent(route: DashboardRoute, state: ConnectionState, controll
         DashboardRoute.LOCAL_HISTORY_DETAILS -> {
             val display = historyForDisplay(source, navigation.query, authority)
             SideEffect { observer?.projected(source, display, state.refresh.evaluatedAt) }
-            HistoryExportAction(exporter)
             StoredHistoryContent(navigation, display, state.refresh.evaluatedAt, kind, page)
+            HistoryExportAction(exporter)
         }
         DashboardRoute.CONNECTION_DETAILS -> Column(Modifier.testTag("connection-details")) { ConnectionContent(state, controller, browser) }
     }

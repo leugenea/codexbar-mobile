@@ -51,12 +51,16 @@ class HistoryExportLifecycleTest {
                 openDetailRoute(compose, fixture.owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
                 compose.onNodeWithTag("history-export").performScrollTo().assertIsEnabled().performClick()
                 compose.waitUntil(10_000) { captured.get() != null }
-                assertEquals("application/json", captured.get().type)
-                assertTrue(captured.get().categories.contains(Intent.CATEGORY_OPENABLE))
-                assertEquals("codexbar-history-v1.json", captured.get().getStringExtra(Intent.EXTRA_TITLE))
+                val intent = requireNotNull(captured.get())
+                assertEquals("application/json", intent.type)
+                // CreateDocument sets action/type/title, unlike GetContent it adds no OPENABLE category.
+                assertNull(intent.categories)
+                assertEquals("codexbar-history-v1.json", intent.getStringExtra(Intent.EXTRA_TITLE))
+                val request = fixture.owner.historyExportRequest
+                compose.waitUntil(10_000) { !request.busy.value }
+                assertNull(request.pending)
                 compose.onNodeWithTag("history-export").assertIsEnabled()
                 verifyDocument(access)
-                val request = fixture.owner.historyExportRequest
                 request.pending = "detached-before-recreation"
                 request.busy.value = true
                 scenario.recreate()
