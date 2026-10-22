@@ -228,13 +228,23 @@ process-kill/relaunch are separate evidence boundaries, not established by parse
 tests. A10 live refresh/rotation/logout still needs an exact-candidate owner check;
 A8 sign-in alone does not close parent #4.
 
-## History JSON export
+## History JSON export and import
 
 The local-history detail route exports all retained entries plus coherent continuation
 state through SAF, off Main, without credentials/account metadata or the local
 partition UUID. The versioned production encoder/decoder, privacy boundary and
 forward-compatibility contract are documented in [history export v1](docs/history-export.md).
-Import is a separate feature; decoding does not write storage.
+Import uses JSON-only SAF OpenDocument, then explicit replace confirmation. A
+process-memory lifetime ticket cannot target a successor login. Bounded UTF-8 input
+is strictly validated and rebound to the current partition. The store's existing I/O
+lock spans one SQLite transaction replacing entries, high-water, reducer and retention
+continuation; age/count/byte eviction is inside the transaction. Revoked capabilities
+fail before irreversible admission. The recorder barriers its admitted read/append
+pair and holds queued observations across replacement, preventing a pre-import N+1
+from leaking past the imported cursor. Confirmed work belongs to the process owner,
+which rereads the active presentation after success even if its Activity waiter is
+cancelled. Decoding alone does not write storage. Registered JVM/native tests cover
+these contracts; source/parser checks do not establish hosted runtime acceptance.
 
 ## Pure usage-history contract (M4a-1)
 

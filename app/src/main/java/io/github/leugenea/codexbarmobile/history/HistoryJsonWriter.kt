@@ -29,13 +29,13 @@ internal class HistoryJsonWriter {
         put("kind", text(value.kind)); put("durationSeconds", value.durationSeconds); put("resetAt", text(value.resetAt))
     }
 
-    private fun segment(value: HistorySegment): JsonObject = buildJsonObject {
+    fun segment(value: HistorySegment): JsonObject = buildJsonObject {
         put("kind", text(value.id.kind)); put("firstOrdinal", value.id.first.ordinal)
         put("window", optional(value.window, ::identity)); put("breaks", JsonArray(value.breaks.map(::text)))
         put("resetCause", text(value.resetCause))
     }
 
-    private fun point(value: HistoryPoint): JsonObject = buildJsonObject {
+    fun point(value: HistoryPoint): JsonObject = buildJsonObject {
         put("ordinal", value.observation.ordinal); put("observedAt", text(value.observedAt)); put("clock", clock(value.clock))
         put("usedPercent", text(value.usedPercent)); put("segment", segment(value.segment))
         put("nominalStart", text(value.nominalStart)); put("baseline", text(value.baseline))

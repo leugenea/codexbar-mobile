@@ -33,6 +33,10 @@ class HistoryAccess internal constructor(
         if (owner.rejection(this, partition) != null) return null
         return owner.exportHistory(this, appVersion, exportedAt)
     }
+    override fun importHistory(text: String, now: java.time.Instant): HistoryImportOutcome {
+        owner.rejection(this, partition)?.let { return HistoryImportOutcome.Unavailable(it) }
+        return owner.importHistory(this, text, now)
+    }
     override fun delete(partition: HistoryPartition): HistoryDeleteOutcome {
         if (partition != this.partition) return HistoryDeleteOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
         return beginDelete().complete()
@@ -241,8 +245,7 @@ class SQLiteHistoryStore internal constructor(
     /** Pre-transaction headroom; evictions are separate durable maintenance, never consumed IDs. */
     private fun reserveSpace(partition: HistoryPartition, payloadBytes: Int) {
         files.checkBudget()
-        val requiredPages = 8L + (payloadBytes + 4095) / 4096
-        while (schema.spacePages() < requiredPages) {
+        HistoryStorageSpace.reserve(payloadBytes, schema::spacePages) {
             if (schema.count() == 0L) throw HistoryStorageException(HistoryUnavailable.STORAGE_FULL)
             schema.transaction {
                 val state = schema.state(partition)
@@ -309,6 +312,24 @@ class SQLiteHistoryStore internal constructor(
         } while (page.hasMore)
         return entries
     }
+
+    internal fun importHistory(access: HistoryAccess, text: String, now: java.time.Instant): HistoryImportOutcome =
+        operation(HistoryUnavailable.WRITE_FAILURE, { HistoryImportOutcome.Unavailable(it ?: HistoryUnavailable.IO_FAILURE) }) {
+            if (!authorized(access, access.partition)) return@operation HistoryImportOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
+            val document = try { HistoryImport.decode(text, access.partition) } catch (_: HistoryImportTooLarge) {
+                return@operation HistoryImportOutcome.TooLarge
+            } catch (_: UnsupportedHistoryVersion) {
+                return@operation HistoryImportOutcome.UnsupportedVersion
+            } catch (_: Exception) {
+                return@operation HistoryImportOutcome.Invalid
+            }
+            hooks.beforeWriteAdmission()
+            if (!authorized(access, access.partition)) return@operation HistoryImportOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
+            files.checkBudget()
+            hooks.afterWriteAdmission()
+            HistoryImport.replace(document, schema, limits, now, hooks::afterInsert, hooks::beforeCommit)
+            HistoryImportOutcome.Imported
+        }
 
     /** A retired caller must not wait behind a held irreversible write/removal. */
     internal fun rejection(access: HistoryAccess, partition: HistoryPartition): HistoryUnavailable? = synchronized(admission) {

@@ -366,6 +366,36 @@ HISTORY_EXPORT_NATIVE = {
 }
 HISTORY_EXPORT_NATIVE_COUNT = sum(map(len, HISTORY_EXPORT_NATIVE.values()))
 
+HISTORY_IMPORT_JVM = {
+    "io.github.leugenea.codexbarmobile.history.HistoryImportControllerTest": {
+        "cancelledActivityWaiterKeepsProcessImportBusyResultAndRefreshedPresentation",
+    },
+    "io.github.leugenea.codexbarmobile.history.HistoryImportTest": {
+        "checkedInV1FixtureAndUnknownFieldsImportWithRetainedOrigins",
+        "exportImportRestoresExactRowsContinuationAndNextSegmentWithoutNewBreak",
+        "importAppliesAgeCountAndByteRetentionWithoutChangingHighWaterOrCursor",
+        "inconsistentCursorSegmentAndPendingBreakAreRejectedWithoutReplacement",
+        "interruptedReplacementRollsBackRowsHighWaterCursorAndRetentionTogether",
+        "malformedNewerAndOrdinalInvariantFilesLeaveExistingHistoryUntouched",
+        "oversizedAndMalformedUtf8StreamsAreRejectedBeforeDecodeOrMutation",
+        "retainedUnknownTimeHolesAndUnkeyedPointsDoNotInvalidateRealExports",
+    },
+    "io.github.leugenea.codexbarmobile.history.HistoryImportRecorderTest": {
+        "importWaitsForPreImportNPlusOneThenQueuedRecordingUsesImportedHighWater",
+        "revokedCapabilityRejectsImportWithoutChangingRowsOrContinuation",
+    },
+    "io.github.leugenea.codexbarmobile.HistoryImportRequestTest": {
+        "importAdmissionCancelledBeforeDispatchCannotOpenPickerOrStrandBusy",
+        "importPickerKeepsOriginalLifetimeAcrossRecreationAndDropsCancelledRead",
+    },
+}
+HISTORY_IMPORT_NATIVE = {
+    "io.github.leugenea.codexbarmobile.HistoryImportLifecycleTest": {
+        "localHistoryImportConfirmsJsonSafReplacesSQLiteAndAnnouncesResult",
+    },
+}
+HISTORY_IMPORT_NATIVE_COUNT = sum(map(len, HISTORY_IMPORT_NATIVE.values()))
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -393,7 +423,8 @@ def verify_reports(directory: Path, kind: str) -> dict:
     current_history = CURRENT_HISTORY_JVM if kind == "jvm" else CURRENT_HISTORY_NATIVE
     dashboard = DASHBOARD_JVM if kind == "jvm" else DASHBOARD_NATIVE
     export = HISTORY_EXPORT_JVM if kind == "jvm" else HISTORY_EXPORT_NATIVE
-    for classname, required in (current_history | dashboard | export).items():
+    imported = HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
+    for classname, required in (current_history | dashboard | export | imported).items():
         for name in required:
             matches = [case for case in cases if case["class"] == classname and case["name"] == name]
             if len(matches) != 1:

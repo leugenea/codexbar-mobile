@@ -8,12 +8,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 /** Process-memory only: retain a user-requested snapshot across SAF/Activity recreation, never Bundle it. */
-internal class HistoryExportRequest {
-    var pending: String? = null
+internal typealias HistoryExportRequest = HistoryDocumentRequest<String>
+
+internal class HistoryDocumentRequest<T> {
+    var pending: T? = null
     val busy = MutableStateFlow(false)
     fun clear() { pending = null; busy.value = false }
 
-    fun start(scope: CoroutineScope, prepare: suspend () -> String?, launch: () -> Unit, failure: () -> Unit) {
+    fun start(scope: CoroutineScope, prepare: suspend () -> T?, launch: () -> Unit, failure: () -> Unit) {
         if (busy.value) return
         // Arm cleanup before any dispatch or persistent state change can race recreation.
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -34,12 +36,13 @@ internal class HistoryExportRequest {
         }
     }
 
-    fun finish(scope: CoroutineScope, write: suspend (String?) -> Unit) {
+    fun finish(scope: CoroutineScope, write: suspend (T?) -> Unit) {
         scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 val captured = pending
                 pending = null
                 ensureActive()
+                busy.value = true
                 write(captured)
             } finally {
                 clear()

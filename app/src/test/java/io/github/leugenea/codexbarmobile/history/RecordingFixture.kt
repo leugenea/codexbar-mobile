@@ -11,7 +11,7 @@ import java.time.Instant
 
 /** Original synthetic integrated owner/reader/reducer fixture, with no Android stub execution. */
 @OptIn(ExperimentalCoroutinesApi::class)
-internal class RecordingFixture(val test: TestScope, capacity: Int = 16) {
+internal class RecordingFixture(val test: TestScope, capacity: Int = 16, lifetimeStorage: HistoryLifetimeStorage? = null) {
     private val dispatcher = StandardTestDispatcher(test.testScheduler)
     val storage = RecordingDispatcher(dispatcher)
     val journal = LifetimeJournal()
@@ -48,7 +48,7 @@ internal class RecordingFixture(val test: TestScope, capacity: Int = 16) {
     }
     val owner = ConnectionController(credentials, DeviceCodeAuthenticator(fake, credentials, clock, storageDispatcher = dispatcher),
         NativeFeasibilityReader(fake, clock), scope, mutationDispatcher = dispatcher,
-        storageDispatcher = storage, history = HistoryLifetimeCoordinator(journal.storage()), historyQueueCapacity = capacity)
+        storageDispatcher = storage, history = HistoryLifetimeCoordinator(lifetimeStorage ?: journal.storage()), historyQueueCapacity = capacity)
     val snapshot get() = owner.historySnapshots.value
     val gets get() = fake.calls.filter { it.request is ProviderHttpRequest.Get }
     fun settle() = test.runCurrent()

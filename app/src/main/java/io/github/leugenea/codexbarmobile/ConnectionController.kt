@@ -56,6 +56,7 @@ internal class ConnectionController(
     historyQueueCapacity: Int = 16,
 ) {
     internal val historyExportRequest = HistoryExportRequest()
+    internal val historyImporterState = HistoryImporterState()
     private val ownerScope = CoroutineScope(scope.coroutineContext + mutationDispatcher)
     private val mutableState = MutableStateFlow(ConnectionState(ConnectionPhase.RESTORING))
     val state: StateFlow<ConnectionState> = mutableState
@@ -73,6 +74,7 @@ internal class ConnectionController(
     private var deletion: Deferred<CredentialResult<Unit>>? = null
     private var historyDeletion: Deferred<HistoryDeleteOutcome>? = null
     private var historyRestore: Job? = null
+    private var historyImport: Deferred<HistoryImportOutcome>? = null
     private var closed = false
     private val stopped = CompletableDeferred<Unit>()
     private val historyRecorder = UsageHistoryRecorder(ownerScope, storageDispatcher, historyQueueCapacity)
@@ -251,6 +253,35 @@ internal class ConnectionController(
         val access = historyCapability(active) ?: return@withContext null
         val encoded = withContext(storageDispatcher) { access.exportHistory(appVersion, exportedAt) }
         encoded.takeIf { generation === active && historyCapability(active) === access && !closed }
+    }
+
+    internal suspend fun historyImportTarget(): HistoryImportTarget? = withContext(mutationDispatcher) {
+        val active = generation ?: return@withContext null
+        if (closed || cleanupPending()) return@withContext null
+        historyCapability(active)?.let { HistoryImportTarget(active, it.partition) }
+    }
+
+    /** SAF may retire runtime access, but must never redirect a predecessor file to a new login. */
+    internal suspend fun importHistory(target: HistoryImportTarget, text: String, now: java.time.Instant): HistoryImportOutcome =
+        withContext(mutationDispatcher) {
+            if (historyImport?.isActive == true) return@withContext HistoryImportOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE)
+            // Confirmation admits process-owned work; Activity cancellation only detaches its waiter.
+            ownerScope.async(start = CoroutineStart.UNDISPATCHED) {
+                ensureActive()
+                historyImporterState.importing.value = true
+                historyImporterState.result.value = null
+                try { performHistoryImport(target, text, now).also { historyImporterState.result.value = it } }
+                finally { historyImporterState.importing.value = false }
+            }.also { historyImport = it }.await()
+        }
+
+    private suspend fun performHistoryImport(target: HistoryImportTarget, text: String, now: java.time.Instant): HistoryImportOutcome {
+        historyRestore?.join()
+        val access = historyCapability(target.generation)
+        if (closed || cleanupPending() || generation !== target.generation || access?.partition != target.partition) {
+            return HistoryImportOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
+        }
+        return historyRecorder.importHistory(requireNotNull(access), text, now)
     }
 
     internal fun currentHistoryDisplayContext() = historyRecorder.currentDisplayContext()
@@ -433,6 +464,7 @@ internal class ConnectionController(
             session.awaitShutdown()
             historyDeletion?.join()
             historyRecorder.settled()
+            historyImport?.join()
             nameWrite?.join()
             // A cancelled stage/activation waiter can leave its process-owned child running.
             history?.let { coordinator -> withContext(storageDispatcher) { coordinator.close() } }
