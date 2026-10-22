@@ -1,5 +1,7 @@
 """Pure controller artifact provenance and release-only Gradle receipt controls."""
+from contextlib import redirect_stdout
 import copy
+import io
 import json
 import os
 from pathlib import Path
@@ -88,6 +90,26 @@ class ControllerTests(unittest.TestCase):
         summary = (self.root / 'summary').read_text()
         data = json.loads(summary.split('```json\n', 1)[1].split('```', 1)[0])
         self.assertEqual(data['notes'], self.env['REQUEST_NOTES'].strip())
+        self.assertIn('allow=true', (self.root / 'output').read_text())
+
+    def test_runner_commands_in_notes_are_only_written_to_step_summary(self):
+        notes = 'Document ##[set-output] deprecation\n::add-mask::x'
+        self.env.update(REQUEST_OPERATION='publish', REQUEST_PREPARE_RUN_ID='90', REQUEST_NOTES=notes)
+        self.api = self.fixtures.wrapper(self.fixtures.PolicyAPI(self.fixtures.context(operation='publish')))
+        stdout = io.StringIO()
+        with redirect_stdout(stdout):
+            self.run_main('admit')
+        logged = stdout.getvalue()
+        summary = (self.root / 'summary').read_text()
+        data = json.loads(summary.split('```json\n', 1)[1].split('```', 1)[0])
+        self.assertEqual(data['notes'], notes)
+        for command in ('##[set-output]', '::add-mask::x'):
+            self.assertNotIn(command, logged)
+            self.assertIn(command, summary)
+        self.assertTrue(logged.startswith('Owner confirmation: '))
+        confirmation = json.loads(logged.removeprefix('Owner confirmation: '))
+        self.assertEqual(set(confirmation), {'channel', 'tag', 'source', 'versionCode'})
+        self.assertEqual(confirmation, {key: value for key, value in data.items() if key != 'notes'})
         self.assertIn('allow=true', (self.root / 'output').read_text())
 
     def test_stable_without_notes_is_denied_in_pre_environment_admission(self):

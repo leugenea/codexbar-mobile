@@ -93,7 +93,7 @@ def main():
             summary = {key: expected[key] for key in ('channel', 'tag', 'source', 'versionCode')}
             summary['notes'] = record['notes'].strip()
             stream.write('## Owner confirmation — check before Approve\n```json\n' + canonical(summary).decode() + '```\n')
-        print('Owner confirmation:', canonical(summary).decode())
+        print('Owner confirmation:', canonical({key: value for key, value in summary.items() if key != 'notes'}).decode())
         return
     if args.operation == 'remote-state':
         # This GET-only helper has a technically Contents-write job token for draft visibility.
