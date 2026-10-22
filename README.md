@@ -4,6 +4,20 @@ An independent, unofficial Android phone project. It is not affiliated with or
 endorsed by OpenAI or CodexBar. **The app starts in the native connection/live usage screen. Provider access remains
 unofficial and identity unverified.**
 
+## Installation
+
+1. Download the APK and `SHA256SUMS` from the
+   [latest GitHub Release](https://github.com/leugenea/codexbar-mobile/releases/latest).
+2. Verify the APK's SHA-256 against `SHA256SUMS` before installing: use a phone hash
+   app, or run `sha256sum --ignore-missing -c SHA256SUMS` in the download directory.
+3. Open the APK and allow installation from that source when Android prompts.
+
+In-place upgrades require the same signing certificate (SHA-256):
+`c63d395d8ce30ba04bf6dd2f78d1da2badcfa8768b65079a9a508862eb775bbb`.
+Production `io.github.leugenea.codexbarmobile` and debug
+`io.github.leugenea.codexbarmobile.dev` install side by side with isolated data;
+there is no data migration between them.
+
 ## What works today
 
 - Default connection/live screen with truthful disconnected, loading, reauthorization,
@@ -95,9 +109,9 @@ exact-merge checks; see the original-parent map in [Architecture](ARCHITECTURE.m
 Native chart fixtures and integrated captures are synthetic, not live-provider evidence. The native
 contract exercises actual Keystore/SQLite with synthetic transport and fresh-runtime
 restoration, not literal process death or verified provider identity. There is no
-verified-account history, background refresh service, widget
-or signed production release. CI debug APKs are test outputs, not signed release
-deliverables. Minimum Android version is Android 8.0 (API 26).
+verified-account history, background refresh service or widget. CI debug APKs are
+test outputs, not signed release deliverables. Minimum Android version is
+Android 8.0 (API 26).
 
 The app declares INTERNET, with cleartext traffic explicitly disabled.
 Explicit connection is the only entry into the
@@ -108,6 +122,16 @@ Future provider work is gated separately. The [research](docs/research/m0.md)
 discusses private interfaces, OAuth-client authorization, provider terms and
 distribution risk. An observed endpoint or an upstream open-source license does
 not grant service access or promise that a mobile integration will be supported.
+
+## Known limitations
+
+- Unofficial app, not affiliated with or endorsed by OpenAI or CodexBar.
+- Codex usage from ChatGPT subscriptions only; no API-key usage tracking.
+- Android only (Android 8.0 / API 26 or newer).
+- Session expiry/rotation is verified by synthetic tests only, not live-provider evidence.
+- Usage history is local to this device; no cross-device sync or backup.
+- No in-app license screen; `THIRD_PARTY_NOTICES.txt` and the legal bundle ship as
+  Release assets.
 
 ## Build and contribute
 
@@ -137,7 +161,7 @@ retains its own licenses and notices; see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTI
 
 
 Development builds use the isolated `io.github.leugenea.codexbarmobile.dev` package
-and a `0.1.0-dev.<history count>+g<checkout SHA>` name. Hosted CI also prepares a
-verified **unsigned, non-distributable release APK** as a future signing input.
-It is not a signed candidate or published release, and no data migration or upgrade
-compatibility is promised. See [version and release preparation](CONTRIBUTING.md#version-packages-and-unsigned-release-preparation).
+and a `0.2.0-dev.<history count>+g<checkout SHA>` name. Hosted CI also prepares a
+verified **unsigned, non-distributable release APK** as a signing input.
+That CI output is not a signed candidate or published release. See
+[version and release preparation](CONTRIBUTING.md#version-packages-and-unsigned-release-preparation).
