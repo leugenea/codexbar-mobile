@@ -381,4 +381,7 @@
     <string name="dashboard_inventory_discrepant">Inventory differs from reported counts</string>
     <string name="dashboard_banked_partial">Inventory is partial</string>
     <string name="dashboard_banked_stale">Inventory may be out of date</string>
+    <string name="history_export">Export history</string>
+    <string name="history_export_success">History exported</string>
+    <string name="history_export_failure">Could not export history. Please try again.</string>
 </resources>

@@ -55,6 +55,7 @@ internal class ConnectionController(
     private val history: HistoryLifetimeCoordinator? = null,
     historyQueueCapacity: Int = 16,
 ) {
+    internal val historyExportRequest = HistoryExportRequest()
     private val ownerScope = CoroutineScope(scope.coroutineContext + mutationDispatcher)
     private val mutableState = MutableStateFlow(ConnectionState(ConnectionPhase.RESTORING))
     val state: StateFlow<ConnectionState> = mutableState
@@ -241,6 +242,15 @@ internal class ConnectionController(
 
     internal fun observeHistory(request: HistoryPresentationRequest, expected: HistoryDisplayContext) = command {
         historyRecorder.observe(request, expected)
+    }
+
+    /** Prepare while foreground authority is live, before SAF temporarily backgrounds the app. */
+    internal suspend fun exportHistory(appVersion: String, exportedAt: java.time.Instant): String? = withContext(mutationDispatcher) {
+        val active = generation ?: return@withContext null
+        if (closed || cleanupPending()) return@withContext null
+        val access = historyCapability(active) ?: return@withContext null
+        val encoded = withContext(storageDispatcher) { access.exportHistory(appVersion, exportedAt) }
+        encoded.takeIf { generation === active && historyCapability(active) === access && !closed }
     }
 
     internal fun currentHistoryDisplayContext() = historyRecorder.currentDisplayContext()

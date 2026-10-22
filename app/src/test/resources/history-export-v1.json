@@ -1,0 +1,52 @@
+{
+  "formatVersion": 1,
+  "appVersion": "test-v1",
+  "exportedAt": "2027-01-15T08:00:00Z",
+  "entries": [
+    {
+      "ordinal": 7,
+      "clock": {
+        "epoch": "00000000-0000-0000-0000-000000000002",
+        "monotonicMillis": 7000
+      },
+      "observedAt": null,
+      "gap": "READ_ERROR",
+      "windows": [],
+      "slots": [],
+      "allowed": null,
+      "limitReached": null
+    }
+  ],
+  "continuation": {
+    "highWaterOrdinal": 7,
+    "cursor": {
+      "fiveHour": {
+        "lastPoint": null,
+        "lastCandidate": null,
+        "nominalStart": "UNAVAILABLE",
+        "pendingBreak": "READ_ERROR"
+      },
+      "weekly": {
+        "lastPoint": null,
+        "lastCandidate": null,
+        "nominalStart": "UNAVAILABLE",
+        "pendingBreak": "READ_ERROR"
+      }
+    },
+    "ageAnchor": {
+      "at": "2027-01-15T08:00:00Z",
+      "clock": {
+        "epoch": "00000000-0000-0000-0000-000000000002",
+        "monotonicMillis": 7000
+      }
+    },
+    "ageSuspended": true,
+    "cutoffs": {
+      "BYTE_CAP": 6
+    },
+    "lastClock": {
+      "epoch": "00000000-0000-0000-0000-000000000002",
+      "monotonicMillis": 7000
+    }
+  }
+}

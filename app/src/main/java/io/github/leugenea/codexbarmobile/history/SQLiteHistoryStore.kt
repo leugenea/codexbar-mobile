@@ -29,6 +29,10 @@ class HistoryAccess internal constructor(
         owner.rejection(this, query.partition)?.let { return HistoryReadOutcome.Unavailable(it) }
         return owner.read(this, query)
     }
+    override fun exportHistory(appVersion: String, exportedAt: java.time.Instant): String? {
+        if (owner.rejection(this, partition) != null) return null
+        return owner.exportHistory(this, appVersion, exportedAt)
+    }
     override fun delete(partition: HistoryPartition): HistoryDeleteOutcome {
         if (partition != this.partition) return HistoryDeleteOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
         return beginDelete().complete()
@@ -283,6 +287,28 @@ class SQLiteHistoryStore internal constructor(
             val last = state.cursor.lastOrdinal.takeIf { it > 0 }?.let { ObservationId(it) }
             HistoryReadOutcome.Ready(HistoryReadSnapshot(query, page, last, more, state.cutoffs.keys, state.cutoffs))
         }
+
+    /** The same I/O lock spans state + all read pages: append/retention cannot tear the export. */
+    internal fun exportHistory(access: HistoryAccess, appVersion: String, exportedAt: java.time.Instant): String? =
+        operation(HistoryUnavailable.READ_FAILURE, { null }) {
+            if (!authorized(access, access.partition)) return@operation null
+            val state = schema.state(access.partition)
+            val entries = exportEntries(access) ?: return@operation null
+            if (!authorized(access, access.partition)) return@operation null
+            HistoryExport.encode(HistoryExportDocument(appVersion, exportedAt, entries, state))
+        }
+
+    private fun exportEntries(access: HistoryAccess): List<HistoryEntry>? {
+        val entries = ArrayList<HistoryEntry>()
+        var after: ObservationId? = null
+        do {
+            val result = read(access, HistoryReadQuery(access.partition, limits.readPage, after))
+            val page = (result as? HistoryReadOutcome.Ready)?.snapshot ?: return null
+            entries.addAll(page.entries)
+            after = page.nextAfter
+        } while (page.hasMore)
+        return entries
+    }
 
     /** A retired caller must not wait behind a held irreversible write/removal. */
     internal fun rejection(access: HistoryAccess, partition: HistoryPartition): HistoryUnavailable? = synchronized(admission) {

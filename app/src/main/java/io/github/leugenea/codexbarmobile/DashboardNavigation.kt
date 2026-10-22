@@ -30,13 +30,14 @@ internal fun ConnectionScreen(state: ConnectionState, controller: ConnectionCont
     var route by remember(controller) { mutableStateOf(DashboardRoute.DASHBOARD) }
     val drawer = remember(controller) { DrawerState(DrawerValue.Closed) }
     val scope = rememberCoroutineScope()
+    val exporter = historyExporter(controller)
     BackHandler(drawer.isOpen || route != DashboardRoute.DASHBOARD) {
         if (drawer.isOpen) scope.launch { drawer.close() } else route = DashboardRoute.DASHBOARD
     }
     ModalNavigationDrawer(drawerState = drawer, drawerContent = {
         DetailDrawer(route) { route = it; scope.launch { drawer.close() } }
     }) {
-        ConnectionRoute(state, controller, route, openBrowser, observer,
+        ConnectionRoute(state, controller, route, openBrowser, observer, exporter,
             { scope.launch { drawer.open() } }, { route = DashboardRoute.DASHBOARD })
     }
 }
@@ -55,7 +56,7 @@ private fun DetailDrawer(route: DashboardRoute, select: (DashboardRoute) -> Unit
 
 @Composable
 private fun ConnectionRoute(state: ConnectionState, controller: ConnectionController, route: DashboardRoute,
-    openBrowser: () -> Unit, observer: HistoryUiObserver?, openDrawer: () -> Unit, back: () -> Unit) {
+    openBrowser: () -> Unit, observer: HistoryUiObserver?, exporter: HistoryExporter, openDrawer: () -> Unit, back: () -> Unit) {
     val source = collectedHistory(controller, observer)
     // Collection triggers a pass; this actual volatile slot is the permission on that pass.
     val authority = controller.currentHistoryDisplayContext()
@@ -72,7 +73,7 @@ private fun ConnectionRoute(state: ConnectionState, controller: ConnectionContro
         verticalArrangement = Arrangement.spacedBy(20.dp)) {
         RouteHeader(route, openDrawer, back)
         AccountNameHeader(accountName, controller::renameAccount)
-        RouteContent(route, state, controller, openBrowser, source, authority, current, navigation, observer,
+        RouteContent(route, state, controller, openBrowser, source, authority, current, navigation, observer, exporter,
             { kind = it.kind }, { after = it })
     }
 }
@@ -101,13 +102,14 @@ private fun RouteHeader(route: DashboardRoute, openDrawer: () -> Unit, back: () 
 @Composable
 private fun RouteContent(route: DashboardRoute, state: ConnectionState, controller: ConnectionController,
     browser: () -> Unit, source: HistoryGraphSnapshot, authority: HistoryDisplayContext?, current: HistoryPresentationRequest.Current,
-    navigation: HistoryNavigation, observer: HistoryUiObserver?, kind: (HistoryNavigation) -> Unit, page: (ObservationId?) -> Unit) {
+    navigation: HistoryNavigation, observer: HistoryUiObserver?, exporter: HistoryExporter, kind: (HistoryNavigation) -> Unit, page: (ObservationId?) -> Unit) {
     when (route) {
         DashboardRoute.DASHBOARD -> DashboardScreen(state, controller, browser, source, current, authority, observer)
         DashboardRoute.LOCAL_HISTORY_DETAILS -> {
             val display = historyForDisplay(source, navigation.query, authority)
             SideEffect { observer?.projected(source, display, state.refresh.evaluatedAt) }
             StoredHistoryContent(navigation, display, state.refresh.evaluatedAt, kind, page)
+            HistoryExportAction(exporter)
         }
         DashboardRoute.CONNECTION_DETAILS -> Column(Modifier.testTag("connection-details")) { ConnectionContent(state, controller, browser) }
     }

@@ -335,6 +335,37 @@ DASHBOARD_NATIVE = {
 DASHBOARD_NATIVE_COUNT = sum(map(len, DASHBOARD_NATIVE.values()))
 DASHBOARD_JVM_COUNT = sum(map(len, DASHBOARD_JVM.values()))
 
+HISTORY_EXPORT_JVM = {
+    "io.github.leugenea.codexbarmobile.history.HistoryExportTest": {
+        "emptyHistoryRoundTripsWithZeroHighWaterAndNoInventedEntries",
+        "statusOnlyRoundTripPreservesFieldKnowledgeSlotsAndIndependentFlags",
+        "measuredRoundTripKeepsExactDecimalScaleFractionalResetAndClock",
+        "gapsAndMultipleSegmentsRoundTripWithEvictedOriginsAndContinuationTail",
+        "checkedInV1FixtureDecodesToExpectedEntriesAndContinuation",
+        "unknownFieldsAtEveryObjectLevelAreIgnoredAndDestinationPartitionIsExplicit",
+        "newerVersionAndMalformedKnownFieldsAreRejectedWithoutStorageWrites",
+        "explicitOutputAllowlistNeverIncludesSecretsAccountPlanOrLocalPartition",
+        "integerMembersRejectMalformedExponentAndNonIntegerTokens",
+        "integerMembersRejectExponentNotationIncludingPrecisionLoss",
+        "integerMembersRejectQuotedIntegers",
+        "integerMembersPreserveExactLongsAndRejectOverflow",
+        "enumMembersRequireQuotedStringsIncludingNullableFieldsAndBreakArrays",
+    },
+    "io.github.leugenea.codexbarmobile.HistoryExportRequestTest": {
+        "startCancellationBeforeFirstDispatchReleasesBusyAndAllowsRetry",
+        "resultCancellationBeforeFirstDispatchClearsConsumedSnapshotAndAllowsRetry",
+        "pendingPickerSurvivesScopeCancellationAndDuplicateStartUntilNewScopeResult",
+        "alreadyCancelledScopeCannotPrepareOrStrandConsumedResult",
+        "preparationAndPickerFailuresReleaseBusyWithoutRetainingSnapshot",
+    },
+}
+HISTORY_EXPORT_NATIVE = {
+    "io.github.leugenea.codexbarmobile.HistoryExportLifecycleTest": {
+        "localHistoryExportLaunchesJsonSafAndWritesCoherentPagedHistoryOffMain",
+    },
+}
+HISTORY_EXPORT_NATIVE_COUNT = sum(map(len, HISTORY_EXPORT_NATIVE.values()))
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -361,7 +392,8 @@ def verify_reports(directory: Path, kind: str) -> dict:
         raise ValueError(f"Missing real {kind} launch/refresh tests: {sorted(missing)}")
     current_history = CURRENT_HISTORY_JVM if kind == "jvm" else CURRENT_HISTORY_NATIVE
     dashboard = DASHBOARD_JVM if kind == "jvm" else DASHBOARD_NATIVE
-    for classname, required in (current_history | dashboard).items():
+    export = HISTORY_EXPORT_JVM if kind == "jvm" else HISTORY_EXPORT_NATIVE
+    for classname, required in (current_history | dashboard | export).items():
         for name in required:
             matches = [case for case in cases if case["class"] == classname and case["name"] == name]
             if len(matches) != 1:
