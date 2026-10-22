@@ -2,6 +2,7 @@
 from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DASHBOARD_NATIVE,
                                              EXPECTED_CURRENT_READ_JVM, SCANNER_CLASS)
 from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT
+from verify_test_reports import HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE
 import hashlib
 import json
 import os
@@ -835,6 +836,7 @@ class SyntheticReportTests(unittest.TestCase):
                 for name in sorted(names - ({missing} if missing else set())):
                     ET.SubElement(suite, "testcase", classname=classname, name=name)
         current = (CURRENT_HISTORY_JVM | {SCANNER_CLASS: EXPECTED_CURRENT_READ_JVM} | EXPECTED_DASHBOARD_JVM) if kind == "jvm" else (CURRENT_HISTORY_NATIVE | EXPECTED_DASHBOARD_NATIVE)
+        current |= HISTORY_EXPORT_JVM if kind == "jvm" else HISTORY_EXPORT_NATIVE
         for classname, names in current.items():
             for name in sorted(names):
                 if name != missing:
@@ -856,7 +858,7 @@ class SyntheticReportTests(unittest.TestCase):
                 with self.subTest(kind=kind, container_depth=depth):
                     self.write_report(kind, container_depth=depth)
                     result = verify_reports(self.directory, kind)
-                    self.assertEqual(result["testCount"], 148 if kind == "native" else 49)
+                    self.assertEqual(result["testCount"], 149 if kind == "native" else 57)
 
     def test_rejects_missing_tests(self):
         for kind in EXPECTED:

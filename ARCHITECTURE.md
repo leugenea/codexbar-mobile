@@ -228,6 +228,14 @@ process-kill/relaunch are separate evidence boundaries, not established by parse
 tests. A10 live refresh/rotation/logout still needs an exact-candidate owner check;
 A8 sign-in alone does not close parent #4.
 
+## History JSON export
+
+The local-history detail route exports all retained entries plus coherent continuation
+state through SAF, off Main, without credentials/account metadata or the local
+partition UUID. The versioned production encoder/decoder, privacy boundary and
+forward-compatibility contract are documented in [history export v1](docs/history-export.md).
+Import is a separate feature; decoding does not write storage.
+
 ## Pure usage-history contract (M4a-1)
 
 `history/WindowHistory` consumes A1's normalized `UsageObservation` and field knowledge;

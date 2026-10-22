@@ -23,6 +23,8 @@ internal sealed interface HistoryPartitionOutcome {
 /** Revocable port, not a partition-only authority. */
 interface HistoryRuntimeAccess : HistoryStore {
     val partition: HistoryPartition
+    /** Blocking, coherent paged export; null means unavailable, never an invented empty history. */
+    fun exportHistory(appVersion: String, exportedAt: java.time.Instant): String? = null
     fun revoke()
 }
 
