@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792649435480,
+  "lastUpdate": 1792655833650,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2267,6 +2267,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/d3b791faac063bc500e26814c002498a2b320ff9"
         },
         "date": 1792649432499,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "78ab54b1efea1e00d8706c1ff8d0d24711192dc6",
+          "message": "feat(release): publish change notes on Release pages (#166)\n\n* feat(release): publish change notes above the integrity marker (#164)\n\n* fix(release): keep release notes out of runner stdout (#164)",
+          "timestamp": "2026-10-22T10:56:47+03:00",
+          "tree_id": "c2dc7f93aa1403e3042b3034e06e2b666132af2f",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/78ab54b1efea1e00d8706c1ff8d0d24711192dc6"
+        },
+        "date": 1792655832903,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
