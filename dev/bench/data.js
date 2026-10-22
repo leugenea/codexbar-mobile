@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792649433039,
+  "lastUpdate": 1792649435480,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -4513,6 +4513,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/d9b7298e5e68fb599f8d2e3f83ac9f2ed3c65cbb"
         },
         "date": 1792609989747,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0.13164193393968407,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 1,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d3b791faac063bc500e26814c002498a2b320ff9",
+          "message": "docs: add installation and known limitations; start 0.2.0 (#165)",
+          "timestamp": "2026-10-22T09:10:06+03:00",
+          "tree_id": "54e94ef0213e914b6c64eda5a6915a9395dbe7ec",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/d3b791faac063bc500e26814c002498a2b320ff9"
+        },
+        "date": 1792649435110,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
