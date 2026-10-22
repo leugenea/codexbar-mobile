@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792655837038,
+  "lastUpdate": 1792701708231,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2301,6 +2301,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/78ab54b1efea1e00d8706c1ff8d0d24711192dc6"
         },
         "date": 1792655832903,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b7db13794a5db2eafd81835ccee9f31be0cf4ace",
+          "message": "feat(history): JSON export format v1 and export to file (#169)\n\n* feat(history): JSON export format v1 and export to file (#167)\n\n* fix(history): keep export action below existing history controls (#167)\n\n* test(history): account for the refresh on activity recreation in export test (#167)\n\n* docs(history): drop hand-written export JSON Schema; prose + v1 fixture define the format (#167)\n\n* fix(history): cancellation-safe export request; strict integers and enums in export reader (#167)",
+          "timestamp": "2026-10-22T23:41:17+03:00",
+          "tree_id": "c1052317a4cb83bef9153249dd0de0d3a27635b3",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/b7db13794a5db2eafd81835ccee9f31be0cf4ace"
+        },
+        "date": 1792701707297,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
