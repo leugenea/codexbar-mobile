@@ -21,11 +21,20 @@ class GuardedReleaseWorkflowTests(unittest.TestCase):
         self.assertEqual(self.workflow['on']['workflow_dispatch']['inputs']['operation']['options'], ['prepare', 'publish'])
         self.assertEqual(self.workflow['env']['RELEASE_CONFIG'], '${{ vars.RELEASE_CONFIG }}')
         self.assertEqual(set(self.workflow['on']['workflow_dispatch']['inputs']),
-                         {'operation', 'channel', 'tag', 'prepare_run_id'})
+                         {'operation', 'channel', 'tag', 'prepare_run_id', 'notes'})
         self.assertEqual(self.workflow['run-name'], '${{ inputs.operation }} ${{ inputs.channel }} ${{ inputs.tag }}')
         self.assertNotIn('secrets.', str(self.workflow['jobs']['publish']))
         for name in ('admit', 'unsigned', 'sign'):
             self.assertEqual(self.workflow['jobs'][name]['permissions'], {'contents': 'read', 'actions': 'read'})
+
+    def test_notes_are_optional_text_passed_only_through_environment(self):
+        notes = self.workflow['on']['workflow_dispatch']['inputs']['notes']
+        self.assertEqual(notes['type'], 'string')
+        self.assertIs(notes['required'], False)
+        self.assertEqual(self.workflow['env']['REQUEST_NOTES'], '${{ inputs.notes }}')
+        for job in self.workflow['jobs'].values():
+            for step in job['steps']:
+                self.assertNotIn('inputs.notes', step.get('run', ''))
 
     def test_different_filename_never_inherits_writer_exception(self):
         with self.assertRaises(ValueError):

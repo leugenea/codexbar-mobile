@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import urllib.parse
 
-from release_publication import identifier, marker, read_assets, release_binding, require
+from release_publication import history_body, identifier, notes_text, read_assets, release_binding, release_body, require
 from release_runtime import fingerprint, load, members
 from release_signing import _unique, verify_assets
 from version_identity import MAX_CODE, official_inputs, parse_tag, target_version
@@ -96,6 +96,10 @@ def admit(api, config, context):
             and context['workflowSha'] == context['sha']
             and context['workflowRef'] == api.repository + '/' + WORKFLOW + '@refs/heads/main',
             'Untrusted event/controller')
+    notes = notes_text(context.get('notes', ''))
+    require(context['operation'] == 'publish' or not notes, 'Release notes are only valid for publish')
+    require(context['operation'] != 'publish' or context['channel'] != 'stable' or notes,
+            'Stable publication requires release notes')
     repository = api.get('')
     require(repository['id'] == context['repositoryId'] and repository['full_name'] == api.repository
             and repository['default_branch'] == 'main' and repository['fork'] is False, 'Repository identity differs')
@@ -228,7 +232,10 @@ def history(api, record, expected, sdk, reports):
         accepted_runs.add(authority['runId'])
         official_inputs(identity['target'], identity['channel'], {'RELEASE_TAG': tag,
                         'RELEASE_VERSION_CODE': str(identity['versionCode']), 'RELEASE_PREVIOUS_VERSION_CODE': '0'})
-        release_binding(release, identity, marker(assets))
+        body = history_body(release['body'], assets)
+        if record['operation'] == 'publish' and tag == expected['tag']:
+            body = release_body(assets, record.get('notes', ''))
+        release_binding(release, identity, body)
         if tag == expected['tag']:
             require(identity == expected and authority['runId'] == (record.get('prepareRunId') or record['runId']),
                     'Tag already belongs to a different allocation')
