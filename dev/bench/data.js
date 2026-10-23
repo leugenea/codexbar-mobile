@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792730683468,
+  "lastUpdate": 1792730685563,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -4722,6 +4722,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Duplication",
             "value": 0.12578616352201258,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 1,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "849f23aac2aaff395037b71d74c2eb77442fbd19",
+          "message": "feat(history): import a JSON export, replacing local history (#170)",
+          "timestamp": "2026-10-23T07:44:13+03:00",
+          "tree_id": "a118c12bfd3642fa6ce745649ef260e00b6a24a0",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/849f23aac2aaff395037b71d74c2eb77442fbd19"
+        },
+        "date": 1792730685311,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0.12029746281714784,
             "unit": "%"
           },
           {
