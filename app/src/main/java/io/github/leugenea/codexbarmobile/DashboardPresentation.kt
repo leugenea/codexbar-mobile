@@ -2,6 +2,12 @@ package io.github.leugenea.codexbarmobile
 
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.usage.Knowledge
+import java.math.BigDecimal
+import java.math.RoundingMode
+import java.text.DecimalFormatSymbols
+import java.util.Locale
+
+internal data class PresentedPace(val resource: Int, val amount: String? = null)
 
 /** Compact labels/selectors only; existing usage, C1, B1 and graph projections own all facts. */
 internal object DashboardPresentation {
@@ -32,7 +38,16 @@ internal object DashboardPresentation {
         else -> null
     }
 
-    fun incomplete(source: HistoryGraphSnapshot) = source.hasMore || source.truncation.isNotEmpty() || source.lostSamples > 0
+    /** Display only: HALF_UP rounds ties away from zero to 0.1 percentage points.
+     * Thus -0.05 and +0.05 show reserve/over pace; magnitudes below 0.05 are on pace.
+     * The original observed comparison and provider measurement remain exact.
+     */
+    fun pace(delta: BigDecimal, locale: Locale): PresentedPace {
+        val rounded = delta.setScale(1, RoundingMode.HALF_UP)
+        if (rounded.signum() == 0) return PresentedPace(R.string.dashboard_on_pace)
+        val amount = rounded.abs().toPlainString().replace('.', DecimalFormatSymbols.getInstance(locale).decimalSeparator)
+        return PresentedPace(if (rounded.signum() > 0) R.string.dashboard_over_pace else R.string.dashboard_reserve, amount)
+    }
 
     fun status(status: UsageScreenStatus): Int = when (status) {
         UsageScreenStatus.DISCONNECTED -> R.string.dashboard_disconnected

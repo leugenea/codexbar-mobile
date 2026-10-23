@@ -311,6 +311,13 @@ DASHBOARD_JVM = {
         'compactChartEquivalentUsesOriginalExactFactsAndIndependentReferences',
         'compactMissingChartAndPhaseActionsKeepTypedErrorsAndSinglePointTruth',
         'reportedInventoryCountNeverFallsBackToSummaryRowsOrZero',
+        'paceLineUsesOverReserveAndOnPaceWithoutChangingExactComparison',
+        'paceLineHalfTenthBoundariesRoundAwayFromZero',
+        'paceLineNearZeroAndAdjacentBoundaryValuesNeverShowSignedZero',
+        'paceLineKeepsOneDecimalAndLocaleSeparator',
+        'chartTimeLabelsUseYearlessLocalePatternsAndContainingHour',
+        'chartTimeLabelsRetainFullAndPartialRepeatedHourOffsets',
+        'chartTimeLabelsKeepUnrepresentableInstantsUnknown',
     },
     'io.github.leugenea.codexbarmobile.history.HistoryDisplayAuthorityTest': {
         'currentNullDiagnosticSelectionCannotReplaySuccessorOrRetiredLoss',
@@ -329,6 +336,7 @@ DASHBOARD_NATIVE = {
     'io.github.leugenea.codexbarmobile.DashboardCopyAndTimeTest': {
         'dashboardAndDisclosureFollowPhoneZoneLocaleAndTicksWithoutRequests',
         'minutePrecisionMatchesDashboardWindowDetailsAndBankedExpiry',
+        'simplifiedWindowsKeepOneTopObservationYearlessAxisAndReadablePace',
         'noReachableTextOrSemanticsUsesRemovedTimePhraseWhileOriginalInstantsRemainExact',
     },
     'io.github.leugenea.codexbarmobile.DashboardHistoryIsolationTest': {

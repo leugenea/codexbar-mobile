@@ -69,7 +69,7 @@ class DashboardCopyAndTimeTest {
                 await("minute-precision usage and inventory settled") {
                     owner.state.value.refresh.inventory.attempt !== previous && !owner.state.value.refresh.refreshing
                 }
-                compose.onNodeWithTag("live-five-hour-reset-relative").performScrollTo().assertTextEquals("Reset: $duration remaining")
+                compose.onNodeWithTag("live-five-hour-reset-relative").performScrollTo().assertTextEquals("Next reset in $duration")
                 compose.onNodeWithTag("banked-disclosure-toggle").performScrollTo().performClick()
                 compose.onNodeWithTag("banked-disclosure-remaining-0", useUnmergedTree = true).performScrollTo()
                     .assertTextEquals("$duration remaining")
@@ -79,6 +79,48 @@ class DashboardCopyAndTimeTest {
                 compose.onNodeWithTag("banked-item-0-relative", useUnmergedTree = true).performScrollTo()
                     .assertTextEquals("Banked entitlement expiry: $duration remaining")
                 returnDashboard(compose, owner)
+            }
+        }
+    }
+
+    @Test fun simplifiedWindowsKeepOneTopObservationYearlessAxisAndReadablePace() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            awaitConnectionScreen(compose, owner)
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
+            compose.onNodeWithTag("connect").performScrollTo().performClick()
+            returnDashboard(compose, owner)
+            await("initial current measurements settled") { recordedHistory(owner).points.size == 1 && !owner.state.value.refresh.refreshing }
+            val measured = "Measurement observed at (second precision): Jan 15, 2027, 8:00:00\u202fAM"
+            compose.onNodeWithTag("dashboard-status").assertTextEquals("Last reported usage")
+            compose.onAllNodesWithText(measured, useUnmergedTree = true).assertCountEquals(1)
+            compose.onNodeWithTag("dashboard-observed-at").performScrollTo().assertTextEquals(measured)
+            val cards = hasAnyAncestor(hasTestTag("dashboard-FIVE_HOUR")) or hasAnyAncestor(hasTestTag("dashboard-WEEKLY"))
+            compose.onAllNodes(cards and hasText("Measurement observed at", substring = true), useUnmergedTree = true).assertCountEquals(0)
+            for (removed in listOf("Measured used percent", "Observed-only delta", "Recorded observation", "Recorded history is incomplete")) {
+                compose.onAllNodes(hasText(removed, substring = true), useUnmergedTree = true).assertCountEquals(0)
+            }
+            compose.onNodeWithTag("live-five-hour-reset-absolute").assertDoesNotExist()
+            compose.onNodeWithTag("live-five-hour-reset-relative").assertTextEquals("Next reset in 1 hour")
+            val first = compose.onNodeWithTag("history-chart-five-hour-first").performScrollTo()
+                .assertTextEquals("Time axis start: Jan 15, 04:00").fetchSemanticsNode().boundsInRoot
+            val last = compose.onNodeWithTag("history-chart-five-hour-last")
+                .assertTextEquals("Time axis end: Jan 15, 09:00").fetchSemanticsNode().boundsInRoot
+            assertTrue("Start is left of end", first.right <= last.left)
+            assertEquals("Time labels share one row", first.top, last.top, 0f)
+            assertTrue("Time labels are below the chart", compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true)
+                .fetchSemanticsNode().boundsInRoot.bottom <= first.top)
+            val pace = compose.onNodeWithTag("history-chart-five-hour-pace")
+            pace.performScrollTo().assertTextEquals("67.6% in reserve")
+            for ((percent, label) in listOf("80.0056" to "On pace", "90" to "Over pace by 10.0%", "1" to "Baseline and delta unavailable: uncertain correction")) {
+                val previous = owner.state.value.refresh.usage.attempt
+                fixture.transport.advance(1000)
+                fixture.transport.usageBody = NavigationTransport.USAGE.replace("12.375", percent)
+                owner.readUsage()
+                await("$label admitted and current chart delivered") {
+                    owner.state.value.refresh.usage.attempt !== previous && !owner.state.value.refresh.refreshing &&
+                        compose.onAllNodes(hasTestTag("history-chart-five-hour-pace") and hasText(label)).fetchSemanticsNodes().size == 1
+                }
+                pace.performScrollTo().assertTextEquals(label)
             }
         }
     }

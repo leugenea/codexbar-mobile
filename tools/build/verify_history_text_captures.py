@@ -111,11 +111,11 @@ DASHBOARD_CAPTURES = {
 }
 
 DASHBOARD_LAYOUTS = {
-    "dashboard-main-portrait-light": ("history-chart-five-hour-equivalent", ["connection-screen", "dashboard"]),
-    "dashboard-weekly-portrait-light": ("history-chart-weekly-equivalent", ["connection-screen", "dashboard"]),
+    "dashboard-main-portrait-light": ("history-chart-five-hour-pace", ["connection-screen", "dashboard"]),
+    "dashboard-weekly-portrait-light": ("history-chart-weekly-pace", ["connection-screen", "dashboard"]),
     "dashboard-banked-expanded-portrait-light": ("banked-disclosure-status", ["connection-screen", "dashboard"]),
     "dashboard-drawer-portrait-dark": ("drawer-LOCAL_HISTORY_DETAILS", ["connection-screen", "dashboard", "details-drawer"]),
-    "dashboard-main-landscape-dark-large-font": ("history-chart-five-hour-equivalent", ["connection-screen", "dashboard"]),
+    "dashboard-main-landscape-dark-large-font": ("history-chart-five-hour-pace", ["connection-screen", "dashboard"]),
     "dashboard-connection-details-landscape-dark": ("banked-container", ["connection-screen", "connection-details"]),
     "dashboard-local-history-details-large-font": ("history-page-cursor", ["connection-screen", "connection-history"]),
 }
@@ -435,7 +435,7 @@ def verify_assembled_metadata(metadata: dict, name: str, size: tuple[int, int], 
         if metadata.get("uiCursor") != f"Exclusive admission cursor: {after} · Page limit: 32" or metadata.get("layoutLabel") != "history-page-cursor":
             raise ValueError("Assembled visible UI cursor changed")
     else:
-        expected_label = "dashboard-no-info-FIVE_HOUR" if name == "history-assembled-fresh-portrait-light" else "history-chart-five-hour-equivalent"
+        expected_label = "dashboard-no-info-FIVE_HOUR" if name == "history-assembled-fresh-portrait-light" else "history-chart-five-hour-pace"
         if "uiCursor" in metadata or metadata.get("layoutLabel") != expected_label:
             raise ValueError("Dashboard must use its real compact label, not a hidden cursor")
     if name in ASSEMBLED_COUNTS:

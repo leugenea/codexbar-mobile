@@ -362,9 +362,10 @@
     <string name="dashboard_no_history_unsupported">No current information · latest usage unsupported.</string>
     <string name="dashboard_window_malformed">Some latest usage fields are malformed.</string>
     <string name="dashboard_window_unsupported">Latest usage percentage unsupported.</string>
-    <string name="dashboard_single_observation">One recorded observation · no observed trend</string>
-    <string name="dashboard_recorded_observations">Recorded observations · gaps are not connected</string>
-    <string name="dashboard_history_incomplete">Recorded history is incomplete. More information is in details.</string>
+    <string name="dashboard_next_reset">Next reset in %1$s</string>
+    <string name="dashboard_over_pace">Over pace by %1$s%%</string>
+    <string name="dashboard_reserve">%1$s%% in reserve</string>
+    <string name="dashboard_on_pace">On pace</string>
     <string name="dashboard_history_warning">History could not be fully updated.</string>
     <string name="dashboard_geometry_warning">Some recorded values cannot be drawn. Exact values remain in details.</string>
     <string name="dashboard_banked_count">Banked resets (%1$d)</string>

@@ -33,8 +33,8 @@ class DashboardUiTest {
             compose.onNodeWithTag("history-select-FIVE_HOUR").assertDoesNotExist()
             compose.onNodeWithTag("history-page-cursor").assertDoesNotExist()
             val before = fixture.transport.counts()
-            capture.capture("dashboard-main-portrait-light", scenario, fixture, "history-chart-five-hour-equivalent", WindowKind.FIVE_HOUR)
-            capture.capture("dashboard-weekly-portrait-light", scenario, fixture, "history-chart-weekly-equivalent", WindowKind.WEEKLY)
+            capture.capture("dashboard-main-portrait-light", scenario, fixture, "history-chart-five-hour-pace", WindowKind.FIVE_HOUR)
+            capture.capture("dashboard-weekly-portrait-light", scenario, fixture, "history-chart-weekly-pace", WindowKind.WEEKLY)
             val weekly = compose.onNodeWithTag("history-chart-weekly-canvas", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
             compose.onNodeWithTag("banked-disclosure-toggle").performScrollTo().assertIsDisplayed()
             assertTrue(weekly.height > 0)
@@ -63,7 +63,7 @@ class DashboardUiTest {
             assertCurrentDrawing(recordedHistory(owner), 0, 0, 0)
             fixture.transport.advance(1000); owner.readUsage()
             await("first actual successful measurement after durable loss gap") { recordedHistory(owner).points.map { it.observation.ordinal } == listOf(2L) && !owner.state.value.refresh.refreshing }
-            compose.onNodeWithTag("history-chart-five-hour-equivalent").assertTextEquals("One recorded observation · no observed trend")
+            compose.onNodeWithTag("history-chart-five-hour-pace").assertTextEquals("67.6% in reserve")
             assertCurrentDrawing(recordedHistory(owner), 1, 0, 1)
             openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
             await("actual initial gap and subsequent measurement retained in Page") {
@@ -147,10 +147,11 @@ class DashboardUiTest {
             assertEquals(java.time.Instant.ofEpochSecond(1_800_003_600, 250000000), source.reset.facts!!.relativeDerived.value)
             assertEquals(source.point.segment.window, owner.currentHistoryDisplayContext()!!.periods.fiveHour.window)
             assertCurrentDrawing(current, 1, 0, 1)
-            compose.onNodeWithTag("live-five-hour-reset-absolute").assertTextEquals("Reset: Jan 15, 2027, 09:00")
+            compose.onNodeWithTag("live-five-hour-reset-absolute").assertDoesNotExist()
+            compose.onNodeWithTag("live-five-hour-reset-relative").assertTextEquals("Next reset in 59 minutes")
             compose.onNodeWithTag("dashboard-no-info-FIVE_HOUR").assertDoesNotExist()
             compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertExists()
-            compose.onNodeWithTag("history-chart-five-hour-equivalent").assertTextEquals("One recorded observation · no observed trend")
+            compose.onNodeWithTag("history-chart-five-hour-pace").assertTextEquals("67.6% in reserve")
             fixture.transport.usageBody = """{"rate_limit":{"primary_window":{"limit_window_seconds":18000,"used_percent":12.375,"reset_at":1800003600,"reset_after_seconds":3659}}}"""
             fixture.transport.advance(1000); owner.readUsage()
             await("60.25-second reset discrepancy removes current five-hour identity and shows dashboard absence") {
@@ -181,11 +182,12 @@ class DashboardUiTest {
             }
             assertEquals(java.time.Instant.parse("2027-01-15T09:00:00Z"), owner.currentHistoryDisplayContext()!!.periods.fiveHour.window!!.resetAt)
             compose.onNodeWithTag("live-five-hour-percent").assertTextEquals("7.25% used")
-            compose.onNodeWithTag("live-five-hour-reset-absolute").assertTextEquals("Reset: Jan 15, 2027, 09:00")
+            compose.onNodeWithTag("live-five-hour-reset-absolute").assertDoesNotExist()
+            compose.onNodeWithTag("live-five-hour-reset-relative").assertTextEquals("Next reset in 59 minutes")
             compose.onNodeWithTag("dashboard-window-warning-FIVE_HOUR").assertTextEquals("Some latest usage fields are malformed.")
             compose.onNodeWithTag("dashboard-no-info-FIVE_HOUR").assertDoesNotExist()
             compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertExists()
-            compose.onNodeWithTag("history-chart-five-hour-equivalent").assertTextEquals("One recorded observation · no observed trend")
+            compose.onNodeWithTag("history-chart-five-hour-pace").assertTextEquals("72.8% in reserve")
         }
     }
 
@@ -250,14 +252,15 @@ class DashboardUiTest {
         settings.apply(true, 2f)
         launch(dark = true, font = 2f, landscape = true).use { scenario ->
             login()
-            listOf("history-chart-five-hour-title", "history-chart-weekly-title", "history-chart-five-hour-equivalent").forEach {
+            listOf("dashboard-observed-at", "live-five-hour-reset-relative", "history-chart-five-hour-title", "history-chart-weekly-title",
+                "history-chart-five-hour-first", "history-chart-five-hour-last", "history-chart-five-hour-pace").forEach {
                 HistoryAcceptanceCapture(compose).label(it)
             }
             listOf("open-drawer", "live-refresh", "banked-disclosure-toggle").forEach {
                 val node = compose.onNodeWithTag(it).performScrollTo().assertHasClickAction().fetchSemanticsNode()
                 assertTrue(node.size.height >= 48 * scenarioDensity(scenario))
             }
-            capture.capture("dashboard-main-landscape-dark-large-font", scenario, fixture, "history-chart-five-hour-equivalent", WindowKind.FIVE_HOUR)
+            capture.capture("dashboard-main-landscape-dark-large-font", scenario, fixture, "history-chart-five-hour-pace", WindowKind.FIVE_HOUR)
             openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
             HistoryAcceptanceCapture(compose).label("account-name")
             listOf("account-name-edit", "connect", "cancel-connect", "remove-account").forEach {

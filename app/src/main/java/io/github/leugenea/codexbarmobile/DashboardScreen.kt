@@ -22,8 +22,8 @@ internal fun DashboardScreen(state: ConnectionState, controller: ConnectionContr
     Column(Modifier.fillMaxWidth().testTag("dashboard"), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         DashboardStatus(state, usage)
         DashboardActions(state, usage, controller, openAccountSettings)
-        DashboardWindow(usage.windows[0], five, time, state.refresh.evaluatedAt)
-        DashboardWindow(usage.windows[1], weekly, time, state.refresh.evaluatedAt)
+        DashboardWindow(usage.windows[0], five, time)
+        DashboardWindow(usage.windows[1], weekly, time)
         BankedResetDisclosure(BankedResetPresentation.present(state, time.zone, time.locale), authority)
     }
 }
@@ -32,6 +32,8 @@ internal fun DashboardScreen(state: ConnectionState, controller: ConnectionContr
 private fun DashboardStatus(state: ConnectionState, model: PresentedUsage) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
         Text(stringResource(DashboardPresentation.status(model.status)), Modifier.testTag("dashboard-status"))
+        model.observedAt?.let { Text(stringResource(R.string.history_fact, stringResource(R.string.history_point_time), it),
+            Modifier.testTag("dashboard-observed-at")) }
         if (model.refreshing) Text(stringResource(R.string.dashboard_refreshing))
         model.errorResource?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
         DashboardPresentation.problem(state.problem)?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
@@ -48,7 +50,7 @@ private fun DashboardActions(state: ConnectionState, model: PresentedUsage, cont
 }
 
 @Composable
-private fun DashboardWindow(window: PresentedUsageWindow, display: HistoryGraphSnapshot, time: PhoneTimeConfiguration, now: java.time.Instant?) {
+private fun DashboardWindow(window: PresentedUsageWindow, display: HistoryGraphSnapshot, time: PhoneTimeConfiguration) {
     val plot = remember(display) { HistoryPlotInputs.project(display) }
     val series = if (window.tag == "live-five-hour") plot.fiveHour else plot.weekly
     Card(Modifier.fillMaxWidth().testTag("dashboard-${series.kind.name}")) {
@@ -61,7 +63,7 @@ private fun DashboardWindow(window: PresentedUsageWindow, display: HistoryGraphS
                 DashboardPresentation.windowWarning(window.status, window.malformed)?.let {
                     Text(stringResource(it), Modifier.testTag("dashboard-window-warning-${series.kind.name}"), color = MaterialTheme.colorScheme.error)
                 }
-                CompactHistoryChart(series, display, time, now)
+                CompactHistoryChart(series, display, time)
             } else Text(stringResource(DashboardPresentation.noInformation(display, window.status, window.malformed)), Modifier.testTag("dashboard-no-info-${series.kind.name}"))
         }
     }
@@ -70,8 +72,9 @@ private fun DashboardWindow(window: PresentedUsageWindow, display: HistoryGraphS
 @Composable
 private fun DashboardReset(time: PresentedTime?, tag: String) {
     val known = time ?: return
-    val absolute = known.absolute ?: return
-    Text(stringResource(R.string.live_reset_absolute, absoluteTimeLabel(absolute)), Modifier.testTag("$tag-reset-absolute"))
-    if (known.state != TimeState.UNKNOWN_CLOCK && known.snapshot != TimeSnapshot.CLOCK_BEFORE_OBSERVATION)
-        Text(stringResource(R.string.live_reset_relative, relativeLabel(known)), Modifier.testTag("$tag-reset-relative"))
+    if (known.absolute == null) return
+    if (known.state != TimeState.UNKNOWN_CLOCK && known.snapshot != TimeSnapshot.CLOCK_BEFORE_OBSERVATION) {
+        val label = known.remaining?.let { stringResource(R.string.dashboard_next_reset, remainingTimeLabel(it)) } ?: relativeLabel(known)
+        Text(label, Modifier.testTag("$tag-reset-relative"))
+    }
 }

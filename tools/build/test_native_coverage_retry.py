@@ -289,7 +289,7 @@ class RetryContracts(unittest.TestCase):
         self.assertEqual(HISTORY_CHART_CASES, RETAINED_CHART_CASES)
         path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
         cases = list(ET.parse(path).getroot().iter("testcase"))
-        self.assertEqual(len(cases), 152)
+        self.assertEqual(len(cases), 153)
         for classname, expected in ((HISTORY_TEXT_CLASS, RETAINED_TEXT_CASES),
                                     (HISTORY_CHART_CLASS, RETAINED_CHART_CASES)):
             self.assertEqual({case.get("name") for case in cases if case.get("classname") == classname}, expected)

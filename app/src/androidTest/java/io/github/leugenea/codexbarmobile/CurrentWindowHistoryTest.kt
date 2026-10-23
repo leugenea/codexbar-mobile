@@ -38,7 +38,7 @@ class CurrentWindowHistoryTest {
             page(listOf(301L, 302L, 304L, 305L, 306L))
             assertEquals(307L, recordedHistory(owner).storage!!.lastAdmitted!!.ordinal)
             assertCurrentDrawing(recordedHistory(owner), 5, 2, 2)
-            listOf("$five-title", "$five-legend", "$five-equivalent", "$five-first", "$five-last").forEach(capture::label)
+            listOf("$five-title", "$five-legend", "$five-pace", "$five-first", "$five-last").forEach(capture::label)
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
             capture.capture(if (dark) "history-current-dark-portrait" else "history-current-light-portrait", scenario, fixture, emptyList(), chart = true)
             openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)

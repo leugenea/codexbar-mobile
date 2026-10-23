@@ -108,7 +108,7 @@ class HistoryTextContracts(unittest.TestCase):
             if name in ASSEMBLED_CAPTURES:
                 if metadata["route"] == "DASHBOARD":
                     metadata.pop("uiCursor", None)
-                    metadata["layoutLabel"] = "dashboard-no-info-FIVE_HOUR" if name == "history-assembled-fresh-portrait-light" else "history-chart-five-hour-equivalent"
+                    metadata["layoutLabel"] = "dashboard-no-info-FIVE_HOUR" if name == "history-assembled-fresh-portrait-light" else "history-chart-five-hour-pace"
                 else:
                     metadata["layoutLabel"] = "history-page-cursor"
             image = self.png(*size)

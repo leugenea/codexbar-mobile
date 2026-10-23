@@ -33,6 +33,7 @@ class UsagePresentationTest {
             assertEquals(phase.name, status, model.status)
             val connected = phase in setOf(ConnectionPhase.READING, ConnectionPhase.OBSERVED, ConnectionPhase.RESTORED)
             assertEquals(connected, model.windows.first().percent != null)
+            assertEquals(if (connected) "Oct 8, 2026, 12:00:00 AM" else null, model.observedAt)
             assertEquals(connected && phase != ConnectionPhase.READING, model.refreshEnabled)
         }
     }
@@ -40,6 +41,7 @@ class UsagePresentationTest {
     @Test fun initialLoadingDormantAndUnavailableDoNotInventZeroUsage() {
         val dormant = present(ConnectionState(ConnectionPhase.RESTORED))
         assertEquals(UsageScreenStatus.UNAVAILABLE, dormant.status)
+        assertNull(dormant.observedAt)
         assertTrue(dormant.refreshEnabled)
         val loading = present(ConnectionState(ConnectionPhase.READING, refresh = UsageRefreshState(refreshing = true)))
         assertEquals(UsageScreenStatus.LOADING, loading.status)
@@ -60,6 +62,7 @@ class UsagePresentationTest {
         assertEquals(UsageWindowStatus.AVAILABLE, english.status)
         val german = UsagePresentation.present(ConnectionState(ConnectionPhase.OBSERVED, refresh = refresh(usage)), ZoneOffset.UTC, Locale.GERMANY)
         assertEquals("12,345678901234567890", german.windows.first().percent)
+        assertEquals("08.10.2026, 00:00:00", german.observedAt)
     }
 
     @Test fun extremeFractionExponentsStayExactWithoutPlainStringExpansionOrScaleOverflow() {
@@ -173,6 +176,7 @@ class UsagePresentationTest {
         assertFalse(model.refreshEnabled)
         assertEquals("12.5", model.windows.first().percent)
         assertEquals(TimeSnapshot.STALE, model.windows.first().reset!!.snapshot)
+        assertEquals("The retained measurement clock is not the failed attempt clock", "Oct 8, 2026, 12:00:00 AM", model.observedAt)
         val stale = present(ConnectionState(ConnectionPhase.OBSERVED, refresh = refresh(observation()).copy(usage = success.copy(stale = true))))
         assertEquals(UsageScreenStatus.STALE, stale.status)
     }

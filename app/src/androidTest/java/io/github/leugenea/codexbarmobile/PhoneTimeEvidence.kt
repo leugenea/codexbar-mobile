@@ -136,7 +136,8 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
 
     private fun labels(history: Boolean, dashboard: Boolean, observed: String, reset: String, resetSource: String, nominalStart: String) {
         if (dashboard) {
-            label("live-five-hour-reset-absolute", "Reset: $reset")
+            compose.onNodeWithTag("live-five-hour-reset-absolute").assertDoesNotExist()
+            label("dashboard-observed-at", "Measurement observed at (second precision): $observed")
             label("banked-disclosure-expiry-0", reset)
             compose.onNodeWithTag("banked-disclosure-remaining-0", useUnmergedTree = true).performScrollTo().assertExists()
         } else if (history) {
