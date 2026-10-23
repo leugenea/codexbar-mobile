@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792730685563,
+  "lastUpdate": 1792753942700,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2369,6 +2369,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/849f23aac2aaff395037b71d74c2eb77442fbd19"
         },
         "date": 1792730683059,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "882ea461238a4495059f315d027e1de9bf323fb6",
+          "message": "feat(ui): move account management into Account settings (#175)\n\n* feat(ui): move account management into Account settings (#171)\n\n* fix(ui): drop unused account strings; count Account settings route in connection diagnostics (#171)\n\n* test(ui): assert no resurrected name draft or removal dialog in reopened Account settings (#171)",
+          "timestamp": "2026-10-23T14:11:53+03:00",
+          "tree_id": "4e9c384225dfecadc77b07d30cdbd5b7cb9e3774",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/882ea461238a4495059f315d027e1de9bf323fb6"
+        },
+        "date": 1792753942104,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
