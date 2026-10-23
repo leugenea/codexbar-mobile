@@ -6,7 +6,6 @@
     <string name="gate_lifecycle">Device login must be enabled in security settings or by your workspace admin. The single bounded login continues while you use the system browser; Cancel stops it. Recreation keeps this in-memory attempt. Process death drops pending login: restart required. Restored credentials remain unresolved; no automatic reads or refresh.</string>
     <string name="gate_state">State: %1$s · problem: %2$s</string>
     <string name="gate_exchange_completed">Selected exchange: HTTP 200 · credentials persisted · identity unverified · token lifetime unknown</string>
-    <string name="gate_connect">Connect and read usage</string>
     <string name="gate_reauth">Sign in again</string>
     <string name="gate_read">Read usage with stored session</string>
     <string name="gate_refresh">Refresh session and read usage</string>
@@ -339,8 +338,6 @@
     <string name="dashboard_back">Back to dashboard</string>
     <string name="drawer_history">Full local history details</string>
     <string name="drawer_connection">Full live connection details</string>
-    <string name="dashboard_login">Login</string>
-    <string name="dashboard_reauthorize_action">Reauthorize</string>
     <string name="dashboard_disconnected">Sign in to see your usage</string>
     <string name="dashboard_loading">Connecting…</string>
     <string name="dashboard_unavailable">Usage information unavailable</string>

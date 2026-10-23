@@ -118,6 +118,7 @@ class DashboardUiTest {
                 compose.onNodeWithTag(tag).assertDoesNotExist()
             compose.onNodeWithTag("open-account-settings").performScrollTo().assertTextEquals("Account settings").performClick()
             compose.onNodeWithTag("account-settings").assertExists()
+            assertConnectionHasNoDiagnosticDump(compose)
             compose.onNodeWithTag("connect").performScrollTo().assertTextEquals("Add account").assertIsEnabled()
             compose.onNodeWithTag("account-name-edit").assertDoesNotExist()
             compose.onNodeWithTag("remove-account").performScrollTo().assertIsNotEnabled()
@@ -129,6 +130,7 @@ class DashboardUiTest {
                 compose.onNodeWithTag(tag).assertDoesNotExist()
             compose.onNodeWithTag("open-account-settings").performScrollTo().performClick()
             compose.onNodeWithTag("account-settings").assertExists()
+            assertConnectionHasNoDiagnosticDump(compose)
             assertEquals(0L, fixture.transport.requests.get())
         }
     }

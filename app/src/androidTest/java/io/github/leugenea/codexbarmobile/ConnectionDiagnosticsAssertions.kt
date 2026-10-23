@@ -12,7 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 /** Match the retired dump's formats, not facts legitimately owned by live/banked/history UI. */
 internal fun assertConnectionHasNoDiagnosticDump(compose: ComposeTestRule) {
     compose.onNodeWithTag("connection-screen").assertExists()
-    val routes = listOf("dashboard", "connection-history", "connection-details").filter {
+    val routes = listOf("dashboard", "connection-history", "connection-details", "account-settings").filter {
         compose.onAllNodes(hasTestTag(it), useUnmergedTree = true).fetchSemanticsNodes().size == 1
     }
     org.junit.Assert.assertEquals("Exactly one actual connection route is mounted", 1, routes.size)

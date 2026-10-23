@@ -9,6 +9,25 @@ MAIN = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
 
 
 class AccountSettingsContracts(unittest.TestCase):
+    def test_retired_inline_account_action_strings_are_removed(self):
+        retired = {"gate_connect", "dashboard_login", "dashboard_reauthorize_action"}
+        for path in (ROOT / "app/src/main/res").rglob("*.xml"):
+            names = {node.get("name") for node in ET.parse(path).getroot()}
+            with self.subTest(resource_file=path.relative_to(ROOT)):
+                self.assertFalse(names & retired)
+
+    def test_diagnostics_route_census_includes_account_settings(self):
+        native = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile"
+        diagnostics = (native / "ConnectionDiagnosticsAssertions.kt").read_text()
+        census = re.search(r"val routes = listOf\(([^)]+)\)\.filter", diagnostics)
+        self.assertIsNotNone(census)
+        self.assertEqual(re.findall(r'"([^"]+)"', census[1]),
+                         ["dashboard", "connection-history", "connection-details", "account-settings"])
+        self.assertIn('testTag("account-settings")', (MAIN / "AccountSettingsScreen.kt").read_text())
+        self.assertIn('org.junit.Assert.assertEquals("Exactly one actual connection route is mounted", 1, routes.size)',
+                      diagnostics)
+        self.assertIn('compose.onAllNodes(connection and dump, useUnmergedTree = true).assertCountEquals(0)', diagnostics)
+
     def test_account_management_has_only_the_settings_host(self):
         calls = {name: [] for name in ("AccountNameHeader", "AccountRemovalAction", "DeviceLoginCode")}
         tags = {name: [] for name in ("connect", "cancel-connect", "open-browser", "verification-url")}
