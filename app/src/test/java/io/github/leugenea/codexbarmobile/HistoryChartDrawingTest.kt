@@ -18,21 +18,25 @@ class HistoryChartDrawingTest {
         val result = append()
         val series = plot(listOf(result.entry)).fiveHour
         val drawing = historyChartDrawing(series)
-        assertEquals(listOf(series.samples.single().measured!!.position), drawing.markers)
+        assertEquals(listOf(series.samples.single().measured!!.position), drawing.observations)
         assertTrue(drawing.measured.isEmpty())
         assertEquals(listOf(HistoryChartLine(series.references.single().start as PlotPosition.Available,
             series.references.single().end as PlotPosition.Available)), drawing.nominal)
-        assertEquals(1, drawing.markers.size)
-        assertEquals(0.8, drawing.markers.single().x, 0.0)
+        assertEquals(drawing.observations, drawing.isolated)
+        assertNull(drawing.trend)
+        assertEquals(1, drawing.observations.size)
+        assertEquals(0.8, drawing.observations.single().x, 0.0)
     }
 
-    @Test fun straightEdgesFollowOnlyTheSuppliedRunAndKeepEveryMarker() {
+    @Test fun straightEdgesFollowOnlyTheSuppliedRunWithoutIsolatedTicks() {
         val first = append()
         val second = append(first.cursor, usage(observedAt = at.plusSeconds(60)), 61_000)
         val series = plot(listOf(first.entry, second.entry)).fiveHour
         val drawing = historyChartDrawing(series)
-        assertEquals(2, drawing.markers.size)
-        assertEquals(listOf(HistoryChartLine(drawing.markers[0], drawing.markers[1])), drawing.measured)
+        assertEquals(2, drawing.observations.size)
+        assertTrue(drawing.isolated.isEmpty())
+        assertNotNull(drawing.trend)
+        assertEquals(listOf(HistoryChartLine(drawing.observations[0], drawing.observations[1])), drawing.measured)
         assertEquals(1, drawing.nominal.size)
         assertEquals(at.plusSeconds(60), series.samples.last().measured!!.source.observedAt)
     }
@@ -49,8 +53,10 @@ class HistoryChartDrawingTest {
         for (entries in listOf(listOf(first.entry, gap.entry, afterGap.entry),
             listOf(first.entry, corrected.entry), listOf(first.entry, reset.entry), listOf(first.entry, hole.entry))) {
             val drawing = historyChartDrawing(plot(entries).fiveHour)
-            assertEquals(2, drawing.markers.size)
+            assertEquals(2, drawing.observations.size)
             assertTrue(drawing.measured.isEmpty())
+            assertEquals(drawing.observations, drawing.isolated)
+            assertNotNull(drawing.trend) // Analytical fit spans the window, never a measured bridge.
         }
     }
 
@@ -60,7 +66,7 @@ class HistoryChartDrawingTest {
         for (query in listOf(HistoryGraphQuery(after = ObservationId(1)), HistoryGraphQuery())) {
             val source = plot(listOf(second.entry), query)
             val drawing = historyChartDrawing(source.fiveHour)
-            assertEquals(1, drawing.markers.size)
+            assertEquals(1, drawing.observations.size)
             assertTrue(drawing.measured.isEmpty())
             assertEquals(ObservationId(1), source.fiveHour.segments.single().source.id.first)
         }
@@ -71,7 +77,7 @@ class HistoryChartDrawingTest {
         val first = append(usage = usage(window(absolute = Input.Missing)))
         val second = append(first.cursor, usage(window(absolute = Input.Missing), observedAt = at.plusSeconds(60)), 61_000)
         val drawing = historyChartDrawing(plot(listOf(first.entry, second.entry)).fiveHour)
-        assertEquals(2, drawing.markers.size)
+        assertEquals(2, drawing.observations.size)
         assertTrue(drawing.measured.isEmpty())
         assertTrue(drawing.nominal.isEmpty())
         for (source in listOf(plot(emptyList()), HistoryPlotInputs.project(HistoryGraphSnapshot(HistoryReadiness.LOADING)))) {
@@ -101,7 +107,7 @@ class HistoryChartDrawingTest {
         val series = HistoryPlotSeries(original.kind, original.content, original.measuredDomain, original.deltaDomain,
             emptyList(), listOf(HistoryPlotSegment(point.source.segment, listOf(one, two))), emptyList(), emptyList())
         val drawing = historyChartDrawing(series)
-        assertEquals(listOf(position, position), drawing.markers)
+        assertEquals(listOf(position, position), drawing.observations)
         assertEquals(1, drawing.measured.size)
         assertEquals("1E-10000", one.exactPercentText)
         assertEquals("2E-10000", two.exactPercentText)

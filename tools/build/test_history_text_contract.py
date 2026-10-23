@@ -82,8 +82,10 @@ class HistoryTextContracts(unittest.TestCase):
             metadata = dict(name=name, synthetic=True, api=36, orientation=orientation, dark=dark,
                             fontScale=font, density=1, renderedLocale="en-US", width=size[0], height=size[1])
             if name in CHART_COUNTS:
-                metadata.update(zip(("markerCount", "connectionCount", "referenceCount"), CHART_COUNTS[name]))
-                metadata.update(pixelOraclePassed=True, canvasLeft=0.1, canvasTop=0.1, canvasRight=1.9, canvasBottom=1.9)
+                metadata.update(zip(("observationCount", "connectionCount", "referenceCount"), CHART_COUNTS[name]))
+                metadata.update(pixelOraclePassed=True, canvasLeft=0.1, canvasTop=0.1, canvasRight=1.9, canvasBottom=1.9,
+                                trendCount=int(CHART_COUNTS[name][0] >= 2),
+                                trendPixelOraclePassed=name == "history-chart-measured-portrait-dark")
             if name in INTEGRATED_CAPTURES:
                 metadata.update(productionEntry=True, visibleRoots=["connection-screen"], activity="io.github.leugenea.codexbarmobile.MainActivity",
                                 phase="OBSERVED", queryKind="FIVE_HOUR", queryLimit=32, queryAfter=0,
@@ -92,6 +94,8 @@ class HistoryTextContracts(unittest.TestCase):
                                 canvasRight=1.9, canvasBottom=1.9,
                                 canvasClippedLeft=0.1, canvasClippedTop=0.1,
                                 canvasClippedRight=1.9, canvasClippedBottom=1.9)
+                if name == "history-integrated-chart-portrait-light":
+                    metadata.update(queryLimit=100000, lastOrdinal=35, pageEntries=35, hasMore=False)
             if name in ASSEMBLED_CAPTURES:
                 keys = ("phase", "readiness", "queryKind", "queryLimit", "queryAfter", "firstOrdinal", "lastOrdinal", "pageEntries", "requests", "gets")
                 metadata.update(zip(keys, ASSEMBLED_PAGES[name]))
@@ -99,7 +103,7 @@ class HistoryTextContracts(unittest.TestCase):
                                 visibleControls=ASSEMBLED_CONTROLS[name], layoutFontScale=font, layoutDensity=1,
                                 uiCursor=f"Exclusive admission cursor: {metadata['queryAfter']} · Page limit: 32")
                 if name in ASSEMBLED_COUNTS:
-                    metadata.update(zip(("markerCount", "connectionCount", "referenceCount", "boundaryCount"), ASSEMBLED_COUNTS[name]))
+                    metadata.update(zip(("observationCount", "connectionCount", "referenceCount", "boundaryCount"), ASSEMBLED_COUNTS[name]))
                     metadata.update(pixelOraclePassed=True, canvasLeft=0.1, canvasTop=0.1, canvasRight=1.9, canvasBottom=1.9,
                                     canvasClippedLeft=0.1, canvasClippedTop=0.1, canvasClippedRight=1.9, canvasClippedBottom=1.9)
                     metadata["pixelSamples"] = self.assembled_samples(ASSEMBLED_COUNTS[name])
@@ -141,7 +145,7 @@ class HistoryTextContracts(unittest.TestCase):
     @staticmethod
     def assembled_samples(counts):
         samples = []
-        for kind, count in zip(("marker", "edge", "dash", "break"), (counts[0], counts[1], counts[2] * 56, counts[3])):
+        for kind, count in zip(("observation", "edge", "dash", "break"), (counts[0], counts[1], counts[2] * 56, counts[3])):
             for index in range(count):
                 matched = kind != "break" and (kind != "dash" or index < 28)
                 samples.append(dict(kind=kind, x=1, y=1, targetArgb=-16777216 if matched else -1,

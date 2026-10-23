@@ -30,7 +30,7 @@ internal object CurrentHistoryRead {
         else -> CurrentHistoryReadOutcome.Ready(pages)
     }
 
-    /** Current cards also retain one latest entry, independently of their paginated chart page. */
+    /** Whole-window cards retain bounded selected entries and independent latest pace provenance. */
     private class Selection(val query: HistoryGraphQuery, val latest: Boolean = false) {
         val selected = ArrayList<HistoryEntry>(query.limit + 1)
         var highWater: ObservationId? = null

@@ -56,7 +56,7 @@ internal fun assertCurrentDrawing(source: HistoryGraphSnapshot, markers: Int, ed
     val plot = HistoryPlotInputs.project(source)
     val series = if (source.query.kind == WindowKind.WEEKLY) plot.weekly else plot.fiveHour
     val drawing = historyChartDrawing(series)
-    org.junit.Assert.assertEquals(markers, drawing.markers.size)
+    org.junit.Assert.assertEquals(markers, drawing.observations.size)
     org.junit.Assert.assertEquals(edges, drawing.measured.size)
     org.junit.Assert.assertEquals(references, drawing.nominal.size)
 }

@@ -100,7 +100,7 @@ class HistoryNavigationContracts(unittest.TestCase):
                 self.fixture.captures()
                 path = self.directory / (name + ".json")
                 data = json.loads(path.read_text())
-                data[key] = value
+                data[key] = not data["hasMore"] if key == "hasMore" else value
                 path.write_text(json.dumps(data))
                 with self.subTest(name=name, key=key), self.assertRaises(ValueError):
                     verify_captures(self.directory)

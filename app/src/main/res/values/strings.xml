@@ -309,8 +309,8 @@
     <string name="history_assumption">The nominal baseline assumes evenly distributed full quota from reset minus window duration to reset. It is analytical, not measured usage or a prediction of exhaustion.</string>
     <string name="history_sparse">Observations are sparse; gaps, reset changes and corrections are not joined.</string>
     <string name="history_chart_title">%1$s · observed usage chart</string>
-    <string name="history_chart_legend">● Measured observations · solid straight connections within each run only\nDashed line: nominal analytical full-quota reference, not a forecast</string>
-    <string name="history_chart_counts">Drawn markers: %1$d · Within-run connections: %2$d · Nominal reference lines: %3$d</string>
+    <string name="history_chart_legend">Solid line: measured observations within each run; isolated observation: short tick\nFaint short dashes: least-squares usage trend when available\nLong dashes: nominal analytical full-quota reference, not a forecast</string>
+    <string name="history_chart_counts">Measured observations: %1$d · Within-run connections: %2$d · Nominal reference lines: %3$d</string>
     <string name="history_chart_percent">%1$d%%</string>
     <string name="history_chart_time_first">Time axis start: %1$s</string>
     <string name="history_chart_time_last">Time axis end: %1$s</string>

@@ -14,7 +14,7 @@ internal data class HistoryGraphQuery(
     val window: WindowIdentity? = null,
     val currentOnly: Boolean = false,
 ) {
-    init { require(limit in 1..256) }
+    init { require(limit in 1..(if (currentOnly) HistoryLimits.MAX_OBSERVATIONS else 256)) }
     fun storage(partition: HistoryPartition) = HistoryReadQuery(partition, limit, after)
     fun selects(source: HistoryWindow): Boolean =
         (kind == null || source.kind == kind) && (window == null || matchesWindow(source, window))
@@ -95,7 +95,7 @@ internal class HistoryGraphSnapshot(
     val request: HistoryPresentationRequest = HistoryPresentationRequest.Page(query),
     val selection: HistoryDisplaySelection? = displayPermission?.context?.selection,
     val currentPages: CurrentHistoryPages? = null,
-    /** Latest selected admitted entry, separate from the chart's bounded first page. */
+    /** Latest selected admitted entry, independent of geometry/pace eligibility. */
     val latestCurrent: HistoryEntry? = null,
 ) {
     init { require(storage == null || currentPages == null) }

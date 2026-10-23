@@ -22,13 +22,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # Independent selected-family oracle, not names derived from generated XML.
 RETAINED_CHART_CASES = {
-    "singleMeasuredMarkerAndDashedNominalAreSeparateActualPixels",
+    "singleMeasuredTickAndDashedNominalAreSeparateActualPixels",
     "connectedMeasurementsDrawStraightEdgesAndPercentAxisInDarkPortrait",
     "gapsCorrectionsAndResetChangesHaveNoPaintedBridgeInLandscapeDark",
     "emptyStatusOnlyLoadingAndErrorsNeverInventACanvasOrZero",
     "typedUnavailableGeometryAndUnderflowKeepExactFactsInsteadOfClamping",
     "unknownBaselineLargeFontKeepsSinglePointCompleteLabelsAndReachableDetails",
-    "endpointMarkersAreFullyInsetAndVisibleInLandscapeLight",
+    "lineEndpointsAreInsetWithoutPointMarkersInLandscapeLight",
 }
 
 
@@ -80,8 +80,9 @@ class HistoryChartContracts(unittest.TestCase):
 
     def test_chart_capture_rejects_false_pixels_counts_nonfinite_or_outside_bounds(self):
         mutations = (("pixelOraclePassed", False), ("pixelOraclePassed", 1),
-                     ("markerCount", 99), ("markerCount", True), ("connectionCount", None),
-                     ("referenceCount", -1), ("canvasLeft", -0.1), ("canvasTop", -0.1),
+                     ("observationCount", 99), ("observationCount", True), ("connectionCount", None),
+                     ("referenceCount", -1), ("trendCount", -1), ("trendCount", True),
+                     ("trendPixelOraclePassed", None), ("canvasLeft", -0.1), ("canvasTop", -0.1),
                      ("canvasRight", 4), ("canvasBottom", 4), ("canvasTop", float("nan")),
                      ("canvasLeft", "0"), ("canvasBottom", None), ("canvasRight", 0.1))
         for name in CHART_CAPTURES:
@@ -108,10 +109,30 @@ class HistoryChartContracts(unittest.TestCase):
         self.assertIn("Time axis end: Oct 9, 01:00", native)
         self.assertNotIn("Time axis start: Oct 8, 2026", native)
 
+    def test_shared_chart_has_solid_runs_singleton_ticks_and_clipped_translucent_ols(self):
+        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
+        paint = (main / "HistoryChartComponent.kt").read_text()
+        drawing = (main / "HistoryChartDrawing.kt").read_text()
+        fit = (main / "HistoryTrend.kt").read_text()
+        request = (main / "history/HistoryPresentationRequest.kt").read_text()
+        self.assertNotIn("drawCircle", paint)
+        self.assertIn("drawing.measured.forEach", paint)
+        self.assertIn("drawing.isolated.forEach", paint)
+        self.assertIn("clipRect(inset, inset, size.width - inset, size.height - inset)", paint)
+        self.assertIn("measured.copy(alpha = 0.45f)", paint)
+        self.assertIn("PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))", paint)
+        self.assertIn("historyTrend(observations)", drawing)
+        self.assertIn("points.size < 2", fit)
+        self.assertIn("first == last", fit)
+        self.assertIn("covariance / variance", fit)
+        self.assertIn("val limit: Int = HistoryLimits.MAX_OBSERVATIONS", request)
+        resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
+        self.assertIn("least-squares usage trend when available", resources["history_chart_legend"] or "")
+
     def test_chart_counts_are_quantity_neutral_and_no_dependency_or_coverage_exemption_exists(self):
         resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
         self.assertEqual(resources["history_chart_counts"],
-                         "Drawn markers: %1$d · Within-run connections: %2$d · Nominal reference lines: %3$d")
+                         "Measured observations: %1$d · Within-run connections: %2$d · Nominal reference lines: %3$d")
         build = (ROOT / "app/build.gradle").read_text()
         self.assertIn("minimum = 0.90", build)
         self.assertNotRegex(build, r"exclude.*HistoryChart|chart.*[Dd]ependenc")

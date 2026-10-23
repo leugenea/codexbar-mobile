@@ -135,7 +135,7 @@ class DashboardHistoryIsolationTest {
         fixture.transport.advance(40_000)
         ActivityScenario.launch(MainActivity::class.java).use {
             awaitConnectionScreen(compose, owner)
-            await("bounded pair behind seeded rows") { recordedHistory(owner).storage?.entries?.size == 32 }
+            await("bounded pair behind seeded rows") { recordedHistory(owner).storage?.entries?.size == 40 }
             val context = owner.currentHistoryDisplayContext()!!
             val request = owner.historySnapshots.value.request as HistoryPresentationRequest.Current
             val token = owner.historySnapshots.value.selection
@@ -144,12 +144,19 @@ class DashboardHistoryIsolationTest {
             repeat(4) { owner.observeHistory(request, context) }
             fixture.settled("equal pair observations coalesce without scan")
             assertSame(token, owner.historySnapshots.value.selection); assertEquals(reads, fixture.reads.size)
-            assertTrue(recordedHistory(owner).hasMore)
-            assertEquals(32, recordedHistory(owner, WindowKind.WEEKLY).points.size)
-            assertTrue(recordedHistory(owner, WindowKind.WEEKLY).hasMore)
-            assertEquals((301L..332L).toList(), recordedHistory(owner).storage!!.entries.map { it.id.ordinal })
+            assertFalse(recordedHistory(owner).hasMore)
+            assertEquals(40, recordedHistory(owner, WindowKind.WEEKLY).points.size)
+            assertFalse(recordedHistory(owner, WindowKind.WEEKLY).hasMore)
+            assertEquals((301L..340L).toList(), recordedHistory(owner).storage!!.entries.map { it.id.ordinal })
             assertTrue(fixture.reads.all { it.query.limit <= 256 })
             assertEquals(340L, recordedHistory(owner).storage!!.lastAdmitted!!.ordinal)
+            val complete = recordedHistory(owner)
+            val series = HistoryPlotInputs.project(complete).fiveHour
+            assertEquals(complete.points.last().observedAt, series.measuredDomain!!.time.last)
+            assertEquals(1.0, historyChartDrawing(series).observations.last().x, 0.0)
+            compose.onNodeWithTag("history-chart-five-hour-last").performScrollTo().assertTextEquals(
+                "Time axis end: " + TimePresentation.chartTime(complete.points.last().observedAt,
+                    java.time.ZoneOffset.UTC, java.util.Locale.US, "MMM d, HH:mm"))
             assertEquals(requests, fixture.transport.counts())
         }
     }

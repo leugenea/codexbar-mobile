@@ -52,7 +52,7 @@ class DashboardPresentationTest {
         val series = HistoryPlotInputs.project(source).fiveHour
         val drawing = historyChartDrawing(series)
         assertTrue(DashboardPresentation.hasChart(series))
-        assertEquals(1, drawing.markers.size); assertTrue(drawing.measured.isEmpty()); assertEquals(1, drawing.nominal.size)
+        assertEquals(1, drawing.observations.size); assertTrue(drawing.measured.isEmpty()); assertEquals(1, drawing.nominal.size)
         val detail = HistoryTextPresentation.detail(source.entries.single(), SyntheticHistory.at, java.time.ZoneOffset.UTC, java.util.Locale.US)
         assertEquals("12.375", detail.windows.single().facts.single { it.label == R.string.history_measured }.value)
         assertEquals("-67.625", detail.windows.single().facts.single { it.label == R.string.history_delta }.value)
@@ -79,9 +79,9 @@ class DashboardPresentationTest {
         assertSame(observations.last(), accepted.observation)
         assertEquals("50", accepted.windows.first().percent)
         assertEquals(TimePresentation.timestamp(observations.last().observedAt, ZoneOffset.UTC, Locale.US), accepted.observedAt)
-        assertEquals((1L..32L).toList(), display.entries.map { it.source.id.ordinal })
-        assertTrue(display.hasMore)
-        assertEquals(start.plusSeconds(31 * 60L), display.points.last().observedAt)
+        assertEquals((1L..33L).toList(), display.entries.map { it.source.id.ordinal })
+        assertFalse(display.hasMore)
+        assertEquals(observations.last().observedAt, display.points.last().observedAt)
         assertEquals(ObservationId(33), display.latestCurrent!!.id)
         val comparison = DashboardPresentation.paceComparison(display, accepted.observation, WindowKind.FIVE_HOUR) as UsedComparison.Available
         assertEquals(observations.last().observedAt, comparison.point.observedAt)
@@ -105,7 +105,7 @@ class DashboardPresentationTest {
             assertEquals(observations[317].observedAt, old.latestCurrent.observedAt)
             assertEquals(ObservationId(320), fresh.latestCurrent!!.id)
             assertEquals(observations.last().observedAt, fresh.latestCurrent.observedAt)
-            assertEquals(32, old.entries.size); assertEquals(32, fresh.entries.size)
+            assertEquals(318, old.entries.size); assertEquals(320, fresh.entries.size)
             val previous = DashboardPresentation.paceComparison(old, observations[317], aging) as UsedComparison.Available
             assertEquals(observations[317].observedAt, previous.point.observedAt)
             assertNull(DashboardPresentation.paceComparison(old, observations.last(), aging))
@@ -176,6 +176,34 @@ class DashboardPresentationTest {
     @Test fun chartTimeLabelsKeepUnrepresentableInstantsUnknown() {
         assertNull(TimePresentation.chartTime(Instant.MAX, ZoneOffset.UTC, Locale.US, "MMM d, HH:mm"))
         assertNull(TimePresentation.chartTime(Instant.MIN, ZoneId.of("America/Los_Angeles"), Locale.US, "MMM d, HH:mm"))
+    }
+
+    @Test fun compactWholeWindowLastPointEndLabelAndTrendReachLatestObservationBeyond32() {
+        val start = Instant.parse("2027-01-15T01:00:00Z")
+        val reset = Instant.parse("2027-01-15T05:00:00Z")
+        val observations = List(320) { index ->
+            SyntheticHistory.usage(SyntheticHistory.window(percent = Input.Value(BigDecimal(index).divide(BigDecimal(4))),
+                absolute = Input.Value(reset.epochSecond)), observedAt = start.plusSeconds(index * 30L))
+        }
+        val display = currentDisplays(observations).first
+        val series = HistoryPlotInputs.project(display).fiveHour
+        val last = observations.last().observedAt!!
+        assertEquals(320, series.samples.size)
+        assertEquals(last, series.samples.last().measured!!.source.observedAt)
+        assertEquals(start, series.measuredDomain!!.time.first)
+        assertEquals(last, series.measuredDomain.time.last)
+        assertEquals("Jan 15, 03:00", TimePresentation.chartTime(series.measuredDomain.time.last, ZoneOffset.UTC, Locale.US, "MMM d, HH:mm"))
+        val drawing = historyChartDrawing(series)
+        assertEquals(319, drawing.measured.size)
+        assertTrue(drawing.isolated.isEmpty())
+        assertEquals(1.0, drawing.observations.last().x, 0.0)
+        assertEquals(0.0, drawing.trend!!.start.x, 0.0)
+        assertEquals(1.0, drawing.trend.end.x, 0.0)
+        assertEquals(0.7975, drawing.trend.end.y, 1e-12)
+        val reference = series.references.single()
+        assertEquals(0.0, (reference.start as PlotPosition.Available).x, 0.0)
+        assertEquals(1.0, (reference.end as PlotPosition.Available).x, 0.0)
+        assertSame(display.latestCurrent!!.windows.first().point, series.samples.last().measured!!.source)
     }
 
     private fun acceptedUsage(usage: UsageObservation): PresentedUsage {
