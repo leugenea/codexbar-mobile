@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792792805533,
+  "lastUpdate": 1792792808743,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -5057,6 +5057,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/ae8f366fbfdb268050bc647d39246d558e922506"
         },
         "date": 1792783975270,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4d2aa6bfe4b35a1c745a0e675d0ee59607d975d7",
+          "message": "feat(ui): show banked resets as a table card (#181)\n\n* feat(ui): show banked resets as a table card on the main screen (#178)\n\n* fix(ui): show each banked reset fact once per table row (#178)\n\n* fix(ui): lowercase non-unit composable name for lint (#178)",
+          "timestamp": "2026-10-24T00:59:34+03:00",
+          "tree_id": "692f90b63a6ab33d7ba397fd99b733817cebeccf",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/4d2aa6bfe4b35a1c745a0e675d0ee59607d975d7"
+        },
+        "date": 1792792808183,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
