@@ -90,6 +90,7 @@ class CurrentHistoryReadTest {
         assertNull(result.fiveHour.query.after); assertNull(result.weekly.query.after)
         assertEquals(ObservationId(640), result.fiveHour.lastAdmitted)
         assertEquals(result.fiveHour.lastAdmitted, result.weekly.lastAdmitted)
+        assertSame(rows.last(), result.latestFiveHour); assertSame(rows.last(), result.latestWeekly)
         assertEquals(listOf(null, ObservationId(256), ObservationId(512)), access.reads.map { it.after })
         assertTrue(access.reads.all { it.limit <= 256 })
     }
@@ -163,6 +164,7 @@ class CurrentHistoryReadTest {
         assertEquals(ObservationId(300), result.fiveHour!!.lastAdmitted)
         assertEquals(result.fiveHour.lastAdmitted, result.weekly!!.lastAdmitted)
         assertTrue(result.fiveHour.entries.isEmpty()); assertTrue(result.weekly.entries.isEmpty())
+        assertNull(result.latestFiveHour); assertNull(result.latestWeekly)
     }
 
     private fun jointRequest(entry: HistoryEntry, limit: Int) = HistoryPresentationRequest.Current(

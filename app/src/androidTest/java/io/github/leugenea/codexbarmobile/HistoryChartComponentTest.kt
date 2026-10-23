@@ -64,8 +64,8 @@ class HistoryChartComponentTest {
             compose.onNodeWithTag("history-chart-weekly-counts").assertTextEquals(
                 "Drawn markers: 1 · Within-run connections: 0 · Nominal reference lines: 1")
             verifyLabels("$five-title", "$five-legend", "$five-first", "$five-last")
-            compose.onNodeWithTag("$five-first").assertTextEquals("Time axis start: Oct 8, 2026, 20:00")
-            compose.onNodeWithTag("$five-last").assertTextEquals("Time axis end: Oct 9, 2026, 01:00")
+            compose.onNodeWithTag("$five-first").assertTextEquals("Time axis start: Oct 8, 20:00")
+            compose.onNodeWithTag("$five-last").assertTextEquals("Time axis end: Oct 9, 01:00")
             withCanvas { bitmap ->
                 markerPixels(bitmap, plot.fiveHour)
                 // Independent sampled diagonal: a solid reference fails the required gaps.
@@ -76,7 +76,7 @@ class HistoryChartComponentTest {
             withCanvas("history-chart-weekly") { bitmap -> markerPixels(bitmap, plot.weekly) }
             verifyLabels("history-chart-weekly-title", "history-chart-weekly-first", "history-chart-weekly-last")
             compose.onNodeWithTag("history-chart-weekly-first").assertTextEquals(
-                "Time axis start: Oct 2, 2026, 01:00")
+                "Time axis start: Oct 2, 01:00")
             capture("history-chart-reference-portrait-light", plot, dark = false)
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assert(
                 SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))

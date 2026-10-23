@@ -5,6 +5,7 @@ import io.github.leugenea.codexbarmobile.usage.Field
 import io.github.leugenea.codexbarmobile.usage.Knowledge
 import io.github.leugenea.codexbarmobile.usage.SelectionState
 import io.github.leugenea.codexbarmobile.usage.WindowSelection
+import io.github.leugenea.codexbarmobile.usage.UsageObservation
 import java.math.BigDecimal
 import java.text.DecimalFormatSymbols
 import java.time.ZoneId
@@ -41,6 +42,8 @@ internal data class PresentedUsage(
     val allowedResource: Int,
     val limitResource: Int,
     val windows: List<PresentedUsageWindow>,
+    val observedAt: String? = null,
+    val observation: UsageObservation? = null,
 )
 
 /** Pure B2 -> UI projection. No transport, cache ownership, time arithmetic or entitlement UI. */
@@ -60,6 +63,7 @@ internal object UsagePresentation {
             refresh.usage.stale && usage != null, connected && !state.busy && !refresh.refreshing,
             error?.let(::errorResource), flag(usage?.allowed, R.string.live_allowed, R.string.live_not_allowed),
             flag(usage?.limitReached, R.string.live_limit_reached, R.string.live_limit_not_reached), windows,
+            TimePresentation.timestamp(usage?.observedAt, zone, locale), usage,
         )
     }
 

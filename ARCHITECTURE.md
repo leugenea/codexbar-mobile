@@ -1120,12 +1120,13 @@ gate, alongside runtime/lint/coverage and independent full-candidate review.
 ## Dashboard presentation and joint observation (issue 142)
 
 The dashboard renders both exact current five-hour and weekly sections without a
-kind selector. Known percentages and B1 phone-local reset/remaining labels precede
-the compact charts. Missing current identity or actual renderable retained history
-has one concise no-information line per window, no empty Canvas or analytical-only
-substitute. A single observation remains one marker and is labeled as no observed
-trend. `CompactHistoryChart` reuses the existing plot/drawing/axis/paint primitives
-and existing exact fact projection for its compact accessible equivalent; detailed
+kind selector. Known percentages and B1 minute-precision `Next reset in` labels precede
+the compact charts; there is no separate absolute-reset line in these cards. Missing
+current identity or actual renderable retained history has one concise no-information
+line per window, no empty Canvas or analytical-only substitute. A single observation
+remains one marker without an invented observed trend. `CompactHistoryChart` reuses the
+existing plot/drawing/axis/paint primitives and original observed comparison for its
+compact accessible equivalent; detailed
 admission/clock/cursor/counter text stays in stored details. No alternative math,
 normalization, inferred zero, old-period fallback or accumulated archive is added.
 
@@ -1135,8 +1136,11 @@ only two nullable exact window keys and a bounded limit (production32). The join
 starts at query.after and retains the original query in its returned storage page.
 Both share ascending batches<=256, an initial high-water and a total100000 examined
 ceiling. Independent32+1 selected buffers prevent a dense first window from
-starving a sparse sibling. A later failed batch fails the joint result rather than
-publishing a healthy partial success. The native storage port/schema/retention,
+starving a sparse sibling. Current requests scan through that high-water and retain
+one latest matching entry per window separately from the unchanged first chart page;
+paginated detail requests still stop at their matching lookahead. A later failed
+batch fails the joint result rather than publishing a healthy partial success. The
+native storage port/schema/retention,
 16 waiting observations, one worker and provider cadence are unchanged.
 
 The existing volatile display context now holds one identity-bearing request
@@ -1166,6 +1170,50 @@ the new routes. Native collection/appearance, hosted lint/JVM/instrumented execu
 compatible whole-handwritten>=90% INSTRUCTION union and APK acceptance are pending
 until their exact candidate evidence is independently reviewed. No signed-release,
 live-provider or merge approval follows from source/static tooling.
+
+## Simplified usage window cards (issue 173)
+
+The dashboard's last-reported-usage status owns one localized second-precision
+measurement-observed-at label, projected from the retained accepted usage source.
+It is not repeated inside either window card, cannot switch to a failed attempt's
+clock, and is hidden with retired/disconnected facts. The compact cards omit the
+recorded-observation count/no-trend copy, repeated exact measured percentage,
+raw observed-only delta and incomplete-history sentence. Storage/problem and
+unknown-pace states remain explicit; full local-history text retains exact source
+facts, deltas and loss/retention diagnostics, and full connection details retains
+its independently labeled absolute/relative reset facts.
+
+Each compact pace line uses the latest independently selected admitted window,
+not the last point of the first32-entry chart page. Its observation instant and
+original percent/duration/reset facts must match the same accepted usage source
+that supplies the headline and top timestamp. Pending/missing/mismatched comparisons
+show the existing unavailable state; a latest status-only or ineligible observation
+never falls back to an older point. Existing eligibility and `EvenDistribution`
+math supply the original observed comparison: `Over pace by N%`, `N% in reserve`,
+or `On pace`. Display rounding is BigDecimal HALF_UP to
+one decimal (ties away from zero); exactly +/-0.05 becomes +/-0.1, while magnitudes
+below 0.05 display `On pace`, without negative zero. Decimal separators follow the
+existing usage-percent locale policy. Neither measurements, DECIMAL128 comparison
+math, storage nor chart drawing/points/lines/reference are changed.
+
+Both chart hosts share a wrapping two-column row below the unchanged Canvas:
+start at physical left, end at physical right. Android's locale-aware `MMMdHHmm`
+skeleton supplies the yearless date/time pattern; B1 retains containing-hour display,
+phone-zone conversion and repeated-hour numeric offsets. Original instants remain
+exact. Unknown/unrepresentable dates remain unknown. The existing minute-flooring
+and plural formatter supplies `Next reset in <remaining>` without a second suffix.
+
+Mandatory JVM additions cover pace direction/rounding/locale and yearless
+label/timezone/offset/unknown boundaries, plus latest-observation provenance beyond
+32 entries, independently aging windows across storage batches, and unavailable/
+status-only/correction cases. The chart still renders its original bounded first
+page (including its original axis endpoints); chart redesign remains issue174.
+One added native dashboard method covers
+removed lines, the single top clock, left/right yearless labels and reserve/on/over/
+unknown pace through actual accepted reads. Existing large-font/landscape label
+checks and capture label receipts now target the readable pace line; no image or
+pixel oracle is removed. Exact report registries and synthetic totals are updated.
+These are authored contracts, not local Android runtime, lint or visual approval.
 
 ## Verification boundaries
 

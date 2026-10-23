@@ -67,6 +67,18 @@ class LiveUsageVisualContracts(unittest.TestCase):
                 with self.subTest(name=name, tag=tag), self.assertRaises(ValueError):
                     live_capture_receipt(path.with_suffix(".png"))
 
+    def test_full_connection_diagnostics_retain_both_reset_facts_while_dashboard_is_compact(self):
+        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
+        live = (main / "LiveUsageScreen.kt").read_text()
+        self.assertIn("R.string.live_reset_absolute", live)
+        self.assertIn("R.string.live_reset_relative", live)
+        self.assertIn("remainingTimeLabel(remaining)", live)
+        dashboard = (main / "DashboardScreen.kt").read_text()
+        self.assertNotIn("R.string.live_reset_absolute", dashboard)
+        self.assertIn("R.string.dashboard_next_reset", dashboard)
+        self.assertEqual({tag for tag in EXPECTED_LIVE_FACTS if tag.endswith("-reset-absolute")},
+                         {"live-five-hour-reset-absolute", "live-weekly-reset-absolute"})
+
     def test_hour_only_reset_copy_is_rejected_when_fixture_has_minutes(self):
         self.captures()
         for name in LIVE_CAPTURES:

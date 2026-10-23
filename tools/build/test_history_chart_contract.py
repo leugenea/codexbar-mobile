@@ -94,6 +94,20 @@ class HistoryChartContracts(unittest.TestCase):
                 with self.subTest(name=name, key=key), self.assertRaises(ValueError):
                     verify_captures(self.directory)
 
+    def test_yearless_axis_labels_are_shared_and_keep_physical_left_right_placement(self):
+        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
+        chart = (main / "HistoryChartComponent.kt").read_text()
+        self.assertIn('getBestDateTimePattern(locale, "MMMdHHmm")', chart)
+        self.assertIn("TimePresentation.chartTime", chart)
+        self.assertIn("Arrangement.Absolute.SpaceBetween", chart)
+        self.assertIn('"$tag-first", Modifier.weight(1f), TextAlign.Left', chart)
+        self.assertIn('"$tag-last", Modifier.weight(1f), TextAlign.Right', chart)
+        self.assertIn("HistoryAxisTimes", (main / "CompactHistoryChart.kt").read_text())
+        native = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryChartComponentTest.kt").read_text()
+        self.assertIn("Time axis start: Oct 8, 20:00", native)
+        self.assertIn("Time axis end: Oct 9, 01:00", native)
+        self.assertNotIn("Time axis start: Oct 8, 2026", native)
+
     def test_chart_counts_are_quantity_neutral_and_no_dependency_or_coverage_exemption_exists(self):
         resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
         self.assertEqual(resources["history_chart_counts"],

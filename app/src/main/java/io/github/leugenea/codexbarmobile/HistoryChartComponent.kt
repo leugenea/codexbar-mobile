@@ -17,8 +17,8 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
 import io.github.leugenea.codexbarmobile.history.*
-import io.github.leugenea.codexbarmobile.usage.Field
 import io.github.leugenea.codexbarmobile.usage.WindowKind
 import java.time.Instant
 import java.time.ZoneId
@@ -56,8 +56,7 @@ private fun HistoryWindowChart(series: HistoryPlotSeries, zone: ZoneId, locale: 
                 Text(stringResource(R.string.history_chart_no_geometry), Modifier.testTag("$tag-no-geometry"))
             } else {
                 HistoryPercentPlot(drawing, tag)
-                HistoryAxisTime(domain.time.first, R.string.history_chart_time_first, zone, locale, "$tag-first")
-                HistoryAxisTime(domain.time.last, R.string.history_chart_time_last, zone, locale, "$tag-last")
+                HistoryAxisTimes(domain.time.first, domain.time.last, zone, locale, tag)
             }
         }
     }
@@ -80,10 +79,21 @@ private fun HistoryGeometryNotes(series: HistoryPlotSeries, tag: String) {
 }
 
 @Composable
-internal fun HistoryAxisTime(at: Instant, resource: Int, zone: ZoneId, locale: Locale, tag: String) {
-    val time = TimePresentation.present(Field(io.github.leugenea.codexbarmobile.usage.Knowledge.KNOWN, at), TimeKind.PERIODIC_RESET, null, null, zone, locale)
-    val label = time.absolute?.let { absoluteTimeLabel(it) } ?: stringResource(R.string.time_unknown_target)
-    Text(stringResource(resource, label), Modifier.testTag(tag))
+internal fun HistoryAxisTimes(first: Instant, last: Instant, zone: ZoneId, locale: Locale, tag: String) {
+    // Android supplies the locale's yearless date/time skeleton; B1 owns hour/offset handling.
+    val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMdHHmm")
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Absolute.SpaceBetween) {
+        HistoryAxisTime(first, R.string.history_chart_time_first, zone, locale, pattern, "$tag-first", Modifier.weight(1f), TextAlign.Left)
+        Spacer(Modifier.width(12.dp))
+        HistoryAxisTime(last, R.string.history_chart_time_last, zone, locale, pattern, "$tag-last", Modifier.weight(1f), TextAlign.Right)
+    }
+}
+
+@Composable
+private fun HistoryAxisTime(at: Instant, resource: Int, zone: ZoneId, locale: Locale, pattern: String,
+    tag: String, modifier: Modifier, align: TextAlign) {
+    val label = TimePresentation.chartTime(at, zone, locale, pattern) ?: stringResource(R.string.time_unknown_target)
+    Text(stringResource(resource, label), modifier.testTag(tag), textAlign = align)
 }
 
 @Composable

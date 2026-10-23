@@ -97,8 +97,8 @@ class DashboardContracts(unittest.TestCase):
         self.assertEqual(DASHBOARD_NATIVE_COUNT, EXPECTED_DASHBOARD_NATIVE_COUNT)
         self.assertEqual(DASHBOARD_JVM_COUNT, EXPECTED_DASHBOARD_JVM_COUNT)
         self.assertEqual(CURRENT_HISTORY_JVM[SCANNER_CLASS], EXPECTED_CURRENT_READ_JVM)
-        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_NATIVE.values())), 16)
-        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 14)
+        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_NATIVE.values())), 17)
+        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 24)
         for kind, registry, source_set in (("jvm", EXPECTED_DASHBOARD_JVM, "test"), ("native", EXPECTED_DASHBOARD_NATIVE, "androidTest")):
             for classname, required in registry.items():
                 source = ROOT / f"app/src/{source_set}/java/{classname.replace('.', '/')}.kt"
@@ -125,6 +125,27 @@ class DashboardContracts(unittest.TestCase):
                         tree.write(path)
                         with self.subTest(kind=kind, name=name, mutation=mutation), self.assertRaises(ValueError):
                             verify_reports(self.directory, kind)
+
+    def test_simplified_window_copy_removes_retired_lines_without_rounding_stored_history(self):
+        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
+        resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
+        for removed in ("dashboard_single_observation", "dashboard_recorded_observations", "dashboard_history_incomplete"):
+            self.assertNotIn(removed, resources)
+        self.assertEqual(resources["dashboard_next_reset"], "Next reset in %1$s")
+        self.assertEqual(resources["dashboard_over_pace"], "Over pace by %1$s%%")
+        self.assertEqual(resources["dashboard_reserve"], "%1$s%% in reserve")
+        self.assertEqual(resources["dashboard_on_pace"], "On pace")
+        compact = (main / "CompactHistoryChart.kt").read_text()
+        for removed in ("history_measured", "history_point_time", "history_delta", "CompactHistoryFacts", "incomplete("):
+            self.assertNotIn(removed, compact)
+        dashboard = (main / "DashboardScreen.kt").read_text()
+        self.assertNotIn("live_reset_absolute", dashboard)
+        self.assertIn("remainingTimeLabel(it)", dashboard)
+        self.assertIn('testTag("dashboard-observed-at")', dashboard)
+        # Full stored text is the deliberate exact-value route, not the compact window block.
+        stored = (main / "HistoryTextPresentation.kt").read_text()
+        self.assertIn("comparison.deltaPercentagePoints.toString()", stored)
+        self.assertNotIn("setScale", stored)
 
     def test_each_dashboard_image_requires_exact_route_configuration_and_native_owner_receipts(self):
         self.assertEqual(DASHBOARD_CAPTURES, EXPECTED_DASHBOARD_CAPTURE_SPECS)

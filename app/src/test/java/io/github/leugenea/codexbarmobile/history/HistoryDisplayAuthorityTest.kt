@@ -126,11 +126,12 @@ class HistoryDisplayAuthorityTest {
         val request = recorder.state.value.request as HistoryPresentationRequest.Current
         val old = recorder.state.value
         assertEquals(1, currentHistoryForDisplay(old, request, WindowKind.FIVE_HOUR, context).points.size)
+        assertNotNull(currentHistoryForDisplay(old, request, WindowKind.FIVE_HOUR, context).latestCurrent)
         recorder.query(HistoryGraphQuery(32, kind = WindowKind.WEEKLY)); runCurrent()
         recorder.observe(request, context); runCurrent()
         assertNotSame(old.selection, recorder.state.value.selection)
         val challenged = currentHistoryForDisplay(old, request, WindowKind.FIVE_HOUR, context)
-        assertNull(challenged.storage); assertTrue(challenged.points.isEmpty())
+        assertNull(challenged.storage); assertTrue(challenged.points.isEmpty()); assertNull(challenged.latestCurrent)
         assertEquals(1, currentHistoryForDisplay(recorder.state.value, request, WindowKind.FIVE_HOUR, context).points.size)
         val token = recorder.state.value.selection
         recorder.observe(request, context); runCurrent()
@@ -147,6 +148,7 @@ class HistoryDisplayAuthorityTest {
         for (now in invalidTimes) {
             recorder.metadata(UsageRefreshState(usage = RefreshedEndpoint(success = observed), evaluatedAt = now))
             assertNull(currentHistoryForDisplay(old, request, WindowKind.FIVE_HOUR, context).storage)
+            assertNull(currentHistoryForDisplay(old, request, WindowKind.FIVE_HOUR, context).latestCurrent)
         }
         val changed = EndpointObservation(ReadOperation.USAGE, observedAt = SyntheticHistory.at, receivedAtMillis = 1000,
             usage = SyntheticHistory.usage(SyntheticHistory.window(absolute = io.github.leugenea.codexbarmobile.usage.Input.Value(1_800_007_200L))))

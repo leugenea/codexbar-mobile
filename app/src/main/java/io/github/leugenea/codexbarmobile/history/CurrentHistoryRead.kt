@@ -14,13 +14,14 @@ internal object CurrentHistoryRead {
 
     fun readCurrent(access: HistoryRuntimeAccess, request: HistoryPresentationRequest.Current,
         revoked: () -> Boolean): CurrentHistoryReadOutcome {
-        val five = request.query(WindowKind.FIVE_HOUR).takeIf { it.window != null }?.let(::Selection)
-        val weekly = request.query(WindowKind.WEEKLY).takeIf { it.window != null }?.let(::Selection)
+        val five = request.query(WindowKind.FIVE_HOUR).takeIf { it.window != null }?.let { Selection(it, latest = true) }
+        val weekly = request.query(WindowKind.WEEKLY).takeIf { it.window != null }?.let { Selection(it, latest = true) }
         val selections = listOfNotNull(five, weekly)
         if (selections.any { it.query.window!!.partition != access.partition })
             return CurrentHistoryReadOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
         val failure = if (selections.isEmpty()) null else scan(access, null, selections, revoked)
-        return currentResult(failure, CurrentHistoryPages(five?.result(access.partition), weekly?.result(access.partition)))
+        return currentResult(failure, CurrentHistoryPages(five?.result(access.partition), weekly?.result(access.partition),
+            five?.latestEntry, weekly?.latestEntry))
     }
 
     private fun currentResult(failure: HistoryReadOutcome?, pages: CurrentHistoryPages): CurrentHistoryReadOutcome = when (failure) {
@@ -29,20 +30,26 @@ internal object CurrentHistoryRead {
         else -> CurrentHistoryReadOutcome.Ready(pages)
     }
 
-    private class Selection(val query: HistoryGraphQuery) {
+    /** Current cards also retain one latest entry, independently of their paginated chart page. */
+    private class Selection(val query: HistoryGraphQuery, val latest: Boolean = false) {
         val selected = ArrayList<HistoryEntry>(query.limit + 1)
         var highWater: ObservationId? = null
         var last: HistoryReadSnapshot? = null
+        var latestEntry: HistoryEntry? = null
         val complete get() = selected.size > query.limit
         fun accept(page: HistoryReadSnapshot, admitted: ObservationId?) {
             highWater = admitted
             last = page
-            if (complete) return
+            if (complete && !latest) return
             for (entry in page.entries) {
                 if (entry.id.ordinal > (admitted?.ordinal ?: 0)) break
-                if (entry.windows.any(query::selects)) selected.add(entry)
-                if (complete) break
+                if (entry.windows.any(query::selects)) retain(entry)
+                if (complete && !latest) break
             }
+        }
+        private fun retain(entry: HistoryEntry) {
+            latestEntry = entry
+            if (!complete) selected.add(entry)
         }
         fun result(partition: HistoryPartition) = HistoryReadSnapshot(query.storage(partition), selected.take(query.limit),
             highWater, complete, last?.truncation.orEmpty(), last?.cutoffs.orEmpty())
@@ -74,7 +81,7 @@ internal object CurrentHistoryRead {
             val page = outcome.snapshot
             scan.advance(page)
             selections.forEach { it.accept(page, scan.highWater) }
-            if (selections.all { it.complete } || scan.exhausted(page)) return null
+            if (selections.all { it.complete && !it.latest } || scan.exhausted(page)) return null
         }
         return HistoryReadOutcome.Unavailable(HistoryUnavailable.CAPACITY)
     }

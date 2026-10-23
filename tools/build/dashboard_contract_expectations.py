@@ -4,6 +4,16 @@ EXPECTED_DASHBOARD_JVM = {
         "compactChartEquivalentUsesOriginalExactFactsAndIndependentReferences",
         "compactMissingChartAndPhaseActionsKeepTypedErrorsAndSinglePointTruth",
         "reportedInventoryCountNeverFallsBackToSummaryRowsOrZero",
+        "paceLineUsesOverReserveAndOnPaceWithoutChangingExactComparison",
+        "paceLineHalfTenthBoundariesRoundAwayFromZero",
+        "paceLineNearZeroAndAdjacentBoundaryValuesNeverShowSignedZero",
+        "paceLineKeepsOneDecimalAndLocaleSeparator",
+        "compactPaceBeyondFirst32ObservationsMatchesAcceptedHeadlineAndClock",
+        "compactPaceKeepsIndependentlyAgingFiveHourAndWeeklyObservationsSeparate",
+        "compactPaceNeverFallsBackWhenAcceptedComparisonIsMissingOrIneligible",
+        "chartTimeLabelsUseYearlessLocalePatternsAndContainingHour",
+        "chartTimeLabelsRetainFullAndPartialRepeatedHourOffsets",
+        "chartTimeLabelsKeepUnrepresentableInstantsUnknown",
     },
     "io.github.leugenea.codexbarmobile.history.HistoryDisplayAuthorityTest": {
         "currentNullDiagnosticSelectionCannotReplaySuccessorOrRetiredLoss",
@@ -22,6 +32,7 @@ EXPECTED_DASHBOARD_NATIVE = {
     "io.github.leugenea.codexbarmobile.DashboardCopyAndTimeTest": {
         "dashboardAndDisclosureFollowPhoneZoneLocaleAndTicksWithoutRequests",
         "minutePrecisionMatchesDashboardWindowDetailsAndBankedExpiry",
+        "simplifiedWindowsKeepOneTopObservationYearlessAxisAndReadablePace",
         "noReachableTextOrSemanticsUsesRemovedTimePhraseWhileOriginalInstantsRemainExact",
     },
     "io.github.leugenea.codexbarmobile.DashboardHistoryIsolationTest": {
@@ -91,16 +102,16 @@ EXPECTED_DASHBOARD_CAPTURE_SPECS = {
     "dashboard-local-history-details-large-font": (1, False, 2.0, "LOCAL_HISTORY_DETAILS", "PAGE", "NONE"),
 }
 EXPECTED_DASHBOARD_LAYOUTS = {
-    "dashboard-main-portrait-light": ("history-chart-five-hour-equivalent", ["connection-screen", "dashboard"]),
-    "dashboard-weekly-portrait-light": ("history-chart-weekly-equivalent", ["connection-screen", "dashboard"]),
+    "dashboard-main-portrait-light": ("history-chart-five-hour-pace", ["connection-screen", "dashboard"]),
+    "dashboard-weekly-portrait-light": ("history-chart-weekly-pace", ["connection-screen", "dashboard"]),
     "dashboard-banked-expanded-portrait-light": ("banked-disclosure-status", ["connection-screen", "dashboard"]),
     "dashboard-drawer-portrait-dark": ("drawer-LOCAL_HISTORY_DETAILS", ["connection-screen", "dashboard", "details-drawer"]),
-    "dashboard-main-landscape-dark-large-font": ("history-chart-five-hour-equivalent", ["connection-screen", "dashboard"]),
+    "dashboard-main-landscape-dark-large-font": ("history-chart-five-hour-pace", ["connection-screen", "dashboard"]),
     "dashboard-connection-details-landscape-dark": ("banked-container", ["connection-screen", "connection-details"]),
     "dashboard-local-history-details-large-font": ("history-page-cursor", ["connection-screen", "connection-history"]),
 }
 EXPECTED_CURRENT_HOST = {"context": "MATCH", "selection": "MATCH", "periods": "MATCH", "projection": "MATCH"}
 
 # Literal review budgets, independently checked against the enumerated sets.
-EXPECTED_DASHBOARD_NATIVE_COUNT = 16
-EXPECTED_DASHBOARD_JVM_COUNT = 11
+EXPECTED_DASHBOARD_NATIVE_COUNT = 17
+EXPECTED_DASHBOARD_JVM_COUNT = 21

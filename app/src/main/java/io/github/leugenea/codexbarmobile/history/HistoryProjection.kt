@@ -95,6 +95,8 @@ internal class HistoryGraphSnapshot(
     val request: HistoryPresentationRequest = HistoryPresentationRequest.Page(query),
     val selection: HistoryDisplaySelection? = displayPermission?.context?.selection,
     val currentPages: CurrentHistoryPages? = null,
+    /** Latest selected admitted entry, separate from the chart's bounded first page. */
+    val latestCurrent: HistoryEntry? = null,
 ) {
     init { require(storage == null || currentPages == null) }
     val usedUnit = HistoryUnit.PERCENT

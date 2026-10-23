@@ -107,10 +107,14 @@ private fun ResetLabels(time: PresentedTime?, tag: String) {
 @Composable
 internal fun relativeLabel(time: PresentedTime): String {
     val remaining = time.remaining ?: return stringResource(time.state.labelResource)
+    return stringResource(time.state.labelResource, remainingTimeLabel(remaining))
+}
+
+@Composable
+internal fun remainingTimeLabel(remaining: RemainingTime): String {
     // Quantities select grammar only; original Long values remain format arguments.
     val units = remaining.units.map { (resource, value) ->
         pluralStringResource(resource, value.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), value)
     }
-    val duration = if (units.isEmpty()) stringResource(R.string.time_less_than_minute) else units.joinToString(" ")
-    return stringResource(time.state.labelResource, duration)
+    return if (units.isEmpty()) stringResource(R.string.time_less_than_minute) else units.joinToString(" ")
 }
