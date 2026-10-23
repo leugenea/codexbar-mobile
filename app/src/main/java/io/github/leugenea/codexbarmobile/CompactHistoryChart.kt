@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -16,16 +17,19 @@ import io.github.leugenea.codexbarmobile.usage.UsageObservation
 internal fun CompactHistoryChart(series: HistoryPlotSeries, display: HistoryGraphSnapshot, time: PhoneTimeConfiguration,
     observation: UsageObservation?) {
     val tag = if (series.kind == io.github.leugenea.codexbarmobile.usage.WindowKind.FIVE_HOUR) "history-chart-five-hour" else "history-chart-weekly"
-    val drawing = historyChartDrawing(series)
+    val drawing = remember(series) { historyChartDrawing(series) }
+    val unavailableGeometry = remember(series) { series.samples.any { it.measured?.position is PlotPosition.Unavailable } }
+    val underflow = remember(series) {
+        series.samples.any { (it.measured?.position as? PlotPosition.Available)?.detail == PlotRenderDetail.NONZERO_UNDERFLOW }
+    }
     Column(Modifier.fillMaxWidth().testTag(tag), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.history_chart_legend), Modifier.testTag("$tag-legend"), style = MaterialTheme.typography.bodySmall)
         HistoryPercentPlot(drawing, tag)
         series.measuredDomain?.let { HistoryAxisTimes(it.time.first, it.time.last, time.zone, time.locale, tag) }
         CompactHistoryPace(DashboardPresentation.paceComparison(display, observation, series.kind), time, tag)
         if (display.problem != null) Text(stringResource(R.string.dashboard_history_warning), Modifier.testTag("$tag-warning"))
-        if (series.samples.any { it.measured?.position is PlotPosition.Unavailable }) Text(stringResource(R.string.dashboard_geometry_warning))
-        if (series.samples.any { (it.measured?.position as? PlotPosition.Available)?.detail == PlotRenderDetail.NONZERO_UNDERFLOW })
-            Text(stringResource(R.string.history_chart_underflow))
+        if (unavailableGeometry) Text(stringResource(R.string.dashboard_geometry_warning))
+        if (underflow) Text(stringResource(R.string.history_chart_underflow))
     }
 }
 

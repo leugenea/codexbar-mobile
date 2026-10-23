@@ -1,5 +1,10 @@
 """Independent issue142 regression oracles; never import registries under validation."""
 EXPECTED_DASHBOARD_JVM = {
+    "io.github.leugenea.codexbarmobile.HistoryPlotCacheTest": {
+        "metadataTicksReuseWholeWindowGraphAndDrawingInputsWhileKeepingLiveMetadataAndPaceCurrent",
+        "changedPageQueryGenerationPartitionRequestAndSelectionRebuildWholeWindowInputs",
+        "cachedCurrentInputsNeverBypassPeriodOrDisplayRevocation",
+    },
     "io.github.leugenea.codexbarmobile.DashboardPresentationTest": {
         "compactChartEquivalentUsesOriginalExactFactsAndIndependentReferences",
         "compactMissingChartAndPhaseActionsKeepTypedErrorsAndSinglePointTruth",
@@ -116,4 +121,4 @@ EXPECTED_CURRENT_HOST = {"context": "MATCH", "selection": "MATCH", "periods": "M
 
 # Literal review budgets, independently checked against the enumerated sets.
 EXPECTED_DASHBOARD_NATIVE_COUNT = 17
-EXPECTED_DASHBOARD_JVM_COUNT = 22
+EXPECTED_DASHBOARD_JVM_COUNT = 25

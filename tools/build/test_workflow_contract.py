@@ -864,7 +864,7 @@ class SyntheticReportTests(unittest.TestCase):
                 with self.subTest(kind=kind, container_depth=depth):
                     self.write_report(kind, container_depth=depth)
                     result = verify_reports(self.directory, kind)
-                    self.assertEqual(result["testCount"], 153 if kind == "native" else 107)
+                    self.assertEqual(result["testCount"], 153 if kind == "native" else 110)
 
     def test_remaining_time_jvm_cases_match_source_and_reject_incomplete_reports(self):
         self.assertEqual(sum(map(len, REMAINING_TIME_JVM.values())), 7)

@@ -103,11 +103,16 @@ internal class HistoryGraphSnapshot(
     val baselineUnit = HistoryUnit.PERCENT
     val deltaUnit = HistoryUnit.PERCENTAGE_POINTS
     val durationUnit = HistoryUnit.ELAPSED_SI_SECONDS
-    val entries: List<HistoryGraphEntry> = immutableList(storage?.entries.orEmpty().map { entry ->
-        HistoryGraphEntry(entry, entry.windows.filter(query::selects).map(::HistoryGraphWindow))
-    })
+    // Metadata-only wrappers need no analytical work when the UI reuses retained plot inputs.
+    val entries: List<HistoryGraphEntry> by lazy {
+        immutableList(storage?.entries.orEmpty().map { entry ->
+            HistoryGraphEntry(entry, entry.windows.filter(query::selects).map(::HistoryGraphWindow))
+        })
+    }
     /** All page gaps remain, even when selection removes every window on an entry. */
-    val points: List<HistoryPoint> = immutableList(entries.flatMap { entry -> entry.windows.mapNotNull { it.source.point } })
+    val points: List<HistoryPoint> by lazy {
+        immutableList(entries.flatMap { entry -> entry.windows.mapNotNull { it.source.point } })
+    }
     val hasMore: Boolean get() = storage?.hasMore == true
     val truncation: Set<HistoryTruncation> get() = storage?.truncation ?: emptySet()
 }

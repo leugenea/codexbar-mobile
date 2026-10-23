@@ -53,15 +53,16 @@ private fun DashboardActions(state: ConnectionState, model: PresentedUsage, cont
 @Composable
 private fun DashboardWindow(window: PresentedUsageWindow, display: HistoryGraphSnapshot, time: PhoneTimeConfiguration,
     observation: UsageObservation?) {
-    val plot = remember(display) { HistoryPlotInputs.project(display) }
+    val plot = remember { HistoryPlotCache() }.project(display)
     val series = if (window.tag == "live-five-hour") plot.fiveHour else plot.weekly
+    val hasChart = remember(series) { DashboardPresentation.hasChart(series) }
     Card(Modifier.fillMaxWidth().testTag("dashboard-${series.kind.name}")) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(window.labelResource), style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag(if (series.kind == WindowKind.FIVE_HOUR) "history-chart-five-hour-title" else "history-chart-weekly-title").semantics { heading() })
             window.percent?.let { Text(stringResource(R.string.live_percent, it), style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.testTag("${window.tag}-percent")) }
             DashboardReset(window.reset, window.tag)
-            if (DashboardPresentation.hasChart(series)) {
+            if (hasChart) {
                 DashboardPresentation.windowWarning(window.status, window.malformed)?.let {
                     Text(stringResource(it), Modifier.testTag("dashboard-window-warning-${series.kind.name}"), color = MaterialTheme.colorScheme.error)
                 }

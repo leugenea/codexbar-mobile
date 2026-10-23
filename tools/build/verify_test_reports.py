@@ -318,6 +318,11 @@ DEVICE_CODE_COPY_CASES = {
 
 
 DASHBOARD_JVM = {
+    'io.github.leugenea.codexbarmobile.HistoryPlotCacheTest': {
+        'metadataTicksReuseWholeWindowGraphAndDrawingInputsWhileKeepingLiveMetadataAndPaceCurrent',
+        'changedPageQueryGenerationPartitionRequestAndSelectionRebuildWholeWindowInputs',
+        'cachedCurrentInputsNeverBypassPeriodOrDisplayRevocation',
+    },
     'io.github.leugenea.codexbarmobile.DashboardPresentationTest': {
         'compactChartEquivalentUsesOriginalExactFactsAndIndependentReferences',
         'compactMissingChartAndPhaseActionsKeepTypedErrorsAndSinglePointTruth',

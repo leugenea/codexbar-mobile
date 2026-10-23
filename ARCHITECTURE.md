@@ -1127,8 +1127,13 @@ current identity or actual renderable retained history has one concise no-inform
 line per window, no empty Canvas or analytical-only substitute. A single observation
 remains one minimal tick without an invented observed trend. `CompactHistoryChart` reuses the
 existing plot/drawing/axis/paint primitives and original observed comparison for its
-compact accessible equivalent; detailed
-admission/clock/cursor/counter text stays in stored details. No alternative math,
+compact accessible equivalent. Each window keeps one UI-local plot cache, keyed by
+retained storage-page identity, generation, partition, query, request and selection;
+no retained-entry list comparison occurs on metadata ticks. Snapshot analytics are
+lazy, so fresh metadata wrappers do not rebuild comparisons. Stable immutable series
+key remembered drawing/OLS and geometry warnings. The host still checks actual
+revocation/period authority on every pass, and current metadata/latest-entry pace
+binding is never cached. Detailed admission/clock/cursor/counter text stays in stored details. No alternative math,
 normalization, inferred zero, old-period fallback or accumulated archive is added.
 
 `HistoryPresentationRequest` has fixed Idle/Page/Current cases; Current contains

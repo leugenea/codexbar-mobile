@@ -98,7 +98,7 @@ class DashboardContracts(unittest.TestCase):
         self.assertEqual(DASHBOARD_JVM_COUNT, EXPECTED_DASHBOARD_JVM_COUNT)
         self.assertEqual(CURRENT_HISTORY_JVM[SCANNER_CLASS], EXPECTED_CURRENT_READ_JVM)
         self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_NATIVE.values())), 17)
-        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 26)
+        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 29)
         for kind, registry, source_set in (("jvm", EXPECTED_DASHBOARD_JVM, "test"), ("native", EXPECTED_DASHBOARD_NATIVE, "androidTest")):
             for classname, required in registry.items():
                 source = ROOT / f"app/src/{source_set}/java/{classname.replace('.', '/')}.kt"
@@ -125,6 +125,18 @@ class DashboardContracts(unittest.TestCase):
                         tree.write(path)
                         with self.subTest(kind=kind, name=name, mutation=mutation), self.assertRaises(ValueError):
                             verify_reports(self.directory, kind)
+
+    def test_metadata_ticks_reuse_lazy_analytics_and_remember_drawing_by_stable_series(self):
+        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
+        graph = (main / "history/HistoryProjection.kt").read_text()
+        self.assertIn("val entries: List<HistoryGraphEntry> by lazy", graph)
+        self.assertIn("val points: List<HistoryPoint> by lazy", graph)
+        dashboard = (main / "DashboardScreen.kt").read_text()
+        self.assertIn("remember { HistoryPlotCache() }.project(display)", dashboard)
+        self.assertIn("remember(series) { DashboardPresentation.hasChart(series) }", dashboard)
+        compact = (main / "CompactHistoryChart.kt").read_text()
+        self.assertIn("remember(series) { historyChartDrawing(series) }", compact)
+        self.assertIn("DashboardPresentation.paceComparison(display, observation, series.kind)", compact)
 
     def test_simplified_window_copy_removes_retired_lines_without_rounding_stored_history(self):
         main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
