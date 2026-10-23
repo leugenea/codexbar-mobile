@@ -76,6 +76,10 @@ class LiveUsageVisualContracts(unittest.TestCase):
         dashboard = (main / "DashboardScreen.kt").read_text()
         self.assertNotIn("R.string.live_reset_absolute", dashboard)
         self.assertIn("R.string.dashboard_next_reset", dashboard)
+        self.assertIn("R.string.dashboard_updated", dashboard)
+        self.assertNotIn("R.string.history_point_time", dashboard)
+        history = (main / "HistoryTextPresentation.kt").read_text()
+        self.assertIn("R.string.history_point_time, TimePresentation.timestamp(point.observedAt, zone, locale)", history)
         self.assertEqual({tag for tag in EXPECTED_LIVE_FACTS if tag.endswith("-reset-absolute")},
                          {"live-five-hour-reset-absolute", "live-weekly-reset-absolute"})
 

@@ -11,7 +11,8 @@ import tree_sitter_kotlin
 from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DASHBOARD_NATIVE,
     EXPECTED_SCANNER_ADDITIONS, EXPECTED_CURRENT_READ_JVM, PROTECTED_MIXED_SOURCE, SCANNER_CLASS,
     EXPECTED_DASHBOARD_CAPTURE_SPECS, EXPECTED_DASHBOARD_LAYOUTS, EXPECTED_CURRENT_HOST,
-    EXPECTED_DASHBOARD_NATIVE_COUNT, EXPECTED_DASHBOARD_JVM_COUNT, EXPECTED_BANKED_TABLE_ROWS)
+    EXPECTED_DASHBOARD_NATIVE_COUNT, EXPECTED_DASHBOARD_JVM_COUNT, EXPECTED_BANKED_TABLE_ROWS,
+    EXPECTED_COMPACT_COPY)
 from verify_test_reports import DASHBOARD_JVM, DASHBOARD_NATIVE, DASHBOARD_NATIVE_COUNT, DASHBOARD_JVM_COUNT, CURRENT_HISTORY_JVM, verify_reports
 from verify_history_text_captures import DASHBOARD_CAPTURES, DASHBOARD_LAYOUTS, dashboard_capture_receipt
 import test_history_text_contract as history_fixture
@@ -29,7 +30,7 @@ def dashboard_captures(directory, fixture):
                     route=route, requestMode=mode, sourceKind=kind, requests=5, gets=2,
                     activity="io.github.leugenea.codexbarmobile.MainActivity", visibleRoots=roots,
                     layoutLabel=label, layoutFontScale=font, layoutDensity=1, windows=[],
-                    currentHost=EXPECTED_CURRENT_HOST if mode == "CURRENT" else None)
+                    currentHost=EXPECTED_CURRENT_HOST if mode == "CURRENT" else None, compactCopy=None)
         if mode == "CURRENT":
             data["windows"] = [dict(kind=k, limit=100000, after=0, reset="2027-01-15T09:00:00Z", duration=d,
                                     selectedOrdinals=[1], lastAdmitted=1) for k, d in (("FIVE_HOUR", 18000), ("WEEKLY", 604800))]
@@ -41,6 +42,7 @@ def dashboard_captures(directory, fixture):
             data["bankedTableRows"] = copy.deepcopy(EXPECTED_BANKED_TABLE_ROWS)
         image = fixture.png(*size)
         if kind != "NONE":
+            data["compactCopy"] = dict(EXPECTED_COMPACT_COPY[kind], firstLineCount=1, lastLineCount=1)
             primary, reference = ((-10006364, -11975345) if not dark else (-3097345, -3488560))
             samples = [dict(kind="observation", x=1, y=1, targetArgb=primary, actualArgb=primary, matched=True)]
             samples.extend(dict(kind="dash", x=2 if n < 28 else 3, y=2, targetArgb=reference,
@@ -145,6 +147,7 @@ class DashboardContracts(unittest.TestCase):
         resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
         for removed in ("dashboard_single_observation", "dashboard_recorded_observations", "dashboard_history_incomplete"):
             self.assertNotIn(removed, resources)
+        self.assertEqual(resources["dashboard_updated"], "Updated %1$s")
         self.assertEqual(resources["dashboard_next_reset"], "Next reset in %1$s")
         self.assertEqual(resources["dashboard_over_pace"], "Over pace by %1$s%%")
         self.assertEqual(resources["dashboard_reserve"], "%1$s%% in reserve")
@@ -156,6 +159,14 @@ class DashboardContracts(unittest.TestCase):
         self.assertNotIn("live_reset_absolute", dashboard)
         self.assertIn("remainingTimeLabel(it)", dashboard)
         self.assertIn('testTag("dashboard-observed-at")', dashboard)
+        self.assertIn("model.observation?.observedAt", dashboard)
+        self.assertIn("R.string.dashboard_updated, chartTimeLabel(it, time.zone, time.locale, truncateToHour = false)", dashboard)
+        self.assertNotIn("history_point_time", dashboard)
+        self.assertNotIn('Text(stringResource(R.string.history_chart_legend)', compact)
+        self.assertIn("contentDescription = legend", compact)
+        self.assertNotIn('testTag("$tag-legend")', compact)
+        detail = (main / "HistoryChartComponent.kt").read_text()
+        self.assertIn('Text(stringResource(R.string.history_chart_legend), Modifier.testTag("$tag-legend"))', detail)
         # Full stored text is the deliberate exact-value route, not the compact window block.
         stored = (main / "HistoryTextPresentation.kt").read_text()
         self.assertIn("comparison.deltaPercentagePoints.toString()", stored)
@@ -212,13 +223,13 @@ class DashboardContracts(unittest.TestCase):
                          ("requests", 99), ("sourceKind", "INVALID"), ("windows", [{}]),
                          ("uiCursor", "SYNTHETIC-hidden-cursor"), ("layoutLabel", "SYNTHETIC-arbitrary"),
                          ("visibleRoots", ["connection-screen"]), ("visibleRoots", ["connection-screen", "SYNTHETIC-wrong-child"]),
-                         ("currentHost", {}))
+                         ("currentHost", {}), ("compactCopy", {}))
             for key, value in mutations:
                 data = dict(original); data[key] = value
                 path.with_suffix(".json").write_text(json.dumps(data))
                 with self.subTest(name=name, key=key), self.assertRaises(ValueError):
                     dashboard_capture_receipt(path)
-            for key in ("visibleRoots", "layoutLabel", "currentHost"):
+            for key in ("visibleRoots", "layoutLabel", "currentHost", "compactCopy"):
                 data = dict(original); data.pop(key)
                 path.with_suffix(".json").write_text(json.dumps(data))
                 with self.subTest(name=name, missing=key), self.assertRaises(ValueError):
@@ -264,6 +275,7 @@ class DashboardContracts(unittest.TestCase):
                     dashboard_capture_receipt(path)
             path.with_suffix(".json").write_text(json.dumps(original))
             if original["sourceKind"] != "NONE":
+                self.assert_compact_copy_mutations(path, original)
                 for key, value in (("observationCount", 0), ("connectionCount", 1), ("canvasClippedLeft", .5), ("pixelSamples", [])):
                     data = dict(original); data[key] = value
                     path.with_suffix(".json").write_text(json.dumps(data))
@@ -273,6 +285,32 @@ class DashboardContracts(unittest.TestCase):
                 path.write_bytes(self.fixture.png(4, 5))
                 with self.assertRaises(ValueError):
                     dashboard_capture_receipt(path)
+
+    def assert_compact_copy_mutations(self, path, original):
+        wrong = dict(updated="Measurement observed at (second precision): Jan 15, 2027, 8:00:00 AM",
+                     first="Time axis start: " + original["compactCopy"]["first"],
+                     last="Time axis end: Jan 15, 09:00", legendDescription="SYNTHETIC missing explanation",
+                     visibleLegendCount=1, firstLineCount=0, lastLineCount=True)
+        for key, value in wrong.items():
+            for missing in (False, True):
+                data = copy.deepcopy(original)
+                if missing:
+                    data["compactCopy"].pop(key)
+                else:
+                    data["compactCopy"][key] = value
+                path.with_suffix(".json").write_text(json.dumps(data))
+                with self.subTest(compactCopy=key, missing=missing), self.assertRaises(ValueError):
+                    dashboard_capture_receipt(path)
+        for updated in ("Updated Jan 15, 08:00", "Updated Jan 15, 08:38", "Updated Jan 15, 08:37:59"):
+            data = copy.deepcopy(original); data["compactCopy"]["updated"] = updated
+            path.with_suffix(".json").write_text(json.dumps(data))
+            with self.subTest(updated=updated), self.assertRaises(ValueError):
+                dashboard_capture_receipt(path)
+        if original["fontScale"] == 1:
+            data = copy.deepcopy(original); data["compactCopy"]["firstLineCount"] = 2
+            path.with_suffix(".json").write_text(json.dumps(data))
+            with self.assertRaises(ValueError):
+                dashboard_capture_receipt(path)
 
     def test_source_annotations_and_class_identity_cannot_be_spoofed_by_names(self):
         classname = "io.github.leugenea.codexbarmobile.DashboardUiTest"

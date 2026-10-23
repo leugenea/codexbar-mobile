@@ -155,7 +155,7 @@ class DashboardHistoryIsolationTest {
             assertEquals(complete.points.last().observedAt, series.measuredDomain!!.time.last)
             assertEquals(1.0, historyChartDrawing(series).observations.last().x, 0.0)
             compose.onNodeWithTag("history-chart-five-hour-last").performScrollTo().assertTextEquals(
-                "Time axis end: " + TimePresentation.chartTime(complete.points.last().observedAt,
+                TimePresentation.chartTime(complete.points.last().observedAt,
                     java.time.ZoneOffset.UTC, java.util.Locale.US, "MMM d, HH:mm"))
             assertEquals(requests, fixture.transport.counts())
         }

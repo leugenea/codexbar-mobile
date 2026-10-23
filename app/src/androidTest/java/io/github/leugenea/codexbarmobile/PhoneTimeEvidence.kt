@@ -136,10 +136,13 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
     private fun labels(history: Boolean, dashboard: Boolean, observed: String, reset: String, resetSource: String, nominalStart: String) {
         if (dashboard) {
             compose.onNodeWithTag("live-five-hour-reset-absolute").assertDoesNotExist()
-            label("dashboard-observed-at", "Measurement observed at (second precision): $observed")
             val target = fixture.owner.state.value.refresh.inventory.success!!.inventory!!.items.single().value!!.expiresAt.value!!
             val locale = context.resources.configuration.locales[0]
             val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMdHHmm")
+            val source = fixture.owner.state.value.refresh.usage.success!!.usage!!.observedAt!!
+            val updated = source.atZone(ZoneId.systemDefault()).withSecond(0).withNano(0)
+                .format(java.time.format.DateTimeFormatter.ofPattern(pattern, locale))
+            label("dashboard-observed-at", "Updated $updated")
             val yearless = target.atZone(ZoneId.systemDefault()).withMinute(0).withSecond(0).withNano(0)
                 .format(java.time.format.DateTimeFormatter.ofPattern(pattern, locale))
             assertFalse("Banked expiry is yearless", yearless.contains("2027"))

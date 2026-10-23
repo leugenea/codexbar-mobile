@@ -27,6 +27,7 @@ class DashboardUiTest {
     @After fun cleanup() { try { isolation.cleanup() } finally { try { capture.restore() } finally { settings.restore() } } }
 
     @Test fun dashboardShowsBothCurrentWindowsWithoutHistoryNavigationAndRetainsMeasuredReferencePixels() {
+        fixture.transport.advance(2_279_000) // 08:37:59: Updated keeps minutes and floors seconds.
         launch().use { scenario ->
             login()
             for (kind in listOf(WindowKind.FIVE_HOUR, WindowKind.WEEKLY)) assertCurrentDrawing(recordedHistory(owner, kind), 1, 0, 1)
@@ -270,6 +271,7 @@ class DashboardUiTest {
     }
 
     @Test fun dashboardDarkLandscapeAndLargeFontKeepAccessibleTargetsAndCompleteText() {
+        fixture.transport.advance(2_279_000) // Same minute-precision observation as portrait chart captures.
         fixture.transport.inventoryBody = INVENTORY
         settings.apply(true, 2f)
         launch(dark = true, font = 2f, landscape = true).use { scenario ->
