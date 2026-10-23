@@ -61,7 +61,7 @@ private fun BankedTableRow(item: PresentedEntitlementItem, index: Int, time: Pho
     val status = stringResource(DashboardPresentation.bankedItemState(item.state))
     val remaining = if (item.state == EntitlementState.KNOWN)
         item.expiry.remaining?.let { remainingTimeLabel(it) } ?: status else status
-    val description = BankedRowDescription(item, index, expiry, status)
+    val description = bankedRowDescription(item, index, expiry, status)
     Row(Modifier.fillMaxWidth().testTag("banked-disclosure-item-$index").semantics(mergeDescendants = true) {
         contentDescription = description
     }, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -73,7 +73,7 @@ private fun BankedTableRow(item: PresentedEntitlementItem, index: Int, time: Pho
 }
 
 @Composable
-private fun BankedRowDescription(item: PresentedEntitlementItem, index: Int, expiry: String?, status: String): String {
+private fun bankedRowDescription(item: PresentedEntitlementItem, index: Int, expiry: String?, status: String): String {
     val datedExpired = expiry != null && item.state == EntitlementState.EXPIRED
     val expiryFact = when {
         expiry == null -> stringResource(R.string.dashboard_banked_expiry_unknown)

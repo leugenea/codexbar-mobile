@@ -194,7 +194,7 @@ class DashboardContracts(unittest.TestCase):
         self.assertIn("item.state == EntitlementState.KNOWN", card)
         self.assertIn("DashboardPresentation.bankedItemState(item.state)", card)
         self.assertNotIn('testTag("banked-disclosure-state-', card)
-        row = card[card.index("private fun BankedTableRow("):card.index("private fun BankedRowDescription(")]
+        row = card[card.index("private fun BankedTableRow("):card.index("private fun bankedRowDescription(")]
         self.assertEqual(row.count("Text("), 2)
         self.assertNotIn("Column(", row)
 
