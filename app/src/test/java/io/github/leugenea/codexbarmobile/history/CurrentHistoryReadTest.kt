@@ -167,6 +167,26 @@ class CurrentHistoryReadTest {
         assertNull(result.latestFiveHour); assertNull(result.latestWeekly)
     }
 
+    @Test fun wholeCurrentWindowRetainsEveryObservationBeyond32AcrossBatchesWithoutChangingDetailPages() {
+        val rows = jointRows(denseFirst = true)
+        val access = Access(rows)
+        val request = jointRequest(rows.last(), 32).copy(limit = HistoryLimits.MAX_OBSERVATIONS)
+        val pages = (CurrentHistoryRead.readCurrent(access, request) { false } as CurrentHistoryReadOutcome.Ready).pages
+        val five = pages.fiveHour!!
+        assertEquals((1L..640L).toList(), five.entries.map { it.id.ordinal })
+        assertSame(rows.first(), five.entries.first())
+        assertSame(rows.last(), five.entries.last())
+        assertSame(pages.latestFiveHour, five.entries.last())
+        assertFalse(five.hasMore)
+        assertEquals((636L..640L).toList(), pages.weekly!!.entries.map { it.id.ordinal })
+        assertTrue(access.reads.all { it.limit <= 256 })
+        assertEquals(listOf(null, ObservationId(256), ObservationId(512)), access.reads.map { it.after })
+        val detail = (CurrentHistoryRead.read(access, request.query(WindowKind.FIVE_HOUR).copy(limit = 32)) { false }
+            as HistoryReadOutcome.Ready).snapshot
+        assertEquals((1L..32L).toList(), detail.entries.map { it.id.ordinal })
+        assertTrue(detail.hasMore)
+    }
+
     private fun jointRequest(entry: HistoryEntry, limit: Int) = HistoryPresentationRequest.Current(
         entry.windows.single { it.kind == WindowKind.FIVE_HOUR }.point!!.segment.window,
         entry.windows.single { it.kind == WindowKind.WEEKLY }.point!!.segment.window, limit)

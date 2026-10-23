@@ -6,9 +6,9 @@ import io.github.leugenea.codexbarmobile.usage.WindowKind
 internal sealed interface HistoryPresentationRequest {
     data object Idle : HistoryPresentationRequest
     data class Page(val query: HistoryGraphQuery) : HistoryPresentationRequest
-    data class Current(val fiveHour: WindowIdentity?, val weekly: WindowIdentity?, val limit: Int = 32) : HistoryPresentationRequest {
+    data class Current(val fiveHour: WindowIdentity?, val weekly: WindowIdentity?, val limit: Int = HistoryLimits.MAX_OBSERVATIONS) : HistoryPresentationRequest {
         init {
-            require(limit in 1..256)
+            require(limit in 1..HistoryLimits.MAX_OBSERVATIONS)
             require(fiveHour == null || fiveHour.kind == WindowKind.FIVE_HOUR)
             require(weekly == null || weekly.kind == WindowKind.WEEKLY)
         }

@@ -36,7 +36,7 @@ class HistoryNavigationTest {
             captureNavigation(scenario)
             returnDashboard(compose, fixture.owner)
             await("current pair graph identity admitted") {
-                recordedHistory(fixture.owner).let { it.query.currentOnly && it.query.window != null && it.storage?.entries?.size == 32 }
+                recordedHistory(fixture.owner).let { it.query.currentOnly && it.query.window != null && it.storage?.entries?.size == 35 }
             }
             captureChart(scenario)
             enterStoredText()

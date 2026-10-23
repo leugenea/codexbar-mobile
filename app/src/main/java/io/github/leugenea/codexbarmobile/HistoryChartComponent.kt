@@ -10,7 +10,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -48,7 +50,7 @@ private fun HistoryWindowChart(series: HistoryPlotSeries, zone: ZoneId, locale: 
                 Modifier.testTag("$tag-title").semantics { heading() }, style = MaterialTheme.typography.titleMedium)
             Text(stringResource(historyStateResource(series.content)), Modifier.testTag("$tag-content"))
             Text(stringResource(R.string.history_chart_legend), Modifier.testTag("$tag-legend"))
-            Text(stringResource(R.string.history_chart_counts, drawing.markers.size, drawing.measured.size, drawing.nominal.size),
+            Text(stringResource(R.string.history_chart_counts, drawing.observations.size, drawing.measured.size, drawing.nominal.size),
                 Modifier.testTag("$tag-counts"))
             HistoryGeometryNotes(series, tag)
             val domain = series.measuredDomain
@@ -104,29 +106,38 @@ internal fun HistoryPercentPlot(drawing: HistoryChartDrawing, tag: String) {
             listOf(100, 50, 0).forEach { value -> Text(stringResource(R.string.history_chart_percent, value)) }
         }
         Canvas(Modifier.weight(1f).height(176.dp).testTag("$tag-canvas").semantics { hideFromAccessibility() }) {
-            drawChart(drawing, colors.primary, colors.onSurfaceVariant, colors.outlineVariant, colors.surface)
+            drawChart(drawing, colors.primary, colors.onSurfaceVariant, colors.outlineVariant)
         }
     }
 }
 
-// Inset keeps entire endpoint circles visible. Fractions remain unchanged, never clamped.
+// Inset keeps line caps and singleton ticks visible. Fractions are never clamped.
 private fun DrawScope.chartOffset(position: PlotPosition.Available): Offset {
     val inset = 8.dp.toPx()
     return Offset(inset + position.x.toFloat() * (size.width - 2 * inset),
         inset + (1f - position.y.toFloat()) * (size.height - 2 * inset))
 }
 
-private fun DrawScope.drawChart(drawing: HistoryChartDrawing, measured: Color, nominal: Color, grid: Color, background: Color) {
+private fun DrawScope.drawChart(drawing: HistoryChartDrawing, measured: Color, nominal: Color, grid: Color) {
     listOf(0.0, 0.5, 1.0).forEach { y ->
         val detail = PlotRenderDetail.APPROXIMATE
         drawLine(grid, chartOffset(PlotPosition.Available(0.0, y, detail)),
             chartOffset(PlotPosition.Available(1.0, y, detail)), 1.dp.toPx())
     }
+    val inset = 8.dp.toPx()
+    clipRect(inset, inset, size.width - inset, size.height - inset) {
+        drawing.trend?.let { line ->
+            drawLine(measured.copy(alpha = 0.45f), chartOffset(line.start), chartOffset(line.end), 2.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx())))
+        }
+    }
     val dash = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))
     drawing.nominal.forEach { line -> drawLine(nominal, chartOffset(line.start), chartOffset(line.end), 2.dp.toPx(), pathEffect = dash) }
-    drawing.measured.forEach { line -> drawLine(measured, chartOffset(line.start), chartOffset(line.end), 2.dp.toPx()) }
-    drawing.markers.forEach { point ->
-        drawCircle(background, 6.dp.toPx(), chartOffset(point))
-        drawCircle(measured, 4.dp.toPx(), chartOffset(point))
+    drawing.measured.forEach { line -> drawLine(measured, chartOffset(line.start), chartOffset(line.end), 2.dp.toPx(), cap = StrokeCap.Round) }
+    // No point markers. Only isolated runs need a minimal 2dp-long, 2dp-wide tick.
+    drawing.isolated.forEach { point ->
+        val center = chartOffset(point)
+        drawLine(measured, center - Offset(1.dp.toPx(), 0f), center + Offset(1.dp.toPx(), 0f),
+            2.dp.toPx(), cap = StrokeCap.Round)
     }
 }

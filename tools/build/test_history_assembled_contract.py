@@ -87,7 +87,7 @@ class HistoryAssembledContracts(unittest.TestCase):
         for name in ASSEMBLED_COUNTS:
             for key, value in (("canvasLeft", -1), ("canvasTop", float("nan")), ("canvasRight", 100),
                                ("canvasClippedLeft", 0.5), ("canvasClippedBottom", True),
-                               ("markerCount", True), ("connectionCount", 99), ("referenceCount", 99),
+                               ("observationCount", True), ("connectionCount", 99), ("referenceCount", 99),
                                ("boundaryCount", 99), ("pixelOraclePassed", False), ("pixelSamples", [])):
                 with self.subTest(name=name, key=key):
                     self.mutate(name, key, value)

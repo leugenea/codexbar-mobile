@@ -31,7 +31,7 @@ def dashboard_captures(directory, fixture):
                     layoutLabel=label, layoutFontScale=font, layoutDensity=1, windows=[],
                     currentHost=EXPECTED_CURRENT_HOST if mode == "CURRENT" else None)
         if mode == "CURRENT":
-            data["windows"] = [dict(kind=k, limit=32, after=0, reset="2027-01-15T09:00:00Z", duration=d,
+            data["windows"] = [dict(kind=k, limit=100000, after=0, reset="2027-01-15T09:00:00Z", duration=d,
                                     selectedOrdinals=[1], lastAdmitted=1) for k, d in (("FIVE_HOUR", 18000), ("WEEKLY", 604800))]
         if name == "dashboard-drawer-portrait-dark":
             data["drawerLabels"] = ["Full local history details", "Full live connection details", "Account settings"]
@@ -40,10 +40,10 @@ def dashboard_captures(directory, fixture):
         image = fixture.png(*size)
         if kind != "NONE":
             primary, reference = ((-10006364, -11975345) if not dark else (-3097345, -3488560))
-            samples = [dict(kind="marker", x=1, y=1, targetArgb=primary, actualArgb=primary, matched=True)]
+            samples = [dict(kind="observation", x=1, y=1, targetArgb=primary, actualArgb=primary, matched=True)]
             samples.extend(dict(kind="dash", x=2 if n < 28 else 3, y=2, targetArgb=reference,
                                 actualArgb=reference if n < 28 else -1, matched=n < 28) for n in range(56))
-            data.update(markerCount=1, connectionCount=0, referenceCount=1, boundaryCount=0, pixelOraclePassed=True,
+            data.update(observationCount=1, connectionCount=0, referenceCount=1, boundaryCount=0, pixelOraclePassed=True,
                         canvasLeft=0, canvasTop=0, canvasRight=4, canvasBottom=4,
                         canvasClippedLeft=0, canvasClippedTop=0, canvasClippedRight=4, canvasClippedBottom=4,
                         pixelSamples=samples)
@@ -98,7 +98,7 @@ class DashboardContracts(unittest.TestCase):
         self.assertEqual(DASHBOARD_JVM_COUNT, EXPECTED_DASHBOARD_JVM_COUNT)
         self.assertEqual(CURRENT_HISTORY_JVM[SCANNER_CLASS], EXPECTED_CURRENT_READ_JVM)
         self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_NATIVE.values())), 17)
-        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 24)
+        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 29)
         for kind, registry, source_set in (("jvm", EXPECTED_DASHBOARD_JVM, "test"), ("native", EXPECTED_DASHBOARD_NATIVE, "androidTest")):
             for classname, required in registry.items():
                 source = ROOT / f"app/src/{source_set}/java/{classname.replace('.', '/')}.kt"
@@ -125,6 +125,18 @@ class DashboardContracts(unittest.TestCase):
                         tree.write(path)
                         with self.subTest(kind=kind, name=name, mutation=mutation), self.assertRaises(ValueError):
                             verify_reports(self.directory, kind)
+
+    def test_metadata_ticks_reuse_lazy_analytics_and_remember_drawing_by_stable_series(self):
+        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
+        graph = (main / "history/HistoryProjection.kt").read_text()
+        self.assertIn("val entries: List<HistoryGraphEntry> by lazy", graph)
+        self.assertIn("val points: List<HistoryPoint> by lazy", graph)
+        dashboard = (main / "DashboardScreen.kt").read_text()
+        self.assertIn("remember { HistoryPlotCache() }.project(display)", dashboard)
+        self.assertIn("remember(series) { DashboardPresentation.hasChart(series) }", dashboard)
+        compact = (main / "CompactHistoryChart.kt").read_text()
+        self.assertIn("remember(series) { historyChartDrawing(series) }", compact)
+        self.assertIn("DashboardPresentation.paceComparison(display, observation, series.kind)", compact)
 
     def test_simplified_window_copy_removes_retired_lines_without_rounding_stored_history(self):
         main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
@@ -194,7 +206,7 @@ class DashboardContracts(unittest.TestCase):
                     dashboard_capture_receipt(path)
             path.with_suffix(".json").write_text(json.dumps(original))
             if original["sourceKind"] != "NONE":
-                for key, value in (("markerCount", 0), ("connectionCount", 1), ("canvasClippedLeft", .5), ("pixelSamples", [])):
+                for key, value in (("observationCount", 0), ("connectionCount", 1), ("canvasClippedLeft", .5), ("pixelSamples", [])):
                     data = dict(original); data[key] = value
                     path.with_suffix(".json").write_text(json.dumps(data))
                     with self.subTest(name=name, key=key), self.assertRaises(ValueError):

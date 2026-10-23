@@ -1,7 +1,7 @@
 """Offline, explicitly synthetic native-coverage retry/runner regressions; no emulator/Gradle."""
 from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DASHBOARD_NATIVE,
                                              EXPECTED_CURRENT_READ_JVM, SCANNER_CLASS)
-from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT
+from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT, verify_reports
 from verify_test_reports import HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE
 from verify_test_reports import HISTORY_IMPORT_JVM, HISTORY_IMPORT_NATIVE, REMAINING_TIME_JVM
 import copy
@@ -95,6 +95,12 @@ class RetryContracts(unittest.TestCase):
                                                    self.context if context is None else context,
                                                    self.failure if failure is None else failure,
                                                    self.identity, 7000)
+
+    def test_synthetic_reports_keep_all_required_jvm_and_native_cases(self):
+        for kind, relative, count in (("jvm", "test-results/testDebugUnitTest", 110),
+                                      ("native", "outputs/androidTest-results/connected", 153)):
+            with self.subTest(kind=kind):
+                self.assertEqual(verify_reports(self.build / relative, kind)["testCount"], count)
 
     def prepare_missing(self):
         self.native.unlink()

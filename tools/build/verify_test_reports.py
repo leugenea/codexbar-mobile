@@ -63,6 +63,16 @@ REMAINING_TIME_JVM = {
 
 
 CURRENT_HISTORY_JVM = {
+    "io.github.leugenea.codexbarmobile.HistoryTrendTest": {
+        "emptyObservationsHaveNoTrend",
+        "singleObservationHasNoTrend",
+        "twoObservationsFitExactlyWithinTheirTimeRange",
+        "identicalTimesWithVerticalSpreadHaveNoTrend",
+        "flatObservationsFitAHorizontalLine",
+        "risingFitUsesTimeSpacingRatherThanObservationIndex",
+        "fallingFitHandlesUnsortedTimesWithoutChangingObservations",
+        "verticalSpreadAtRepeatedTimesFitsAllPointsWithoutClampingEndpoints",
+    },
     "io.github.leugenea.codexbarmobile.history.CurrentHistoryPeriodTest": {
         "normalizedDurationSelectionUsesExactAbsoluteIdentityAndExistingEvaluationClock",
         "expiryClockLossBeforeStartAmbiguityAndRelativeDiscrepantMalformedResetNeverFallback",
@@ -78,6 +88,7 @@ CURRENT_HISTORY_JVM = {
         "jointCurrentScanFindsBothWindowsBehindArchivesWithIndependentLookahead",
         "jointCurrentScanMissingKeysStatusRetentionAndFailuresStayTyped",
         "jointCurrentScanHasOneHighWaterCeilingAndRejectsRevocation",
+        "wholeCurrentWindowRetainsEveryObservationBeyond32AcrossBatchesWithoutChangingDetailPages",
     },
 }
 CURRENT_HISTORY_NATIVE = {
@@ -227,13 +238,13 @@ HISTORY_TEXT_CASES = {
 
 HISTORY_CHART_CLASS = "io.github.leugenea.codexbarmobile.HistoryChartComponentTest"
 HISTORY_CHART_CASES = {
-    "singleMeasuredMarkerAndDashedNominalAreSeparateActualPixels",
+    "singleMeasuredTickAndDashedNominalAreSeparateActualPixels",
     "connectedMeasurementsDrawStraightEdgesAndPercentAxisInDarkPortrait",
     "gapsCorrectionsAndResetChangesHaveNoPaintedBridgeInLandscapeDark",
     "emptyStatusOnlyLoadingAndErrorsNeverInventACanvasOrZero",
     "typedUnavailableGeometryAndUnderflowKeepExactFactsInsteadOfClamping",
     "unknownBaselineLargeFontKeepsSinglePointCompleteLabelsAndReachableDetails",
-    "endpointMarkersAreFullyInsetAndVisibleInLandscapeLight",
+    "lineEndpointsAreInsetWithoutPointMarkersInLandscapeLight",
 }
 
 
@@ -307,6 +318,11 @@ DEVICE_CODE_COPY_CASES = {
 
 
 DASHBOARD_JVM = {
+    'io.github.leugenea.codexbarmobile.HistoryPlotCacheTest': {
+        'metadataTicksReuseWholeWindowGraphAndDrawingInputsWhileKeepingLiveMetadataAndPaceCurrent',
+        'changedPageQueryGenerationPartitionRequestAndSelectionRebuildWholeWindowInputs',
+        'cachedCurrentInputsNeverBypassPeriodOrDisplayRevocation',
+    },
     'io.github.leugenea.codexbarmobile.DashboardPresentationTest': {
         'compactChartEquivalentUsesOriginalExactFactsAndIndependentReferences',
         'compactMissingChartAndPhaseActionsKeepTypedErrorsAndSinglePointTruth',
@@ -316,6 +332,7 @@ DASHBOARD_JVM = {
         'paceLineNearZeroAndAdjacentBoundaryValuesNeverShowSignedZero',
         'paceLineKeepsOneDecimalAndLocaleSeparator',
         'compactPaceBeyondFirst32ObservationsMatchesAcceptedHeadlineAndClock',
+        'compactWholeWindowLastPointEndLabelAndTrendReachLatestObservationBeyond32',
         'compactPaceKeepsIndependentlyAgingFiveHourAndWeeklyObservationsSeparate',
         'compactPaceNeverFallsBackWhenAcceptedComparisonIsMissingOrIneligible',
         'chartTimeLabelsUseYearlessLocalePatternsAndContainingHour',

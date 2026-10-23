@@ -803,9 +803,10 @@ cases, dependencies, permissions and the coverage denominator/threshold are reta
 that unchanged textual equivalent; the caller supplies a detached page, B1 locale/
 zone/evaluation context and scrolling. Its optional kind selector keeps reusable
 both-kind rendering available while the production connection view shows one kind.
-`HistoryChartDrawing` maps only supplied page-local runs into measured circles and
-straight within-run edges. A single measurement remains a circle. Separate nominal
-analytical endpoints produce dashed lines, never measured markers or forecasts.
+`HistoryChartDrawing` maps only supplied runs into solid measured lines, without
+point markers. A single-observation run remains a minimal line-width tick. Separate
+nominal analytical endpoints retain long dashes; a least-squares usage trend uses
+semi-transparent short dashes, never measured endpoints or a forecast.
 Shape/line-style labels do not rely on color alone. No smoothing, clamping, fake
 measured start/reset point, sorting, quota calculation or cross-page cache is added.
 
@@ -819,7 +820,7 @@ with no duplicated exact-value announcement or countdown live region.
 
 Seven deterministic `HistoryChartDrawingTest` cases cover drawing roles and boundary
 preservation. Eight mandatory `HistoryChartComponentTest` cases exercise production
-Canvas pixels, dashed gaps, marker/straight-edge visibility, absent run bridges,
+Canvas pixels, dashed gaps, singleton-tick/straight-edge visibility, absent run bridges,
 labels/semantics/layout and reachable details across phone portrait/landscape,
 light/dark and doubled font scale. Six synthetic chart PNGs extend the existing
 collector without removing its four textual PNGs or 85 inherited native identities.
@@ -884,7 +885,7 @@ selected-page cursors; mode/current-key changes reset the cursor. Current kind c
 key; stored-text kind changes preserve the original ordinal cursor. There is no
 page stack or accumulated history. Current chart projection reuses the existing
 EvenDistribution, plot inputs, renderer and phone-local time labels, preserving
-actual markers/within-run solid edges and eligible dashed analytical references.
+actual within-run solid lines/singleton ticks and eligible dashed analytical references.
 
 Selection and detail state are in-memory `remember`, not Bundle/saved snapshots.
 The recorder's one volatile display-context slot replaces its private Binding
@@ -1124,20 +1125,25 @@ kind selector. Known percentages and B1 minute-precision `Next reset in` labels 
 the compact charts; there is no separate absolute-reset line in these cards. Missing
 current identity or actual renderable retained history has one concise no-information
 line per window, no empty Canvas or analytical-only substitute. A single observation
-remains one marker without an invented observed trend. `CompactHistoryChart` reuses the
+remains one minimal tick without an invented observed trend. `CompactHistoryChart` reuses the
 existing plot/drawing/axis/paint primitives and original observed comparison for its
-compact accessible equivalent; detailed
-admission/clock/cursor/counter text stays in stored details. No alternative math,
+compact accessible equivalent. Each window keeps one UI-local plot cache, keyed by
+retained storage-page identity, generation, partition, query, request and selection;
+no retained-entry list comparison occurs on metadata ticks. Snapshot analytics are
+lazy, so fresh metadata wrappers do not rebuild comparisons. Stable immutable series
+key remembered drawing/OLS and geometry warnings. The host still checks actual
+revocation/period authority on every pass, and current metadata/latest-entry pace
+binding is never cached. Detailed admission/clock/cursor/counter text stays in stored details. No alternative math,
 normalization, inferred zero, old-period fallback or accumulated archive is added.
 
 `HistoryPresentationRequest` has fixed Idle/Page/Current cases; Current contains
-only two nullable exact window keys and a bounded limit (production32). The joint
+only two nullable exact window keys and a bounded limit (production100000). The joint
 `CurrentHistoryRead` scan starts at null; the compatible single-current delegate
 starts at query.after and retains the original query in its returned storage page.
 Both share ascending batches<=256, an initial high-water and a total100000 examined
-ceiling. Independent32+1 selected buffers prevent a dense first window from
-starving a sparse sibling. Current requests scan through that high-water and retain
-one latest matching entry per window separately from the unchanged first chart page;
+ceiling. Independent selected buffers retain every matching entry through that
+high-water, bounded by the same100000 admitted observations across both windows.
+Current requests also retain one latest matching entry per window for pace binding;
 paginated detail requests still stop at their matching lookahead. A later failed
 batch fails the joint result rather than publishing a healthy partial success. The
 native storage port/schema/retention,
@@ -1171,6 +1177,43 @@ compatible whole-handwritten>=90% INSTRUCTION union and APK acceptance are pendi
 until their exact candidate evidence is independently reviewed. No signed-release,
 live-provider or merge approval follows from source/static tooling.
 
+## Whole-window solid charts and linear trend (issue 174)
+
+Both compact and shared detail chart drawing connect consecutive observations with
+solid 2dp lines only within existing runs. There are no point markers. An isolated
+run uses a 2dp-long, 2dp-wide round-capped tick so a real lone measurement remains
+visible. The accessible legend distinguishes solid measured usage, faint short-dashed
+least-squares trend and the existing long-dashed nominal full-quota reference.
+
+`HistoryTrend` is pure Kotlin ordinary least squares over all renderable observations
+in the displayed series, fitting used percent against actual time, not ordinal index.
+Affine-normalized plot coordinates yield the same fit. Centered covariance/variance
+avoid large timestamp squares; repeated times contribute independently. Fewer than
+two points or zero time spread have no trend. The line spans only the earliest/latest
+observation, is painted at 45% opacity with 4dp/4dp dashes and clipped to the percent
+plot. Its analytical fit may span measured run breaks; solid lines never do.
+
+Compact Current requests now select all matching retained entries rather than 32.
+The same joint ascending scan, native batches<=256, initial high-water and 100000
+examined-entry ceiling remain. Space/time are O(retention ceiling), with at most
+100000 selected entry references per window; no downsampling, fake points, retention,
+SQLite port/schema or provider cadence change. Latest-admitted-entry provenance remains
+separate for pace (including status-only/latest-ineligible facts). Detail Page requests
+and their 32-entry ordinal pagination are unchanged.
+
+For multiple compact observation times, the axis spans the earliest/latest real
+measurement, so the last label and trend cannot stop at the first page. Eligible nominal
+references are analytically evaluated at their intersection with that visible span;
+no measured point changes. Single-time compact series retain existing nominal context.
+Detail components retain their original page-local domain. JVM regressions cover 640
+selected rows across native-sized batches and 320 observations through the compact
+projection, axis end and trend. Eight pure fit cases cover empty/single/two points,
+identical times, flat/rising/falling usage and vertical spread/axis overshoot. Existing
+native cases add no-marker and translucent dashed-trend pixel checks and whole-window
+production assertions without adding Activity campaigns. Capture receipts count
+observations, not rendered markers; exact report registries and synthetic budgets are
+updated. Native captures, Kotlin execution and compatible coverage still require CI.
+
 ## Simplified usage window cards (issue 173)
 
 The dashboard's last-reported-usage status owns one localized second-precision
@@ -1184,7 +1227,7 @@ facts, deltas and loss/retention diagnostics, and full connection details retain
 its independently labeled absolute/relative reset facts.
 
 Each compact pace line uses the latest independently selected admitted window,
-not the last point of the first32-entry chart page. Its observation instant and
+not an inferred comparison from chart geometry. Its observation instant and
 original percent/duration/reset facts must match the same accepted usage source
 that supplies the headline and top timestamp. Pending/missing/mismatched comparisons
 show the existing unavailable state; a latest status-only or ineligible observation
@@ -1206,8 +1249,8 @@ and plural formatter supplies `Next reset in <remaining>` without a second suffi
 Mandatory JVM additions cover pace direction/rounding/locale and yearless
 label/timezone/offset/unknown boundaries, plus latest-observation provenance beyond
 32 entries, independently aging windows across storage batches, and unavailable/
-status-only/correction cases. The chart still renders its original bounded first
-page (including its original axis endpoints); chart redesign remains issue174.
+status-only/correction cases. Issue174 below supersedes the compact first-page
+chart limit while preserving that pace provenance.
 One added native dashboard method covers
 removed lines, the single top clock, left/right yearless labels and reserve/on/over/
 unknown pace through actual accepted reads. Existing large-font/landscape label

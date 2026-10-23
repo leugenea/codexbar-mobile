@@ -1,5 +1,10 @@
 """Independent issue142 regression oracles; never import registries under validation."""
 EXPECTED_DASHBOARD_JVM = {
+    "io.github.leugenea.codexbarmobile.HistoryPlotCacheTest": {
+        "metadataTicksReuseWholeWindowGraphAndDrawingInputsWhileKeepingLiveMetadataAndPaceCurrent",
+        "changedPageQueryGenerationPartitionRequestAndSelectionRebuildWholeWindowInputs",
+        "cachedCurrentInputsNeverBypassPeriodOrDisplayRevocation",
+    },
     "io.github.leugenea.codexbarmobile.DashboardPresentationTest": {
         "compactChartEquivalentUsesOriginalExactFactsAndIndependentReferences",
         "compactMissingChartAndPhaseActionsKeepTypedErrorsAndSinglePointTruth",
@@ -9,6 +14,7 @@ EXPECTED_DASHBOARD_JVM = {
         "paceLineNearZeroAndAdjacentBoundaryValuesNeverShowSignedZero",
         "paceLineKeepsOneDecimalAndLocaleSeparator",
         "compactPaceBeyondFirst32ObservationsMatchesAcceptedHeadlineAndClock",
+        "compactWholeWindowLastPointEndLabelAndTrendReachLatestObservationBeyond32",
         "compactPaceKeepsIndependentlyAgingFiveHourAndWeeklyObservationsSeparate",
         "compactPaceNeverFallsBackWhenAcceptedComparisonIsMissingOrIneligible",
         "chartTimeLabelsUseYearlessLocalePatternsAndContainingHour",
@@ -58,6 +64,7 @@ EXPECTED_SCANNER_ADDITIONS = {
     "jointCurrentScanFindsBothWindowsBehindArchivesWithIndependentLookahead",
     "jointCurrentScanMissingKeysStatusRetentionAndFailuresStayTyped",
     "jointCurrentScanHasOneHighWaterCeilingAndRejectsRevocation",
+    "wholeCurrentWindowRetainsEveryObservationBeyond32AcrossBatchesWithoutChangingDetailPages",
 }
 # These pre-existing source tests remain protected, but this does not make unrelated
 # JVM methods new mandatory report targets.
@@ -114,4 +121,4 @@ EXPECTED_CURRENT_HOST = {"context": "MATCH", "selection": "MATCH", "periods": "M
 
 # Literal review budgets, independently checked against the enumerated sets.
 EXPECTED_DASHBOARD_NATIVE_COUNT = 17
-EXPECTED_DASHBOARD_JVM_COUNT = 21
+EXPECTED_DASHBOARD_JVM_COUNT = 25

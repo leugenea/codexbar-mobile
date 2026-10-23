@@ -209,12 +209,12 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
         val drawing = historyChartDrawing(series)
         val colors = if (data.getBoolean("dark")) darkColorScheme() else lightColorScheme()
         val pixels = HistoryAcceptancePixels(bitmap, full, data.getDouble("density").toFloat())
-        drawing.markers.forEach { pixels.sample("marker", it, colors.primary.toArgb(), true) }
+        drawing.observations.forEach { pixels.sample("observation", it, colors.primary.toArgb(), true) }
         drawing.measured.forEach { pixels.between("edge", it.start, it.end, colors.primary.toArgb(), true) }
         series.segments.zipWithNext().forEach { (one, two) -> pixels.between("break",
             one.points.last().position as PlotPosition.Available, two.points.first().position as PlotPosition.Available, colors.primary.toArgb(), false) }
         drawing.nominal.forEach { pixels.dashes(it, colors.onSurfaceVariant.toArgb()) }
-        data.put("markerCount", drawing.markers.size).put("connectionCount", drawing.measured.size)
+        data.put("observationCount", drawing.observations.size).put("connectionCount", drawing.measured.size)
             .put("referenceCount", drawing.nominal.size).put("boundaryCount", (series.segments.size - 1).coerceAtLeast(0))
             .put("pixelSamples", pixels.samples).put("pixelOraclePassed", true)
     }

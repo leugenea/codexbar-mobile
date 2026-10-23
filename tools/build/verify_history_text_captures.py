@@ -65,12 +65,12 @@ ASSEMBLED_CAPTURES = {
 }
 ASSEMBLED_PAGES = {
     "history-assembled-fresh-portrait-light": ("IDLE", "UNAVAILABLE", "NONE", 256, 0, 0, 0, 0, 0, 0),
-    "history-assembled-single-portrait-dark": ("OBSERVED", "READY", "FIVE_HOUR", 32, 0, 1, 1, 1, 5, 2),
+    "history-assembled-single-portrait-dark": ("OBSERVED", "READY", "FIVE_HOUR", 100000, 0, 1, 1, 1, 5, 2),
     "history-assembled-breaks-landscape-dark": ("RESTORED", "READY", "FIVE_HOUR", 32, 0, 1, 7, 7, 5, 2),
     "history-assembled-unknown-large-font": ("RESTORED", "READY", "FIVE_HOUR", 32, 0, 1, 1, 1, 5, 2),
     "history-assembled-page-landscape-light": ("RESTORED", "READY", "FIVE_HOUR", 32, 32, 33, 35, 3, 5, 2),
-    "history-current-light-portrait": ("OBSERVED", "READY", "FIVE_HOUR", 32, 0, 301, 306, 5, 7, 4),
-    "history-current-dark-portrait": ("OBSERVED", "READY", "FIVE_HOUR", 32, 0, 301, 306, 5, 7, 4),
+    "history-current-light-portrait": ("OBSERVED", "READY", "FIVE_HOUR", 100000, 0, 301, 306, 5, 7, 4),
+    "history-current-dark-portrait": ("OBSERVED", "READY", "FIVE_HOUR", 100000, 0, 301, 306, 5, 7, 4),
 }
 ASSEMBLED_CONTROLS = {
     "history-assembled-fresh-portrait-light": ["open-drawer", "open-account-settings"],
@@ -253,9 +253,14 @@ def valid_configuration(metadata: dict, expected: dict, size: tuple[int, int]) -
 
 
 def verify_chart_metadata(metadata: dict, name: str, size: tuple[int, int]) -> None:
-    expected = dict(zip(("markerCount", "connectionCount", "referenceCount"), CHART_COUNTS[name]))
+    expected = dict(zip(("observationCount", "connectionCount", "referenceCount"), CHART_COUNTS[name]))
     if any(type(metadata.get(key)) is not int or metadata[key] != value for key, value in expected.items()):
         raise ValueError("Chart capture drawing identities/counts changed")
+    trend = int(CHART_COUNTS[name][0] >= 2)
+    if type(metadata.get("trendCount")) is not int or metadata["trendCount"] != trend:
+        raise ValueError("Chart capture trend identities/count changed")
+    if metadata.get("trendPixelOraclePassed") is not (name == "history-chart-measured-portrait-dark"):
+        raise ValueError("Chart capture lacks the translucent dashed trend pixel oracle")
     if metadata.get("pixelOraclePassed") is not True:
         raise ValueError("Chart capture lacks native pixel oracle")
     verify_canvas_bounds(metadata, size)
@@ -291,10 +296,12 @@ def verify_integrated_metadata(metadata: dict, name: str, size: tuple[int, int])
     verify_production_root(metadata)
     if metadata.get("route") != PRODUCTION_ROUTES[name]:
         raise ValueError("Integrated detail/dashboard route changed")
-    expected = dict(queryLimit=32, queryAfter=0, firstOrdinal=1, lastOrdinal=32, pageEntries=32, requests=5, gets=2)
+    compact = name == "history-integrated-chart-portrait-light"
+    expected = dict(queryLimit=100000 if compact else 32, queryAfter=0, firstOrdinal=1,
+                    lastOrdinal=35 if compact else 32, pageEntries=35 if compact else 32, requests=5, gets=2)
     if any(type(metadata.get(key)) is not int or metadata[key] != value for key, value in expected.items()):
         raise ValueError("Integrated capture lacks bounded dormant page/request identities")
-    if metadata.get("productionEntry") is not True or metadata.get("hasMore") is not True:
+    if metadata.get("productionEntry") is not True or metadata.get("hasMore") is not (not compact):
         raise ValueError("Integrated capture is not a production entry with more retained data")
     identity = (metadata.get("activity"), metadata.get("phase"), metadata.get("queryKind"), metadata.get("visibleControls"))
     if identity != ("io.github.leugenea.codexbarmobile.MainActivity", "OBSERVED", "FIVE_HOUR", INTEGRATED_CONTROLS[name]):
@@ -369,18 +376,18 @@ def verify_sample(item: dict, actual: int) -> None:
     matched = all(abs(((actual >> shift) & 255) - ((target >> shift) & 255)) <= 12 for shift in (0, 8, 16))
     if type(item.get("actualArgb")) is not int or item["actualArgb"] != actual or item.get("matched") is not matched:
         raise ValueError("Assembled sample receipt disagrees with decoded PNG pixels")
-    required = {"marker": True, "edge": True, "break": False, "dash": matched}
+    required = {"observation": True, "edge": True, "break": False, "dash": matched}
     if item.get("kind") not in required or matched != required[item["kind"]]:
         raise ValueError("Assembled native paint oracle failed")
 
 
 def verify_assembled_pixels(metadata: dict, name: str, image: bytes) -> None:
     counts = ASSEMBLED_COUNTS[name]
-    keys = ("markerCount", "connectionCount", "referenceCount", "boundaryCount")
+    keys = ("observationCount", "connectionCount", "referenceCount", "boundaryCount")
     if any(type(metadata.get(key)) is not int or metadata[key] != value for key, value in zip(keys, counts)):
         raise ValueError("Assembled drawing identities/counts changed")
     samples = metadata.get("pixelSamples")
-    expected = dict(zip(("marker", "edge", "dash", "break"), (counts[0], counts[1], counts[2] * 56, counts[3])))
+    expected = dict(zip(("observation", "edge", "dash", "break"), (counts[0], counts[1], counts[2] * 56, counts[3])))
     if not isinstance(samples, list) or not samples or len(samples) > 512 or any(not isinstance(item, dict) for item in samples):
         raise ValueError("Missing/bounded assembled PNG sample evidence")
     observed = {kind: sum(item.get("kind") == kind for item in samples) for kind in expected}
@@ -495,7 +502,7 @@ def verify_live_samples(metadata: dict, image: bytes, size: tuple[int, int]) -> 
     for item, actual in zip(samples, decoded_samples(image, samples)):
         verify_live_sample_bounds(item, size)
         # Same channel tolerance/actual-byte check as the inherited chart oracle.
-        verify_sample(dict(item, kind="marker"), actual)
+        verify_sample(dict(item, kind="observation"), actual)
 
 
 def verify_live_sample_bounds(item: dict, size: tuple[int, int]) -> None:
@@ -574,7 +581,7 @@ def verify_dashboard_windows(metadata: dict) -> None:
         if metadata.get("windows") != []:
             raise ValueError("Non-current route must not claim current chart selection")
         return
-    expected = [dict(kind=kind, limit=32, after=0, reset="2027-01-15T09:00:00Z", duration=duration,
+    expected = [dict(kind=kind, limit=100000, after=0, reset="2027-01-15T09:00:00Z", duration=duration,
                      selectedOrdinals=[1], lastAdmitted=1) for kind, duration in (("FIVE_HOUR", 18000), ("WEEKLY", 604800))]
     windows = metadata.get("windows")
     if windows != expected:
@@ -589,12 +596,12 @@ def verify_dashboard_pixels(metadata: dict, size: tuple[int, int], image: bytes)
     samples = metadata.get("pixelSamples")
     if metadata.get("pixelOraclePassed") is not True or not isinstance(samples, list):
         raise ValueError("Dashboard lacks actual registered pixel receipts")
-    expected_counts = dict(markerCount=1, connectionCount=0, referenceCount=1, boundaryCount=0)
+    expected_counts = dict(observationCount=1, connectionCount=0, referenceCount=1, boundaryCount=0)
     if any(type(metadata.get(k)) is not int or metadata[k] != v for k, v in expected_counts.items()):
         raise ValueError("Dashboard single-point/reference paint identities changed")
-    if [item.get("kind") for item in samples].count("marker") != 1 or [item.get("kind") for item in samples].count("dash") != 56:
+    if [item.get("kind") for item in samples].count("observation") != 1 or [item.get("kind") for item in samples].count("dash") != 56:
         raise ValueError("Dashboard marker/dash samples missing or duplicated")
-    if any(item.get("kind") not in {"marker", "dash"} for item in samples):
+    if any(item.get("kind") not in {"observation", "dash"} for item in samples):
         raise ValueError("Dashboard single observation cannot claim measured edges")
     primary, reference = ((-10006364, -11975345) if not metadata["dark"] else (-3097345, -3488560))
     for item, actual in zip(samples, decoded_samples(image, samples)):
@@ -603,7 +610,7 @@ def verify_dashboard_pixels(metadata: dict, size: tuple[int, int], image: bytes)
         if item.get("targetArgb") != (reference if item["kind"] == "dash" else primary):
             raise ValueError("Dashboard paint target differs from registered role")
         verify_sample(item, actual)
-    marker = next(item for item in samples if item["kind"] == "marker")
+    marker = next(item for item in samples if item["kind"] == "observation")
     dashes = [item for item in samples if item["kind"] == "dash"]
     if not marker["matched"] or sum(item["matched"] for item in dashes) < 10 or sum(not item["matched"] for item in dashes) < 10:
         raise ValueError("Dashboard actual marker/dashed hits and gaps required")

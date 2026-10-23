@@ -18,9 +18,12 @@ internal object HistoryPlotInputs {
         val references = selected.mapNotNull { (_, window) ->
             (window.reference as? DistributionReference.Available)?.series
         }.distinctBy { it.window to it.segment }
-        val instants = selected.mapNotNull { it.second.source.point?.observedAt } +
-            references.flatMap { listOf(it.start.at, it.end.at) }
-        val time = HistoryPlotCoordinates.timeDomain(instants)
+        val observed = selected.mapNotNull { it.second.source.point?.observedAt }
+        // Multi-observation compact charts end at the latest measurement, not a page cutoff
+        // or the future reset. Singletons retain nominal context without inventing a span.
+        val measuredTime = HistoryPlotCoordinates.timeDomain(observed)
+        val time = if (source.request is HistoryPresentationRequest.Current && measuredTime?.extent == PlotTimeExtent.SPAN)
+            measuredTime else HistoryPlotCoordinates.timeDomain(observed + references.flatMap { listOf(it.start.at, it.end.at) })
         val measuredDomain = time?.let { HistoryPlotDomain(it, HistoryPlotCoordinates.percent) }
         val deltaDomain = time?.let { HistoryPlotDomain(it, HistoryPlotCoordinates.delta) }
         val samples = selected.map { (entry, window) -> sample(entry, window, measuredDomain, deltaDomain) }
@@ -30,10 +33,19 @@ internal object HistoryPlotInputs {
         val deltas = runs(samples) { it.delta?.position is PlotPosition.Available }.map { run ->
             HistoryPlotDeltaSegment(run.first().measured!!.source.segment, run.map { it.delta!! })
         }
-        val analytical = references.map { reference -> HistoryPlotReference(reference,
-            HistoryPlotCoordinates.position(measuredDomain!!, reference.start.at, reference.start.percent),
-            HistoryPlotCoordinates.position(measuredDomain, reference.end.at, reference.end.percent)) }
+        val analytical = references.mapNotNull { reference -> referenceWithin(reference, measuredDomain!!) }
         return HistoryPlotSeries(kind, content(source, samples), measuredDomain, deltaDomain, samples, segments, deltas, analytical)
+    }
+
+    private fun referenceWithin(reference: EvenDistributionReference, domain: HistoryPlotDomain): HistoryPlotReference? {
+        val first = maxOf(reference.start.at, domain.time.first)
+        val last = minOf(reference.end.at, domain.time.last)
+        if (first > last) return null
+        val start = reference.evaluate(first) as BaselineEvaluation.Available
+        val end = reference.evaluate(last) as BaselineEvaluation.Available
+        return HistoryPlotReference(reference,
+            HistoryPlotCoordinates.position(domain, first, start.percent),
+            HistoryPlotCoordinates.position(domain, last, end.percent))
     }
 
     private fun sample(

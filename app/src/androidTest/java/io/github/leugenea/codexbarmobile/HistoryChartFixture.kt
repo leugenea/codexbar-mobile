@@ -14,7 +14,7 @@ internal object HistoryChartFixture {
     // Deliberately after a fixed reset: real measurements remain drawable without a nominal
     // reference expanding this short time domain. This is not an inferred new quota window.
     fun page(gap: Boolean = false, correction: Boolean = false, changedReset: Boolean = false,
-        endpoints: Boolean = false): List<HistoryEntry> {
+        endpoints: Boolean = false, spread: Boolean = false): List<HistoryEntry> {
         var cursor = HistoryCursor(HistoryTextFixture.partition)
         val entries = mutableListOf<HistoryEntry>()
         for (index in 0..3) {
@@ -24,6 +24,7 @@ internal object HistoryChartFixture {
                 cursor = result.cursor
             }
             val percent = when {
+                spread -> listOf(20, 25, 70, 80)[index]
                 endpoints -> listOf(0, 33, 66, 100)[index]
                 correction && index >= 2 -> 10 + (index - 2) * 20
                 else -> 20 + index * 20

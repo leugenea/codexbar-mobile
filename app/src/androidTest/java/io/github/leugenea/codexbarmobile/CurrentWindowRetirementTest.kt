@@ -161,7 +161,7 @@ class CurrentWindowRetirementTest {
             assertCurrentDrawing(recordedHistory(owner), 0, 0, 0)
             val window = WindowIdentity(requireNotNull(recordedHistory(owner).partition), WindowKind.FIVE_HOUR,
                 18_000, Instant.ofEpochSecond(1_800_003_600L))
-            val query = HistoryGraphQuery(32, kind = WindowKind.FIVE_HOUR, window = window, currentOnly = true)
+            val query = HistoryGraphQuery(HistoryLimits.MAX_OBSERVATIONS, kind = WindowKind.FIVE_HOUR, window = window, currentOnly = true)
             assertEquals(query, recordedHistory(owner).query)
             assertNull(recordedHistory(owner).storage!!.lastAdmitted)
             assertEquals(1L, recordedHistory(owner).lostSamples)

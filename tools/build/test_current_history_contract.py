@@ -56,7 +56,7 @@ class CurrentHistoryContracts(unittest.TestCase):
                 path.write_text(json.dumps(data))
                 with self.subTest(name=name, key=key), self.assertRaises(ValueError):
                     verify_captures(self.directory)
-            for role in ("marker", "edge", "dash", "break"):
+            for role in ("observation", "edge", "dash", "break"):
                 self.fixture.captures()
                 path = self.directory / (name + ".json")
                 data = json.loads(path.read_text())
@@ -79,7 +79,9 @@ class CurrentHistoryContracts(unittest.TestCase):
         self.assertNotRegex(selector + host, r"Instant\.now|UsageNormalizer\.normalize|readUsage\(")
         self.assertIn("HistoryLimits.MAX_OBSERVATIONS", scan)
         self.assertIn("page.nextAfter", scan)
-        self.assertIn("query.limit + 1", scan)
+        self.assertIn("val selected = ArrayList<HistoryEntry>()", scan)
+        self.assertIn("selected.size > query.limit", scan)
+        self.assertIn("if (!complete) selected.add(entry)", scan)
         self.assertIn("HistoryTextComponent", host)
         root = (main / "DashboardNavigation.kt").read_text()
         self.assertIn("authority?.periods", root)
