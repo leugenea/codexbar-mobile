@@ -32,7 +32,8 @@ internal object CurrentHistoryRead {
 
     /** Whole-window cards retain bounded selected entries and independent latest pace provenance. */
     private class Selection(val query: HistoryGraphQuery, val latest: Boolean = false) {
-        val selected = ArrayList<HistoryEntry>(query.limit + 1)
+        // Grow with actual matches; the whole-window ceiling is not an upfront allocation.
+        val selected = ArrayList<HistoryEntry>()
         var highWater: ObservationId? = null
         var last: HistoryReadSnapshot? = null
         var latestEntry: HistoryEntry? = null
