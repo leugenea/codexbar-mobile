@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792771075011,
+  "lastUpdate": 1792771077216,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -4921,6 +4921,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/5b3bf965f504783e55c04a31f7dfbf1f37f34c3d"
         },
         "date": 1792760836691,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b74e4155c83990c3130235b9523e0dfd8abec27e",
+          "message": "feat(ui): simplify dashboard usage window details (#177)\n\n* feat(ui): simplify dashboard usage window details (#173)\n\n* fix(ui): bind compact pace to the latest accepted observation (#173)",
+          "timestamp": "2026-10-23T18:57:26+03:00",
+          "tree_id": "743732dd5387668438095128a01f1ea47498bf26",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/b74e4155c83990c3130235b9523e0dfd8abec27e"
+        },
+        "date": 1792771076956,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
