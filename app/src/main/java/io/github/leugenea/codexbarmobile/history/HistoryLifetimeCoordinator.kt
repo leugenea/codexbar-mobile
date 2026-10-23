@@ -25,6 +25,9 @@ interface HistoryRuntimeAccess : HistoryStore {
     val partition: HistoryPartition
     /** Blocking, coherent paged export; null means unavailable, never an invented empty history. */
     fun exportHistory(appVersion: String, exportedAt: java.time.Instant): String? = null
+    /** Blocking validated replacement; revoked ports never write. */
+    fun importHistory(text: String, now: java.time.Instant): HistoryImportOutcome =
+        HistoryImportOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE)
     fun revoke()
 }
 

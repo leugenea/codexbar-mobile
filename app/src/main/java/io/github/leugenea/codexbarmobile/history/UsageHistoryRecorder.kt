@@ -64,6 +64,7 @@ internal class UsageHistoryRecorder(
     private var workerGap: HistoryGap? = null
     private var worker: Job? = null
     private var readPending = false
+    private var replacing = false
     private var request: HistoryPresentationRequest = HistoryPresentationRequest.Page(HistoryGraphQuery())
     private var selection = HistoryDisplaySelection(request)
     private val query get() = (request as? HistoryPresentationRequest.Page)?.query ?: HistoryGraphQuery()
@@ -178,6 +179,24 @@ internal class UsageHistoryRecorder(
     /** Explicit local reread, including equal Page values. No provider work or admission. */
     fun query(next: HistoryGraphQuery) = select(HistoryPresentationRequest.Page(next))
 
+    /** Owner-lane barrier: drain the admitted read/append pair before replacement, then reread.
+     * No recorder can carry a pre-import N+1 across the replacement transaction. */
+    suspend fun importHistory(access: HistoryRuntimeAccess, text: String, now: java.time.Instant): HistoryImportOutcome {
+        val current = binding?.takeIf { it.access === access && !it.revoked }
+            ?: return HistoryImportOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
+        if (replacing) return HistoryImportOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE)
+        replacing = true
+        return try {
+            worker?.join()
+            val result = withContext(storageDispatcher) { access.importHistory(text, now) }
+            if (result == HistoryImportOutcome.Imported && binding === current && !current.revoked) select(request)
+            result
+        } finally {
+            replacing = false
+            drain()
+        }
+    }
+
     private fun select(next: HistoryPresentationRequest) {
         request = next
         queryRevision++
@@ -237,7 +256,7 @@ internal class UsageHistoryRecorder(
     }
 
     private fun drain() {
-        if (worker != null) return
+        if (worker != null || replacing) return
         val current = binding ?: return
         val next = queue.removeFirstOrNull()
         if (next == null && !readPending) return

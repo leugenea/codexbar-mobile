@@ -381,6 +381,15 @@
     <string name="dashboard_inventory_discrepant">Inventory differs from reported counts</string>
     <string name="dashboard_banked_partial">Inventory is partial</string>
     <string name="dashboard_banked_stale">Inventory may be out of date</string>
+    <string name="history_import">Import history</string>
+    <string name="history_import_confirmation">This will replace all current local history with the selected file. Retention limits still apply. This cannot be undone.</string>
+    <string name="history_import_replace">Replace history</string>
+    <string name="history_import_cancel">Cancel</string>
+    <string name="history_import_success">History imported</string>
+    <string name="history_import_invalid">Invalid history file. History was not changed.</string>
+    <string name="history_import_unsupported">Unsupported history format version. History was not changed.</string>
+    <string name="history_import_too_large">History file is too large. History was not changed.</string>
+    <string name="history_import_unavailable">Could not import history. Please try again while signed in.</string>
     <string name="history_export">Export history</string>
     <string name="history_export_success">History exported</string>
     <string name="history_export_failure">Could not export history. Please try again.</string>

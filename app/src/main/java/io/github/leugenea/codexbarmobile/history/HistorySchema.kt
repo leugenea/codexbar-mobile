@@ -7,7 +7,7 @@ import java.io.File
 import java.time.Instant
 
 /** Two tables, schema v1; no WAL, migration, ATTACH, SQL text from callers or disk-sort query. */
-internal class HistorySchema(private val file: File, private val limits: HistoryStorageLimits) : AutoCloseable {
+internal class HistorySchema(private val file: File, private val limits: HistoryStorageLimits) : AutoCloseable, HistoryReplacementStorage {
     private var opened: SQLiteDatabase? = null
     private val database: SQLiteDatabase get() = opened ?: throw IllegalStateException()
 
@@ -88,7 +88,7 @@ internal class HistorySchema(private val file: File, private val limits: History
         }
     }
 
-    fun insert(entry: HistoryEntry, payload: ByteArray) {
+    override fun insert(entry: HistoryEntry, payload: ByteArray) {
         val values = ContentValues().apply {
             put("ordinal", entry.id.ordinal); put("partition", entry.partition.value.toString())
             entry.observedAt?.let { put("observed_seconds", it.epochSecond); put("observed_nanos", it.nano) }
@@ -97,7 +97,7 @@ internal class HistorySchema(private val file: File, private val limits: History
         database.insertOrThrow("observations", null, values)
     }
 
-    fun writeState(state: HistoryDiskState) {
+    override fun writeState(state: HistoryDiskState) {
         val values = ContentValues().apply {
             put("slot", 1); put("partition", state.cursor.partition.value.toString())
             put("high_water", state.cursor.lastOrdinal); put("payload", HistoryEncoding.state(state))
@@ -137,7 +137,7 @@ internal class HistorySchema(private val file: File, private val limits: History
     }
 
     fun count(): Long = number("SELECT count(*) FROM observations")
-    fun spacePages(): Long = limits.databasePages - number("PRAGMA page_count") + number("PRAGMA freelist_count")
+    override fun spacePages(): Long = limits.databasePages - number("PRAGMA page_count") + number("PRAGMA freelist_count")
 
     /** Unknown observation timestamps are never inferred from receipt time or neighboring rows. */
     fun ageBefore(cutoff: Instant, partition: HistoryPartition): Long {
@@ -150,10 +150,10 @@ internal class HistorySchema(private val file: File, private val limits: History
     fun removeBefore(cutoff: Instant) { database.delete("observations", AGE_PREDICATE, ageArguments(cutoff)) }
     private fun ageArguments(cutoff: Instant): Array<String> = arrayOf(cutoff.epochSecond.toString(), cutoff.epochSecond.toString(), cutoff.nano.toString())
 
-    fun oldestPrefix(count: Long): Long = number("SELECT coalesce(max(ordinal),0) FROM (SELECT ordinal FROM observations ORDER BY ordinal LIMIT ?)", arrayOf(count.toString()))
-    fun removeThrough(ordinal: Long) { database.delete("observations", "ordinal<=?", arrayOf(ordinal.toString())) }
+    override fun oldestPrefix(count: Long): Long = number("SELECT coalesce(max(ordinal),0) FROM (SELECT ordinal FROM observations ORDER BY ordinal LIMIT ?)", arrayOf(count.toString()))
+    override fun removeThrough(ordinal: Long) { database.delete("observations", "ordinal<=?", arrayOf(ordinal.toString())) }
 
-    fun <T> transaction(block: () -> T): T {
+    override fun <T> transaction(block: () -> T): T {
         database.beginTransaction()
         try {
             val result = block()

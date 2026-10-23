@@ -3,6 +3,7 @@ from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DA
                                              EXPECTED_CURRENT_READ_JVM, SCANNER_CLASS)
 from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT
 from verify_test_reports import HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE
+from verify_test_reports import HISTORY_IMPORT_JVM, HISTORY_IMPORT_NATIVE
 import copy
 import json
 import os
@@ -57,6 +58,7 @@ def synthetic_reports(build, failed=False):
                     ET.SubElement(suite, "testcase", classname=classname, name=name)
         current = (CURRENT_HISTORY_JVM | {SCANNER_CLASS: EXPECTED_CURRENT_READ_JVM} | EXPECTED_DASHBOARD_JVM) if kind == "jvm" else (CURRENT_HISTORY_NATIVE | EXPECTED_DASHBOARD_NATIVE)
         current |= HISTORY_EXPORT_JVM if kind == "jvm" else HISTORY_EXPORT_NATIVE
+        current |= HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
         for classname, names in current.items():
             for name in sorted(names):
                 ET.SubElement(suite, "testcase", classname=classname, name=name)
@@ -286,7 +288,7 @@ class RetryContracts(unittest.TestCase):
         self.assertEqual(HISTORY_CHART_CASES, RETAINED_CHART_CASES)
         path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
         cases = list(ET.parse(path).getroot().iter("testcase"))
-        self.assertEqual(len(cases), 149)
+        self.assertEqual(len(cases), 150)
         for classname, expected in ((HISTORY_TEXT_CLASS, RETAINED_TEXT_CASES),
                                     (HISTORY_CHART_CLASS, RETAINED_CHART_CASES)):
             self.assertEqual({case.get("name") for case in cases if case.get("classname") == classname}, expected)

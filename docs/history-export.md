@@ -102,5 +102,40 @@ Export makes no provider requests or history admissions.
 The snapshot stays only in process-owner memory during SAF. The Activity Result
 handler is registered at the navigation root, so Activity recreation can save the
 same snapshot; process death loses it and a returned destination reports failure.
-Destination I/O runs off Main. Import/replacement/confirmation is separate; decoding
-alone performs no storage writes and requires an explicit destination partition.
+Destination I/O runs off Main. Decoding alone performs no storage writes and requires
+an explicit destination partition.
+
+## Import
+
+In the same details view, **Import history** opens JSON-only `ACTION_OPEN_DOCUMENT`
+while a signed-in history partition exists. Choosing a file shows **Replace history**:
+Cancel/dismiss changes nothing; there is no merge. Picker/confirmation state stays
+in process memory across Activity recreation, not process death. The captured
+credential lifetime cannot redirect its file to a successor login after SAF returns.
+
+Provider size metadata and a streaming bound limit input to 64 MiB (twice the storage
+ceiling). Invalid UTF-8, malformed/unsupported JSON, unexplained missing/non-ascending
+ordinals, entries above high-water, inconsistent segments, pending breaks or cursor
+facts are rejected with a short message and no storage writes. Retention cutoffs may
+explain holes and evicted origins; unknown fields keep the compatibility rules above.
+
+Confirmed import rebinds identities to the current partition. Under the existing
+store I/O lock, one SQLite transaction replaces rows, high-water, window cursors and
+retention continuation. Age retention uses import time (30 days; unknown-time statuses
+remain); observation/physical byte caps use the existing eviction bookkeeping and
+space-headroom policy inside the same transaction. Any failure rolls it all back.
+
+The recorder drains an admitted read/append pair before replacement and holds queued
+observations until it finishes: a pre-import N+1 settles before replacement, and the
+next observation reads the imported high-water. Saved continuation is not rebuilt;
+recording continues without an import-induced break, while genuinely changed clocks
+or windows still break. Success rereads the active history/dashboard selection.
+Confirmed work, busy state and one consumable result are process-owned, so cancelling
+an Activity waiter cannot skip refresh or lose the recreated root's result Toast.
+No temporary database, retained URI grant, credential change or provider request is added.
+
+Registered JVM tests cover round-trip/fixture compatibility, rejection, retention,
+transaction cuts, admitted N+1, revocation and controller/request cancellation. The
+native case requires SAF entry/confirmation/result notification and real SQLite
+replacement/rollback. Authored tests and offline parser controls are not hosted
+runtime proof; compilation, JVM/native execution, lint and coverage remain CI gates.

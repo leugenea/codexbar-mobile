@@ -69,9 +69,9 @@ object WindowHistory {
             return fact to interrupted(cursor, missingBreak(absent))
         }
         val candidate = candidate(admission.partition, source!!, reset)
-        val breaks = breaks(cursor, admission, usage, source, candidate)
+        val breaks = breaks(cursor, admission.clock, usage.observedAt!!, source.usedPercent.value!!, candidate)
         val confidence = confidence(cursor, candidate, breaks)
-        val baseline = eligibility(usage, admission.clock, candidate, confidence, breaks)
+        val baseline = eligibility(usage.observedAt!!, admission.clock, candidate, confidence, breaks)
         val segment = if (breaks.isEmpty()) cursor.lastPoint!!.segment else HistorySegment(
             SegmentIdentity(admission.partition, kind, admission.id), candidate, breaks)
         val point = HistoryPoint(admission.id, usage.observedAt!!, admission.clock, source.usedPercent.value!!,
@@ -156,9 +156,9 @@ object WindowHistory {
         return reset.absolute.value?.let { WindowIdentity(partition, source.kind, seconds, it) }
     }
 
-    private fun breaks(
-        cursor: WindowCursor, admission: HistoryAdmission, usage: UsageObservation,
-        source: UsageWindow, candidate: WindowIdentity?,
+    internal fun breaks(
+        cursor: WindowCursor, clock: HistoryClock, at: java.time.Instant,
+        percent: java.math.BigDecimal, candidate: WindowIdentity?,
     ): Set<BreakReason> {
         val reasons = linkedSetOf<BreakReason>()
         cursor.pendingBreak?.let { reasons.add(it) }
@@ -167,10 +167,10 @@ object WindowHistory {
         if (candidate != null && cursor.lastCandidate != null && candidate != cursor.lastCandidate) reasons.add(BreakReason.WINDOW_CHANGED)
         val previous = cursor.lastPoint
         if (previous != null) {
-            if (candidate != null && candidate == previous.segment.window && source.usedPercent.value!! < previous.usedPercent) {
+            if (candidate != null && candidate == previous.segment.window && percent < previous.usedPercent) {
                 reasons.add(BreakReason.PERCENT_CORRECTION)
             }
-            reasons.addAll(clockBreaks(previous, admission.clock, usage.observedAt!!))
+            reasons.addAll(clockBreaks(previous, clock, at))
         }
         return reasons
     }
@@ -196,7 +196,7 @@ object WindowHistory {
         return reasons
     }
 
-    private fun confidence(
+    internal fun confidence(
         cursor: WindowCursor, candidate: WindowIdentity?, breaks: Set<BreakReason>,
     ): NominalStartConfidence = when {
         candidate == null -> NominalStartConfidence.UNAVAILABLE
@@ -206,8 +206,8 @@ object WindowHistory {
     }
 
     /** Eligibility only; M4a-3 owns DECIMAL128 B(t) and delta, not this reducer. */
-    private fun eligibility(
-        usage: UsageObservation, clock: HistoryClock, candidate: WindowIdentity?,
+    internal fun eligibility(
+        at: java.time.Instant, clock: HistoryClock, candidate: WindowIdentity?,
         confidence: NominalStartConfidence, breaks: Set<BreakReason>,
     ): BaselineEligibility {
         if (candidate == null) return BaselineEligibility.UNKEYED_RESET
@@ -217,8 +217,8 @@ object WindowHistory {
         return try {
             val start = candidate.resetAt.minusSeconds(candidate.durationSeconds)
             when {
-                usage.observedAt!! < start -> BaselineEligibility.BEFORE_NOMINAL_START
-                usage.observedAt > candidate.resetAt -> BaselineEligibility.AFTER_RESET
+                at < start -> BaselineEligibility.BEFORE_NOMINAL_START
+                at > candidate.resetAt -> BaselineEligibility.AFTER_RESET
                 else -> BaselineEligibility.ELIGIBLE
             }
         } catch (_: DateTimeException) {

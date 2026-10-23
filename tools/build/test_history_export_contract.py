@@ -40,34 +40,38 @@ EXPECTED_NATIVE = {
 }
 
 
+def assert_exact_reports(test, expected_jvm, expected_native, actual_jvm, actual_native):
+    test.assertEqual(expected_jvm, actual_jvm)
+    test.assertEqual(expected_native, actual_native)
+    writer = test_workflow_contract.SyntheticReportTests()
+    writer.setUp()
+    test.addCleanup(writer.doCleanups)
+    for kind, registry, source_set in (("jvm", expected_jvm, "test"), ("native", expected_native, "androidTest")):
+        for classname, methods in registry.items():
+            source = ROOT / f"app/src/{source_set}/java/{classname.replace('.', '/')}.kt"
+            test.assertEqual(annotated_methods(source.read_text(), classname), methods)
+            for method in methods:
+                for mutation in ("missing", "duplicate", "wrong-class", "failure", "error", "skipped"):
+                    path = writer.write_report(kind)
+                    tree = ET.parse(path)
+                    suite = tree.getroot()
+                    case = next(c for c in suite if c.get("classname") == classname and c.get("name") == method)
+                    if mutation == "missing":
+                        suite.remove(case)
+                    elif mutation == "duplicate":
+                        ET.SubElement(suite, "testcase", attrib=dict(case.attrib))
+                    elif mutation == "wrong-class":
+                        case.set("classname", "SYNTHETIC-spoof")
+                    else:
+                        ET.SubElement(case, mutation)
+                    tree.write(path)
+                    with test.subTest(kind=kind, method=method, mutation=mutation), test.assertRaises(ValueError):
+                        verify_reports(writer.directory, kind)
+
+
 class HistoryExportContracts(unittest.TestCase):
     def test_exact_export_tests_are_required_once_and_cannot_be_spoofed(self):
-        self.assertEqual(EXPECTED_JVM, HISTORY_EXPORT_JVM)
-        self.assertEqual(EXPECTED_NATIVE, HISTORY_EXPORT_NATIVE)
-        writer = test_workflow_contract.SyntheticReportTests()
-        writer.setUp()
-        self.addCleanup(writer.doCleanups)
-        for kind, registry, source_set in (("jvm", EXPECTED_JVM, "test"), ("native", EXPECTED_NATIVE, "androidTest")):
-            for classname, methods in registry.items():
-                source = ROOT / f"app/src/{source_set}/java/{classname.replace('.', '/')}.kt"
-                self.assertEqual(annotated_methods(source.read_text(), classname), methods)
-                for method in methods:
-                    for mutation in ("missing", "duplicate", "wrong-class", "failure", "error", "skipped"):
-                        path = writer.write_report(kind)
-                        tree = ET.parse(path)
-                        suite = tree.getroot()
-                        case = next(c for c in suite if c.get("classname") == classname and c.get("name") == method)
-                        if mutation == "missing":
-                            suite.remove(case)
-                        elif mutation == "duplicate":
-                            ET.SubElement(suite, "testcase", **case.attrib)
-                        elif mutation == "wrong-class":
-                            case.set("classname", "SYNTHETIC-spoof")
-                        else:
-                            ET.SubElement(case, mutation)
-                        tree.write(path)
-                        with self.subTest(kind=kind, method=method, mutation=mutation), self.assertRaises(ValueError):
-                            verify_reports(writer.directory, kind)
+        assert_exact_reports(self, EXPECTED_JVM, EXPECTED_NATIVE, HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE)
 
     def test_checked_in_v1_fixture_and_unknown_member_compatibility_are_guarded(self):
         fixture = json.loads((ROOT / "app/src/test/resources/history-export-v1.json").read_text())
