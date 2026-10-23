@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792771077216,
+  "lastUpdate": 1792783972960,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2471,6 +2471,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/b74e4155c83990c3130235b9523e0dfd8abec27e"
         },
         "date": 1792771074549,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ae8f366fbfdb268050bc647d39246d558e922506",
+          "message": "feat(ui): line charts with dashed linear trend over the whole current window (#179)\n\n* feat(ui): line charts with dashed linear trend over the whole current window (#174)\n\n* fix(history): expect whole-window compact query; no eager limit-sized buffer (#174)\n\n* perf(ui): rebuild whole-window chart only when retained history changes (#174)",
+          "timestamp": "2026-10-23T22:32:26+03:00",
+          "tree_id": "707c9eb1908e97bd57f5e9ed27d8fbf75f40833f",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/ae8f366fbfdb268050bc647d39246d558e922506"
+        },
+        "date": 1792783972229,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
