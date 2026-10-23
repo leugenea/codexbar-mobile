@@ -63,6 +63,7 @@ class AccountRemovalLifecycleTest {
             assertEquals(highWater, recordedHistory(owner).storage!!.lastAdmitted)
             assertEquals(requests, fixture.transport.counts())
             openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
+            awaitDialogDismissed("reopening Account settings does not restore recreated account confirmation")
             compose.onNodeWithTag("account-name").performScrollTo().assertTextEquals("Synthetic retained account")
         }
     }
