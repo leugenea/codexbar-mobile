@@ -8,6 +8,9 @@ EXPECTED_DASHBOARD_JVM = {
         "paceLineHalfTenthBoundariesRoundAwayFromZero",
         "paceLineNearZeroAndAdjacentBoundaryValuesNeverShowSignedZero",
         "paceLineKeepsOneDecimalAndLocaleSeparator",
+        "compactPaceBeyondFirst32ObservationsMatchesAcceptedHeadlineAndClock",
+        "compactPaceKeepsIndependentlyAgingFiveHourAndWeeklyObservationsSeparate",
+        "compactPaceNeverFallsBackWhenAcceptedComparisonIsMissingOrIneligible",
         "chartTimeLabelsUseYearlessLocalePatternsAndContainingHour",
         "chartTimeLabelsRetainFullAndPartialRepeatedHourOffsets",
         "chartTimeLabelsKeepUnrepresentableInstantsUnknown",
@@ -111,4 +114,4 @@ EXPECTED_CURRENT_HOST = {"context": "MATCH", "selection": "MATCH", "periods": "M
 
 # Literal review budgets, independently checked against the enumerated sets.
 EXPECTED_DASHBOARD_NATIVE_COUNT = 17
-EXPECTED_DASHBOARD_JVM_COUNT = 18
+EXPECTED_DASHBOARD_JVM_COUNT = 21

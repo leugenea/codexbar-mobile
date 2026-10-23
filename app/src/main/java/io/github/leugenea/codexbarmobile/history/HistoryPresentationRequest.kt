@@ -22,8 +22,10 @@ internal sealed interface HistoryPresentationRequest {
 internal class HistoryRequestGeneration
 internal class HistoryDisplaySelection(val request: HistoryPresentationRequest, val generation: HistoryRequestGeneration = HistoryRequestGeneration())
 
-internal class CurrentHistoryPages(val fiveHour: HistoryReadSnapshot?, val weekly: HistoryReadSnapshot?) {
+internal class CurrentHistoryPages(val fiveHour: HistoryReadSnapshot?, val weekly: HistoryReadSnapshot?,
+    val latestFiveHour: HistoryEntry? = null, val latestWeekly: HistoryEntry? = null) {
     fun forKind(kind: WindowKind) = if (kind == WindowKind.FIVE_HOUR) fiveHour else weekly
+    fun latestForKind(kind: WindowKind) = if (kind == WindowKind.FIVE_HOUR) latestFiveHour else latestWeekly
 }
 
 internal sealed interface CurrentHistoryReadOutcome {

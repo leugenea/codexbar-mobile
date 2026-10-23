@@ -33,6 +33,7 @@ class UsagePresentationTest {
             assertEquals(phase.name, status, model.status)
             val connected = phase in setOf(ConnectionPhase.READING, ConnectionPhase.OBSERVED, ConnectionPhase.RESTORED)
             assertEquals(connected, model.windows.first().percent != null)
+            assertSame(if (connected) retained.usage.success?.usage else null, model.observation)
             assertEquals(if (connected) "Oct 8, 2026, 12:00:00 AM" else null, model.observedAt)
             assertEquals(connected && phase != ConnectionPhase.READING, model.refreshEnabled)
         }

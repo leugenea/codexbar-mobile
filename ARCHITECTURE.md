@@ -1136,8 +1136,11 @@ only two nullable exact window keys and a bounded limit (production32). The join
 starts at query.after and retains the original query in its returned storage page.
 Both share ascending batches<=256, an initial high-water and a total100000 examined
 ceiling. Independent32+1 selected buffers prevent a dense first window from
-starving a sparse sibling. A later failed batch fails the joint result rather than
-publishing a healthy partial success. The native storage port/schema/retention,
+starving a sparse sibling. Current requests scan through that high-water and retain
+one latest matching entry per window separately from the unchanged first chart page;
+paginated detail requests still stop at their matching lookahead. A later failed
+batch fails the joint result rather than publishing a healthy partial success. The
+native storage port/schema/retention,
 16 waiting observations, one worker and provider cadence are unchanged.
 
 The existing volatile display context now holds one identity-bearing request
@@ -1180,8 +1183,14 @@ unknown-pace states remain explicit; full local-history text retains exact sourc
 facts, deltas and loss/retention diagnostics, and full connection details retains
 its independently labeled absolute/relative reset facts.
 
-Each compact pace line formats the original observed comparison only: `Over pace
-by N%`, `N% in reserve`, or `On pace`. Display rounding is BigDecimal HALF_UP to
+Each compact pace line uses the latest independently selected admitted window,
+not the last point of the first32-entry chart page. Its observation instant and
+original percent/duration/reset facts must match the same accepted usage source
+that supplies the headline and top timestamp. Pending/missing/mismatched comparisons
+show the existing unavailable state; a latest status-only or ineligible observation
+never falls back to an older point. Existing eligibility and `EvenDistribution`
+math supply the original observed comparison: `Over pace by N%`, `N% in reserve`,
+or `On pace`. Display rounding is BigDecimal HALF_UP to
 one decimal (ties away from zero); exactly +/-0.05 becomes +/-0.1, while magnitudes
 below 0.05 display `On pace`, without negative zero. Decimal separators follow the
 existing usage-percent locale policy. Neither measurements, DECIMAL128 comparison
@@ -1194,8 +1203,12 @@ phone-zone conversion and repeated-hour numeric offsets. Original instants remai
 exact. Unknown/unrepresentable dates remain unknown. The existing minute-flooring
 and plural formatter supplies `Next reset in <remaining>` without a second suffix.
 
-Seven mandatory JVM additions cover pace direction/rounding/locale and yearless
-label/timezone/offset/unknown boundaries. One added native dashboard method covers
+Mandatory JVM additions cover pace direction/rounding/locale and yearless
+label/timezone/offset/unknown boundaries, plus latest-observation provenance beyond
+32 entries, independently aging windows across storage batches, and unavailable/
+status-only/correction cases. The chart still renders its original bounded first
+page (including its original axis endpoints); chart redesign remains issue174.
+One added native dashboard method covers
 removed lines, the single top clock, left/right yearless labels and reserve/on/over/
 unknown pace through actual accepted reads. Existing large-font/landscape label
 checks and capture label receipts now target the readable pace line; no image or

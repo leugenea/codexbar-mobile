@@ -10,6 +10,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.usage.WindowKind
+import io.github.leugenea.codexbarmobile.usage.UsageObservation
 
 @Composable
 internal fun DashboardScreen(state: ConnectionState, controller: ConnectionController, openAccountSettings: () -> Unit,
@@ -22,8 +23,8 @@ internal fun DashboardScreen(state: ConnectionState, controller: ConnectionContr
     Column(Modifier.fillMaxWidth().testTag("dashboard"), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         DashboardStatus(state, usage)
         DashboardActions(state, usage, controller, openAccountSettings)
-        DashboardWindow(usage.windows[0], five, time)
-        DashboardWindow(usage.windows[1], weekly, time)
+        DashboardWindow(usage.windows[0], five, time, usage.observation)
+        DashboardWindow(usage.windows[1], weekly, time, usage.observation)
         BankedResetDisclosure(BankedResetPresentation.present(state, time.zone, time.locale), authority)
     }
 }
@@ -50,7 +51,8 @@ private fun DashboardActions(state: ConnectionState, model: PresentedUsage, cont
 }
 
 @Composable
-private fun DashboardWindow(window: PresentedUsageWindow, display: HistoryGraphSnapshot, time: PhoneTimeConfiguration) {
+private fun DashboardWindow(window: PresentedUsageWindow, display: HistoryGraphSnapshot, time: PhoneTimeConfiguration,
+    observation: UsageObservation?) {
     val plot = remember(display) { HistoryPlotInputs.project(display) }
     val series = if (window.tag == "live-five-hour") plot.fiveHour else plot.weekly
     Card(Modifier.fillMaxWidth().testTag("dashboard-${series.kind.name}")) {
@@ -63,7 +65,7 @@ private fun DashboardWindow(window: PresentedUsageWindow, display: HistoryGraphS
                 DashboardPresentation.windowWarning(window.status, window.malformed)?.let {
                     Text(stringResource(it), Modifier.testTag("dashboard-window-warning-${series.kind.name}"), color = MaterialTheme.colorScheme.error)
                 }
-                CompactHistoryChart(series, display, time)
+                CompactHistoryChart(series, display, time, observation)
             } else Text(stringResource(DashboardPresentation.noInformation(display, window.status, window.malformed)), Modifier.testTag("dashboard-no-info-${series.kind.name}"))
         }
     }

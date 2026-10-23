@@ -2,6 +2,9 @@ package io.github.leugenea.codexbarmobile
 
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.usage.Knowledge
+import io.github.leugenea.codexbarmobile.usage.SelectionState
+import io.github.leugenea.codexbarmobile.usage.UsageObservation
+import io.github.leugenea.codexbarmobile.usage.WindowKind
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.DecimalFormatSymbols
@@ -37,6 +40,22 @@ internal object DashboardPresentation {
         status == UsageWindowStatus.UNSUPPORTED -> R.string.dashboard_window_unsupported
         else -> null
     }
+
+    /** Compare only the accepted headline observation, never an older chart-page point. */
+    fun paceComparison(display: HistoryGraphSnapshot, usage: UsageObservation?, kind: WindowKind): UsedComparison? {
+        val observedAt = usage?.observedAt ?: return null
+        val entry = display.latestCurrent ?: return null
+        if (entry.observedAt != observedAt) return null
+        val selection = if (kind == WindowKind.FIVE_HOUR) usage.fiveHour else usage.weekly
+        if (selection.state == SelectionState.AMBIGUOUS) return null
+        val current = selection.candidates.singleOrNull() ?: return null
+        val window = entry.windows.singleOrNull { it.kind == kind } ?: return null
+        return if (matchesHeadline(window, current)) EvenDistribution.compare(window) else null
+    }
+
+    private fun matchesHeadline(window: HistoryWindow, current: io.github.leugenea.codexbarmobile.usage.UsageWindow) =
+        window.kind == current.kind && window.percent == current.usedPercent &&
+            window.duration == current.durationSeconds && window.reset.facts == current.reset
 
     /** Display only: HALF_UP rounds ties away from zero to 0.1 percentage points.
      * Thus -0.05 and +0.05 show reserve/over pace; magnitudes below 0.05 are on pace.

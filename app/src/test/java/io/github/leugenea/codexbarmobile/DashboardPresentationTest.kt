@@ -67,6 +67,75 @@ class DashboardPresentationTest {
         assertEquals(BigDecimal("-67.625"), source)
     }
 
+    @Test fun compactPaceBeyondFirst32ObservationsMatchesAcceptedHeadlineAndClock() {
+        val start = Instant.parse("2027-01-15T01:00:00Z")
+        val reset = Instant.parse("2027-01-15T05:00:00Z")
+        val observations = List(33) { index ->
+            SyntheticHistory.usage(SyntheticHistory.window(percent = Input.Value(BigDecimal(if (index == 32) "50" else "20")),
+                absolute = Input.Value(reset.epochSecond)), observedAt = start.plusSeconds(index * 60L))
+        }
+        val display = currentDisplays(observations).first
+        val accepted = acceptedUsage(observations.last())
+        assertSame(observations.last(), accepted.observation)
+        assertEquals("50", accepted.windows.first().percent)
+        assertEquals(TimePresentation.timestamp(observations.last().observedAt, ZoneOffset.UTC, Locale.US), accepted.observedAt)
+        assertEquals((1L..32L).toList(), display.entries.map { it.source.id.ordinal })
+        assertTrue(display.hasMore)
+        assertEquals(start.plusSeconds(31 * 60L), display.points.last().observedAt)
+        assertEquals(ObservationId(33), display.latestCurrent!!.id)
+        val comparison = DashboardPresentation.paceComparison(display, accepted.observation, WindowKind.FIVE_HOUR) as UsedComparison.Available
+        assertEquals(observations.last().observedAt, comparison.point.observedAt)
+        assertEquals(BigDecimal("50"), comparison.point.usedPercent)
+        assertEquals(PresentedPace(R.string.dashboard_over_pace, "19.3"), DashboardPresentation.pace(comparison.deltaPercentagePoints, Locale.US))
+    }
+
+    @Test fun compactPaceKeepsIndependentlyAgingFiveHourAndWeeklyObservationsSeparate() {
+        for (aging in listOf(WindowKind.FIVE_HOUR, WindowKind.WEEKLY)) {
+            val observations = List(320) { index ->
+                val five = if (aging == WindowKind.FIVE_HOUR && index >= 318) Input.Missing else SyntheticHistory.window()
+                val weekly = if (aging == WindowKind.WEEKLY && index >= 318) Input.Missing else
+                    SyntheticHistory.window(duration = Input.Value(604800L))
+                SyntheticHistory.usage(five, weekly, SyntheticHistory.at.plusSeconds(index.toLong()))
+            }
+            val (five, weekly) = currentDisplays(observations)
+            val old = if (aging == WindowKind.FIVE_HOUR) five else weekly
+            val fresh = if (aging == WindowKind.FIVE_HOUR) weekly else five
+            val freshKind = if (aging == WindowKind.FIVE_HOUR) WindowKind.WEEKLY else WindowKind.FIVE_HOUR
+            assertEquals(ObservationId(318), old.latestCurrent!!.id)
+            assertEquals(observations[317].observedAt, old.latestCurrent.observedAt)
+            assertEquals(ObservationId(320), fresh.latestCurrent!!.id)
+            assertEquals(observations.last().observedAt, fresh.latestCurrent.observedAt)
+            assertEquals(32, old.entries.size); assertEquals(32, fresh.entries.size)
+            val previous = DashboardPresentation.paceComparison(old, observations[317], aging) as UsedComparison.Available
+            assertEquals(observations[317].observedAt, previous.point.observedAt)
+            assertNull(DashboardPresentation.paceComparison(old, observations.last(), aging))
+            val current = DashboardPresentation.paceComparison(fresh, observations.last(), freshKind) as UsedComparison.Available
+            assertEquals(observations.last().observedAt, current.point.observedAt)
+            assertEquals(PresentedPace(R.string.dashboard_reserve, if (freshKind == WindowKind.FIVE_HOUR) "69.4" else "87.1"),
+                DashboardPresentation.pace(current.deltaPercentagePoints, Locale.US))
+        }
+    }
+
+    @Test fun compactPaceNeverFallsBackWhenAcceptedComparisonIsMissingOrIneligible() {
+        val first = SyntheticHistory.usage(SyntheticHistory.window(percent = Input.Value(BigDecimal("50"))))
+        val missing = SyntheticHistory.usage(SyntheticHistory.window(percent = Input.Missing), observedAt = SyntheticHistory.at.plusSeconds(1))
+        val display = currentDisplays(listOf(first, missing)).first
+        val unavailable = DashboardPresentation.paceComparison(display, missing, WindowKind.FIVE_HOUR) as UsedComparison.Unavailable
+        assertEquals(DistributionUnavailable.Ineligible(BaselineEligibility.UNKNOWN_PERCENT), unavailable.reason)
+        assertNull(unavailable.source.point)
+        assertNull(DashboardPresentation.paceComparison(display, first, WindowKind.FIVE_HOUR))
+        assertNull(DashboardPresentation.paceComparison(display, null, WindowKind.FIVE_HOUR))
+        assertNull(DashboardPresentation.paceComparison(display, missing.copy(observedAt = null), WindowKind.FIVE_HOUR))
+        val corrected = SyntheticHistory.usage(SyntheticHistory.window(percent = Input.Value(BigDecimal("20"))),
+            observedAt = SyntheticHistory.at.plusSeconds(1))
+        val correctedDisplay = currentDisplays(listOf(first, corrected)).first
+        val correction = DashboardPresentation.paceComparison(correctedDisplay, corrected, WindowKind.FIVE_HOUR) as UsedComparison.Unavailable
+        assertEquals(DistributionUnavailable.Ineligible(BaselineEligibility.UNCERTAIN_CORRECTION), correction.reason)
+        assertNull(DashboardPresentation.paceComparison(correctedDisplay, first.copy(observedAt = corrected.observedAt), WindowKind.FIVE_HOUR))
+        assertNull(DashboardPresentation.paceComparison(correctedDisplay, corrected.copy(observedAt = corrected.observedAt!!.plusSeconds(1)), WindowKind.FIVE_HOUR))
+        assertNull(DashboardPresentation.paceComparison(HistoryGraphSnapshot(), corrected, WindowKind.FIVE_HOUR))
+    }
+
     @Test fun paceLineHalfTenthBoundariesRoundAwayFromZero() {
         for ((value, resource) in listOf("0.05" to R.string.dashboard_over_pace, "-0.05" to R.string.dashboard_reserve)) {
             assertEquals(PresentedPace(resource, "0.1"), DashboardPresentation.pace(BigDecimal(value), Locale.US))
@@ -107,5 +176,47 @@ class DashboardPresentationTest {
     @Test fun chartTimeLabelsKeepUnrepresentableInstantsUnknown() {
         assertNull(TimePresentation.chartTime(Instant.MAX, ZoneOffset.UTC, Locale.US, "MMM d, HH:mm"))
         assertNull(TimePresentation.chartTime(Instant.MIN, ZoneId.of("America/Los_Angeles"), Locale.US, "MMM d, HH:mm"))
+    }
+
+    private fun acceptedUsage(usage: UsageObservation): PresentedUsage {
+        val endpoint = EndpointObservation(io.github.leugenea.codexbarmobile.transport.ReadOperation.USAGE,
+            status = 200, observedAt = usage.observedAt, usage = usage)
+        val refresh = UsageRefreshState(usage = RefreshedEndpoint(endpoint, endpoint, 0), evaluatedAt = usage.observedAt)
+        return UsagePresentation.present(ConnectionState(ConnectionPhase.OBSERVED, refresh = refresh), ZoneOffset.UTC, Locale.US)
+    }
+
+    private fun currentDisplays(observations: List<UsageObservation>): Pair<HistoryGraphSnapshot, HistoryGraphSnapshot> {
+        var cursor = HistoryCursor(SyntheticHistory.partition)
+        val entries = observations.map { usage ->
+            val elapsed = java.time.Duration.between(observations.first().observedAt, usage.observedAt).toMillis()
+            SyntheticHistory.append(cursor, usage, 1000 + elapsed).also { cursor = it.cursor }.entry
+        }
+        val first = observations.first()
+        val request = HistoryPresentationRequest.Current(
+            WindowHistory.identity(SyntheticHistory.partition, first.fiveHour, WindowKind.FIVE_HOUR),
+            WindowHistory.identity(SyntheticHistory.partition, first.weekly, WindowKind.WEEKLY))
+        val pages = (CurrentHistoryRead.readCurrent(ReadAccess(entries), request) { false } as CurrentHistoryReadOutcome.Ready).pages
+        val generation = HistoryGeneration()
+        val context = HistoryDisplayContext(generation).apply {
+            periods = CurrentHistoryPeriods(CurrentHistoryPeriod(request.fiveHour), CurrentHistoryPeriod(request.weekly))
+            selection = HistoryDisplaySelection(request)
+        }
+        val source = HistoryGraphSnapshot(HistoryReadiness.READY, generation, SyntheticHistory.partition,
+            displayPermission = HistoryDisplayPermission(context, HistoryDisplayAuthority { context }),
+            request = request, selection = context.selection, currentPages = pages)
+        return currentHistoryForDisplay(source, request, WindowKind.FIVE_HOUR, context) to
+            currentHistoryForDisplay(source, request, WindowKind.WEEKLY, context)
+    }
+
+    private class ReadAccess(private val entries: List<HistoryEntry>) : HistoryRuntimeAccess {
+        override val partition = SyntheticHistory.partition
+        override fun read(query: HistoryReadQuery): HistoryReadOutcome {
+            val remaining = entries.filter { it.id.ordinal > (query.after?.ordinal ?: 0) }
+            return HistoryReadOutcome.Ready(HistoryReadSnapshot(query, remaining.take(query.limit), entries.last().id,
+                remaining.size > query.limit))
+        }
+        override fun append(admission: HistoryAdmission): HistoryAppendOutcome = error("Read-only fixture")
+        override fun delete(partition: HistoryPartition): HistoryDeleteOutcome = error("Read-only fixture")
+        override fun revoke() = Unit
     }
 }

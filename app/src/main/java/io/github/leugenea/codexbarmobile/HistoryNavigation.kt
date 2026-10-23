@@ -56,7 +56,7 @@ private fun currentGraph(source: HistoryGraphSnapshot, query: HistoryGraphQuery,
     val readiness = if (source.readiness == HistoryReadiness.READY && page?.content == HistoryContent.EMPTY) HistoryReadiness.EMPTY else source.readiness
     return HistoryGraphSnapshot(readiness, source.generation, source.partition, query, page,
         source.problem, source.storageReason, source.lostSamples, source.live, source.displayPermission,
-        source.request, source.selection)
+        source.request, source.selection, latestCurrent = query.kind?.let { source.currentPages?.latestForKind(it) })
 }
 
 private fun hiddenHistory(current: HistoryDisplayContext?, query: HistoryGraphQuery) =
