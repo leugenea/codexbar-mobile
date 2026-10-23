@@ -70,7 +70,7 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
                 data.put("inventoryRows", frame.state.refresh.inventory.success?.inventory?.items?.size ?: 0)
                 if (kind != null) chart(data, bitmap, frame, kind, tag)
                 if (name == "dashboard-drawer-portrait-dark") data.put("drawerLabels", JSONArray(listOf(
-                    text("drawer-LOCAL_HISTORY_DETAILS"), text("drawer-CONNECTION_DETAILS"))))
+                    text("drawer-LOCAL_HISTORY_DETAILS"), text("drawer-CONNECTION_DETAILS"), text("drawer-ACCOUNT_SETTINGS"))))
                 revalidate(frame, scenario, fixture.owner)
                 save(name, bitmap, data)
             } finally { bitmap.recycle() }

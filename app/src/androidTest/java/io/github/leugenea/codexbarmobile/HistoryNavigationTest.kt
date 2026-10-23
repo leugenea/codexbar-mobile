@@ -218,10 +218,12 @@ class HistoryNavigationTest {
     }
 
     private fun click(tag: String) {
+        if (tag in setOf("connect", "remove-account")) openDetailRoute(compose, fixture.owner, DashboardRoute.ACCOUNT_SETTINGS)
         val node = compose.onNodeWithTag(tag)
         node.performScrollTo()
         node.performClick()
         compose.waitForIdle()
+        if (tag == "connect") returnDashboard(compose, fixture.owner)
     }
 
     private fun page(kind: WindowKind, after: Long, count: Int) {

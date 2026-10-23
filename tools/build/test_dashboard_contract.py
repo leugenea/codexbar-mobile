@@ -34,7 +34,7 @@ def dashboard_captures(directory, fixture):
             data["windows"] = [dict(kind=k, limit=32, after=0, reset="2027-01-15T09:00:00Z", duration=d,
                                     selectedOrdinals=[1], lastAdmitted=1) for k, d in (("FIVE_HOUR", 18000), ("WEEKLY", 604800))]
         if name == "dashboard-drawer-portrait-dark":
-            data["drawerLabels"] = ["Full local history details", "Full live connection details"]
+            data["drawerLabels"] = ["Full local history details", "Full live connection details", "Account settings"]
         if name in {"dashboard-banked-expanded-portrait-light", "dashboard-connection-details-landscape-dark"}:
             data.update(inventoryCount=7, inventoryRows=3)
         image = fixture.png(*size)
@@ -97,7 +97,7 @@ class DashboardContracts(unittest.TestCase):
         self.assertEqual(DASHBOARD_NATIVE_COUNT, EXPECTED_DASHBOARD_NATIVE_COUNT)
         self.assertEqual(DASHBOARD_JVM_COUNT, EXPECTED_DASHBOARD_JVM_COUNT)
         self.assertEqual(CURRENT_HISTORY_JVM[SCANNER_CLASS], EXPECTED_CURRENT_READ_JVM)
-        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_NATIVE.values())), 14)
+        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_NATIVE.values())), 15)
         self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 14)
         for kind, registry, source_set in (("jvm", EXPECTED_DASHBOARD_JVM, "test"), ("native", EXPECTED_DASHBOARD_NATIVE, "androidTest")):
             for classname, required in registry.items():
@@ -158,10 +158,10 @@ class DashboardContracts(unittest.TestCase):
                     with self.subTest(name=name, wrongHost=key), self.assertRaises(ValueError):
                         dashboard_capture_receipt(path)
             if name == "dashboard-drawer-portrait-dark":
-                labels = ["Full local history details", "Full live connection details"]
+                labels = ["Full local history details", "Full live connection details", "Account settings"]
                 self.assertEqual(original["drawerLabels"], labels)
                 for wrong_labels in ([label.lower() for label in labels],
-                                     [labels[0], labels[1].replace("live", "love")],
+                                     [labels[0], labels[1].replace("live", "love"), labels[2]],
                                      labels[::-1], labels[:1], labels + ["SYNTHETIC-extra-row"], None):
                     data = dict(original); data["drawerLabels"] = wrong_labels
                     path.with_suffix(".json").write_text(json.dumps(data))

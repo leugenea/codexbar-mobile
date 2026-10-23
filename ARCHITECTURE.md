@@ -9,7 +9,7 @@ honest projections of the one process owner; no sample model or preview route is
 
 ```text
 MainActivity / StateFlow observer + identity-tagged STARTED lifecycle observer
-    -> ConnectionScreen / dashboard plus two drawer detail routes
+    -> ConnectionScreen / dashboard, two drawer detail routes and Account settings
     -> NativeConnection.get(applicationContext) / one lazy process owner
 ```
 
@@ -445,7 +445,7 @@ compilation alone does not establish runtime or coverage acceptance.
 
 ## Local account display name
 
-The single connected/restored account surface shows a user-authored local label or
+The Account settings screen shows the single connected/restored account's user-authored local label or
 **Unnamed local account**, with provider identity still explicitly unverified. This is
 not provider-account association, provider-side profile modification, a credential or
 multi-account selection. Unreadable name storage has a distinct **name unavailable**
@@ -504,7 +504,7 @@ is implied by compilation or fresh-holder restoration.
 
 ## Explicit local account removal
 
-The connection controls expose **Remove account from this device**, not immediate
+Account settings exposes **Remove account from this device**, not immediate
 sign-out. A Material 3 `AlertDialog` names saved sign-in credentials, local usage
 history and the local display name as the local removal scope, and explicitly
 excludes OpenAI/ChatGPT account deletion and subscription cancellation. Cancel,
@@ -830,7 +830,12 @@ and the conditional assembled acceptance contract are described below.
 ## Production bounded history navigation (M4b-3a)
 
 The Connection screen defaults to the compact dashboard; the modal drawer contains
-exactly **Full local history details** and **Full live connection details**.
+**Full local history details**, **Full live connection details**, and **Account settings**
+anchored at its bottom. Account settings alone hosts local naming, device sign-in
+(including reauthorization, cancellation, code copy and browser launch), and confirmed
+local removal. The dashboard and connection details instead point disconnected users
+to Account settings with an open action; usage/session refresh controls stay in place.
+Account settings has no history-page interest and navigation never starts provider I/O.
 Back closes an open drawer first;
 Back/up from details returns dashboard. Recreation resets these ephemeral UI
 choices to dashboard/closed, without replacing the process owner. A route

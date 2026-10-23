@@ -7,10 +7,18 @@ import io.github.leugenea.codexbarmobile.usage.WindowKind
 
 /** Idempotent route commands based on the live UI, never on asynchronous recorder query state. */
 internal fun openDetailRoute(compose: ComposeTestRule, owner: ConnectionController, route: DashboardRoute) {
-    val root = if (route == DashboardRoute.LOCAL_HISTORY_DETAILS) "connection-history" else "connection-details"
+    val root = when (route) {
+        DashboardRoute.LOCAL_HISTORY_DETAILS -> "connection-history"
+        DashboardRoute.ACCOUNT_SETTINGS -> "account-settings"
+        else -> "connection-details"
+    }
     if (compose.onAllNodesWithTag(root).fetchSemanticsNodes().isEmpty()) {
         compose.onNodeWithTag("open-drawer").performScrollTo().performClick()
-        val label = if (route == DashboardRoute.LOCAL_HISTORY_DETAILS) "Full local history details" else "Full live connection details"
+        val label = when (route) {
+            DashboardRoute.LOCAL_HISTORY_DETAILS -> "Full local history details"
+            DashboardRoute.ACCOUNT_SETTINGS -> "Account settings"
+            else -> "Full live connection details"
+        }
         compose.onNodeWithTag("drawer-${route.name}").assertTextEquals(label).performClick()
         try { compose.waitUntil(8_000) { compose.onAllNodesWithTag(root).fetchSemanticsNodes().size == 1 } }
         catch (error: ComposeTimeoutException) { throw AssertionError("Drawer route $route: last=${owner.state.value}, request=${owner.historySnapshots.value.request}", error) }

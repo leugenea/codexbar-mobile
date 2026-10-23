@@ -8,12 +8,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
-import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.usage.WindowKind
 
 @Composable
-internal fun DashboardScreen(state: ConnectionState, controller: ConnectionController, browser: () -> Unit,
+internal fun DashboardScreen(state: ConnectionState, controller: ConnectionController, openAccountSettings: () -> Unit,
     source: HistoryGraphSnapshot, current: HistoryPresentationRequest.Current, authority: HistoryDisplayContext?, observer: HistoryUiObserver?) {
     val time = phoneTimeConfiguration()
     val usage = UsagePresentation.present(state, time.zone, time.locale)
@@ -22,7 +21,7 @@ internal fun DashboardScreen(state: ConnectionState, controller: ConnectionContr
     SideEffect { observer?.projectedCurrent(source, five, weekly, state.refresh.evaluatedAt) }
     Column(Modifier.fillMaxWidth().testTag("dashboard"), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         DashboardStatus(state, usage)
-        DashboardActions(state, usage, controller, browser)
+        DashboardActions(state, usage, controller, openAccountSettings)
         DashboardWindow(usage.windows[0], five, time, state.refresh.evaluatedAt)
         DashboardWindow(usage.windows[1], weekly, time, state.refresh.evaluatedAt)
         BankedResetDisclosure(BankedResetPresentation.present(state, time.zone, time.locale), authority)
@@ -40,24 +39,11 @@ private fun DashboardStatus(state: ConnectionState, model: PresentedUsage) {
 }
 
 @Composable
-private fun DashboardActions(state: ConnectionState, model: PresentedUsage, controller: ConnectionController, browser: () -> Unit) {
+private fun DashboardActions(state: ConnectionState, model: PresentedUsage, controller: ConnectionController, openAccountSettings: () -> Unit) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        val awaiting = state.auth as? AuthState.AwaitingUser
-        if (awaiting != null) {
-            DeviceLoginCode(awaiting, controller)
-            Button(onClick = browser, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("open-browser")) {
-                Text(stringResource(R.string.gate_browser))
-            }
-        }
-        if (DashboardPresentation.loginVisible(state.phase)) Button(onClick = controller::connect, enabled = !state.busy,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("connect")) {
-            Text(stringResource(if (state.phase == ConnectionPhase.REAUTH_REQUIRED) R.string.dashboard_reauthorize_action else R.string.dashboard_login))
-        }
+        if (DashboardPresentation.loginVisible(state.phase)) AccountSettingsLink(openAccountSettings)
         if (!DashboardPresentation.loginVisible(state.phase)) Button(onClick = { controller.readUsage() }, enabled = model.refreshEnabled,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("live-refresh")) { Text(stringResource(R.string.live_refresh)) }
-        if (DashboardPresentation.cancelVisible(state.phase)) OutlinedButton(onClick = controller::cancel,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("cancel-connect")) { Text(stringResource(R.string.gate_cancel)) }
-        AccountRemovalAction(state.phase, controller)
     }
 }
 

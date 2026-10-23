@@ -6,7 +6,6 @@
     <string name="gate_lifecycle">Device login must be enabled in security settings or by your workspace admin. The single bounded login continues while you use the system browser; Cancel stops it. Recreation keeps this in-memory attempt. Process death drops pending login: restart required. Restored credentials remain unresolved; no automatic reads or refresh.</string>
     <string name="gate_state">State: %1$s · problem: %2$s</string>
     <string name="gate_exchange_completed">Selected exchange: HTTP 200 · credentials persisted · identity unverified · token lifetime unknown</string>
-    <string name="gate_connect">Connect and read usage</string>
     <string name="gate_reauth">Sign in again</string>
     <string name="gate_read">Read usage with stored session</string>
     <string name="gate_refresh">Refresh session and read usage</string>
@@ -55,13 +54,13 @@
     <!-- B3: live usage and independent entitlement rendering consume owner observations. -->
     <string name="live_title">Current usage windows</string>
     <string name="live_identity">Unofficial · provider observations. Identity and workspace remain unverified.</string>
-    <string name="live_disconnected">Disconnected · use the connection controls below to sign in</string>
+    <string name="live_disconnected">Disconnected · add an account in Account settings</string>
     <string name="live_loading">Loading · usage is not yet available</string>
     <string name="live_unavailable">Usage unavailable · refresh to request an observation</string>
     <string name="live_current">Last successful usage observation</string>
     <string name="live_stale">Stale usage · last successful values retained</string>
     <string name="live_error">Unable to update usage · no quota inferred</string>
-    <string name="live_reauthorize">Authorization required · sign in again using the controls below</string>
+    <string name="live_reauthorize">Authorization required · sign in again in Account settings</string>
     <string name="live_refreshing">Refreshing · last successful values retained</string>
     <string name="live_stale_detail">Usage has not succeeded for at least 15 minutes. These values may be out of date.</string>
     <string name="live_refresh">Refresh usage</string>
@@ -339,8 +338,6 @@
     <string name="dashboard_back">Back to dashboard</string>
     <string name="drawer_history">Full local history details</string>
     <string name="drawer_connection">Full live connection details</string>
-    <string name="dashboard_login">Login</string>
-    <string name="dashboard_reauthorize_action">Reauthorize</string>
     <string name="dashboard_disconnected">Sign in to see your usage</string>
     <string name="dashboard_loading">Connecting…</string>
     <string name="dashboard_unavailable">Usage information unavailable</string>
@@ -393,4 +390,7 @@
     <string name="history_export">Export history</string>
     <string name="history_export_success">History exported</string>
     <string name="history_export_failure">Could not export history. Please try again.</string>
+    <string name="account_settings_title">Account settings</string>
+    <string name="account_add">Add account</string>
+    <string name="account_settings_required">Add an account in Account settings to view usage.</string>
 </resources>

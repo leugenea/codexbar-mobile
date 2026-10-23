@@ -267,9 +267,11 @@ class HistoryIsolationTest {
     }
 
     private fun click(tag: String) {
+        if (tag in setOf("connect", "remove-account")) openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
         val node = compose.onNodeWithTag(tag)
         if (tag != "remove-account-confirm") node.performScrollTo()
         node.performClick(); compose.waitForIdle()
+        if (tag in setOf("connect", "remove-account-confirm")) returnDashboard(compose, owner)
     }
 
     private fun query(kind: WindowKind = WindowKind.FIVE_HOUR, after: Long = 0) =

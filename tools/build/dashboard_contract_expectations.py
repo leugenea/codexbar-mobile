@@ -36,6 +36,7 @@ EXPECTED_DASHBOARD_NATIVE = {
         "dashboardMissingEmptySingleAndFailedHistoryHaveOneHonestLinePerWindow",
         "dashboardShowsBothCurrentWindowsWithoutHistoryNavigationAndRetainsMeasuredReferencePixels",
         "drawerHasExactTwoLabelsBackPrecedenceAndDetailsReturnToDashboard",
+        "emptyDashboardOpensAccountSettingsWithoutInlineManagementOrProviderRequests",
         "dashboardKnownPercentPreservesMalformedResetAndIndependentCurrentSiblingWarning",
         "fiveHourFractionalResetPairPopulatesDashboardButBeyondToleranceRemainsUnavailable",
     },
@@ -100,5 +101,5 @@ EXPECTED_DASHBOARD_LAYOUTS = {
 EXPECTED_CURRENT_HOST = {"context": "MATCH", "selection": "MATCH", "periods": "MATCH", "projection": "MATCH"}
 
 # Literal review budgets, independently checked against the enumerated sets.
-EXPECTED_DASHBOARD_NATIVE_COUNT = 14
+EXPECTED_DASHBOARD_NATIVE_COUNT = 15
 EXPECTED_DASHBOARD_JVM_COUNT = 11
