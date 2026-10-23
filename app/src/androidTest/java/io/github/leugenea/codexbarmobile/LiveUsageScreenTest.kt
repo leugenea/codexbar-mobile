@@ -159,7 +159,7 @@ class LiveUsageScreenTest {
         progress("live-five-hour", 0.125f, "Five-hour window · 12.5% used", "Provider-reported usage", "12.5% used")
         progress("live-weekly", 0.7625f, "Weekly window · 76.25% used", "Provider-reported usage", "76.25% used")
         text("live-five-hour-reset-absolute", "Reset: Oct 8, 2026, 01:00")
-        text("live-five-hour-reset-relative", "Reset: 0 days 1 hour remaining")
+        text("live-five-hour-reset-relative", "Reset: 1 hour remaining")
         text("live-weekly-reset-absolute", "Reset: Oct 10, 2026, 01:00")
         text("live-weekly-reset-relative", "Reset: 2 days 1 hour remaining")
         text("live-allowed", "Provider permission: allowed")
@@ -182,7 +182,7 @@ class LiveUsageScreenTest {
                 reset = ",\"reset_at\":1791594000,\"reset_after_seconds\":176400"))
             read()
             text("live-weekly-reset-absolute", "Reset: Oct 10, 2026, 01:00")
-            text("live-weekly-reset-relative", "Reset: 2 days 0 hours remaining")
+            text("live-weekly-reset-relative", "Reset: 2 days 59 minutes remaining")
             progress("live-weekly", 0.12345679f, "Weekly window · 12.345678901234567890% used",
                 "Provider-reported usage", "12.345678901234567890% used")
             val accepted = owner.state.value.refresh.usage.success!!
@@ -223,7 +223,7 @@ class LiveUsageScreenTest {
         fake.usage = response(fiveHour("47.25", reset = ",\"reset_after_seconds\":500"))
         launchLive().use {
             read()
-            text("live-five-hour-reset-relative", "Reset: <1h remaining")
+            text("live-five-hour-reset-relative", "Reset: 8 minutes remaining")
             val requests = fake.gets.get()
             clock.advance(500_000)
             waitFor("local reset evaluation crosses original instant") {
@@ -262,7 +262,7 @@ class LiveUsageScreenTest {
             read()
             text("live-five-hour-status", "Malformed window or usage percentage · no value inferred")
             compose.onNodeWithTag("live-five-hour-progress").assertDoesNotExist()
-            text("live-five-hour-reset-relative", "Reset: <1h remaining")
+            text("live-five-hour-reset-relative", "Reset: 8 minutes remaining")
             compose.onNodeWithTag("live-five-hour-reset-absolute").assertExists()
         }
     }
@@ -274,7 +274,7 @@ class LiveUsageScreenTest {
         launchLive().use {
             read()
             text("live-five-hour-reset-absolute", "Reset: Nov 1, 2026, 01:00 UTC-05:00")
-            text("live-five-hour-reset-relative", "Reset: 0 days 1 hour remaining")
+            text("live-five-hour-reset-relative", "Reset: 1 hour 30 minutes remaining")
             compose.onNodeWithTag("live-five-hour-reset-absolute").assertExists()
             compose.onNodeWithTag("live-five-hour-reset-relative").assertExists()
         }
@@ -381,9 +381,9 @@ class LiveUsageScreenTest {
             text("banked-summary-text", "Usage summary for inventory comparison: 1 available banked reset")
             text("banked-inventory-text", "Inventory reports: 1 available banked reset")
             text("banked-item-0-absolute", "Banked entitlement expiry: Oct 8, 2026, 00:00")
-            text("banked-item-0-relative", "Banked entitlement expiry: <1h remaining")
+            text("banked-item-0-relative", "Banked entitlement expiry: 59 minutes remaining")
             text("banked-item-0-provider", "Provider status: available")
-            assertBankedOwner("banked-item-0", "<1h remaining")
+            assertBankedOwner("banked-item-0", "59 minutes remaining")
             compose.onNodeWithTag("banked-item-0").assert(SemanticsMatcher.expectValue(
                 SemanticsProperties.StateDescription, "Provider-reported banked entitlements"))
             assertBankedOwner("banked-inventory", "1 available banked reset")
@@ -474,7 +474,7 @@ class LiveUsageScreenTest {
             read()
             text("banked-status", "Malformed banked entitlement information")
             text("banked-item-0-row", "Row data: malformed · wrong field type")
-            text("banked-item-1-relative", "Banked entitlement expiry: <1h remaining")
+            text("banked-item-1-relative", "Banked entitlement expiry: 59 minutes remaining")
             assertViewOnlyBanked()
         }
     }
@@ -596,7 +596,7 @@ class LiveUsageScreenTest {
             reconstructedConnectionDetails()
             listOf("banked-title", "banked-status", "banked-summary-text", "banked-inventory-text", "banked-limitations",
                 "banked-item-0-provider", "banked-item-0-absolute", "banked-item-0-relative", "banked-issue-AVAILABLE_ROW_COUNT_MISMATCH").forEach(::noOverflow)
-            text("banked-item-0-relative", "Banked entitlement expiry: 1 day 14 hours remaining")
+            text("banked-item-0-relative", "Banked entitlement expiry: 1 day 14 hours 31 minutes remaining")
             val previous = shared.state.value.refresh.inventory.attempt
             scenario.recreate()
             waitFor("banked recreated root and resumed inventory settle") {

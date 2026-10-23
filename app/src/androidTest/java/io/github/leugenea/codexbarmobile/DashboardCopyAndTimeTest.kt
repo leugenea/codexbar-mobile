@@ -50,6 +50,39 @@ class DashboardCopyAndTimeTest {
         if (Build.VERSION.SDK_INT >= 33) PhoneTimeEvidence(compose, fixture).run(history = false, dashboard = true)
     }
 
+    @Test fun minutePrecisionMatchesDashboardWindowDetailsAndBankedExpiry() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            awaitConnectionScreen(compose, owner)
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
+            compose.onNodeWithTag("connect").performScrollTo().performClick()
+            returnDashboard(compose, owner)
+            await("initial usage settled") { owner.state.value.refresh.usage.success != null && !owner.state.value.refresh.refreshing }
+            val cases = listOf(59L to "less than a minute", 60L to "1 minute",
+                86700L to "1 day 5 minutes", 259200L to "3 days")
+            for ((seconds, duration) in cases) {
+                val target = fixture.transport.clock.now().wall!!.plusSeconds(seconds)
+                fixture.transport.usageBody = NavigationTransport.USAGE.replace("1800003600", target.epochSecond.toString())
+                fixture.transport.inventoryBody = """{"available_count":1,"credits":[{"id":"synthetic-minute-expiry",
+                    "reset_type":"codex_rate_limits","status":"available","granted_at":"2026-10-01T00:00:00Z","expires_at":"$target"}]}"""
+                val previous = owner.state.value.refresh.inventory.attempt
+                owner.readUsage()
+                await("minute-precision usage and inventory settled") {
+                    owner.state.value.refresh.inventory.attempt !== previous && !owner.state.value.refresh.refreshing
+                }
+                compose.onNodeWithTag("live-five-hour-reset-relative").performScrollTo().assertTextEquals("Reset: $duration remaining")
+                compose.onNodeWithTag("banked-disclosure-toggle").performScrollTo().performClick()
+                compose.onNodeWithTag("banked-disclosure-remaining-0", useUnmergedTree = true).performScrollTo()
+                    .assertTextEquals("$duration remaining")
+                compose.onNodeWithTag("banked-disclosure-toggle").performScrollTo().performClick()
+                openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
+                compose.onNodeWithTag("live-five-hour-reset-relative").performScrollTo().assertTextEquals("Reset: $duration remaining")
+                compose.onNodeWithTag("banked-item-0-relative", useUnmergedTree = true).performScrollTo()
+                    .assertTextEquals("Banked entitlement expiry: $duration remaining")
+                returnDashboard(compose, owner)
+            }
+        }
+    }
+
     private fun removedPhrase() = SemanticsMatcher("removed precision phrase in visible text or accessible equivalent") { node ->
         val text = node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.joinToString { it.text }
         val descriptions = node.config.getOrElse(SemanticsProperties.ContentDescription) { emptyList() }.joinToString()

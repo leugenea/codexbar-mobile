@@ -96,9 +96,9 @@ class UsagePresentationTest {
         val usage = observation(reset = Input.Value(TARGET.epochSecond))
         val time = model(usage).windows.first().reset!!
         assertEquals(AbsoluteTime("Oct 9, 2026", "14:00", null), time.absolute)
-        assertEquals(RemainingTime(1, 14), time.remaining)
+        assertEquals(RemainingTime(1, 14, 59), time.remaining)
         val near = present(ConnectionState(ConnectionPhase.OBSERVED, refresh = refresh(usage).copy(evaluatedAt = TARGET.minusSeconds(1))))
-        assertEquals(TimeState.LESS_THAN_HOUR, near.windows.first().reset!!.state)
+        assertEquals(TimeState.FUTURE, near.windows.first().reset!!.state)
         val passed = present(ConnectionState(ConnectionPhase.OBSERVED, refresh = refresh(usage).copy(evaluatedAt = TARGET)))
         assertEquals(TimeState.AWAITING_REFRESH, passed.windows.first().reset!!.state)
         assertEquals(TimeSnapshot.STALE, passed.windows.first().reset!!.snapshot)
@@ -128,8 +128,8 @@ class UsagePresentationTest {
         val current = weekly(observed)
         assertEquals("12.345678901234567890", current.percent)
         assertEquals(AbsoluteTime("Oct 10, 2026", "01:00", null), current.reset!!.absolute)
-        assertEquals(RemainingTime(2, 0), current.reset.remaining)
-        assertEquals(TimeState.LESS_THAN_HOUR, weekly(Instant.parse("2026-10-10T00:59:59Z")).reset!!.state)
+        assertEquals(RemainingTime(2, 0, 59), current.reset.remaining)
+        assertEquals(TimeState.FUTURE, weekly(Instant.parse("2026-10-10T00:59:59Z")).reset!!.state)
         val passed = weekly(Instant.parse("2026-10-10T01:00:00Z"))
         assertEquals(TimeState.AWAITING_REFRESH, passed.reset!!.state)
         assertEquals(TimeSnapshot.STALE, passed.reset.snapshot)
@@ -202,7 +202,7 @@ class UsagePresentationTest {
         assertEquals(UsageScreenStatus.CURRENT, model.status)
         assertFalse(model.stale)
         assertNull(model.errorResource)
-        assertEquals(RemainingTime(1, 14), model.windows.first().reset!!.remaining)
+        assertEquals(RemainingTime(1, 14, 59), model.windows.first().reset!!.remaining)
     }
 
     @Test fun malformedPercentageKeepsKnownResetAndMalformedResetKeepsKnownPercentage() {

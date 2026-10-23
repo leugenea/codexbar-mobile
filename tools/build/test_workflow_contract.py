@@ -3,7 +3,7 @@ from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DA
                                              EXPECTED_CURRENT_READ_JVM, SCANNER_CLASS)
 from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT
 from verify_test_reports import HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE
-from verify_test_reports import HISTORY_IMPORT_JVM, HISTORY_IMPORT_NATIVE
+from verify_test_reports import HISTORY_IMPORT_JVM, HISTORY_IMPORT_NATIVE, REMAINING_TIME_JVM
 import hashlib
 import json
 import os
@@ -372,7 +372,10 @@ class WorkflowContracts(unittest.TestCase):
         self.assertIn("name: Instrumented tests and coverage (API 36 emulator)", native)
         self.assertNotRegex(native, r"(?m)^    needs:")
         self.assertIn("runs-on: ubuntu-24.04", native)
-        self.assertIn("timeout-minutes: 50", native)
+        self.assertRegex(native, r"(?m)^    timeout-minutes: 60$")
+        step = native.split("      - name: Run unit and instrumented tests with coverage (API 36)\n", 1)[1].split("      - name:", 1)[0]
+        self.assertIn("timeout-minutes: 45", step)
+        self.assertIn("timeout --signal=TERM --kill-after=30s 42m bash tools/build/run-hosted-native-smoke.sh", step)
         self.assertIn("sudo chmod a+rw /dev/kvm", native)
         self.assertIn("if: always()", native)
         self.assertIn("android-instrumented-${{ github.run_id }}-${{ github.run_attempt }}", native)
@@ -839,6 +842,7 @@ class SyntheticReportTests(unittest.TestCase):
         current = (CURRENT_HISTORY_JVM | {SCANNER_CLASS: EXPECTED_CURRENT_READ_JVM} | EXPECTED_DASHBOARD_JVM) if kind == "jvm" else (CURRENT_HISTORY_NATIVE | EXPECTED_DASHBOARD_NATIVE)
         current |= HISTORY_EXPORT_JVM if kind == "jvm" else HISTORY_EXPORT_NATIVE
         current |= HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
+        current |= REMAINING_TIME_JVM if kind == "jvm" else {}
         for classname, names in current.items():
             for name in sorted(names):
                 if name != missing:
@@ -860,7 +864,31 @@ class SyntheticReportTests(unittest.TestCase):
                 with self.subTest(kind=kind, container_depth=depth):
                     self.write_report(kind, container_depth=depth)
                     result = verify_reports(self.directory, kind)
-                    self.assertEqual(result["testCount"], 151 if kind == "native" else 80)
+                    self.assertEqual(result["testCount"], 152 if kind == "native" else 87)
+
+    def test_remaining_time_jvm_cases_match_source_and_reject_incomplete_reports(self):
+        self.assertEqual(sum(map(len, REMAINING_TIME_JVM.values())), 7)
+        for classname, required in REMAINING_TIME_JVM.items():
+            source = ROOT / f"app/src/test/java/{classname.replace('.', '/')}.kt"
+            declared = set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text()))
+            self.assertTrue(required <= declared)
+            for name in required:
+                for mutation in ("missing", "wrong-class", "duplicate", "failure", "error", "skipped"):
+                    path = self.write_report("jvm")
+                    tree = ET.parse(path)
+                    suite = tree.getroot()
+                    case = next(c for c in suite if c.get("classname") == classname and c.get("name") == name)
+                    if mutation == "missing":
+                        suite.remove(case)
+                    elif mutation == "wrong-class":
+                        case.set("classname", "SYNTHETIC-wrong-class")
+                    elif mutation == "duplicate":
+                        ET.SubElement(suite, "testcase", **case.attrib)
+                    else:
+                        ET.SubElement(case, mutation)
+                    tree.write(path)
+                    with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
+                        verify_reports(self.directory, "jvm")
 
     def test_rejects_missing_tests(self):
         for kind in EXPECTED:

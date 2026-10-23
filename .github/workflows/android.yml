@@ -181,7 +181,7 @@ jobs:
     name: Instrumented tests and coverage (API 36 emulator)
     # Independent strict gate; JVM tests stay in both jobs for same-compilation coverage.
     runs-on: ubuntu-24.04
-    timeout-minutes: 50
+    timeout-minutes: 60
     env:
       RELEASE_CHANNEL: dev
       # Same home is inherited by setup-gradle and every wrapper invocation.
@@ -296,9 +296,9 @@ jobs:
           sudo chmod a+rw /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
       - name: Run unit and instrumented tests with coverage (API 36)
-        timeout-minutes: 35
+        timeout-minutes: 45
         run: |
-          timeout --signal=TERM --kill-after=30s 32m bash tools/build/run-hosted-native-smoke.sh
+          timeout --signal=TERM --kill-after=30s 42m bash tools/build/run-hosted-native-smoke.sh
       - name: Record native task outcomes (all outcomes)
         if: always()
         run: |

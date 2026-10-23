@@ -21,6 +21,7 @@ EXPECTED_DASHBOARD_JVM = {
 EXPECTED_DASHBOARD_NATIVE = {
     "io.github.leugenea.codexbarmobile.DashboardCopyAndTimeTest": {
         "dashboardAndDisclosureFollowPhoneZoneLocaleAndTicksWithoutRequests",
+        "minutePrecisionMatchesDashboardWindowDetailsAndBankedExpiry",
         "noReachableTextOrSemanticsUsesRemovedTimePhraseWhileOriginalInstantsRemainExact",
     },
     "io.github.leugenea.codexbarmobile.DashboardHistoryIsolationTest": {
@@ -101,5 +102,5 @@ EXPECTED_DASHBOARD_LAYOUTS = {
 EXPECTED_CURRENT_HOST = {"context": "MATCH", "selection": "MATCH", "periods": "MATCH", "projection": "MATCH"}
 
 # Literal review budgets, independently checked against the enumerated sets.
-EXPECTED_DASHBOARD_NATIVE_COUNT = 15
+EXPECTED_DASHBOARD_NATIVE_COUNT = 16
 EXPECTED_DASHBOARD_JVM_COUNT = 11

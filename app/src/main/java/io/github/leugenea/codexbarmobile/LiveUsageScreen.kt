@@ -108,7 +108,9 @@ private fun ResetLabels(time: PresentedTime?, tag: String) {
 internal fun relativeLabel(time: PresentedTime): String {
     val remaining = time.remaining ?: return stringResource(time.state.labelResource)
     // Quantities select grammar only; original Long values remain format arguments.
-    val days = pluralStringResource(TimePresentation.daysPluralResource, remaining.days.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), remaining.days)
-    val hours = pluralStringResource(TimePresentation.hoursPluralResource, remaining.hours, remaining.hours)
-    return stringResource(time.state.labelResource, stringResource(TimePresentation.relativeFormatResource, days, hours))
+    val units = remaining.units.map { (resource, value) ->
+        pluralStringResource(resource, value.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), value)
+    }
+    val duration = if (units.isEmpty()) stringResource(R.string.time_less_than_minute) else units.joinToString(" ")
+    return stringResource(time.state.labelResource, duration)
 }

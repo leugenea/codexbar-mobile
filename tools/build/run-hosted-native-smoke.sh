@@ -150,10 +150,10 @@ logcat_pid=$!
 : > evidence/native/boot-success.txt
 printf '%s\n' 'boundary=strict-native-tests' >> evidence/native/boundaries.txt
 # The complete native test task, no class/method filters and no metadata bypass/generation.
-# Keep the original 15-minute graph budget across both attempts. A retry is
+# Share the 25-minute graph budget across both attempts. A retry is
 # allowed only for missing/empty/truncated native coverage AND ADB-offline evidence after
 # passing suites. It reruns the whole graph: JVM/native data must share compilation.
-graph_deadline=$((SECONDS + 900))
+graph_deadline=$((SECONDS + 1500))
 coverage_attempt=1
 while :; do
   attempt_dir="evidence/native/attempt-$coverage_attempt"

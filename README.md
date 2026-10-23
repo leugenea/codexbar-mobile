@@ -35,14 +35,15 @@ there is no data migration between them.
 - Live Material 3 usage windows with precise provider percentages and fractional bars,
   five-hour/weekly duration labels (including weekly-only), independent permission/limit
   flags, missing/error/stale/exhausted states and accessible status announcements.
-- Local absolute reset date/hour plus relative remainder, including `<1h` and awaiting
-  refresh; passed resets never zero usage. Absolute labels truncate to the containing
-  local hour; elapsed days/hours are floored from the original instant, not that label.
+- Local absolute reset date/hour plus minute-precision relative remainder, omitting
+  zero days/hours/minutes and showing `less than a minute` below 60 seconds. Passed
+  resets await refresh without zeroing usage. Absolute labels truncate to the containing
+  local hour; the remainder floors the original elapsed duration to whole minutes.
 - Foreground refresh after explicit activation: coalesced connect/resume/manual triggers,
   polling no faster than 60 seconds, bounded cancellable reads and server Retry-After
   deferral. Local countdown/freshness ticks do not request provider data.
 - Read-only banked resets with provider summary/inventory counts, per-item status and
-  simultaneous local absolute/relative expiry (including `<1h` and expired items).
+  simultaneous local absolute/relative expiry (including sub-minute and expired items).
   Empty, unknown with reasons, unsupported, inaccessible, malformed and conflicting
   inventory remain distinct; stale/error inventory retains its own successful clock.
   Counts are never recomputed from rows. No activation or purchase action exists.
