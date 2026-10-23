@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792701712858,
+  "lastUpdate": 1792730683468,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2335,6 +2335,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/b7db13794a5db2eafd81835ccee9f31be0cf4ace"
         },
         "date": 1792701707297,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "849f23aac2aaff395037b71d74c2eb77442fbd19",
+          "message": "feat(history): import a JSON export, replacing local history (#170)",
+          "timestamp": "2026-10-23T07:44:13+03:00",
+          "tree_id": "a118c12bfd3642fa6ce745649ef260e00b6a24a0",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/849f23aac2aaff395037b71d74c2eb77442fbd19"
+        },
+        "date": 1792730683059,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
