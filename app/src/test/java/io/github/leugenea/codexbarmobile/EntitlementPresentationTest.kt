@@ -66,7 +66,7 @@ class EntitlementPresentationTest {
         assertEquals(TimeKind.ENTITLEMENT_EXPIRY, item.expiry.kind)
         assertEquals(TimeState.FUTURE, item.expiry.state)
         assertEquals(AbsoluteTime("Oct 9, 2026", "14:00", null), item.expiry.absolute)
-        assertEquals(RemainingTime(1, 14), item.expiry.remaining)
+        assertEquals(RemainingTime(1, 14, 31), item.expiry.remaining)
         assertEquals(TimeSnapshot.OBSERVED, item.expiry.snapshot)
         assertEquals(R.string.entitlement_expiry, item.expiryLabelResource)
     }
@@ -166,10 +166,10 @@ class EntitlementPresentationTest {
         val item = result.items.single()
         assertEquals(EntitlementState.KNOWN, result.state)
         assertEquals(TimeKind.ENTITLEMENT_EXPIRY, item.expiry.kind)
-        assertEquals(TimeState.LESS_THAN_HOUR, item.expiry.state)
+        assertEquals(TimeState.FUTURE, item.expiry.state)
         assertEquals(AbsoluteTime("Oct 8, 2026", "00:00", null), item.expiry.absolute)
-        assertNull(item.expiry.remaining)
-        assertEquals(R.string.time_less_than_hour, item.expiry.state.labelResource)
+        assertEquals(RemainingTime(0, 0, 59), item.expiry.remaining)
+        assertEquals(R.string.time_remaining, item.expiry.state.labelResource)
     }
 
     @Test fun repeatedDstHourUsesB1AbsoluteOffsetAndElapsedRemainingTime() {
@@ -178,7 +178,7 @@ class EntitlementPresentationTest {
         val item = present(facts, at, ZoneId.of("America/New_York")).items.single()
         assertEquals(TimeKind.ENTITLEMENT_EXPIRY, item.expiry.kind)
         assertEquals(AbsoluteTime("Nov 1, 2026", "01:00", "-05:00"), item.expiry.absolute)
-        assertEquals(RemainingTime(0, 2), item.expiry.remaining)
+        assertEquals(RemainingTime(0, 2, 0), item.expiry.remaining)
     }
 
     @Test fun summaryDisagreementIsVisibleAndNeitherCountIsRecomputed() {

@@ -50,7 +50,7 @@ class EntitlementIntegrationTest {
         assertEquals(summaryTime, facts.summaryObservedAt)
         assertEquals(now, facts.inventoryObservedAt)
         assertEquals(AbsoluteTime("Oct 9, 2026", "14:00", null), facts.items.single().expiry.absolute)
-        assertEquals(RemainingTime(1, 14), facts.items.single().expiry.remaining)
+        assertEquals(RemainingTime(1, 14, 31), facts.items.single().expiry.remaining)
         assertFalse(model.stale)
         assertFalse(model.refreshing)
         assertNull(model.errorResource)
@@ -83,7 +83,7 @@ class EntitlementIntegrationTest {
     @Test fun expiredAndSubHourItemsKeepDistinctExpiryKindAndOriginalCount() {
         val facts = inventory(rows = Input.Value(listOf(row(Input.Value("2026-10-08T00:59:59.999999Z")))))
         val first = present(connection(endpoint(facts))).entitlements
-        assertEquals(TimeState.LESS_THAN_HOUR, first.items.single().expiry.state)
+        assertEquals(TimeState.FUTURE, first.items.single().expiry.state)
         assertEquals(TimeKind.ENTITLEMENT_EXPIRY, first.items.single().expiry.kind)
         assertEquals(AbsoluteTime("Oct 8, 2026", "00:00", null), first.items.single().expiry.absolute)
         val expired = present(connection(endpoint(facts), evaluated = Instant.parse("2026-10-08T01:00:00Z"))).entitlements

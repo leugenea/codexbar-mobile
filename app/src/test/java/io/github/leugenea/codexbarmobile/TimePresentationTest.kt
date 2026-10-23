@@ -45,7 +45,7 @@ class TimePresentationTest {
         for ((zone, absolute, locale) in cases) {
             val result = TimePresentation.presentWithClock(target, TimeKind.PERIODIC_RESET, now, clock, ZoneId.of(zone), locale)
             assertEquals(absolute, result.absolute)
-            assertEquals(RemainingTime(1, 14), result.remaining)
+            assertEquals(RemainingTime(1, 14, 59), result.remaining)
             assertEquals(TimeState.FUTURE, result.state)
             assertEquals(TimeKind.PERIODIC_RESET, result.kind)
             assertEquals(TimeSnapshot.OBSERVED, result.snapshot)
@@ -57,18 +57,25 @@ class TimePresentationTest {
     @Test fun localizedDateDoesNotDependOnTheDefaultLocale() {
         val result = present("2026-10-09T14:20:00Z", locale = Locale.GERMANY)
         assertEquals(AbsoluteTime("09.10.2026", "14:00", null), result.absolute)
-        assertEquals(RemainingTime(1, 14), result.remaining)
+        assertEquals(RemainingTime(1, 14, 20), result.remaining)
     }
 
-    @Test fun dayHourAndSubsecondBoundariesFloorElapsedHours() {
+    @Test fun dayHourMinuteAndSubsecondBoundariesFloorElapsedMinutes() {
         val cases = listOf(
-            Triple("2026-10-08T00:00:00.000000001Z", TimeState.LESS_THAN_HOUR, null),
-            Triple("2026-10-08T00:59:59.999999999Z", TimeState.LESS_THAN_HOUR, null),
-            Triple("2026-10-08T01:00:00Z", TimeState.FUTURE, RemainingTime(0, 1)),
-            Triple("2026-10-08T01:59:59.999999999Z", TimeState.FUTURE, RemainingTime(0, 1)),
-            Triple("2026-10-08T23:59:59.999999999Z", TimeState.FUTURE, RemainingTime(0, 23)),
-            Triple("2026-10-09T00:00:00Z", TimeState.FUTURE, RemainingTime(1, 0)),
-            Triple("2026-10-10T14:59:59.999999999Z", TimeState.FUTURE, RemainingTime(2, 14)),
+            Triple("2026-10-08T00:00:00Z", TimeState.AWAITING_REFRESH, null),
+            Triple("2026-10-08T00:00:00.000000001Z", TimeState.FUTURE, RemainingTime(0, 0, 0)),
+            Triple("2026-10-08T00:00:59Z", TimeState.FUTURE, RemainingTime(0, 0, 0)),
+            Triple("2026-10-08T00:00:59.999999999Z", TimeState.FUTURE, RemainingTime(0, 0, 0)),
+            Triple("2026-10-08T00:01:00Z", TimeState.FUTURE, RemainingTime(0, 0, 1)),
+            Triple("2026-10-08T00:59:59Z", TimeState.FUTURE, RemainingTime(0, 0, 59)),
+            Triple("2026-10-08T00:59:59.999999999Z", TimeState.FUTURE, RemainingTime(0, 0, 59)),
+            Triple("2026-10-08T01:00:00Z", TimeState.FUTURE, RemainingTime(0, 1, 0)),
+            Triple("2026-10-08T01:59:59.999999999Z", TimeState.FUTURE, RemainingTime(0, 1, 59)),
+            Triple("2026-10-08T23:59:59Z", TimeState.FUTURE, RemainingTime(0, 23, 59)),
+            Triple("2026-10-08T23:59:59.999999999Z", TimeState.FUTURE, RemainingTime(0, 23, 59)),
+            Triple("2026-10-09T00:00:00Z", TimeState.FUTURE, RemainingTime(1, 0, 0)),
+            Triple("2026-10-09T00:05:00Z", TimeState.FUTURE, RemainingTime(1, 0, 5)),
+            Triple("2026-10-10T14:59:59.999999999Z", TimeState.FUTURE, RemainingTime(2, 14, 59)),
         )
         for ((target, state, remaining) in cases) {
             val result = present(target)
@@ -84,9 +91,11 @@ class TimePresentationTest {
         val past = present("2026-10-08T00:29:59.999999999Z", at)
         for (result in listOf(future, equal, past)) {
             assertEquals(AbsoluteTime("Oct 8, 2026", "00:00", null), result.absolute)
-            assertNull(result.remaining)
         }
-        assertEquals(TimeState.LESS_THAN_HOUR, future.state)
+        assertEquals(RemainingTime(0, 0, 0), future.remaining)
+        assertNull(equal.remaining)
+        assertNull(past.remaining)
+        assertEquals(TimeState.FUTURE, future.state)
         assertEquals(TimeState.AWAITING_REFRESH, equal.state)
         assertEquals(TimeState.AWAITING_REFRESH, past.state)
         assertEquals(TimeSnapshot.STALE, equal.snapshot)
@@ -100,7 +109,7 @@ class TimePresentationTest {
         assertEquals(AbsoluteTime("Oct 8, 2026", "00:00", null), result.absolute)
         assertNull(result.remaining)
         assertEquals(TimeState.EXPIRED, present("2026-10-07T23:59:59Z", kind = TimeKind.ENTITLEMENT_EXPIRY).state)
-        assertEquals(TimeState.LESS_THAN_HOUR, present("2026-10-08T00:01:00Z", kind = TimeKind.ENTITLEMENT_EXPIRY).state)
+        assertEquals(TimeState.FUTURE, present("2026-10-08T00:01:00Z", kind = TimeKind.ENTITLEMENT_EXPIRY).state)
     }
 
     @Test fun springForwardUsesElapsedTimeNotTheMissingLocalHour() {
@@ -109,7 +118,7 @@ class TimePresentationTest {
             Instant.parse("2026-03-08T06:00:00Z"), ZoneId.of("America/New_York"),
         )
         assertEquals(AbsoluteTime("Mar 8, 2026", "03:00", null), result.absolute)
-        assertEquals(RemainingTime(0, 1), result.remaining)
+        assertEquals(RemainingTime(0, 1, 0), result.remaining)
         assertEquals(TimeState.FUTURE, result.state)
     }
 
@@ -120,10 +129,11 @@ class TimePresentationTest {
         val second = present("2026-11-01T06:30:00Z", at, at, zone)
         assertEquals(AbsoluteTime("Nov 1, 2026", "01:00", "-04:00"), first.absolute)
         assertEquals(AbsoluteTime("Nov 1, 2026", "01:00", "-05:00"), second.absolute)
-        assertEquals(RemainingTime(0, 1), first.remaining)
-        assertEquals(RemainingTime(0, 2), second.remaining)
+        assertEquals(RemainingTime(0, 1, 0), first.remaining)
+        assertEquals(RemainingTime(0, 2, 0), second.remaining)
         val subHour = present("2026-11-01T06:30:00Z", Instant.parse("2026-11-01T05:45:00Z"), at, zone)
-        assertEquals(TimeState.LESS_THAN_HOUR, subHour.state)
+        assertEquals(TimeState.FUTURE, subHour.state)
+        assertEquals(RemainingTime(0, 0, 45), subHour.remaining)
         assertEquals("-05:00", subHour.absolute?.utcOffset)
     }
 
@@ -134,8 +144,8 @@ class TimePresentationTest {
         val afterOverlap = present("2026-11-01T07:00:00Z", at, at, zone)
         assertEquals(AbsoluteTime("Nov 1, 2026", "01:00", "-05:00"), transition.absolute)
         assertEquals(AbsoluteTime("Nov 1, 2026", "02:00", null), afterOverlap.absolute)
-        assertEquals(RemainingTime(0, 2), transition.remaining)
-        assertEquals(RemainingTime(0, 3), afterOverlap.remaining)
+        assertEquals(RemainingTime(0, 2, 0), transition.remaining)
+        assertEquals(RemainingTime(0, 3, 0), afterOverlap.remaining)
     }
 
     @Test fun repeatedHourWithZeroOffsetUsesNumericUtcOffsetNotZ() {
@@ -145,8 +155,8 @@ class TimePresentationTest {
         val second = present("2026-10-25T01:30:00Z", at, at, zone)
         assertEquals(AbsoluteTime("Oct 25, 2026", "01:00", "+01:00"), first.absolute)
         assertEquals(AbsoluteTime("Oct 25, 2026", "01:00", "+00:00"), second.absolute)
-        assertEquals(RemainingTime(0, 1), first.remaining)
-        assertEquals(RemainingTime(0, 2), second.remaining)
+        assertEquals(RemainingTime(0, 1, 0), first.remaining)
+        assertEquals(RemainingTime(0, 2, 0), second.remaining)
     }
 
     @Test fun halfHourFallBackLabelsTheWholeDisplayedHourAsAmbiguous() {
@@ -156,8 +166,8 @@ class TimePresentationTest {
         val inOverlap = present("2026-04-04T15:15:00Z", at, at, zone)
         assertEquals(AbsoluteTime("Apr 5, 2026", "01:00", "+11:00"), beforeOverlap.absolute)
         assertEquals(AbsoluteTime("Apr 5, 2026", "01:00", "+10:30"), inOverlap.absolute)
-        assertEquals(RemainingTime(0, 2), beforeOverlap.remaining)
-        assertEquals(RemainingTime(0, 3), inOverlap.remaining)
+        assertEquals(RemainingTime(0, 2, 15), beforeOverlap.remaining)
+        assertEquals(RemainingTime(0, 3, 15), inOverlap.remaining)
     }
 
     @Test fun dstDaysAreTwentyFourElapsedHoursNotCalendarDateDifferences() {
@@ -165,9 +175,9 @@ class TimePresentationTest {
         val spring = present("2026-03-09T04:00:00Z", Instant.parse("2026-03-08T05:00:00Z"), null, zone)
         val fall = present("2026-11-02T05:00:00Z", Instant.parse("2026-11-01T04:00:00Z"), null, zone)
         assertEquals(AbsoluteTime("Mar 9, 2026", "00:00", null), spring.absolute)
-        assertEquals(RemainingTime(0, 23), spring.remaining)
+        assertEquals(RemainingTime(0, 23, 0), spring.remaining)
         assertEquals(AbsoluteTime("Nov 2, 2026", "00:00", null), fall.absolute)
-        assertEquals(RemainingTime(1, 1), fall.remaining)
+        assertEquals(RemainingTime(1, 1, 0), fall.remaining)
         assertEquals(TimeSnapshot.UNKNOWN, spring.snapshot)
     }
 
@@ -176,7 +186,7 @@ class TimePresentationTest {
         assertEquals(TimeSnapshot.STALE, result.snapshot)
         assertEquals(TimeState.FUTURE, result.state)
         assertEquals(AbsoluteTime("Oct 9, 2026", "14:00", null), result.absolute)
-        assertEquals(RemainingTime(1, 14), result.remaining)
+        assertEquals(RemainingTime(1, 14, 0), result.remaining)
         val unknown = TimePresentation.present(
             Field<Instant>(Knowledge.UNAVAILABLE, reason = Reason.MISSING), TimeKind.PERIODIC_RESET,
             null, null, utc, Locale.US, staleSnapshot = true,
@@ -219,9 +229,9 @@ class TimePresentationTest {
         assertEquals(TimeState.AWAITING_REFRESH, forward.state)
         assertEquals(TimeSnapshot.STALE, forward.snapshot)
         assertEquals(TimeState.FUTURE, backward.state)
-        assertEquals(RemainingTime(0, 3), backward.remaining)
+        assertEquals(RemainingTime(0, 3, 0), backward.remaining)
         assertEquals(TimeSnapshot.CLOCK_BEFORE_OBSERVATION, backward.snapshot)
-        assertEquals(RemainingTime(0, 2), recovered.remaining)
+        assertEquals(RemainingTime(0, 2, 0), recovered.remaining)
         assertEquals(TimeSnapshot.OBSERVED, recovered.snapshot)
         for (result in listOf(forward, backward, recovered)) {
             assertEquals(AbsoluteTime("Oct 8, 2026", "02:00", null), result.absolute)
@@ -232,7 +242,7 @@ class TimePresentationTest {
         val result = present("2026-10-08T02:00:00Z", observed = null)
         assertEquals(TimeSnapshot.UNKNOWN, result.snapshot)
         assertEquals(TimeState.FUTURE, result.state)
-        assertEquals(RemainingTime(0, 2), result.remaining)
+        assertEquals(RemainingTime(0, 2, 0), result.remaining)
     }
 
     @Test fun unknownClockNeverFallsBackToSystemTimeOrInfiniteLifetime() {
@@ -293,7 +303,7 @@ class TimePresentationTest {
         )
         val result = TimePresentation.presentReset(observation.slots[0].window.value!!.reset, now, now, utc, Locale.US)
         assertEquals(AbsoluteTime("Oct 8, 2026", "02:00", null), result.absolute)
-        assertEquals(RemainingTime(0, 2), result.remaining)
+        assertEquals(RemainingTime(0, 2, 0), result.remaining)
         val unavailable = UsageNormalizer.normalize(
             UsageInput(primary = Input.Value(WindowInput(resetAfterSeconds = Input.Value(7200)))), null, now,
         )
@@ -357,7 +367,7 @@ class TimePresentationTest {
         assertEquals(2, clock.reads)
         assertEquals(first, second)
         assertEquals(TimeKind.ENTITLEMENT_EXPIRY, first.kind)
-        assertEquals(RemainingTime(1, 14), first.remaining)
+        assertEquals(RemainingTime(1, 14, 59), first.remaining)
         assertEquals(1L, first.remaining!!.days)
         assertEquals(14, first.remaining.hours)
         assertEquals("Oct 9, 2026", first.absolute!!.date)
@@ -367,9 +377,8 @@ class TimePresentationTest {
         assertEquals(R.string.time_absolute_offset, AbsoluteTime("Nov 1, 2026", "01:00", "-05:00").formatResource)
         assertEquals(R.plurals.time_days, TimePresentation.daysPluralResource)
         assertEquals(R.plurals.time_hours, TimePresentation.hoursPluralResource)
-        assertEquals(R.string.time_days_hours, TimePresentation.relativeFormatResource)
+        assertEquals(R.plurals.time_minutes, TimePresentation.minutesPluralResource)
         assertEquals(R.string.time_remaining, TimeState.FUTURE.labelResource)
-        assertEquals(R.string.time_less_than_hour, TimeState.LESS_THAN_HOUR.labelResource)
         assertEquals(R.string.time_awaiting_refresh, TimeState.AWAITING_REFRESH.labelResource)
         assertEquals(R.string.time_expired, TimeState.EXPIRED.labelResource)
         assertEquals(R.string.time_unknown_target, TimeState.UNKNOWN_TARGET.labelResource)
@@ -379,6 +388,15 @@ class TimePresentationTest {
         assertEquals(R.string.time_snapshot_unknown, TimeSnapshot.UNKNOWN.labelResource)
         assertEquals(R.string.time_snapshot_stale, TimeSnapshot.STALE.labelResource)
         assertEquals(R.string.time_clock_before_observation, TimeSnapshot.CLOCK_BEFORE_OBSERVATION.labelResource)
+    }
+
+    @Test fun remainingTimeUnitsOmitEveryZeroWithoutChangingOrder() {
+        assertEquals(emptyList<Pair<Int, Long>>(), RemainingTime(0, 0, 0).units)
+        assertEquals(listOf(R.plurals.time_minutes to 5L), RemainingTime(0, 0, 5).units)
+        assertEquals(listOf(R.plurals.time_hours to 2L, R.plurals.time_minutes to 5L), RemainingTime(0, 2, 5).units)
+        assertEquals(listOf(R.plurals.time_days to 1L, R.plurals.time_minutes to 5L), RemainingTime(1, 0, 5).units)
+        assertEquals(listOf(R.plurals.time_days to 3L), RemainingTime(3, 0, 0).units)
+        assertEquals(listOf(R.plurals.time_days to Long.MAX_VALUE), RemainingTime(Long.MAX_VALUE, 0, 0).units)
     }
 
     private class CountingClock(private val fixed: Instant) : Clock() {

@@ -47,6 +47,21 @@ CLASS = {
 }
 
 
+REMAINING_TIME_JVM = {
+    "io.github.leugenea.codexbarmobile.TimePresentationTest": {
+        "dayHourMinuteAndSubsecondBoundariesFloorElapsedMinutes",
+        "remainingTimeUnitsOmitEveryZeroWithoutChangingOrder",
+    },
+    "io.github.leugenea.codexbarmobile.TimePresentationResourcesTest": {
+        "stateAndSnapshotWordingIsExplicit",
+        "absoluteFormatsPreserveLocalDateAndRepeatedHourOffsetWithoutPrecisionSuffix",
+        "dayHourAndMinutePluralsRetainZeroSingularAndMultipleUnits",
+        "minutePrecisionFormatsSingularPluralAndOmittedUnits",
+        "zeroUnitsUseLessThanAMinuteWithinRemainingWrapper",
+    },
+}
+
+
 CURRENT_HISTORY_JVM = {
     "io.github.leugenea.codexbarmobile.history.CurrentHistoryPeriodTest": {
         "normalizedDurationSelectionUsesExactAbsoluteIdentityAndExistingEvaluationClock",
@@ -313,6 +328,7 @@ DASHBOARD_JVM = {
 DASHBOARD_NATIVE = {
     'io.github.leugenea.codexbarmobile.DashboardCopyAndTimeTest': {
         'dashboardAndDisclosureFollowPhoneZoneLocaleAndTicksWithoutRequests',
+        'minutePrecisionMatchesDashboardWindowDetailsAndBankedExpiry',
         'noReachableTextOrSemanticsUsesRemovedTimePhraseWhileOriginalInstantsRemainExact',
     },
     'io.github.leugenea.codexbarmobile.DashboardHistoryIsolationTest': {
@@ -425,7 +441,8 @@ def verify_reports(directory: Path, kind: str) -> dict:
     dashboard = DASHBOARD_JVM if kind == "jvm" else DASHBOARD_NATIVE
     export = HISTORY_EXPORT_JVM if kind == "jvm" else HISTORY_EXPORT_NATIVE
     imported = HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
-    for classname, required in (current_history | dashboard | export | imported).items():
+    remaining_time = REMAINING_TIME_JVM if kind == "jvm" else {}
+    for classname, required in (current_history | dashboard | export | imported | remaining_time).items():
         for name in required:
             matches = [case for case in cases if case["class"] == classname and case["name"] == name]
             if len(matches) != 1:

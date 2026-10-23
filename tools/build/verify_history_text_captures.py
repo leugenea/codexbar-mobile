@@ -479,7 +479,7 @@ LIVE_FACTS = {
     "live-five-hour-percent": "12.5% used",
     "live-weekly-percent": "76.25% used",
     "live-five-hour-reset-absolute": "Reset: Oct 8, 2026, 01:00",
-    "live-five-hour-reset-relative": "Reset: 0 days 1 hour remaining",
+    "live-five-hour-reset-relative": "Reset: 1 hour 30 minutes remaining",
     "live-weekly-reset-absolute": "Reset: Oct 10, 2026, 01:00",
     "live-weekly-reset-relative": "Reset: 2 days 1 hour remaining",
 }

@@ -108,7 +108,7 @@ internal object EntitlementPresentation {
         }
         return when (expiry.state) {
             TimeState.EXPIRED -> EntitlementState.EXPIRED
-            TimeState.FUTURE, TimeState.LESS_THAN_HOUR -> EntitlementState.KNOWN
+            TimeState.FUTURE -> EntitlementState.KNOWN
             else -> EntitlementState.UNKNOWN
         }
     }

@@ -308,7 +308,7 @@ class UsageRefreshTest {
         visible(true); manual()
         val window = state.refresh.usage.success!!.usage!!.fiveHour.candidates.single()
         val first = state.refresh.reset(window, ZoneOffset.UTC, Locale.US)
-        assertEquals(TimeState.LESS_THAN_HOUR, first.state)
+        assertEquals(TimeState.FUTURE, first.state)
         advance(2_000)
         val passed = state.refresh.reset(window, ZoneOffset.UTC, Locale.US)
         assertEquals(TimeState.AWAITING_REFRESH, passed.state)
@@ -330,7 +330,7 @@ class UsageRefreshTest {
         assertEquals(Instant.parse("2026-01-01T00:01:01.250Z"), source.reset.relativeDerived.value)
         assertEquals(61L, source.reset.relativeSeconds.value)
         assertFalse(source.reset.discrepant) // Difference is 59.25s, despite the future derived reset.
-        assertEquals(TimeState.LESS_THAN_HOUR, state.refresh.reset(source, ZoneOffset.UTC, Locale.US).state)
+        assertEquals(TimeState.FUTURE, state.refresh.reset(source, ZoneOffset.UTC, Locale.US).state)
         val requests = fake.gets.size
         advance(1_000)
         assertEquals(requests, fake.gets.size)

@@ -18,7 +18,7 @@ EXPECTED_LIVE_FACTS = {
     "live-five-hour-percent": "12.5% used",
     "live-weekly-percent": "76.25% used",
     "live-five-hour-reset-absolute": "Reset: Oct 8, 2026, 01:00",
-    "live-five-hour-reset-relative": "Reset: 0 days 1 hour remaining",
+    "live-five-hour-reset-relative": "Reset: 1 hour 30 minutes remaining",
     "live-weekly-reset-absolute": "Reset: Oct 10, 2026, 01:00",
     "live-weekly-reset-relative": "Reset: 2 days 1 hour remaining",
 }
@@ -66,6 +66,16 @@ class LiveUsageVisualContracts(unittest.TestCase):
                 path.write_text(json.dumps(changed))
                 with self.subTest(name=name, tag=tag), self.assertRaises(ValueError):
                     live_capture_receipt(path.with_suffix(".png"))
+
+    def test_hour_only_reset_copy_is_rejected_when_fixture_has_minutes(self):
+        self.captures()
+        for name in LIVE_CAPTURES:
+            path = self.directory / (name + ".json")
+            data = json.loads(path.read_text())
+            data["visibleFacts"]["live-five-hour-reset-relative"] = "Reset: 1 hour remaining"
+            path.write_text(json.dumps(data))
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                live_capture_receipt(path.with_suffix(".png"))
 
     def test_new_cases_are_registered_and_keep_all_inherited_cases(self):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/LiveUsageScreenTest.kt").read_text()

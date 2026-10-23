@@ -192,7 +192,7 @@ The script permits **one bounded retry** only after passing JVM/native suites,
 with ADB-offline evidence at collection and missing, empty or truncated native coverage
 from the same checkout/run/attempt. It preserves the failed graph's data and
 logs, waits for device readiness, then reruns the complete JVM/native/coverage
-graph within the original 15-minute graph budget. It never combines coverage
+graph within the shared 25-minute graph budget. It never combines coverage
 across attempts or retries failing tests, timeouts, other invalid datasets or a
 coverage-threshold failure. `coverage_gate.py prepare()` deletes execution data,
 class snapshots and test/coverage reports before both suites on **each** attempt;

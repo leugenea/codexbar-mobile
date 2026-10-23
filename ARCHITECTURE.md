@@ -168,8 +168,10 @@ The live periodic-usage card uses 20dp content padding,
 all percentages and reset/status facts still come from the normalized presentation.
 The banked section remains independently grouped below it, in the same single scroll
 container. The selected root/card/content/bar/track paint contract remains unchanged.
-B1 alone supplies reset absolute/relative labels, including unknown/sub-hour/passed and
-repeated-hour offsets. Status transitions use polite accessibility live regions; ordinary
+B1 alone supplies reset absolute/relative labels, including unknown/sub-minute/passed and
+repeated-hour offsets. Relative durations floor the original elapsed time to whole minutes,
+split into elapsed 24-hour days/hours/minutes and omit every zero unit. Positive durations
+below one minute show "less than a minute"; the existing "remaining" wrapper is retained. Status transitions use polite accessibility live regions; ordinary
 countdowns do not repeatedly announce. One wrapping, vertically scrollable content tree
 keeps actions reachable in landscape. Usage stays with the process owner across
 Activity recreation; no connection state, credential or obsolete UI selector is
@@ -1237,8 +1239,9 @@ Its hosted API 36 emulator uses 4096 MiB of RAM. After
 passing JVM/native suites, missing, empty or truncated native coverage permits
 one full-graph retry only with ADB-offline collection evidence and matching
 checkout/run/attempt identity. Missing JVM data cannot retry. Attempt 1 is archived;
-no data is combined across attempts, and the original 15-minute graph budget stays
-in force. History screenshot verification runs after the retry loop on the final
+no data is combined across attempts, and both attempts share a 25-minute graph budget.
+The native script has a 42-minute wrapper and a 45-minute step limit for image setup,
+boot and graph execution; the 60-minute job also covers SDK setup and evidence upload. History screenshot verification runs after the retry loop on the final
 attempt and remains fail-closed. Full `--info` evidence (including every retry attempt)
 remains unfiltered; only known informational console noise is suppressed. The
 SHA-pinned checkout/upload-artifact actions use Node 24 without changing credential

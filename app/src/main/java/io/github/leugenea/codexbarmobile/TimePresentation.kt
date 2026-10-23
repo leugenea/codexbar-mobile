@@ -17,7 +17,6 @@ enum class TimeKind { PERIODIC_RESET, ENTITLEMENT_EXPIRY }
 
 enum class TimeState(val labelResource: Int) {
     FUTURE(R.string.time_remaining),
-    LESS_THAN_HOUR(R.string.time_less_than_hour),
     AWAITING_REFRESH(R.string.time_awaiting_refresh),
     EXPIRED(R.string.time_expired),
     UNKNOWN_TARGET(R.string.time_unknown_target),
@@ -39,8 +38,15 @@ data class AbsoluteTime(val date: String, val hour: String, val utcOffset: Strin
         get() = if (utcOffset == null) R.string.time_absolute else R.string.time_absolute_offset
 }
 
-/** Elapsed 24-hour days, NOT calendar days. Consumers pluralize both units, including zero. */
-data class RemainingTime(val days: Long, val hours: Int)
+/** Elapsed 24-hour days, NOT calendar days. Zero-valued units are omitted before pluralization. */
+data class RemainingTime(val days: Long, val hours: Int, val minutes: Int) {
+    val units: List<Pair<Int, Long>>
+        get() = listOf(
+            TimePresentation.daysPluralResource to days,
+            TimePresentation.hoursPluralResource to hours.toLong(),
+            TimePresentation.minutesPluralResource to minutes.toLong(),
+        ).filter { it.second > 0 }
+}
 
 data class PresentedTime(
     val kind: TimeKind,
@@ -57,8 +63,10 @@ data class PresentedTime(
  *
  * Absolute hour labels truncate minutes/seconds for display only; the labels carry no
  * precision suffix. Relative time uses the ORIGINAL epoch instant: floor positive
- * elapsed duration to whole hours, then divide by 24. 0 < duration < 1h is LESS_THAN_HOUR;
- * equality is already passed. Never infer another reset, change usage or provider counts.
+ * elapsed duration down to whole minutes, never showing a later reset than the real one.
+ * Split into elapsed days/hours/minutes and omit zero units; positive durations below
+ * one minute have no units ("less than a minute"). Equality is already passed.
+ * Never infer another reset, change usage or provider counts.
  *
  * Unknown evaluation time still permits a known absolute date; unknown/discrepant targets
  * do not choose a date or infinite lifetime. Field knowledge/reasons survive projection.
@@ -72,7 +80,7 @@ data class PresentedTime(
 object TimePresentation {
     val daysPluralResource: Int = R.plurals.time_days
     val hoursPluralResource: Int = R.plurals.time_hours
-    val relativeFormatResource: Int = R.string.time_days_hours
+    val minutesPluralResource: Int = R.plurals.time_minutes
 
     fun present(
         target: Field<Instant>, kind: TimeKind, observedAt: Instant?, now: Instant?,
@@ -115,13 +123,12 @@ object TimePresentation {
         target == null || absolute == null -> TimeState.UNKNOWN_TARGET
         now == null -> TimeState.UNKNOWN_CLOCK
         target <= now -> if (kind == TimeKind.PERIODIC_RESET) TimeState.AWAITING_REFRESH else TimeState.EXPIRED
-        Duration.between(now, target) < Duration.ofHours(1) -> TimeState.LESS_THAN_HOUR
         else -> TimeState.FUTURE
     }
 
     private fun remaining(target: Instant, now: Instant): RemainingTime {
-        val hours = Duration.between(now, target).toHours()
-        return RemainingTime(hours / 24, (hours % 24).toInt())
+        val minutes = Duration.between(now, target).toMinutes()
+        return RemainingTime(minutes / 1440, ((minutes / 60) % 24).toInt(), (minutes % 60).toInt())
     }
 
     private fun snapshot(target: Instant?, observed: Instant?, now: Instant?, stale: Boolean): TimeSnapshot = when {
