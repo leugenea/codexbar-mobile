@@ -113,8 +113,7 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
         awaitConnectionScreen(compose, fixture.owner)
         if (dashboard) {
             returnDashboard(compose, fixture.owner)
-            if (compose.onAllNodesWithTag("banked-disclosure-item-0").fetchSemanticsNodes().isEmpty())
-                compose.onNodeWithTag("banked-disclosure-toggle").performScrollTo().performClick()
+            compose.onNodeWithTag("banked-disclosure-item-0").assertExists()
             return
         }
         if (!history) {
@@ -138,7 +137,13 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
         if (dashboard) {
             compose.onNodeWithTag("live-five-hour-reset-absolute").assertDoesNotExist()
             label("dashboard-observed-at", "Measurement observed at (second precision): $observed")
-            label("banked-disclosure-expiry-0", reset)
+            val target = fixture.owner.state.value.refresh.inventory.success!!.inventory!!.items.single().value!!.expiresAt.value!!
+            val locale = context.resources.configuration.locales[0]
+            val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMdHHmm")
+            val yearless = target.atZone(ZoneId.systemDefault()).withMinute(0).withSecond(0).withNano(0)
+                .format(java.time.format.DateTimeFormatter.ofPattern(pattern, locale))
+            assertFalse("Banked expiry is yearless", yearless.contains("2027"))
+            label("banked-disclosure-expiry-0", yearless)
             compose.onNodeWithTag("banked-disclosure-remaining-0", useUnmergedTree = true).performScrollTo().assertExists()
         } else if (history) {
             fact("Source observed at (second precision): $observed")

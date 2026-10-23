@@ -32,7 +32,7 @@ class DashboardCopyAndTimeTest {
             for (route in listOf(DashboardRoute.DASHBOARD, DashboardRoute.LOCAL_HISTORY_DETAILS, DashboardRoute.CONNECTION_DETAILS)) {
                 if (route == DashboardRoute.DASHBOARD) {
                     returnDashboard(compose, owner)
-                    compose.onNodeWithTag("banked-disclosure-toggle").performScrollTo().performClick()
+                    compose.onNodeWithTag("banked-disclosure-title").performScrollTo().assertHasNoClickAction()
                 } else openDetailRoute(compose, owner, route)
                 if (route == DashboardRoute.LOCAL_HISTORY_DETAILS) {
                     await("stored exact detail page") { recordedHistory(owner).storage != null }
@@ -57,7 +57,7 @@ class DashboardCopyAndTimeTest {
             compose.onNodeWithTag("connect").performScrollTo().performClick()
             returnDashboard(compose, owner)
             await("initial usage settled") { owner.state.value.refresh.usage.success != null && !owner.state.value.refresh.refreshing }
-            val cases = listOf(59L to "less than a minute", 60L to "1 minute",
+            val cases = listOf(59L to "less than a minute", 60L to "1 minute", 7500L to "2 hours 5 minutes",
                 86700L to "1 day 5 minutes", 259200L to "3 days")
             for ((seconds, duration) in cases) {
                 val target = fixture.transport.clock.now().wall!!.plusSeconds(seconds)
@@ -70,10 +70,9 @@ class DashboardCopyAndTimeTest {
                     owner.state.value.refresh.inventory.attempt !== previous && !owner.state.value.refresh.refreshing
                 }
                 compose.onNodeWithTag("live-five-hour-reset-relative").performScrollTo().assertTextEquals("Next reset in $duration")
-                compose.onNodeWithTag("banked-disclosure-toggle").performScrollTo().performClick()
+                compose.onNodeWithTag("banked-disclosure-title").performScrollTo().assertHasNoClickAction()
                 compose.onNodeWithTag("banked-disclosure-remaining-0", useUnmergedTree = true).performScrollTo()
-                    .assertTextEquals("$duration remaining")
-                compose.onNodeWithTag("banked-disclosure-toggle").performScrollTo().performClick()
+                    .assertTextEquals(duration)
                 openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
                 compose.onNodeWithTag("live-five-hour-reset-relative").performScrollTo().assertTextEquals("Reset: $duration remaining")
                 compose.onNodeWithTag("banked-item-0-relative", useUnmergedTree = true).performScrollTo()

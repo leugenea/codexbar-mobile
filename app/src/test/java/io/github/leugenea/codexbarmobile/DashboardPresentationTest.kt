@@ -157,6 +157,17 @@ class DashboardPresentationTest {
         assertEquals(PresentedPace(R.string.dashboard_reserve, "12,4"), DashboardPresentation.pace(BigDecimal("-12.35"), Locale.GERMANY))
     }
 
+    @Test fun bankedRowDetailsKeepMinutePrecisionAndIndependentStatesWithoutDuplicateAnnouncements() {
+        for (remaining in listOf("less than a minute remaining", "2 hours 5 minutes remaining")) {
+            assertEquals(remaining, DashboardPresentation.bankedRowDetails(remaining, null))
+            assertEquals("$remaining, Unsupported item information",
+                DashboardPresentation.bankedRowDetails(remaining, "Unsupported item information"))
+        }
+        assertEquals("Entitlement expired", DashboardPresentation.bankedRowDetails("Entitlement expired", "Entitlement expired"))
+        assertEquals("Time unavailable, Item information unknown",
+            DashboardPresentation.bankedRowDetails("Time unavailable", "Item information unknown"))
+    }
+
     @Test fun chartTimeLabelsUseYearlessLocalePatternsAndContainingHour() {
         val at = Instant.parse("2027-01-15T08:37:12.123456789Z")
         assertEquals("Jan 15, 08:00", TimePresentation.chartTime(at, ZoneOffset.UTC, Locale.US, "MMM d, HH:mm"))

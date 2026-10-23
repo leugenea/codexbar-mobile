@@ -17,6 +17,10 @@ internal object DashboardPresentation {
     fun inventoryCount(facts: PresentedEntitlements): Long? =
         facts.reportedAvailableCount?.takeIf { it.knowledge == Knowledge.KNOWN }?.value
 
+    /** A row announces the countdown once, with any independent non-known item state. */
+    fun bankedRowDetails(relative: String, status: String?): String =
+        listOfNotNull(relative, status?.takeIf { it != relative }).joinToString(", ")
+
     fun hasChart(series: HistoryPlotSeries) = series.samples.any { it.measured?.position is PlotPosition.Available }
 
     fun noInformation(source: HistoryGraphSnapshot, status: UsageWindowStatus = UsageWindowStatus.UNAVAILABLE, malformed: Boolean = false): Int = when {

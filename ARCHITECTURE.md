@@ -1159,12 +1159,18 @@ accepted Work retains preappend/high-water/gap/append ordering across route chan
 admission failure accounting is separate from superseded presentation outcomes.
 Idle drops page interest while keeping actual recording and shared diagnostics.
 
-The banked-reset disclosure is collapsed below both graph sections. Its title uses
-only known inventory reportedAvailableCount; unknown is not zero and summary or
-row counts never substitute. Every retained item, including malformed/expired rows,
-keeps C1 state and B1 expiry/relative labels. Independent summary/count/container/
-issues/clocks stay in full connection details. Expanding, local ticks and phone
-zone/locale effects issue no provider request or admission. Absolute labels remove
+The banked-reset card is always visible below both graph sections, with the same
+Material Card, 20dp padding, 12dp spacing and titleLarge heading as the usage windows.
+Its title uses only known inventory reportedAvailableCount; unknown is not zero and
+summary or row counts never substitute. The wrapping, weighted two-column table
+shows yearless chart-format expiry and B1 minute-precision remaining time, with
+subtle row dividers and end-aligned remaining values. Every retained item, including
+malformed/expired rows, keeps C1 state; one row owns its expiry/remaining/state
+accessibility announcement, while decorative headers and duplicate text are hidden.
+Empty inventory has a short status line instead of a table. Independent stale,
+partial and inventory-state notes stay inside the card; summary/count/container/
+issues/clocks stay in full connection details. Local ticks and phone zone/locale
+effects issue no provider request or admission. Absolute labels remove
 the precision suffix only; original instants, containing-hour formatting, elapsed
 countdown math and recognized weekly inclusive60-second conflict policy remain.
 

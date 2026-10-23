@@ -35,7 +35,7 @@ def dashboard_captures(directory, fixture):
                                     selectedOrdinals=[1], lastAdmitted=1) for k, d in (("FIVE_HOUR", 18000), ("WEEKLY", 604800))]
         if name == "dashboard-drawer-portrait-dark":
             data["drawerLabels"] = ["Full local history details", "Full live connection details", "Account settings"]
-        if name in {"dashboard-banked-expanded-portrait-light", "dashboard-connection-details-landscape-dark"}:
+        if name in {"dashboard-banked-table-portrait-light", "dashboard-connection-details-landscape-dark"}:
             data.update(inventoryCount=7, inventoryRows=3)
         image = fixture.png(*size)
         if kind != "NONE":
@@ -98,7 +98,7 @@ class DashboardContracts(unittest.TestCase):
         self.assertEqual(DASHBOARD_JVM_COUNT, EXPECTED_DASHBOARD_JVM_COUNT)
         self.assertEqual(CURRENT_HISTORY_JVM[SCANNER_CLASS], EXPECTED_CURRENT_READ_JVM)
         self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_NATIVE.values())), 17)
-        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 29)
+        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 30)
         for kind, registry, source_set in (("jvm", EXPECTED_DASHBOARD_JVM, "test"), ("native", EXPECTED_DASHBOARD_NATIVE, "androidTest")):
             for classname, required in registry.items():
                 source = ROOT / f"app/src/{source_set}/java/{classname.replace('.', '/')}.kt"
@@ -158,6 +158,30 @@ class DashboardContracts(unittest.TestCase):
         stored = (main / "HistoryTextPresentation.kt").read_text()
         self.assertIn("comparison.deltaPercentagePoints.toString()", stored)
         self.assertNotIn("setScale", stored)
+
+    def test_banked_card_keeps_shared_style_wrapping_table_and_no_disclosure_state(self):
+        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
+        card = (main / "BankedResetCard.kt").read_text()
+        windows = (main / "DashboardScreen.kt").read_text()
+        for shared in ("Card(Modifier.fillMaxWidth()", "Column(Modifier.padding(20.dp)",
+                       "Arrangement.spacedBy(12.dp)", "MaterialTheme.typography.titleLarge"):
+            self.assertIn(shared, card)
+            self.assertIn(shared, windows)
+        for required in ("TimePresentation.chartTime(", "remainingTimeLabel(it)",
+                         "HorizontalDivider(", "Modifier.weight(1f)", "TextAlign.End",
+                         "semantics(mergeDescendants = true)", "contentDescription = description",
+                         "model.entitlements.items.isNotEmpty()"):
+            self.assertIn(required, card)
+        for removed in ("OutlinedButton", "expanded", "remember", "maxLines", "TextOverflow"):
+            self.assertNotIn(removed, card)
+        self.assertEqual(card.count("Card(Modifier"), 1)
+        self.assertFalse((main / "BankedResetDisclosure.kt").exists())
+        resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
+        self.assertNotIn("dashboard_expanded", resources)
+        self.assertNotIn("dashboard_collapsed", resources)
+        self.assertEqual(resources["dashboard_banked_expires"], "Expires")
+        self.assertEqual(resources["dashboard_banked_remaining"], "Remaining")
+        self.assertEqual(resources["dashboard_banked_row"], "Banked reset %1$d, expires %2$s, %3$s")
 
     def test_each_dashboard_image_requires_exact_route_configuration_and_native_owner_receipts(self):
         self.assertEqual(DASHBOARD_CAPTURES, EXPECTED_DASHBOARD_CAPTURE_SPECS)

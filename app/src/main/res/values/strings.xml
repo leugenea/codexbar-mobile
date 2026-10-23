@@ -370,8 +370,9 @@
     <string name="dashboard_geometry_warning">Some recorded values cannot be drawn. Exact values remain in details.</string>
     <string name="dashboard_banked_count">Banked resets (%1$d)</string>
     <string name="dashboard_banked_unknown">Banked resets (count unknown)</string>
-    <string name="dashboard_expanded">Expanded</string>
-    <string name="dashboard_collapsed">Collapsed</string>
+    <string name="dashboard_banked_expires">Expires</string>
+    <string name="dashboard_banked_remaining">Remaining</string>
+    <string name="dashboard_banked_row">Banked reset %1$d, expires %2$s, %3$s</string>
     <string name="dashboard_inventory_known">Reported inventory</string>
     <string name="dashboard_inventory_empty">No retained items</string>
     <string name="dashboard_inventory_unsupported">Unsupported item information</string>

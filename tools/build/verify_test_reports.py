@@ -327,6 +327,7 @@ DASHBOARD_JVM = {
         'compactChartEquivalentUsesOriginalExactFactsAndIndependentReferences',
         'compactMissingChartAndPhaseActionsKeepTypedErrorsAndSinglePointTruth',
         'reportedInventoryCountNeverFallsBackToSummaryRowsOrZero',
+        'bankedRowDetailsKeepMinutePrecisionAndIndependentStatesWithoutDuplicateAnnouncements',
         'paceLineUsesOverReserveAndOnPaceWithoutChangingExactComparison',
         'paceLineHalfTenthBoundariesRoundAwayFromZero',
         'paceLineNearZeroAndAdjacentBoundaryValuesNeverShowSignedZero',
@@ -366,7 +367,7 @@ DASHBOARD_NATIVE = {
         'pairReadsRemainBoundedBehindArchivesAndCoalesceWithoutExtraAdmissions',
     },
     'io.github.leugenea.codexbarmobile.DashboardUiTest': {
-        'bankedDisclosureUsesReportedCountAndRetainsEveryExpiryAndUnknownRow',
+        'bankedTableUsesReportedCountAndRetainsEveryExpiryAndUnknownRow',
         'dashboardActionsFollowConnectionPhaseAndDormantNavigationDoesNotRead',
         'dashboardDarkLandscapeAndLargeFontKeepAccessibleTargetsAndCompleteText',
         'dashboardMissingEmptySingleAndFailedHistoryHaveOneHonestLinePerWindow',

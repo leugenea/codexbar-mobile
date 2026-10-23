@@ -25,7 +25,7 @@ internal fun DashboardScreen(state: ConnectionState, controller: ConnectionContr
         DashboardActions(state, usage, controller, openAccountSettings)
         DashboardWindow(usage.windows[0], five, time, usage.observation)
         DashboardWindow(usage.windows[1], weekly, time, usage.observation)
-        BankedResetDisclosure(BankedResetPresentation.present(state, time.zone, time.locale), authority)
+        BankedResetCard(BankedResetPresentation.present(state, time.zone, time.locale), time)
     }
 }
 

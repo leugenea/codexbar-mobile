@@ -9,6 +9,7 @@ EXPECTED_DASHBOARD_JVM = {
         "compactChartEquivalentUsesOriginalExactFactsAndIndependentReferences",
         "compactMissingChartAndPhaseActionsKeepTypedErrorsAndSinglePointTruth",
         "reportedInventoryCountNeverFallsBackToSummaryRowsOrZero",
+        "bankedRowDetailsKeepMinutePrecisionAndIndependentStatesWithoutDuplicateAnnouncements",
         "paceLineUsesOverReserveAndOnPaceWithoutChangingExactComparison",
         "paceLineHalfTenthBoundariesRoundAwayFromZero",
         "paceLineNearZeroAndAdjacentBoundaryValuesNeverShowSignedZero",
@@ -48,7 +49,7 @@ EXPECTED_DASHBOARD_NATIVE = {
         "pairReadsRemainBoundedBehindArchivesAndCoalesceWithoutExtraAdmissions",
     },
     "io.github.leugenea.codexbarmobile.DashboardUiTest": {
-        "bankedDisclosureUsesReportedCountAndRetainsEveryExpiryAndUnknownRow",
+        "bankedTableUsesReportedCountAndRetainsEveryExpiryAndUnknownRow",
         "dashboardActionsFollowConnectionPhaseAndDormantNavigationDoesNotRead",
         "dashboardDarkLandscapeAndLargeFontKeepAccessibleTargetsAndCompleteText",
         "dashboardMissingEmptySingleAndFailedHistoryHaveOneHonestLinePerWindow",
@@ -102,7 +103,7 @@ EXPECTED_CURRENT_READ_JVM = PROTECTED_MIXED_SOURCE[SCANNER_CLASS] | EXPECTED_SCA
 EXPECTED_DASHBOARD_CAPTURE_SPECS = {
     "dashboard-main-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "FIVE_HOUR"),
     "dashboard-weekly-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "WEEKLY"),
-    "dashboard-banked-expanded-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "NONE"),
+    "dashboard-banked-table-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "NONE"),
     "dashboard-drawer-portrait-dark": (1, True, 1.0, "DASHBOARD", "CURRENT", "NONE"),
     "dashboard-main-landscape-dark-large-font": (2, True, 2.0, "DASHBOARD", "CURRENT", "FIVE_HOUR"),
     "dashboard-connection-details-landscape-dark": (2, True, 1.0, "CONNECTION_DETAILS", "IDLE", "NONE"),
@@ -111,7 +112,7 @@ EXPECTED_DASHBOARD_CAPTURE_SPECS = {
 EXPECTED_DASHBOARD_LAYOUTS = {
     "dashboard-main-portrait-light": ("history-chart-five-hour-pace", ["connection-screen", "dashboard"]),
     "dashboard-weekly-portrait-light": ("history-chart-weekly-pace", ["connection-screen", "dashboard"]),
-    "dashboard-banked-expanded-portrait-light": ("banked-disclosure-status", ["connection-screen", "dashboard"]),
+    "dashboard-banked-table-portrait-light": ("banked-disclosure-title", ["connection-screen", "dashboard"]),
     "dashboard-drawer-portrait-dark": ("drawer-LOCAL_HISTORY_DETAILS", ["connection-screen", "dashboard", "details-drawer"]),
     "dashboard-main-landscape-dark-large-font": ("history-chart-five-hour-pace", ["connection-screen", "dashboard"]),
     "dashboard-connection-details-landscape-dark": ("banked-container", ["connection-screen", "connection-details"]),
@@ -121,4 +122,4 @@ EXPECTED_CURRENT_HOST = {"context": "MATCH", "selection": "MATCH", "periods": "M
 
 # Literal review budgets, independently checked against the enumerated sets.
 EXPECTED_DASHBOARD_NATIVE_COUNT = 17
-EXPECTED_DASHBOARD_JVM_COUNT = 25
+EXPECTED_DASHBOARD_JVM_COUNT = 26
