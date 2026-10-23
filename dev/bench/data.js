@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792753945251,
+  "lastUpdate": 1792760833867,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2403,6 +2403,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/882ea461238a4495059f315d027e1de9bf323fb6"
         },
         "date": 1792753942104,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5b3bf965f504783e55c04a31f7dfbf1f37f34c3d",
+          "message": "feat(ui): minute-precision remaining time; raise native CI budget (#176)\n\n* feat(ui): minute-precision remaining time omitting zero units; raise native CI budget (#172)\n\n* test(ui): expect minute-precision reset text in live captures (#172)",
+          "timestamp": "2026-10-23T16:06:48+03:00",
+          "tree_id": "32eac6b4b97f16f26086182839482c5b7d27580e",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/5b3bf965f504783e55c04a31f7dfbf1f37f34c3d"
+        },
+        "date": 1792760833169,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
