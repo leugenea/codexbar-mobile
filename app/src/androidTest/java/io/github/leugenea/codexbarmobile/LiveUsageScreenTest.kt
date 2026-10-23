@@ -159,7 +159,7 @@ class LiveUsageScreenTest {
         progress("live-five-hour", 0.125f, "Five-hour window · 12.5% used", "Provider-reported usage", "12.5% used")
         progress("live-weekly", 0.7625f, "Weekly window · 76.25% used", "Provider-reported usage", "76.25% used")
         text("live-five-hour-reset-absolute", "Reset: Oct 8, 2026, 01:00")
-        text("live-five-hour-reset-relative", "Reset: 1 hour remaining")
+        text("live-five-hour-reset-relative", "Reset: 1 hour 30 minutes remaining")
         text("live-weekly-reset-absolute", "Reset: Oct 10, 2026, 01:00")
         text("live-weekly-reset-relative", "Reset: 2 days 1 hour remaining")
         text("live-allowed", "Provider permission: allowed")
