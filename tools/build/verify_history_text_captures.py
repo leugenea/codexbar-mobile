@@ -103,7 +103,7 @@ PRODUCTION_ROUTES = {
 DASHBOARD_CAPTURES = {
     "dashboard-main-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "FIVE_HOUR"),
     "dashboard-weekly-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "WEEKLY"),
-    "dashboard-banked-expanded-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "NONE"),
+    "dashboard-banked-table-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "NONE"),
     "dashboard-drawer-portrait-dark": (1, True, 1.0, "DASHBOARD", "CURRENT", "NONE"),
     "dashboard-main-landscape-dark-large-font": (2, True, 2.0, "DASHBOARD", "CURRENT", "FIVE_HOUR"),
     "dashboard-connection-details-landscape-dark": (2, True, 1.0, "CONNECTION_DETAILS", "IDLE", "NONE"),
@@ -113,13 +113,22 @@ DASHBOARD_CAPTURES = {
 DASHBOARD_LAYOUTS = {
     "dashboard-main-portrait-light": ("history-chart-five-hour-pace", ["connection-screen", "dashboard"]),
     "dashboard-weekly-portrait-light": ("history-chart-weekly-pace", ["connection-screen", "dashboard"]),
-    "dashboard-banked-expanded-portrait-light": ("banked-disclosure-status", ["connection-screen", "dashboard"]),
+    "dashboard-banked-table-portrait-light": ("banked-disclosure-title", ["connection-screen", "dashboard"]),
     "dashboard-drawer-portrait-dark": ("drawer-LOCAL_HISTORY_DETAILS", ["connection-screen", "dashboard", "details-drawer"]),
     "dashboard-main-landscape-dark-large-font": ("history-chart-five-hour-pace", ["connection-screen", "dashboard"]),
     "dashboard-connection-details-landscape-dark": ("banked-container", ["connection-screen", "connection-details"]),
     "dashboard-local-history-details-large-font": ("history-page-cursor", ["connection-screen", "connection-history"]),
 }
 
+
+BANKED_TABLE_ROWS = [
+    dict(expiry="Jan 15, 09:00", remaining="1 hour", textCellCount=2,
+         description="Banked reset 1, expires Jan 15, 09:00, 1 hour remaining"),
+    dict(expiry="Jan 15, 07:00", remaining="Expired", textCellCount=2,
+         description="Banked reset 2, expired Jan 15, 07:00"),
+    dict(expiry="—", remaining="Unknown", textCellCount=2,
+         description="Banked reset 3, expiry unknown, state Unknown"),
+]
 
 # Bitmap.compress uses Skia's non-interlaced direct-color PNG encoder. Support
 # its grayscale/RGB/gray-alpha/RGBA 8/16-bit output, not palette or Adam7 files.
@@ -567,9 +576,13 @@ def dashboard_capture_receipt(path: Path) -> dict:
     verify_dashboard_windows(metadata)
     if path.stem == "dashboard-drawer-portrait-dark" and metadata.get("drawerLabels") != ["Full local history details", "Full live connection details", "Account settings"]:
         raise ValueError("Owner drawer rows changed")
-    if path.stem in {"dashboard-banked-expanded-portrait-light", "dashboard-connection-details-landscape-dark"}:
+    if path.stem in {"dashboard-banked-table-portrait-light", "dashboard-connection-details-landscape-dark"}:
         if metadata.get("inventoryCount") != 7 or metadata.get("inventoryRows") != 3:
             raise ValueError("Reported count/retained inventory rows changed")
+    if path.stem == "dashboard-banked-table-portrait-light":
+        rows = metadata.get("bankedTableRows")
+        if rows != BANKED_TABLE_ROWS or any(type(row.get("textCellCount")) is not int for row in rows):
+            raise ValueError("Banked table must retain two cells and announce each expiry/state/countdown once")
     if kind != "NONE":
         verify_dashboard_pixels(metadata, size, image)
     return dict(metadata, path=str(path), pngSha256=hashlib.sha256(image).hexdigest(),

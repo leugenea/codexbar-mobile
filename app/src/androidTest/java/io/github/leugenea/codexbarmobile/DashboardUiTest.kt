@@ -36,9 +36,12 @@ class DashboardUiTest {
             capture.capture("dashboard-main-portrait-light", scenario, fixture, "history-chart-five-hour-pace", WindowKind.FIVE_HOUR)
             capture.capture("dashboard-weekly-portrait-light", scenario, fixture, "history-chart-weekly-pace", WindowKind.WEEKLY)
             val weekly = compose.onNodeWithTag("history-chart-weekly-canvas", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-            compose.onNodeWithTag("banked-disclosure-toggle").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("banked-disclosure-title").performScrollTo().assertIsDisplayed().assertHasNoClickAction()
             assertTrue(weekly.height > 0)
             compose.onNodeWithTag("banked-disclosure-item-0").assertDoesNotExist()
+            compose.onNodeWithTag("banked-disclosure-header").assertDoesNotExist()
+            compose.onNodeWithTag("banked-disclosure-title").assertTextEquals("Banked resets (0)")
+            compose.onNodeWithTag("banked-disclosure-status").assertTextEquals("No retained items")
             assertEquals(before, fixture.transport.counts())
         }
     }
@@ -104,7 +107,8 @@ class DashboardUiTest {
             openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
             await("dormant stored facts") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L }
             returnDashboard(compose, owner)
-            click("banked-disclosure-toggle"); click("banked-disclosure-toggle")
+            compose.onNodeWithTag("banked-disclosure-title").performScrollTo().assertTextEquals("Banked resets (count unknown)")
+            compose.onNodeWithTag("banked-disclosure-header").assertDoesNotExist()
             assertEquals(before, fixture.transport.counts())
             compose.onNodeWithTag("dashboard-no-info-FIVE_HOUR").assertExists()
         }
@@ -191,19 +195,36 @@ class DashboardUiTest {
         }
     }
 
-    @Test fun bankedDisclosureUsesReportedCountAndRetainsEveryExpiryAndUnknownRow() {
+    @Test fun bankedTableUsesReportedCountAndRetainsEveryExpiryAndUnknownRow() {
         fixture.transport.inventoryBody = INVENTORY
         launch().use { scenario ->
             login()
-            compose.onNodeWithTag("banked-disclosure-item-0").assertDoesNotExist()
+            compose.onNodeWithTag("banked-disclosure-item-0").assertExists()
             val before = fixture.transport.counts()
-            click("banked-disclosure-toggle")
-            compose.onNodeWithTag("banked-disclosure-toggle").assertTextContains("Banked resets (7)")
-                .assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Expanded"))
+            compose.onNodeWithTag("banked-disclosure-toggle").assertDoesNotExist()
+            compose.onNodeWithTag("banked-disclosure-title").performScrollTo().assertTextEquals("Banked resets (7)").assertHasNoClickAction()
+            compose.onNodeWithTag("banked-disclosure-header", useUnmergedTree = true)
+                .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+            for (header in listOf("Expires", "Remaining")) compose.onNode(
+                hasText(header) and hasAnyAncestor(hasTestTag("banked-disclosure-header")), useUnmergedTree = true)
+                .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+            compose.onNodeWithTag("banked-disclosure-status").assertTextEquals("Inventory differs from reported counts")
+            compose.onNodeWithText("Inventory is partial").assertExists()
             for (index in 0..2) compose.onNodeWithTag("banked-disclosure-item-$index").performScrollTo().assertIsDisplayed()
-            compose.onNodeWithTag("banked-disclosure-expiry-0", useUnmergedTree = true).performScrollTo().assertTextEquals("Jan 15, 2027, 09:00")
-            compose.onNodeWithTag("banked-disclosure-remaining-1", useUnmergedTree = true).performScrollTo().assertTextEquals("Entitlement expired")
-            capture.capture("dashboard-banked-expanded-portrait-light", scenario, fixture, "banked-disclosure-status")
+            compose.onNodeWithTag("banked-disclosure-expiry-0", useUnmergedTree = true).performScrollTo().assertTextEquals("Jan 15, 09:00")
+            compose.onNodeWithTag("banked-disclosure-expiry-1", useUnmergedTree = true).performScrollTo().assertTextEquals("Jan 15, 07:00")
+            compose.onNodeWithTag("banked-disclosure-expiry-2", useUnmergedTree = true).performScrollTo().assertTextEquals("—")
+            compose.onNodeWithTag("banked-disclosure-remaining-1", useUnmergedTree = true).performScrollTo().assertTextEquals("Expired")
+            compose.onNodeWithTag("banked-disclosure-remaining-2", useUnmergedTree = true).performScrollTo().assertTextEquals("Unknown")
+            compose.onNodeWithTag("banked-disclosure-remaining-0", useUnmergedTree = true).assertTextEquals("1 hour")
+            compose.onNodeWithTag("banked-disclosure-item-0")
+                .assertContentDescriptionEquals("Banked reset 1, expires Jan 15, 09:00, 1 hour remaining")
+            compose.onNodeWithTag("banked-disclosure-item-1")
+                .assertContentDescriptionEquals("Banked reset 2, expired Jan 15, 07:00")
+            compose.onNodeWithTag("banked-disclosure-item-2")
+                .assertContentDescriptionEquals("Banked reset 3, expiry unknown, state Unknown")
+            assertBankedTableReadable()
+            capture.capture("dashboard-banked-table-portrait-light", scenario, fixture, "banked-disclosure-title")
             openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             compose.onNodeWithTag("banked-inventory-text", useUnmergedTree = true).performScrollTo().assertTextEquals("Inventory reports: 7 available banked resets")
             compose.onNodeWithTag("banked-container").performScrollTo().assertExists()
@@ -249,6 +270,7 @@ class DashboardUiTest {
     }
 
     @Test fun dashboardDarkLandscapeAndLargeFontKeepAccessibleTargetsAndCompleteText() {
+        fixture.transport.inventoryBody = INVENTORY
         settings.apply(true, 2f)
         launch(dark = true, font = 2f, landscape = true).use { scenario ->
             login()
@@ -256,10 +278,12 @@ class DashboardUiTest {
                 "history-chart-five-hour-first", "history-chart-five-hour-last", "history-chart-five-hour-pace").forEach {
                 HistoryAcceptanceCapture(compose).label(it)
             }
-            listOf("open-drawer", "live-refresh", "banked-disclosure-toggle").forEach {
+            listOf("open-drawer", "live-refresh").forEach {
                 val node = compose.onNodeWithTag(it).performScrollTo().assertHasClickAction().fetchSemanticsNode()
                 assertTrue(node.size.height >= 48 * scenarioDensity(scenario))
             }
+            assertBankedTableReadable()
+            HistoryAcceptanceCapture(compose).label("banked-disclosure-title")
             capture.capture("dashboard-main-landscape-dark-large-font", scenario, fixture, "history-chart-five-hour-pace", WindowKind.FIVE_HOUR)
             openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
             HistoryAcceptanceCapture(compose).label("account-name")
@@ -270,9 +294,24 @@ class DashboardUiTest {
         }
         settings.apply(false, 2f)
         launch(font = 2f).use { scenario ->
+            assertBankedTableReadable()
             openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
             await("large-font stored page") { recordedHistory(owner).storage != null }
             capture.capture("dashboard-local-history-details-large-font", scenario, fixture, "history-page-cursor")
+        }
+    }
+
+    private fun assertBankedTableReadable() {
+        val hidden = SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility)
+        for (index in 0..2) {
+            compose.onNodeWithTag("banked-disclosure-item-$index").assert(!hidden)
+            for (column in listOf("expiry", "remaining")) {
+                val node = compose.onNodeWithTag("banked-disclosure-$column-$index", useUnmergedTree = true)
+                HistoryAcceptanceCapture(compose).layout(node.performScrollTo().assert(hidden))
+            }
+            compose.onNodeWithTag("banked-disclosure-state-$index", useUnmergedTree = true).assertDoesNotExist()
+            compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text) and
+                hasAnyAncestor(hasTestTag("banked-disclosure-item-$index")), useUnmergedTree = true).assertCountEquals(2)
         }
     }
 

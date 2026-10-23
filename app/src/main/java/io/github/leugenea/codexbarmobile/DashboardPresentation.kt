@@ -17,6 +17,21 @@ internal object DashboardPresentation {
     fun inventoryCount(facts: PresentedEntitlements): Long? =
         facts.reportedAvailableCount?.takeIf { it.knowledge == Knowledge.KNOWN }?.value
 
+    /** Expiry owns an expired state when dated; otherwise the second fact owns the state/countdown. */
+    fun bankedRowDetails(expiry: String, remaining: String?): String =
+        listOfNotNull(expiry, remaining).joinToString(", ")
+
+    /** Compact row states are separate from the unchanged card-level inventory notes. */
+    fun bankedItemState(state: EntitlementState): Int = when (state) {
+        EntitlementState.KNOWN, EntitlementState.UNKNOWN -> R.string.dashboard_banked_state_unknown
+        EntitlementState.EMPTY -> R.string.dashboard_inventory_empty
+        EntitlementState.UNSUPPORTED -> R.string.dashboard_banked_state_unsupported
+        EntitlementState.INACCESSIBLE -> R.string.dashboard_banked_state_unavailable
+        EntitlementState.MALFORMED -> R.string.dashboard_banked_state_malformed
+        EntitlementState.EXPIRED -> R.string.dashboard_inventory_expired
+        EntitlementState.DISCREPANT -> R.string.dashboard_banked_state_discrepant
+    }
+
     fun hasChart(series: HistoryPlotSeries) = series.samples.any { it.measured?.position is PlotPosition.Available }
 
     fun noInformation(source: HistoryGraphSnapshot, status: UsageWindowStatus = UsageWindowStatus.UNAVAILABLE, malformed: Boolean = false): Int = when {

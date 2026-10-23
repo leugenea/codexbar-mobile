@@ -157,6 +157,29 @@ class DashboardPresentationTest {
         assertEquals(PresentedPace(R.string.dashboard_reserve, "12,4"), DashboardPresentation.pace(BigDecimal("-12.35"), Locale.GERMANY))
     }
 
+    @Test fun bankedRowDetailsKeepMinutePrecisionAndIndependentStatesWithoutDuplicateAnnouncements() {
+        for (remaining in listOf("less than a minute remaining", "2 hours 5 minutes remaining")) {
+            assertEquals("expires Jan 15, 09:00, $remaining",
+                DashboardPresentation.bankedRowDetails("expires Jan 15, 09:00", remaining))
+        }
+        assertEquals("expired Jan 15, 07:00", DashboardPresentation.bankedRowDetails("expired Jan 15, 07:00", null))
+        assertEquals("expiry unknown, state Unknown", DashboardPresentation.bankedRowDetails("expiry unknown", "state Unknown"))
+        assertEquals("expires Jan 15, 09:00, state Unsupported",
+            DashboardPresentation.bankedRowDetails("expires Jan 15, 09:00", "state Unsupported"))
+        val labels = mapOf(
+            EntitlementState.KNOWN to R.string.dashboard_banked_state_unknown,
+            EntitlementState.UNKNOWN to R.string.dashboard_banked_state_unknown,
+            EntitlementState.EMPTY to R.string.dashboard_inventory_empty,
+            EntitlementState.UNSUPPORTED to R.string.dashboard_banked_state_unsupported,
+            EntitlementState.INACCESSIBLE to R.string.dashboard_banked_state_unavailable,
+            EntitlementState.MALFORMED to R.string.dashboard_banked_state_malformed,
+            EntitlementState.EXPIRED to R.string.dashboard_inventory_expired,
+            EntitlementState.DISCREPANT to R.string.dashboard_banked_state_discrepant,
+        )
+        assertEquals(EntitlementState.entries.toSet(), labels.keys)
+        labels.forEach { (state, resource) -> assertEquals(state.name, resource, DashboardPresentation.bankedItemState(state)) }
+    }
+
     @Test fun chartTimeLabelsUseYearlessLocalePatternsAndContainingHour() {
         val at = Instant.parse("2027-01-15T08:37:12.123456789Z")
         assertEquals("Jan 15, 08:00", TimePresentation.chartTime(at, ZoneOffset.UTC, Locale.US, "MMM d, HH:mm"))

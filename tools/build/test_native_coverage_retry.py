@@ -97,7 +97,7 @@ class RetryContracts(unittest.TestCase):
                                                    self.identity, 7000)
 
     def test_synthetic_reports_keep_all_required_jvm_and_native_cases(self):
-        for kind, relative, count in (("jvm", "test-results/testDebugUnitTest", 110),
+        for kind, relative, count in (("jvm", "test-results/testDebugUnitTest", 111),
                                       ("native", "outputs/androidTest-results/connected", 153)):
             with self.subTest(kind=kind):
                 self.assertEqual(verify_reports(self.build / relative, kind)["testCount"], count)
