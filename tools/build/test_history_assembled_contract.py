@@ -83,6 +83,50 @@ class HistoryAssembledContracts(unittest.TestCase):
                 with self.subTest(name=name, key=key):
                     self.mutate(name, key, value)
 
+    def test_dashboard_chart_captures_require_exact_accessible_plot_legend_without_visible_text(self):
+        for name in ASSEMBLED_COUNTS:
+            self.fixture.captures()
+            path = self.directory / (name + ".json")
+            data = json.loads(path.read_text())
+            receipt = data["compactLegend"]
+            mutations = [None, {}, "SYNTHETIC not a receipt"]
+            for key, value in (("plotTag", "history-chart-five-hour-canvas"),
+                               ("legendDescription", "SYNTHETIC missing explanation"),
+                               ("legendDescription", receipt["legendDescription"].split("\n")[0]),
+                               ("visibleLegendCount", 1), ("visibleLegendCount", False),
+                               ("hiddenFromAccessibility", True), ("hiddenFromAccessibility", 0)):
+                mutations.append(dict(receipt, **{key: value}))
+                mutations.append({field: item for field, item in receipt.items() if field != key})
+            for value in mutations:
+                with self.subTest(name=name, value=value):
+                    self.mutate(name, "compactLegend", value)
+            data.pop("compactLegend")
+            path.write_text(json.dumps(data))
+            with self.subTest(name=name, missing=True), self.assertRaises(ValueError):
+                verify_captures(self.directory)
+        for name in ASSEMBLED_CAPTURES.keys() - ASSEMBLED_COUNTS.keys():
+            with self.subTest(name=name, unexpected=True):
+                self.mutate(name, "compactLegend", receipt)
+
+    def test_dashboard_capture_drivers_use_plot_semantics_not_the_removed_visible_label(self):
+        native = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile"
+        for filename in ("CurrentWindowHistoryTest.kt", "HistoryAssembledAcceptanceTest.kt"):
+            source = (native / filename).read_text()
+            self.assertNotIn('"$five-legend"', source)
+            self.assertIn("chart = true", source)
+        collector = (native / "HistoryAcceptanceCapture.kt").read_text()
+        self.assertIn('data.put("compactLegend", compactLegend())', collector)
+        self.assertIn('onNodeWithTag("$tag-plot").assertIsDisplayed().assertContentDescriptionEquals(legend)', collector)
+        self.assertIn('plot.config[SemanticsProperties.ContentDescription].single()', collector)
+        self.assertIn('plot.config.contains(SemanticsProperties.HideFromAccessibility)', collector)
+        self.assertIn('assertFalse("The plot\'s legend explanation must remain accessible", hidden)', collector)
+        self.assertIn('hasTestTag("$tag-legend") or hasText(legend)', collector)
+        self.assertIn("visible.assertCountEquals(0)", collector)
+        for line in ("Solid line: measured observations within each run; isolated observation: short tick",
+                     "Faint short dashes: least-squares usage trend when available",
+                     "Long dashes: nominal analytical full-quota reference, not a forecast"):
+            self.assertIn(line, collector)
+
     def test_full_canvas_rejects_hidden_clipping_even_when_clipped_receipt_is_contained(self):
         for name in ASSEMBLED_COUNTS:
             for key, value in (("canvasLeft", -1), ("canvasTop", float("nan")), ("canvasRight", 100),

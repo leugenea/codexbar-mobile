@@ -455,8 +455,23 @@ def verify_assembled_metadata(metadata: dict, name: str, size: tuple[int, int], 
         if "uiCursor" in metadata or metadata.get("layoutLabel") != expected_label:
             raise ValueError("Dashboard must use its real compact label, not a hidden cursor")
     if name in ASSEMBLED_COUNTS:
+        verify_assembled_compact_legend(metadata)
         verify_integrated_canvas(metadata, size)
         verify_assembled_pixels(metadata, name, image)
+    elif "compactLegend" in metadata:
+        raise ValueError("Non-chart captures must not claim a compact legend")
+
+
+def verify_assembled_compact_legend(metadata: dict) -> None:
+    legend = ("Solid line: measured observations within each run; isolated observation: short tick\n"
+              "Faint short dashes: least-squares usage trend when available\n"
+              "Long dashes: nominal analytical full-quota reference, not a forecast")
+    expected = dict(plotTag="history-chart-five-hour-plot", legendDescription=legend,
+                    visibleLegendCount=0, hiddenFromAccessibility=False)
+    receipt = metadata.get("compactLegend")
+    if not isinstance(receipt, dict) or any(type(receipt.get(key)) is not type(value) or receipt[key] != value
+                                            for key, value in expected.items()):
+        raise ValueError("Assembled dashboard explanation must be exact, accessible and plot-only")
 
 
 def capture_receipt(path: Path) -> dict:
