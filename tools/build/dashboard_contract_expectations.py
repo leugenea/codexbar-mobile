@@ -118,6 +118,15 @@ EXPECTED_DASHBOARD_LAYOUTS = {
     "dashboard-connection-details-landscape-dark": ("banked-container", ["connection-screen", "connection-details"]),
     "dashboard-local-history-details-large-font": ("history-page-cursor", ["connection-screen", "connection-history"]),
 }
+EXPECTED_BANKED_TABLE_ROWS = [
+    dict(expiry="Jan 15, 09:00", remaining="1 hour", textCellCount=2,
+         description="Banked reset 1, expires Jan 15, 09:00, 1 hour remaining"),
+    dict(expiry="Jan 15, 07:00", remaining="Expired", textCellCount=2,
+         description="Banked reset 2, expired Jan 15, 07:00"),
+    dict(expiry="—", remaining="Unknown", textCellCount=2,
+         description="Banked reset 3, expiry unknown, state Unknown"),
+]
+
 EXPECTED_CURRENT_HOST = {"context": "MATCH", "selection": "MATCH", "periods": "MATCH", "projection": "MATCH"}
 
 # Literal review budgets, independently checked against the enumerated sets.

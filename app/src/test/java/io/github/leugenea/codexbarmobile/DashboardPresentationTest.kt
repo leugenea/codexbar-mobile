@@ -159,13 +159,25 @@ class DashboardPresentationTest {
 
     @Test fun bankedRowDetailsKeepMinutePrecisionAndIndependentStatesWithoutDuplicateAnnouncements() {
         for (remaining in listOf("less than a minute remaining", "2 hours 5 minutes remaining")) {
-            assertEquals(remaining, DashboardPresentation.bankedRowDetails(remaining, null))
-            assertEquals("$remaining, Unsupported item information",
-                DashboardPresentation.bankedRowDetails(remaining, "Unsupported item information"))
+            assertEquals("expires Jan 15, 09:00, $remaining",
+                DashboardPresentation.bankedRowDetails("expires Jan 15, 09:00", remaining))
         }
-        assertEquals("Entitlement expired", DashboardPresentation.bankedRowDetails("Entitlement expired", "Entitlement expired"))
-        assertEquals("Time unavailable, Item information unknown",
-            DashboardPresentation.bankedRowDetails("Time unavailable", "Item information unknown"))
+        assertEquals("expired Jan 15, 07:00", DashboardPresentation.bankedRowDetails("expired Jan 15, 07:00", null))
+        assertEquals("expiry unknown, state Unknown", DashboardPresentation.bankedRowDetails("expiry unknown", "state Unknown"))
+        assertEquals("expires Jan 15, 09:00, state Unsupported",
+            DashboardPresentation.bankedRowDetails("expires Jan 15, 09:00", "state Unsupported"))
+        val labels = mapOf(
+            EntitlementState.KNOWN to R.string.dashboard_banked_state_unknown,
+            EntitlementState.UNKNOWN to R.string.dashboard_banked_state_unknown,
+            EntitlementState.EMPTY to R.string.dashboard_inventory_empty,
+            EntitlementState.UNSUPPORTED to R.string.dashboard_banked_state_unsupported,
+            EntitlementState.INACCESSIBLE to R.string.dashboard_banked_state_unavailable,
+            EntitlementState.MALFORMED to R.string.dashboard_banked_state_malformed,
+            EntitlementState.EXPIRED to R.string.dashboard_inventory_expired,
+            EntitlementState.DISCREPANT to R.string.dashboard_banked_state_discrepant,
+        )
+        assertEquals(EntitlementState.entries.toSet(), labels.keys)
+        labels.forEach { (state, resource) -> assertEquals(state.name, resource, DashboardPresentation.bankedItemState(state)) }
     }
 
     @Test fun chartTimeLabelsUseYearlessLocalePatternsAndContainingHour() {

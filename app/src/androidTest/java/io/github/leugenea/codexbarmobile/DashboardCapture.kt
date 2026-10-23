@@ -69,6 +69,7 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
                 data.put("inventoryCount", frame.state.refresh.inventory.success?.inventory?.reportedAvailableCount?.value ?: JSONObject.NULL)
                 data.put("inventoryRows", frame.state.refresh.inventory.success?.inventory?.items?.size ?: 0)
                 if (kind != null) chart(data, bitmap, frame, kind, tag)
+                if (name == "dashboard-banked-table-portrait-light") data.put("bankedTableRows", bankedTableRows())
                 if (name == "dashboard-drawer-portrait-dark") data.put("drawerLabels", JSONArray(listOf(
                     text("drawer-LOCAL_HISTORY_DETAILS"), text("drawer-CONNECTION_DETAILS"), text("drawer-ACCOUNT_SETTINGS"))))
                 revalidate(frame, scenario, fixture.owner)
@@ -177,7 +178,20 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
         is HistoryPresentationRequest.Current -> "CURRENT"
     }
 
-    private fun text(tag: String): String = compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
+    private fun text(tag: String, unmerged: Boolean = false): String = compose.onNodeWithTag(tag, useUnmergedTree = unmerged)
+        .fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
+
+    private fun bankedTableRows(): JSONArray = JSONArray((0..2).map { index ->
+        val tag = "banked-disclosure-item-$index"
+        val row = compose.onNodeWithTag(tag).fetchSemanticsNode()
+        val cells = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text) and
+            hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true).fetchSemanticsNodes()
+        compose.onNodeWithTag("banked-disclosure-state-$index", useUnmergedTree = true).assertDoesNotExist()
+        JSONObject().put("expiry", text("banked-disclosure-expiry-$index", true))
+            .put("remaining", text("banked-disclosure-remaining-$index", true))
+            .put("description", row.config[SemanticsProperties.ContentDescription].single())
+            .put("textCellCount", cells.size)
+    })
 
     private fun window(frame: Frame, kind: WindowKind): JSONObject {
         val pair = requireNotNull(frame.current)

@@ -58,23 +58,33 @@ private fun BankedTableHeader() {
 private fun BankedTableRow(item: PresentedEntitlementItem, index: Int, time: PhoneTimeConfiguration, pattern: String) {
     val expiry = item.source.value?.expiresAt?.value?.takeIf { item.expiry.absolute != null }
         ?.let { TimePresentation.chartTime(it, time.zone, time.locale, pattern) }
-        ?: stringResource(R.string.time_unknown_target)
-    val remaining = item.expiry.remaining?.let { remainingTimeLabel(it) } ?: relativeLabel(item.expiry)
-    val relative = relativeLabel(item.expiry)
-    val status = if (item.state == EntitlementState.KNOWN) null
-        else stringResource(DashboardPresentation.entitlementState(item.state))
-    val description = stringResource(R.string.dashboard_banked_row, index + 1, expiry,
-        DashboardPresentation.bankedRowDetails(relative, status))
+    val status = stringResource(DashboardPresentation.bankedItemState(item.state))
+    val remaining = if (item.state == EntitlementState.KNOWN)
+        item.expiry.remaining?.let { remainingTimeLabel(it) } ?: status else status
+    val description = BankedRowDescription(item, index, expiry, status)
     Row(Modifier.fillMaxWidth().testTag("banked-disclosure-item-$index").semantics(mergeDescendants = true) {
         contentDescription = description
     }, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(expiry, Modifier.weight(1f).testTag("banked-disclosure-expiry-$index").semantics { hideFromAccessibility() })
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(remaining, Modifier.fillMaxWidth().testTag("banked-disclosure-remaining-$index")
-                .semantics { hideFromAccessibility() }, textAlign = TextAlign.End)
-            if (status != null && status != remaining) Text(status,
-                Modifier.fillMaxWidth().testTag("banked-disclosure-state-$index").semantics { hideFromAccessibility() },
-                textAlign = TextAlign.End, style = MaterialTheme.typography.bodySmall)
-        }
+        Text(expiry ?: stringResource(R.string.dashboard_banked_missing_expiry),
+            Modifier.weight(1f).testTag("banked-disclosure-expiry-$index").semantics { hideFromAccessibility() })
+        Text(remaining, Modifier.weight(1f).testTag("banked-disclosure-remaining-$index")
+            .semantics { hideFromAccessibility() }, textAlign = TextAlign.End)
     }
+}
+
+@Composable
+private fun BankedRowDescription(item: PresentedEntitlementItem, index: Int, expiry: String?, status: String): String {
+    val datedExpired = expiry != null && item.state == EntitlementState.EXPIRED
+    val expiryFact = when {
+        expiry == null -> stringResource(R.string.dashboard_banked_expiry_unknown)
+        datedExpired -> stringResource(R.string.dashboard_banked_expired_on, expiry)
+        else -> stringResource(R.string.dashboard_banked_expires_on, expiry)
+    }
+    val remainingFact = when {
+        datedExpired -> null
+        item.state == EntitlementState.KNOWN -> relativeLabel(item.expiry)
+        else -> stringResource(R.string.dashboard_banked_state, status)
+    }
+    return stringResource(R.string.dashboard_banked_row, index + 1,
+        DashboardPresentation.bankedRowDetails(expiryFact, remainingFact))
 }

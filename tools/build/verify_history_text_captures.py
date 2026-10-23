@@ -121,6 +121,15 @@ DASHBOARD_LAYOUTS = {
 }
 
 
+BANKED_TABLE_ROWS = [
+    dict(expiry="Jan 15, 09:00", remaining="1 hour", textCellCount=2,
+         description="Banked reset 1, expires Jan 15, 09:00, 1 hour remaining"),
+    dict(expiry="Jan 15, 07:00", remaining="Expired", textCellCount=2,
+         description="Banked reset 2, expired Jan 15, 07:00"),
+    dict(expiry="—", remaining="Unknown", textCellCount=2,
+         description="Banked reset 3, expiry unknown, state Unknown"),
+]
+
 # Bitmap.compress uses Skia's non-interlaced direct-color PNG encoder. Support
 # its grayscale/RGB/gray-alpha/RGBA 8/16-bit output, not palette or Adam7 files.
 # These budgets exceed the hosted phone capture sizes, without trusting IHDR
@@ -570,6 +579,10 @@ def dashboard_capture_receipt(path: Path) -> dict:
     if path.stem in {"dashboard-banked-table-portrait-light", "dashboard-connection-details-landscape-dark"}:
         if metadata.get("inventoryCount") != 7 or metadata.get("inventoryRows") != 3:
             raise ValueError("Reported count/retained inventory rows changed")
+    if path.stem == "dashboard-banked-table-portrait-light":
+        rows = metadata.get("bankedTableRows")
+        if rows != BANKED_TABLE_ROWS or any(type(row.get("textCellCount")) is not int for row in rows):
+            raise ValueError("Banked table must retain two cells and announce each expiry/state/countdown once")
     if kind != "NONE":
         verify_dashboard_pixels(metadata, size, image)
     return dict(metadata, path=str(path), pngSha256=hashlib.sha256(image).hexdigest(),

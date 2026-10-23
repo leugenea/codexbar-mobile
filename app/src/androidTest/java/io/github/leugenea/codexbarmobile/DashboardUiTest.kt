@@ -212,14 +212,17 @@ class DashboardUiTest {
             compose.onNodeWithText("Inventory is partial").assertExists()
             for (index in 0..2) compose.onNodeWithTag("banked-disclosure-item-$index").performScrollTo().assertIsDisplayed()
             compose.onNodeWithTag("banked-disclosure-expiry-0", useUnmergedTree = true).performScrollTo().assertTextEquals("Jan 15, 09:00")
-            compose.onNodeWithTag("banked-disclosure-remaining-1", useUnmergedTree = true).performScrollTo().assertTextEquals("Entitlement expired")
+            compose.onNodeWithTag("banked-disclosure-expiry-1", useUnmergedTree = true).performScrollTo().assertTextEquals("Jan 15, 07:00")
+            compose.onNodeWithTag("banked-disclosure-expiry-2", useUnmergedTree = true).performScrollTo().assertTextEquals("—")
+            compose.onNodeWithTag("banked-disclosure-remaining-1", useUnmergedTree = true).performScrollTo().assertTextEquals("Expired")
+            compose.onNodeWithTag("banked-disclosure-remaining-2", useUnmergedTree = true).performScrollTo().assertTextEquals("Unknown")
             compose.onNodeWithTag("banked-disclosure-remaining-0", useUnmergedTree = true).assertTextEquals("1 hour")
             compose.onNodeWithTag("banked-disclosure-item-0")
                 .assertContentDescriptionEquals("Banked reset 1, expires Jan 15, 09:00, 1 hour remaining")
             compose.onNodeWithTag("banked-disclosure-item-1")
-                .assertContentDescriptionEquals("Banked reset 2, expires Jan 15, 07:00, Entitlement expired, Expired")
+                .assertContentDescriptionEquals("Banked reset 2, expired Jan 15, 07:00")
             compose.onNodeWithTag("banked-disclosure-item-2")
-                .assertContentDescriptionEquals("Banked reset 3, expires Time unavailable, Time unavailable, Item information unknown")
+                .assertContentDescriptionEquals("Banked reset 3, expiry unknown, state Unknown")
             assertBankedTableReadable()
             capture.capture("dashboard-banked-table-portrait-light", scenario, fixture, "banked-disclosure-title")
             openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
@@ -306,8 +309,9 @@ class DashboardUiTest {
                 val node = compose.onNodeWithTag("banked-disclosure-$column-$index", useUnmergedTree = true)
                 HistoryAcceptanceCapture(compose).layout(node.performScrollTo().assert(hidden))
             }
-            if (index > 0) HistoryAcceptanceCapture(compose).layout(
-                compose.onNodeWithTag("banked-disclosure-state-$index", useUnmergedTree = true).performScrollTo().assert(hidden))
+            compose.onNodeWithTag("banked-disclosure-state-$index", useUnmergedTree = true).assertDoesNotExist()
+            compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text) and
+                hasAnyAncestor(hasTestTag("banked-disclosure-item-$index")), useUnmergedTree = true).assertCountEquals(2)
         }
     }
 

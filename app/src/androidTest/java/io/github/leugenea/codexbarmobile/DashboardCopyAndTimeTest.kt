@@ -79,6 +79,31 @@ class DashboardCopyAndTimeTest {
                     .assertTextEquals("Banked entitlement expiry: $duration remaining")
                 returnDashboard(compose, owner)
             }
+            assertBankedNonKnownRows()
+        }
+    }
+
+    private fun assertBankedNonKnownRows() {
+        val dated = """{"reset_type":"codex_rate_limits","status":"available","expires_at":"2027-01-18T08:00:00Z"}"""
+        val cases = listOf(
+            Triple(dated.replace("available", "synthetic-unsupported"), "Jan 18, 08:00", "Unsupported"),
+            Triple(dated.replace("\"available\"", "null"), "Jan 18, 08:00", "Unknown"),
+            Triple(dated.replace("\"2027-01-18T08:00:00Z\"", "false"), "—", "Malformed"),
+            Triple("null", "—", "Unknown"),
+        )
+        for ((row, expiry, state) in cases) {
+            fixture.transport.inventoryBody = """{"available_count":1,"credits":[$row]}"""
+            val previous = owner.state.value.refresh.inventory.attempt
+            owner.readUsage()
+            await("$state row with $expiry expiry settled") {
+                owner.state.value.refresh.inventory.attempt !== previous && !owner.state.value.refresh.refreshing
+            }
+            compose.onNodeWithTag("banked-disclosure-expiry-0", useUnmergedTree = true).performScrollTo().assertTextEquals(expiry)
+            compose.onNodeWithTag("banked-disclosure-remaining-0", useUnmergedTree = true).assertTextEquals(state)
+            compose.onNodeWithTag("banked-disclosure-state-0", useUnmergedTree = true).assertDoesNotExist()
+            val expiryFact = if (expiry == "—") "expiry unknown" else "expires $expiry"
+            compose.onNodeWithTag("banked-disclosure-item-0")
+                .assertContentDescriptionEquals("Banked reset 1, $expiryFact, state $state")
         }
     }
 

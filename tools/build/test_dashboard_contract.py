@@ -11,7 +11,7 @@ import tree_sitter_kotlin
 from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DASHBOARD_NATIVE,
     EXPECTED_SCANNER_ADDITIONS, EXPECTED_CURRENT_READ_JVM, PROTECTED_MIXED_SOURCE, SCANNER_CLASS,
     EXPECTED_DASHBOARD_CAPTURE_SPECS, EXPECTED_DASHBOARD_LAYOUTS, EXPECTED_CURRENT_HOST,
-    EXPECTED_DASHBOARD_NATIVE_COUNT, EXPECTED_DASHBOARD_JVM_COUNT)
+    EXPECTED_DASHBOARD_NATIVE_COUNT, EXPECTED_DASHBOARD_JVM_COUNT, EXPECTED_BANKED_TABLE_ROWS)
 from verify_test_reports import DASHBOARD_JVM, DASHBOARD_NATIVE, DASHBOARD_NATIVE_COUNT, DASHBOARD_JVM_COUNT, CURRENT_HISTORY_JVM, verify_reports
 from verify_history_text_captures import DASHBOARD_CAPTURES, DASHBOARD_LAYOUTS, dashboard_capture_receipt
 import test_history_text_contract as history_fixture
@@ -37,6 +37,8 @@ def dashboard_captures(directory, fixture):
             data["drawerLabels"] = ["Full local history details", "Full live connection details", "Account settings"]
         if name in {"dashboard-banked-table-portrait-light", "dashboard-connection-details-landscape-dark"}:
             data.update(inventoryCount=7, inventoryRows=3)
+        if name == "dashboard-banked-table-portrait-light":
+            data["bankedTableRows"] = copy.deepcopy(EXPECTED_BANKED_TABLE_ROWS)
         image = fixture.png(*size)
         if kind != "NONE":
             primary, reference = ((-10006364, -11975345) if not dark else (-3097345, -3488560))
@@ -181,7 +183,20 @@ class DashboardContracts(unittest.TestCase):
         self.assertNotIn("dashboard_collapsed", resources)
         self.assertEqual(resources["dashboard_banked_expires"], "Expires")
         self.assertEqual(resources["dashboard_banked_remaining"], "Remaining")
-        self.assertEqual(resources["dashboard_banked_row"], "Banked reset %1$d, expires %2$s, %3$s")
+        self.assertEqual(resources["dashboard_banked_row"], "Banked reset %1$d, %2$s")
+        self.assertEqual(resources["dashboard_banked_missing_expiry"], "—")
+        self.assertEqual(resources["dashboard_banked_expiry_unknown"], "expiry unknown")
+        self.assertEqual(resources["dashboard_banked_expires_on"], "expires %1$s")
+        self.assertEqual(resources["dashboard_banked_expired_on"], "expired %1$s")
+        self.assertEqual(resources["dashboard_banked_state"], "state %1$s")
+        for state in ("unknown", "unsupported", "unavailable", "malformed", "discrepant"):
+            self.assertEqual(resources[f"dashboard_banked_state_{state}"], state.capitalize())
+        self.assertIn("item.state == EntitlementState.KNOWN", card)
+        self.assertIn("DashboardPresentation.bankedItemState(item.state)", card)
+        self.assertNotIn('testTag("banked-disclosure-state-', card)
+        row = card[card.index("private fun BankedTableRow("):card.index("private fun BankedRowDescription(")]
+        self.assertEqual(row.count("Text("), 2)
+        self.assertNotIn("Column(", row)
 
     def test_each_dashboard_image_requires_exact_route_configuration_and_native_owner_receipts(self):
         self.assertEqual(DASHBOARD_CAPTURES, EXPECTED_DASHBOARD_CAPTURE_SPECS)
@@ -214,6 +229,25 @@ class DashboardContracts(unittest.TestCase):
                     path.with_suffix(".json").write_text(json.dumps(data))
                     with self.subTest(name=name, wrongHost=key), self.assertRaises(ValueError):
                         dashboard_capture_receipt(path)
+            if name == "dashboard-banked-table-portrait-light":
+                self.assertEqual(original["bankedTableRows"], EXPECTED_BANKED_TABLE_ROWS)
+                wrong_rows = [None, [], original["bankedTableRows"][:2], original["bankedTableRows"][::-1]]
+                for index in range(3):
+                    for key, value in (("expiry", "Time unavailable"), ("remaining", "Entitlement expired"),
+                                       ("description", "SYNTHETIC duplicated state"), ("textCellCount", 3),
+                                       ("textCellCount", 2.0)):
+                        rows = copy.deepcopy(original["bankedTableRows"])
+                        rows[index][key] = value
+                        wrong_rows.append(rows)
+                for rows in wrong_rows:
+                    data = dict(original, bankedTableRows=rows)
+                    path.with_suffix(".json").write_text(json.dumps(data))
+                    with self.subTest(bankedTableRows=rows), self.assertRaises(ValueError):
+                        dashboard_capture_receipt(path)
+                data = dict(original); data.pop("bankedTableRows")
+                path.with_suffix(".json").write_text(json.dumps(data))
+                with self.assertRaises(ValueError):
+                    dashboard_capture_receipt(path)
             if name == "dashboard-drawer-portrait-dark":
                 labels = ["Full local history details", "Full live connection details", "Account settings"]
                 self.assertEqual(original["drawerLabels"], labels)
