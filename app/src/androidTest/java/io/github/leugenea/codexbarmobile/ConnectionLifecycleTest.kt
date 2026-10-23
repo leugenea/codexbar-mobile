@@ -338,6 +338,7 @@ class ConnectionLifecycleTest {
             await(scenario, "terminal refresh requires reauth") { it.phase == ConnectionPhase.REAUTH_REQUIRED }
             assertFalse(keyExists(slot))
             assertFalse(KeystoreCredentialStore.file(context, slot).exists())
+            openDetailRoute(compose, NativeConnection.get(context), DashboardRoute.ACCOUNT_SETTINGS)
             compose.onNodeWithTag("connect").performScrollTo().assertTextEquals("Sign in again")
             assertSavedStateHasNoSecrets(scenario)
             fake.refreshStatus = 200
@@ -417,6 +418,7 @@ class ConnectionLifecycleTest {
             assertFalse(KeystoreCredentialStore.file(context, slot).exists())
             assertEquals(1, fake.refreshCount)
             scenario.onActivity { assertNull(it.connection.state.value.observations) }
+            openDetailRoute(compose, NativeConnection.get(context), DashboardRoute.CONNECTION_DETAILS)
             compose.onNodeWithTag("read-usage").performScrollTo().assertIsNotEnabled()
             assertEquals(1, fake.refreshCount)
             assertSavedStateHasNoSecrets(scenario)
@@ -696,6 +698,7 @@ class ConnectionLifecycleTest {
     private fun launch(): ActivityScenario<MainActivity> = ActivityScenario.launch(MainActivity::class.java)
 
     private fun assertPresentedObservations(facts: FeasibilityObservations) {
+        openDetailRoute(compose, NativeConnection.get(context), DashboardRoute.CONNECTION_DETAILS)
         assertEquals(SelectionState.KNOWN, facts.usage.usage!!.weekly.state)
         compose.onNodeWithTag("live-weekly-status").performScrollTo().assertTextEquals("Provider-reported usage")
         compose.onNodeWithTag("live-weekly-percent").performScrollTo().assertTextEquals("5% used")
@@ -715,7 +718,10 @@ class ConnectionLifecycleTest {
         assertConnectionHasNoDiagnosticDump(compose)
     }
     private fun click(tag: String, expectTransition: Boolean = true) {
-        if (tag in setOf("connect", "read-usage", "refresh-session", "open-browser", "copy-device-code", "cancel-connect")) openDetailRoute(compose, NativeConnection.get(context), DashboardRoute.CONNECTION_DETAILS)
+        if (tag in setOf("connect", "open-browser", "copy-device-code", "cancel-connect", "remove-account"))
+            openDetailRoute(compose, NativeConnection.get(context), DashboardRoute.ACCOUNT_SETTINGS)
+        if (tag in setOf("read-usage", "refresh-session"))
+            openDetailRoute(compose, NativeConnection.get(context), DashboardRoute.CONNECTION_DETAILS)
         val changesState = tag in setOf("connect", "read-usage", "refresh-session", "remove-account-confirm", "cancel-connect")
         val before = if (changesState) NativeConnection.get(context).state.value else null
         val node = compose.onNodeWithTag(tag)
@@ -753,7 +759,7 @@ class ConnectionLifecycleTest {
             val owner = NativeConnection.get(context)
             awaitConnectionScreen(compose, owner)
             assertConnectionHasNoDiagnosticDump(compose)
-            openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
             assertConnectionHasNoDiagnosticDump(compose)
         }
     }

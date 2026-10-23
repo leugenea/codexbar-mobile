@@ -2,25 +2,12 @@ package io.github.leugenea.codexbarmobile
 
 import android.content.Context
 import androidx.annotation.VisibleForTesting
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
 import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
@@ -109,7 +96,7 @@ internal object NativeConnection {
 }
 
 @Composable
-internal fun ConnectionContent(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit) {
+internal fun ConnectionContent(state: ConnectionState, controller: ConnectionController, openAccountSettings: () -> Unit) {
     LiveUsageScreen(state) { controller.readUsage() }
     Text(stringResource(R.string.gate_identity))
     Text(stringResource(R.string.gate_boundary))
@@ -117,26 +104,10 @@ internal fun ConnectionContent(state: ConnectionState, controller: ConnectionCon
     Text(stringResource(R.string.gate_state, state.phase.name, state.problem?.name ?: "—"),
         Modifier.testTag("gate-state"))
     if (state.auth is AuthState.Connected) Text(stringResource(R.string.gate_exchange_completed))
-    val awaiting = state.auth as? AuthState.AwaitingUser
-    if (awaiting != null) {
-        Text(awaiting.verificationUrl, Modifier.testTag("verification-url"))
-        DeviceLoginCode(awaiting, controller)
-        Button(onClick = openBrowser, modifier = Modifier.testTag("open-browser")) {
-            Text(stringResource(R.string.gate_browser))
-        }
-    }
-    Button(onClick = controller::connect, enabled = !state.busy, modifier = Modifier.testTag("connect")) {
-        Text(stringResource(if (state.phase == ConnectionPhase.REAUTH_REQUIRED) R.string.gate_reauth else R.string.gate_connect))
-    }
+    if (DashboardPresentation.loginVisible(state.phase)) AccountSettingsLink(openAccountSettings)
     OutlinedButton(onClick = { controller.readUsage() }, enabled = !state.busy && controller.session.snapshot() is SessionResult.Ready,
         modifier = Modifier.testTag("read-usage")) { Text(stringResource(R.string.gate_read)) }
     OutlinedButton(onClick = { controller.readUsage(refreshSession = true) },
         enabled = !state.busy && controller.session.snapshot() is SessionResult.Ready,
         modifier = Modifier.testTag("refresh-session")) { Text(stringResource(R.string.gate_refresh)) }
-    OutlinedButton(onClick = controller::cancel,
-        enabled = state.phase !in setOf(ConnectionPhase.RESTORING, ConnectionPhase.SIGNING_OUT),
-        modifier = Modifier.testTag("cancel-connect")) {
-        Text(stringResource(R.string.gate_cancel))
-    }
-    AccountRemovalAction(state.phase, controller)
 }

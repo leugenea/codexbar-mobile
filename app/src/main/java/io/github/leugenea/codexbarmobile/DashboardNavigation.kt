@@ -21,6 +21,7 @@ internal enum class DashboardRoute(val title: Int) {
     DASHBOARD(R.string.dashboard_title),
     LOCAL_HISTORY_DETAILS(R.string.drawer_history),
     CONNECTION_DETAILS(R.string.drawer_connection),
+    ACCOUNT_SETTINGS(R.string.account_settings_title),
 }
 
 /** Only ephemeral presentation choices; no saved account, payload, cursor or capability. */
@@ -39,25 +40,31 @@ internal fun ConnectionScreen(state: ConnectionState, controller: ConnectionCont
         DetailDrawer(route) { route = it; scope.launch { drawer.close() } }
     }) {
         ConnectionRoute(state, controller, route, openBrowser, observer, exporter, importer,
-            { scope.launch { drawer.open() } }, { route = DashboardRoute.DASHBOARD })
+            { scope.launch { drawer.open() } }, { route = DashboardRoute.DASHBOARD },
+            { route = DashboardRoute.ACCOUNT_SETTINGS })
     }
 }
 
 @Composable
 private fun DetailDrawer(route: DashboardRoute, select: (DashboardRoute) -> Unit) {
     ModalDrawerSheet(Modifier.testTag("details-drawer")) {
-        Spacer(Modifier.height(24.dp))
-        listOf(DashboardRoute.LOCAL_HISTORY_DETAILS, DashboardRoute.CONNECTION_DETAILS).forEach { destination ->
-            NavigationDrawerItem(label = { Text(stringResource(destination.title)) },
-                selected = route == destination, onClick = { select(destination) },
-                modifier = Modifier.padding(horizontal = 12.dp).heightIn(min = 48.dp).testTag("drawer-${destination.name}"))
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+            Spacer(Modifier.height(24.dp))
+            listOf(DashboardRoute.LOCAL_HISTORY_DETAILS, DashboardRoute.CONNECTION_DETAILS).forEach { destination ->
+                NavigationDrawerItem(label = { Text(stringResource(destination.title)) },
+                    selected = route == destination, onClick = { select(destination) },
+                    modifier = Modifier.padding(horizontal = 12.dp).heightIn(min = 48.dp).testTag("drawer-${destination.name}"))
+            }
         }
+        NavigationDrawerItem(label = { Text(stringResource(R.string.account_settings_title)) },
+            selected = route == DashboardRoute.ACCOUNT_SETTINGS, onClick = { select(DashboardRoute.ACCOUNT_SETTINGS) },
+            modifier = Modifier.padding(12.dp).heightIn(min = 48.dp).testTag("drawer-ACCOUNT_SETTINGS"))
     }
 }
 
 @Composable
 private fun ConnectionRoute(state: ConnectionState, controller: ConnectionController, route: DashboardRoute,
-    openBrowser: () -> Unit, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter, openDrawer: () -> Unit, back: () -> Unit) {
+    openBrowser: () -> Unit, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter, openDrawer: () -> Unit, back: () -> Unit, openAccountSettings: () -> Unit) {
     val source = collectedHistory(controller, observer)
     // Collection triggers a pass; this actual volatile slot is the permission on that pass.
     val authority = controller.currentHistoryDisplayContext()
@@ -68,13 +75,11 @@ private fun ConnectionRoute(state: ConnectionState, controller: ConnectionContro
     val current = HistoryPresentationRequest.Current(periods.fiveHour.window, periods.weekly.window)
     val request = routeRequest(route, current, navigation)
     ObserveHistoryRequest(controller, authority, request, source.request)
-    val accountName by controller.accountName.collectAsState()
     val scroll = key(route) { rememberScrollState() }
     Column(Modifier.fillMaxSize().testTag("connection-screen").verticalScroll(scroll).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)) {
         RouteHeader(route, openDrawer, back)
-        AccountNameHeader(accountName, controller::renameAccount)
-        RouteContent(route, state, controller, openBrowser, source, authority, current, navigation, observer, exporter, importer,
+        RouteContent(route, state, controller, openBrowser, openAccountSettings, source, authority, current, navigation, observer, exporter, importer,
             { kind = it.kind }, { after = it })
     }
 }
@@ -83,7 +88,7 @@ private fun routeRequest(route: DashboardRoute, current: HistoryPresentationRequ
     when (route) {
         DashboardRoute.DASHBOARD -> current
         DashboardRoute.LOCAL_HISTORY_DETAILS -> HistoryPresentationRequest.Page(navigation.query)
-        DashboardRoute.CONNECTION_DETAILS -> HistoryPresentationRequest.Idle
+        DashboardRoute.CONNECTION_DETAILS, DashboardRoute.ACCOUNT_SETTINGS -> HistoryPresentationRequest.Idle
     }
 
 @Composable
@@ -102,10 +107,10 @@ private fun RouteHeader(route: DashboardRoute, openDrawer: () -> Unit, back: () 
 
 @Composable
 private fun RouteContent(route: DashboardRoute, state: ConnectionState, controller: ConnectionController,
-    browser: () -> Unit, source: HistoryGraphSnapshot, authority: HistoryDisplayContext?, current: HistoryPresentationRequest.Current,
+    browser: () -> Unit, openAccountSettings: () -> Unit, source: HistoryGraphSnapshot, authority: HistoryDisplayContext?, current: HistoryPresentationRequest.Current,
     navigation: HistoryNavigation, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter, kind: (HistoryNavigation) -> Unit, page: (ObservationId?) -> Unit) {
     when (route) {
-        DashboardRoute.DASHBOARD -> DashboardScreen(state, controller, browser, source, current, authority, observer)
+        DashboardRoute.DASHBOARD -> DashboardScreen(state, controller, openAccountSettings, source, current, authority, observer)
         DashboardRoute.LOCAL_HISTORY_DETAILS -> {
             val display = historyForDisplay(source, navigation.query, authority)
             SideEffect { observer?.projected(source, display, state.refresh.evaluatedAt) }
@@ -113,6 +118,7 @@ private fun RouteContent(route: DashboardRoute, state: ConnectionState, controll
             HistoryExportAction(exporter)
             HistoryImportAction(importer, authority?.generation != null && source.partition != null)
         }
-        DashboardRoute.CONNECTION_DETAILS -> Column(Modifier.testTag("connection-details")) { ConnectionContent(state, controller, browser) }
+        DashboardRoute.CONNECTION_DETAILS -> Column(Modifier.testTag("connection-details")) { ConnectionContent(state, controller, openAccountSettings) }
+        DashboardRoute.ACCOUNT_SETTINGS -> AccountSettingsScreen(state, controller, browser)
     }
 }

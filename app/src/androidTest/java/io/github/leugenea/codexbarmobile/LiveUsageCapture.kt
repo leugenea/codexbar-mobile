@@ -24,7 +24,7 @@ import kotlin.math.roundToInt
 /** Samples the real secure Activity's Compose bitmap, retaining the existing test capture seam. */
 internal class LiveUsageCapture(private val compose: ComposeTestRule) {
     fun inheritedContent(dark: Boolean) {
-        val node = compose.onNodeWithTag("account-name").performScrollTo()
+        val node = compose.onNodeWithTag("gate-state").performScrollTo()
         val layout = HistoryAcceptanceCapture(compose).layout(node)
         val colors = if (dark) darkColorScheme() else lightColorScheme()
         assertEquals("Root Text inherits onBackground", colors.onBackground, layout.layoutInput.style.color)

@@ -328,6 +328,7 @@ DASHBOARD_NATIVE = {
         'dashboardMissingEmptySingleAndFailedHistoryHaveOneHonestLinePerWindow',
         'dashboardShowsBothCurrentWindowsWithoutHistoryNavigationAndRetainsMeasuredReferencePixels',
         'drawerHasExactTwoLabelsBackPrecedenceAndDetailsReturnToDashboard',
+        'emptyDashboardOpensAccountSettingsWithoutInlineManagementOrProviderRequests',
         'dashboardKnownPercentPreservesMalformedResetAndIndependentCurrentSiblingWarning',
         'fiveHourFractionalResetPairPopulatesDashboardButBeyondToleranceRemainsUnavailable',
     },

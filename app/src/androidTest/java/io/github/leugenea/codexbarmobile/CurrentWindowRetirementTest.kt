@@ -227,7 +227,11 @@ class CurrentWindowRetirementTest {
 
     private fun currentText(value: String) = compose.onNode(hasAnyAncestor(hasTestTag("connection-history")) and hasText(value), useUnmergedTree = true)
 
-    private fun click(tag: String) { compose.onNodeWithTag(tag).performScrollTo().performClick(); compose.waitForIdle() }
+    private fun click(tag: String) {
+        if (tag == "connect") openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
+        compose.onNodeWithTag(tag).performScrollTo().performClick(); compose.waitForIdle()
+        if (tag == "connect") returnDashboard(compose, owner)
+    }
     private fun await(step: String, predicate: () -> Boolean) {
         try { compose.waitUntil(8_000, predicate) } catch (error: ComposeTimeoutException) {
             throw AssertionError("$step: phase=${owner.state.value.phase}, query=${recordedHistory(owner).query}, readiness=${recordedHistory(owner).readiness}, points=${recordedHistory(owner).points.size}", error)

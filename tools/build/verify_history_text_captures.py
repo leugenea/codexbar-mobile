@@ -73,7 +73,7 @@ ASSEMBLED_PAGES = {
     "history-current-dark-portrait": ("OBSERVED", "READY", "FIVE_HOUR", 32, 0, 301, 306, 5, 7, 4),
 }
 ASSEMBLED_CONTROLS = {
-    "history-assembled-fresh-portrait-light": ["open-drawer", "connect"],
+    "history-assembled-fresh-portrait-light": ["open-drawer", "open-account-settings"],
     "history-assembled-single-portrait-dark": [],
     "history-assembled-breaks-landscape-dark": ["history-select-FIVE_HOUR", "history-select-WEEKLY"],
     "history-assembled-unknown-large-font": ["history-select-FIVE_HOUR", "history-select-WEEKLY"],
@@ -558,7 +558,7 @@ def dashboard_capture_receipt(path: Path) -> dict:
     if "currentHost" not in metadata or metadata["currentHost"] != host:
         raise ValueError("Dashboard lacks an actual matching current host/authority/selection receipt")
     verify_dashboard_windows(metadata)
-    if path.stem == "dashboard-drawer-portrait-dark" and metadata.get("drawerLabels") != ["Full local history details", "Full live connection details"]:
+    if path.stem == "dashboard-drawer-portrait-dark" and metadata.get("drawerLabels") != ["Full local history details", "Full live connection details", "Account settings"]:
         raise ValueError("Owner drawer rows changed")
     if path.stem in {"dashboard-banked-expanded-portrait-light", "dashboard-connection-details-landscape-dark"}:
         if metadata.get("inventoryCount") != 7 or metadata.get("inventoryRows") != 3:

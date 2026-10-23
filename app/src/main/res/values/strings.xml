@@ -55,13 +55,13 @@
     <!-- B3: live usage and independent entitlement rendering consume owner observations. -->
     <string name="live_title">Current usage windows</string>
     <string name="live_identity">Unofficial · provider observations. Identity and workspace remain unverified.</string>
-    <string name="live_disconnected">Disconnected · use the connection controls below to sign in</string>
+    <string name="live_disconnected">Disconnected · add an account in Account settings</string>
     <string name="live_loading">Loading · usage is not yet available</string>
     <string name="live_unavailable">Usage unavailable · refresh to request an observation</string>
     <string name="live_current">Last successful usage observation</string>
     <string name="live_stale">Stale usage · last successful values retained</string>
     <string name="live_error">Unable to update usage · no quota inferred</string>
-    <string name="live_reauthorize">Authorization required · sign in again using the controls below</string>
+    <string name="live_reauthorize">Authorization required · sign in again in Account settings</string>
     <string name="live_refreshing">Refreshing · last successful values retained</string>
     <string name="live_stale_detail">Usage has not succeeded for at least 15 minutes. These values may be out of date.</string>
     <string name="live_refresh">Refresh usage</string>
@@ -393,4 +393,7 @@
     <string name="history_export">Export history</string>
     <string name="history_export_success">History exported</string>
     <string name="history_export_failure">Could not export history. Please try again.</string>
+    <string name="account_settings_title">Account settings</string>
+    <string name="account_add">Add account</string>
+    <string name="account_settings_required">Add an account in Account settings to view usage.</string>
 </resources>

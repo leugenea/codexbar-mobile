@@ -45,7 +45,7 @@ class HistoryAssembledAcceptanceTest {
             compose.onNodeWithTag("live-weekly-percent").assertDoesNotExist()
             capture.label("dashboard-no-info-FIVE_HOUR")
             compose.onNodeWithTag("open-drawer").performScrollTo()
-            capture.capture("history-assembled-fresh-portrait-light", scenario, fixture, listOf("open-drawer", "connect"))
+            capture.capture("history-assembled-fresh-portrait-light", scenario, fixture, listOf("open-drawer", "open-account-settings"))
             assertEquals(0L, fixture.transport.requests.get())
         }
         seedDormant(fresh = false)

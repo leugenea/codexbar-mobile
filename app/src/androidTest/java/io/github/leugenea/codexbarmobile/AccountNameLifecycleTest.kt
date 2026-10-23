@@ -121,8 +121,8 @@ class AccountNameLifecycleTest {
             assertArrayEquals(unchanged, nameFile().readBytes())
             label("Synthetic successor")
             assertEquals(counts, fixture.transport.counts())
-            // Explicit replacement is an advanced connection-details action.
-            openDetailRoute(compose, fixture.owner, DashboardRoute.CONNECTION_DETAILS)
+            // Explicit replacement is an Account settings action.
+            openDetailRoute(compose, fixture.owner, DashboardRoute.ACCOUNT_SETTINGS)
             click("connect")
             await("replacement adopts a fresh unnamed account") {
                 fixture.owner.state.value.let { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing }
@@ -161,17 +161,23 @@ class AccountNameLifecycleTest {
         fixture.owner.connect(); phase(ConnectionPhase.OBSERVED)
         fixture.freshRuntime(); phase(ConnectionPhase.RESTORED)
     }
-    private fun openConnection() { awaitConnectionScreen(compose, fixture.owner) }
+    private fun openConnection() {
+        awaitConnectionScreen(compose, fixture.owner)
+        openDetailRoute(compose, fixture.owner, DashboardRoute.ACCOUNT_SETTINGS)
+    }
     private fun save(input: String) {
         click("account-name-edit")
         compose.onNodeWithTag("account-name-input").performTextReplacement(input)
         click("account-name-save")
         awaitName(io.github.leugenea.codexbarmobile.account.AccountDisplayName.from(input)?.text)
     }
-    private fun label(text: String) = compose.onNodeWithTag("account-name").performScrollTo().assertTextEquals(text).assertIsDisplayed()
+    private fun label(text: String) {
+        openDetailRoute(compose, fixture.owner, DashboardRoute.ACCOUNT_SETTINGS)
+        compose.onNodeWithTag("account-name").performScrollTo().assertTextEquals(text).assertIsDisplayed()
+    }
     private fun click(tag: String) {
         if (tag == "connect" && fixture.owner.state.value.phase in setOf(ConnectionPhase.OBSERVED, ConnectionPhase.RESTORED, ConnectionPhase.READING))
-            compose.onNodeWithTag("connection-details").assertExists()
+            compose.onNodeWithTag("account-settings").assertExists()
         val node = compose.onNodeWithTag(tag)
         if (tag in setOf("account-name-edit", "connect")) node.performScrollTo()
         node.performClick(); compose.waitForIdle()

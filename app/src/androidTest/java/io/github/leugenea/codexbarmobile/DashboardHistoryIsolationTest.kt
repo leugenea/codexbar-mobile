@@ -164,7 +164,9 @@ class DashboardHistoryIsolationTest {
 
     private fun login() {
         awaitConnectionScreen(compose, owner)
+        openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
         compose.onNodeWithTag("connect").performScrollTo().performClick()
+        returnDashboard(compose, owner)
         await("actual main pair and collected projection") { recordedHistory(owner).points.size == 1 && observer.currentPair?.second?.points?.size == 1 && !owner.state.value.refresh.refreshing }
     }
     private fun hold(step: String): HistoryGraphSnapshot {

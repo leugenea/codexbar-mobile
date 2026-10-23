@@ -19,7 +19,8 @@ internal fun awaitConnectionScreen(compose: ComposeTestRule, controller: Connect
             compose.onAllNodes(hasTestTag("connection-screen")).fetchSemanticsNodes().size == 1 &&
                 (compose.onAllNodes(hasTestTag("dashboard-status")).fetchSemanticsNodes().size == 1 ||
                     compose.onAllNodes(hasTestTag("connection-history")).fetchSemanticsNodes().size == 1 ||
-                    compose.onAllNodes(hasTestTag("connection-details")).fetchSemanticsNodes().size == 1) &&
+                    compose.onAllNodes(hasTestTag("connection-details")).fetchSemanticsNodes().size == 1 ||
+                    compose.onAllNodes(hasTestTag("account-settings")).fetchSemanticsNodes().size == 1) &&
                 controller.state.value.phase != ConnectionPhase.RESTORING
         }
         compose.waitForIdle()

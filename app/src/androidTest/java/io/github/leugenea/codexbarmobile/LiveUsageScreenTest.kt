@@ -346,7 +346,7 @@ class LiveUsageScreenTest {
             waitFor("no synthetic credentials restores disconnected") { owner.state.value.phase == ConnectionPhase.IDLE }
             awaitConnectionScreen(compose, owner)
             openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
-            text("live-status", "Disconnected · use the connection controls below to sign in")
+            text("live-status", "Disconnected · add an account in Account settings")
             compose.onNodeWithTag("live-refresh").assertIsNotEnabled()
             compose.onNodeWithTag("live-five-hour-progress").assertDoesNotExist()
             assertEquals(0, fake.gets.get())
@@ -364,9 +364,10 @@ class LiveUsageScreenTest {
             waitFor("missing key publishes durable reauthorization") { owner.state.value.phase == ConnectionPhase.REAUTH_REQUIRED }
             awaitConnectionScreen(compose, owner)
             openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
-            text("live-status", "Authorization required · sign in again using the controls below")
+            text("live-status", "Authorization required · sign in again in Account settings")
             compose.onNodeWithTag("live-status").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
             compose.onNodeWithTag("live-weekly-progress").assertDoesNotExist()
+            compose.onNodeWithTag("open-account-settings").performScrollTo().performClick()
             compose.onNodeWithTag("connect").performScrollTo().assertTextEquals("Sign in again")
             assertEquals(0, fake.gets.get())
         }
@@ -674,10 +675,12 @@ class LiveUsageScreenTest {
     }
 
     private fun click(tag: String) {
+        if (tag in setOf("connect", "remove-account")) openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
         val node = compose.onNodeWithTag(tag)
         if (tag != "remove-account-confirm") node.performScrollTo()
         node.performClick()
         compose.waitForIdle()
+        if (tag in setOf("connect", "remove-account-confirm")) openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
         if (tag in setOf("connect", "live-refresh", "remove-account-confirm")) {
             settleConnectionCommands(compose, owner, "$tag owner admission")
         }

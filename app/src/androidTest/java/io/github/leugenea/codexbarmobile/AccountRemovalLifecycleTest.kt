@@ -62,6 +62,7 @@ class AccountRemovalLifecycleTest {
             assertEquals(partition, owner.historySnapshots.value.partition)
             assertEquals(highWater, recordedHistory(owner).storage!!.lastAdmitted)
             assertEquals(requests, fixture.transport.counts())
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
             compose.onNodeWithTag("account-name").performScrollTo().assertTextEquals("Synthetic retained account")
         }
     }
@@ -92,6 +93,7 @@ class AccountRemovalLifecycleTest {
             fixture.transport.heldPath = null
             fixture.transport.usageBody = NavigationTransport.USAGE.replace("12.375", "42.125")
             click("connect"); phase(ConnectionPhase.OBSERVED)
+            returnDashboard(compose, owner)
             await("successor current pair recorded") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L &&
                 recordedHistory(owner, io.github.leugenea.codexbarmobile.usage.WindowKind.WEEKLY).storage?.lastAdmitted?.ordinal == 1L }
             saveName("Synthetic successor")
@@ -111,6 +113,7 @@ class AccountRemovalLifecycleTest {
                 io.github.leugenea.codexbarmobile.usage.WindowKind.WEEKLY).flatMap { recordedHistory(owner, it).points }
                 .map { it.usedPercent.toPlainString() }.toSet())
             assertEquals(requests, fixture.transport.counts())
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
             compose.onNodeWithTag("account-name").performScrollTo().assertTextEquals("Synthetic successor")
         }
     }
@@ -128,6 +131,7 @@ class AccountRemovalLifecycleTest {
                     && owner.accountRemoval !== predecessor && owner.accountName.value?.edit != null
             }
             awaitDialogDismissed("replacement dismisses predecessor confirmation")
+            returnDashboard(compose, owner)
             await("replacement history recorded") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L }
             saveName("Synthetic replacement successor")
             val credentials = credentialFile().readBytes()
@@ -243,6 +247,11 @@ class AccountRemovalLifecycleTest {
         compose.onNodeWithTag("account-name-input").performTextReplacement(value)
         click("account-name-save")
         await("local name saved") { owner.accountName.value?.name?.text == value }
+        returnDashboard(compose, owner)
+        await("dashboard history selection restored after local naming") {
+            owner.historySnapshots.value.request is HistoryPresentationRequest.Current &&
+                (owner.state.value.phase == ConnectionPhase.RESTORED || recordedHistory(owner).storage?.lastAdmitted != null)
+        }
     }
     private fun dialogScope() {
         compose.onNodeWithText("Remove local account?").assertIsDisplayed()
@@ -302,6 +311,8 @@ class AccountRemovalLifecycleTest {
         } finally { scope.cancel() }
     }
     private fun click(tag: String) {
+        if (tag in setOf("connect", "remove-account", "account-name-edit"))
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
         val node = compose.onNodeWithTag(tag)
         if (tag in setOf("remove-account", "account-name-edit", "connect")) node.performScrollTo()
         node.performClick(); compose.waitForIdle()

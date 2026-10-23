@@ -41,7 +41,9 @@ internal class PhoneTimeEvidence(private val compose: ComposeTestRule, private v
             settleConnectionCommands(compose, fixture.owner, "timestamp fixture foreground receipt")
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 awaitConnectionScreen(compose, fixture.owner)
+                openDetailRoute(compose, fixture.owner, DashboardRoute.ACCOUNT_SETTINGS)
                 compose.onNodeWithTag("connect").performScrollTo().performClick()
+                returnDashboard(compose, fixture.owner)
                 await("original endpoint cycle and history admission settled") {
                     fixture.owner.state.value.phase == ConnectionPhase.OBSERVED && !fixture.owner.state.value.refresh.refreshing &&
                         recordedHistory(fixture.owner).storage?.lastAdmitted?.ordinal == 1L

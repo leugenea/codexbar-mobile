@@ -22,14 +22,14 @@ there is no data migration between them.
 
 - Default connection/live screen with truthful disconnected, loading, reauthorization,
   error and unknown states; recreation keeps the same process owner.
-- Connection controls: connect/cancel, fixed system-browser device login,
+- **Account settings**, at the bottom of the drawer: add/cancel, fixed system-browser device login,
   Keystore-backed local storage and sign-out, and only the two selected read-only routes.
 - Serialized session refresh/rotation with durable save before publication, bounded
   401 recovery, re-auth on terminal/write failures, and generation-isolated local logout.
 - Explicit stored-session read/refresh controls; no invented token TTL.
-- A local display name for the one connected/restored account: set, edit or clear it;
+- In Account settings, a local display name for the one connected/restored account: set, edit or clear it;
   unnamed accounts are labeled honestly and provider identity remains unverified.
-- **Remove account from this device** requires confirmation before removing saved sign-in
+- In Account settings, **Remove account from this device** requires confirmation before removing saved sign-in
   credentials, local usage history and the local display name. Cancel/dismiss changes nothing;
   this does not delete an OpenAI/ChatGPT account or cancel a subscription.
 - Live Material 3 usage windows with precise provider percentages and fractional bars,

@@ -23,7 +23,9 @@ class DashboardCopyAndTimeTest {
         fixture.transport.inventoryBody = DashboardUiTest.INVENTORY
         ActivityScenario.launch(MainActivity::class.java).use {
             awaitConnectionScreen(compose, owner)
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
             compose.onNodeWithTag("connect").performScrollTo().performClick()
+            returnDashboard(compose, owner)
             await("original precision source recorded") { recordedHistory(owner).points.size == 1 && !owner.state.value.refresh.refreshing }
             val original = owner.state.value.refresh.usage.success
             val reset = original!!.usage!!.fiveHour.candidates.single().reset.absolute.value

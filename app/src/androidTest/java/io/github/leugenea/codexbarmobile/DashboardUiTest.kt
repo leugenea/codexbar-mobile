@@ -83,7 +83,8 @@ class DashboardUiTest {
 
     @Test fun dashboardActionsFollowConnectionPhaseAndDormantNavigationDoesNotRead() {
         launch().use {
-            compose.onNodeWithTag("connect").assertTextEquals("Login")
+            compose.onNodeWithTag("connect").assertDoesNotExist()
+            compose.onNodeWithTag("open-account-settings").assertTextEquals("Account settings")
             compose.onNodeWithTag("live-refresh").assertDoesNotExist()
             openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             compose.onNodeWithTag("read-usage").performScrollTo().assertIsNotEnabled()
@@ -93,6 +94,8 @@ class DashboardUiTest {
             login()
             compose.onNodeWithTag("connect").assertDoesNotExist()
             compose.onNodeWithTag("live-refresh").performScrollTo().assertIsEnabled()
+            compose.onNodeWithTag("account-name-edit").assertDoesNotExist()
+            compose.onNodeWithTag("remove-account").assertDoesNotExist()
         }
         fixture.freshRuntime()
         launch().use {
@@ -104,6 +107,29 @@ class DashboardUiTest {
             click("banked-disclosure-toggle"); click("banked-disclosure-toggle")
             assertEquals(before, fixture.transport.counts())
             compose.onNodeWithTag("dashboard-no-info-FIVE_HOUR").assertExists()
+        }
+    }
+
+    @Test fun emptyDashboardOpensAccountSettingsWithoutInlineManagementOrProviderRequests() {
+        launch().use {
+            compose.onNodeWithTag("account-settings-required").performScrollTo()
+                .assertTextEquals("Add an account in Account settings to view usage.").assertIsDisplayed()
+            for (tag in listOf("connect", "cancel-connect", "remove-account", "account-name-edit", "device-code", "open-browser"))
+                compose.onNodeWithTag(tag).assertDoesNotExist()
+            compose.onNodeWithTag("open-account-settings").performScrollTo().assertTextEquals("Account settings").performClick()
+            compose.onNodeWithTag("account-settings").assertExists()
+            compose.onNodeWithTag("connect").performScrollTo().assertTextEquals("Add account").assertIsEnabled()
+            compose.onNodeWithTag("account-name-edit").assertDoesNotExist()
+            compose.onNodeWithTag("remove-account").performScrollTo().assertIsNotEnabled()
+            assertEquals(0L, fixture.transport.requests.get())
+            click("details-back")
+            compose.onNodeWithTag("dashboard").assertExists()
+            openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
+            for (tag in listOf("connect", "cancel-connect", "remove-account", "account-name-edit", "device-code", "open-browser"))
+                compose.onNodeWithTag(tag).assertDoesNotExist()
+            compose.onNodeWithTag("open-account-settings").performScrollTo().performClick()
+            compose.onNodeWithTag("account-settings").assertExists()
+            assertEquals(0L, fixture.transport.requests.get())
         }
     }
 
@@ -189,7 +215,13 @@ class DashboardUiTest {
             click("open-drawer")
             compose.onNodeWithTag("drawer-LOCAL_HISTORY_DETAILS").assertTextEquals("Full local history details")
             compose.onNodeWithTag("drawer-CONNECTION_DETAILS").assertTextEquals("Full live connection details")
-            compose.onAllNodes(hasTestTag("drawer-LOCAL_HISTORY_DETAILS") or hasTestTag("drawer-CONNECTION_DETAILS")).assertCountEquals(2)
+            compose.onNodeWithTag("drawer-ACCOUNT_SETTINGS").assertTextEquals("Account settings").assertIsDisplayed()
+            compose.onAllNodes(hasTestTag("drawer-LOCAL_HISTORY_DETAILS") or hasTestTag("drawer-CONNECTION_DETAILS") or hasTestTag("drawer-ACCOUNT_SETTINGS")).assertCountEquals(3)
+            val connection = compose.onNodeWithTag("drawer-CONNECTION_DETAILS").fetchSemanticsNode().boundsInRoot
+            val account = compose.onNodeWithTag("drawer-ACCOUNT_SETTINGS").fetchSemanticsNode().boundsInRoot
+            val sheet = compose.onNodeWithTag("details-drawer").fetchSemanticsNode().boundsInRoot
+            assertTrue("Account settings is the bottom drawer item", account.top > connection.bottom && account.bottom <= sheet.bottom)
+            assertTrue("The account item is anchored to the drawer bottom", sheet.bottom - account.bottom <= 24 * scenarioDensity(scenario))
             capture.capture("dashboard-drawer-portrait-dark", scenario, fixture, "drawer-LOCAL_HISTORY_DETAILS")
             pressActivityBack(scenario, "open drawer Back")
             awaitDrawerClosed()
@@ -201,6 +233,11 @@ class DashboardUiTest {
             compose.onNodeWithTag("dashboard").assertExists()
             openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             click("details-back"); compose.onNodeWithTag("dashboard").assertExists()
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
+            compose.onNodeWithTag("account-name-edit").performScrollTo().assertIsEnabled()
+            compose.onNodeWithTag("remove-account").performScrollTo().assertIsEnabled()
+            pressActivityBack(scenario, "Account settings Back")
+            compose.onNodeWithTag("dashboard").assertExists()
             openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
             scenario.recreate(); awaitConnectionScreen(compose, owner)
             compose.onNodeWithTag("dashboard").assertExists()
@@ -219,6 +256,12 @@ class DashboardUiTest {
                 assertTrue(node.size.height >= 48 * scenarioDensity(scenario))
             }
             capture.capture("dashboard-main-landscape-dark-large-font", scenario, fixture, "history-chart-five-hour-equivalent", WindowKind.FIVE_HOUR)
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
+            HistoryAcceptanceCapture(compose).label("account-name")
+            listOf("account-name-edit", "connect", "cancel-connect", "remove-account").forEach {
+                val node = compose.onNodeWithTag(it).performScrollTo().assertIsDisplayed().assertHasClickAction().fetchSemanticsNode()
+                assertTrue(node.size.height >= 48 * scenarioDensity(scenario))
+            }
         }
         settings.apply(false, 2f)
         launch(font = 2f).use { scenario ->
@@ -248,7 +291,11 @@ class DashboardUiTest {
         await("accepted real pair and independent inventory") { owner.state.value.phase == ConnectionPhase.OBSERVED &&
             !owner.state.value.refresh.refreshing && recordedHistory(owner).points.size == 1 }
     }
-    private fun click(tag: String) { compose.onNodeWithTag(tag).performScrollTo().performClick(); compose.waitForIdle() }
+    private fun click(tag: String) {
+        if (tag == "connect") openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
+        compose.onNodeWithTag(tag).performScrollTo().performClick(); compose.waitForIdle()
+        if (tag == "connect") returnDashboard(compose, owner)
+    }
     private fun pressActivityBack(scenario: ActivityScenario<MainActivity>, step: String) {
         var focused = false
         await("$step: Activity window focused", { "focused=$focused; ${owner.state.value}" }) {

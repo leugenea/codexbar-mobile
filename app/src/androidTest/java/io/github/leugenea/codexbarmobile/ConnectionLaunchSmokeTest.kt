@@ -47,7 +47,7 @@ class ConnectionLaunchSmokeTest {
             assertRetiredSurfaceAbsent()
             assertInstalledNetworkPolicy()
             assertSecureWindow(scenario)
-            compose.onNodeWithTag("connect").performScrollTo().assertIsDisplayed().assertHasClickAction()
+            compose.onNodeWithTag("open-account-settings").performScrollTo().assertIsDisplayed().assertHasClickAction()
             assertEquals(0L, fixture.transport.requests.get())
         }
     }
@@ -88,7 +88,7 @@ class ConnectionLaunchSmokeTest {
             openDetailRoute(compose, fixture.owner, DashboardRoute.CONNECTION_DETAILS)
             assertTextNotClipped("Unofficial · local connection")
             assertTextNotClipped("Identity unverified · one local session. Token receipt and HTTP 200 do not establish an account or workspace. No account identity is inferred.")
-            compose.onNodeWithTag("connect").performScrollTo().assertIsDisplayed().assertHasClickAction()
+            compose.onNodeWithTag("open-account-settings").performScrollTo().assertIsDisplayed().assertHasClickAction()
             openDetailRoute(compose, fixture.owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
             compose.onNodeWithTag("connection-history").assertExists()
             compose.onNodeWithTag("history-readiness").performScrollTo().assertTextEquals("unavailable")
@@ -109,7 +109,9 @@ class ConnectionLaunchSmokeTest {
         assertEquals(0L, fixture.transport.requests.get())
         launch().use {
             ready(ConnectionPhase.IDLE)
+            openDetailRoute(compose, fixture.owner, DashboardRoute.ACCOUNT_SETTINGS)
             compose.onNodeWithTag("connect").performScrollTo().performClick()
+            returnDashboard(compose, fixture.owner)
             settleConnectionCommands(compose, shared, "connect admission")
             boundedWait("initial authenticated cycle and history admission finish") {
                 shared.state.value.let { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing } &&
