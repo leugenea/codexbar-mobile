@@ -162,7 +162,7 @@ retains its own licenses and notices; see [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTI
 
 
 Development builds use the isolated `io.github.leugenea.codexbarmobile.dev` package
-and a `0.2.0-dev.<history count>+g<checkout SHA>` name. Hosted CI also prepares a
+and a `0.3.0-dev.<history count>+g<checkout SHA>` name. Hosted CI also prepares a
 verified **unsigned, non-distributable release APK** as a signing input.
 That CI output is not a signed candidate or published release. See
 [version and release preparation](CONTRIBUTING.md#version-packages-and-unsigned-release-preparation).
