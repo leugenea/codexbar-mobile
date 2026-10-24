@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RETAINED_CHART_CASES = {
     "singleMeasuredTickAndDashedNominalAreSeparateActualPixels",
     "connectedMeasurementsDrawStraightEdgesAndPercentAxisInDarkPortrait",
-    "gapsCorrectionsAndResetChangesHaveNoPaintedBridgeInLandscapeDark",
+    "gapsCorrectionsAndResetChangesHaveContinuousPaintInLandscapeDark",
     "emptyStatusOnlyLoadingAndErrorsNeverInventACanvasOrZero",
     "typedUnavailableGeometryAndUnderflowKeepExactFactsInsteadOfClamping",
     "unknownBaselineLargeFontKeepsSinglePointCompleteLabelsAndReachableDetails",
@@ -139,7 +139,7 @@ class HistoryChartContracts(unittest.TestCase):
     def test_chart_counts_are_quantity_neutral_and_no_dependency_or_coverage_exemption_exists(self):
         resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
         self.assertEqual(resources["history_chart_counts"],
-                         "Measured observations: %1$d · Within-run connections: %2$d · Nominal reference lines: %3$d")
+                         "Measured observations: %1$d · Measured connections: %2$d · Nominal reference lines: %3$d")
         build = (ROOT / "app/build.gradle").read_text()
         self.assertIn("minimum = 0.90", build)
         self.assertNotRegex(build, r"exclude.*HistoryChart|chart.*[Dd]ependenc")

@@ -1,6 +1,8 @@
 package io.github.leugenea.codexbarmobile
 
 import androidx.compose.ui.test.*
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -37,7 +39,7 @@ class CurrentWindowHistoryTest {
             openDashboard()
             page(listOf(301L, 302L, 304L, 305L, 306L))
             assertEquals(307L, recordedHistory(owner).storage!!.lastAdmitted!!.ordinal)
-            assertCurrentDrawing(recordedHistory(owner), 5, 2, 2)
+            assertCurrentDrawing(recordedHistory(owner), 5, 4, 2)
             listOf("$five-title", "$five-pace", "$five-first", "$five-last").forEach(capture::label)
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
             capture.capture(if (dark) "history-current-dark-portrait" else "history-current-light-portrait", scenario, fixture, emptyList(), chart = true)
@@ -118,6 +120,39 @@ class CurrentWindowHistoryTest {
             compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assertDoesNotExist()
             assertEquals(requests, fixture.transport.counts())
             assertEquals(1L, recordedHistory(owner).storage!!.lastAdmitted!!.ordinal)
+        }
+    }
+
+    @Test fun singleObservationDisplaysFullWindowAxesAndVisibleTickWithoutTrend() {
+        login()
+        settings.apply(false, 1f)
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            settings.observe(compose, scenario, false, false, 1f)
+            openDashboard(); page(listOf(1L))
+            val source = recordedHistory(owner)
+            val series = HistoryPlotInputs.project(source).fiveHour
+            val window = source.query.window!!
+            val drawing = historyChartDrawing(series)
+            assertTrue(DashboardPresentation.hasChart(series))
+            assertEquals(window.resetAt.minusSeconds(window.durationSeconds), series.measuredDomain!!.time.first)
+            assertEquals(window.resetAt, series.measuredDomain.time.last)
+            assertEquals(1, drawing.isolated.size)
+            assertNull(drawing.trend)
+            compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+            val node = compose.onNodeWithTag("$five-canvas", useUnmergedTree = true)
+            val bitmap = node.captureToImage().asAndroidBitmap()
+            try {
+                val density = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                    .targetContext.resources.displayMetrics.density
+                val point = drawing.isolated.single()
+                val pixels = HistoryAcceptancePixels(bitmap, androidx.compose.ui.geometry.Rect(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat()), density)
+                pixels.sample("observation", point, androidx.compose.material3.lightColorScheme().primary.toArgb(), true)
+            } finally { bitmap.recycle() }
+            val pattern = "MMM d, HH:mm"
+            val startLabel = requireNotNull(TimePresentation.chartTime(series.measuredDomain.time.first, java.time.ZoneOffset.UTC, java.util.Locale.US, pattern))
+            val resetLabel = requireNotNull(TimePresentation.chartTime(window.resetAt, java.time.ZoneOffset.UTC, java.util.Locale.US, pattern))
+            compose.onNodeWithTag("$five-first").performScrollTo().assertTextEquals(startLabel)
+            compose.onNodeWithTag("$five-last").performScrollTo().assertTextEquals(resetLabel)
         }
     }
 

@@ -102,7 +102,7 @@ class DashboardContracts(unittest.TestCase):
         self.assertEqual(DASHBOARD_JVM_COUNT, EXPECTED_DASHBOARD_JVM_COUNT)
         self.assertEqual(CURRENT_HISTORY_JVM[SCANNER_CLASS], EXPECTED_CURRENT_READ_JVM)
         self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_NATIVE.values())), 17)
-        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 30)
+        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 31)
         for kind, registry, source_set in (("jvm", EXPECTED_DASHBOARD_JVM, "test"), ("native", EXPECTED_DASHBOARD_NATIVE, "androidTest")):
             for classname, required in registry.items():
                 source = ROOT / f"app/src/{source_set}/java/{classname.replace('.', '/')}.kt"

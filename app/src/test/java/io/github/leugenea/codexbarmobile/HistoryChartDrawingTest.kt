@@ -28,7 +28,7 @@ class HistoryChartDrawingTest {
         assertEquals(0.8, drawing.observations.single().x, 0.0)
     }
 
-    @Test fun straightEdgesFollowOnlyTheSuppliedRunWithoutIsolatedTicks() {
+    @Test fun straightEdgesConnectShownMeasurementsWithoutIsolatedTicks() {
         val first = append()
         val second = append(first.cursor, usage(observedAt = at.plusSeconds(60)), 61_000)
         val series = plot(listOf(first.entry, second.entry)).fiveHour
@@ -41,7 +41,7 @@ class HistoryChartDrawingTest {
         assertEquals(at.plusSeconds(60), series.samples.last().measured!!.source.observedAt)
     }
 
-    @Test fun gapCorrectionResetAndOrdinalHoleNeverBecomeAnEdge() {
+    @Test fun gapCorrectionResetAndOrdinalHoleStillConnectShownMeasurements() {
         val first = append()
         val gap = WindowHistory.append(first.cursor, HistoryAdmission(partition, ObservationId(2),
             HistoryClock(epoch, 31_000), HistoryEvent.Gap(HistoryGap.BACKGROUND))) as HistoryReduction.Applied
@@ -54,9 +54,9 @@ class HistoryChartDrawingTest {
             listOf(first.entry, corrected.entry), listOf(first.entry, reset.entry), listOf(first.entry, hole.entry))) {
             val drawing = historyChartDrawing(plot(entries).fiveHour)
             assertEquals(2, drawing.observations.size)
-            assertTrue(drawing.measured.isEmpty())
-            assertEquals(drawing.observations, drawing.isolated)
-            assertNotNull(drawing.trend) // Analytical fit spans the window, never a measured bridge.
+            assertEquals(listOf(HistoryChartLine(drawing.observations[0], drawing.observations[1])), drawing.measured)
+            assertTrue(drawing.isolated.isEmpty())
+            assertNotNull(drawing.trend)
         }
     }
 
@@ -73,12 +73,13 @@ class HistoryChartDrawingTest {
         assertTrue(historyChartDrawing(plot(listOf(first.entry)).fiveHour).measured.isEmpty())
     }
 
-    @Test fun unkeyedAndUnknownGeometryStayIsolatedWithoutZeroOrBridge() {
+    @Test fun unkeyedMeasurementsConnectWithoutInventingUnknownGeometry() {
         val first = append(usage = usage(window(absolute = Input.Missing)))
         val second = append(first.cursor, usage(window(absolute = Input.Missing), observedAt = at.plusSeconds(60)), 61_000)
         val drawing = historyChartDrawing(plot(listOf(first.entry, second.entry)).fiveHour)
         assertEquals(2, drawing.observations.size)
-        assertTrue(drawing.measured.isEmpty())
+        assertEquals(1, drawing.measured.size)
+        assertTrue(drawing.isolated.isEmpty())
         assertTrue(drawing.nominal.isEmpty())
         for (source in listOf(plot(emptyList()), HistoryPlotInputs.project(HistoryGraphSnapshot(HistoryReadiness.LOADING)))) {
             assertEquals(HistoryChartDrawing(emptyList(), emptyList(), emptyList()), historyChartDrawing(source.fiveHour))

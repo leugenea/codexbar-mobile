@@ -72,6 +72,7 @@ private fun HistoryGeometryNotes(series: HistoryPlotSeries, tag: String) {
         val resource = when (problem) {
             PlotRenderProblem.DECIMAL_CAPACITY -> R.string.history_chart_decimal_capacity
             PlotRenderProblem.OUTSIDE_VALUE_DOMAIN -> R.string.history_chart_outside_domain
+            PlotRenderProblem.OUTSIDE_TIME_DOMAIN -> R.string.history_chart_outside_time_domain
         }
         Text(stringResource(resource), Modifier.testTag("$tag-geometry-${problem.name}"))
     }
@@ -147,7 +148,7 @@ private fun DrawScope.drawChart(drawing: HistoryChartDrawing, measured: Color, n
     val dash = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()))
     drawing.nominal.forEach { line -> drawLine(nominal, chartOffset(line.start), chartOffset(line.end), 2.dp.toPx(), pathEffect = dash) }
     drawing.measured.forEach { line -> drawLine(measured, chartOffset(line.start), chartOffset(line.end), 2.dp.toPx(), cap = StrokeCap.Round) }
-    // No point markers. Only isolated runs need a minimal 2dp-long, 2dp-wide tick.
+    // No point markers. A lone measurement needs a minimal 2dp-long, 2dp-wide tick.
     drawing.isolated.forEach { point ->
         val center = chartOffset(point)
         drawLine(measured, center - Offset(1.dp.toPx(), 0f), center + Offset(1.dp.toPx(), 0f),

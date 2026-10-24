@@ -48,7 +48,7 @@ class HistoryPlotCacheTest {
         val changed = cache.project(fixture.display(pages = fixture.pages(count = 321)))
         assertNotSame(original.fiveHour, changed.fiveHour)
         assertEquals(321, changed.fiveHour.samples.size)
-        assertEquals(fixture.observations.last().observedAt, changed.fiveHour.measuredDomain!!.time.last)
+        assertEquals(source.query.window!!.resetAt, changed.fiveHour.measuredDomain!!.time.last)
         assertEquals(321, historyChartDrawing(changed.fiveHour).observations.size)
         // Even an equal-content replacement page is a new retained identity, not a deep-list key.
         val replacements = listOf(
@@ -85,6 +85,18 @@ class HistoryPlotCacheTest {
         assertNull(retired.source.storage)
         assertNull(retired.source.latestCurrent)
         assertEquals(HistoryLiveMetadata(), retired.source.live)
+    }
+
+    @Test fun changedWindowBoundsInvalidateCachedGeometryWithoutChangingTheRetainedPage() {
+        val fixture = Fixture()
+        val cache = HistoryPlotCache()
+        val source = fixture.display()
+        val before = cache.project(source)
+        val window = source.query.window!!
+        val changed = copyInputs(source, query = source.query.copy(window = window.copy(resetAt = window.resetAt.plusSeconds(60))))
+        assertNotSame(before.fiveHour, cache.project(changed).fiveHour)
+        assertTrue(cache.project(changed).fiveHour.samples.isEmpty()) // Old points cannot fill a successor window.
+        assertEquals(before.fiveHour.measuredDomain, cache.project(source).fiveHour.measuredDomain)
     }
 
     private fun copyInputs(source: HistoryGraphSnapshot, page: HistoryReadSnapshot? = source.storage,

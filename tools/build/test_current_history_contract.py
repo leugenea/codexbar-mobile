@@ -56,7 +56,7 @@ class CurrentHistoryContracts(unittest.TestCase):
                 path.write_text(json.dumps(data))
                 with self.subTest(name=name, key=key), self.assertRaises(ValueError):
                     verify_captures(self.directory)
-            for role in ("observation", "edge", "dash", "break"):
+            for role in ("observation", "edge", "dash", "bridge"):
                 self.fixture.captures()
                 path = self.directory / (name + ".json")
                 data = json.loads(path.read_text())

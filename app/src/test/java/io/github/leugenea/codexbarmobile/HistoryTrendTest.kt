@@ -14,9 +14,9 @@ class HistoryTrendTest {
         assertNull(historyTrend(listOf(point(0.5, 0.8))))
     }
 
-    @Test fun twoObservationsFitExactlyWithinTheirTimeRange() {
+    @Test fun twoObservationsFitExactlyAndExtendAcrossFullDomain() {
         val trend = historyTrend(listOf(point(0.2, 0.3), point(0.8, 0.7)))!!
-        assertLine(trend, 0.2, 0.3, 0.8, 0.7)
+        assertLine(trend, 0.0, 1.0 / 6.0, 1.0, 5.0 / 6.0)
     }
 
     @Test fun identicalTimesWithVerticalSpreadHaveNoTrend() {
@@ -25,7 +25,7 @@ class HistoryTrendTest {
 
     @Test fun flatObservationsFitAHorizontalLine() {
         assertLine(historyTrend(listOf(point(0.1, 0.6), point(0.3, 0.6), point(0.9, 0.6)))!!,
-            0.1, 0.6, 0.9, 0.6)
+            0.0, 0.6, 1.0, 0.6)
     }
 
     @Test fun risingFitUsesTimeSpacingRatherThanObservationIndex() {
@@ -46,6 +46,14 @@ class HistoryTrendTest {
         // The fit can exceed the percent axis. The Canvas clips paint, not the regression.
         assertLine(historyTrend(listOf(point(0.0, 0.0), point(0.1, 1.0), point(1.0, 1.0)))!!,
             0.0, 0.4450549450549451, 1.0, 1.0494505494505495)
+    }
+
+    @Test fun fullWindowFitRemainsUnclampedForCanvasClipping() {
+        val line = historyTrend(listOf(point(0.4, 0.2), point(0.6, 0.8)))!!
+        assertLine(line, 0.0, -1.0, 1.0, 2.0)
+        // Visible intersections of this same fit are (1/3, 0) and (2/3, 1).
+        assertEquals(0.0, line.start.y + (line.end.y - line.start.y) / 3, 1e-12)
+        assertEquals(1.0, line.start.y + (line.end.y - line.start.y) * 2 / 3, 1e-12)
     }
 
     private fun point(x: Double, y: Double) = PlotPosition.Available(x, y, PlotRenderDetail.APPROXIMATE)

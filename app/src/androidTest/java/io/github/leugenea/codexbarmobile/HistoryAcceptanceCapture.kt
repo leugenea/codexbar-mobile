@@ -118,7 +118,7 @@ internal class HistoryAcceptanceCapture(private val compose: ComposeTestRule) {
     // Compact charts expose the exact explanation on the plot, not a visible text label.
     private fun compactLegend(): JSONObject {
         val tag = "history-chart-five-hour"
-        val legend = "Solid line: measured observations within each run; isolated observation: short tick\n" +
+        val legend = "Solid line: measured observations connected in time order; single observation: short tick\n" +
             "Faint short dashes: least-squares usage trend when available\n" +
             "Long dashes: nominal analytical full-quota reference, not a forecast"
         val plot = compose.onNodeWithTag("$tag-plot").assertIsDisplayed().assertContentDescriptionEquals(legend)
@@ -152,8 +152,8 @@ internal class HistoryAcceptanceCapture(private val compose: ComposeTestRule) {
         drawing.observations.forEach { pixels.sample("observation", it, colors.primary.toArgb(), true) }
         drawing.measured.forEach { pixels.between("edge", it.start, it.end, colors.primary.toArgb(), true) }
         series.segments.zipWithNext().forEach { (one, two) ->
-            pixels.between("break", one.points.last().position as PlotPosition.Available,
-                two.points.first().position as PlotPosition.Available, colors.primary.toArgb(), false)
+            pixels.between("bridge", one.points.last().position as PlotPosition.Available,
+                two.points.first().position as PlotPosition.Available, colors.primary.toArgb(), true)
         }
         drawing.nominal.forEach { pixels.dashes(it, colors.onSurfaceVariant.toArgb()) }
         data.put("observationCount", drawing.observations.size).put("connectionCount", drawing.measured.size)

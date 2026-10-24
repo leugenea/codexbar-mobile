@@ -6,7 +6,8 @@ import io.github.leugenea.codexbarmobile.history.PlotRenderDetail
 /** Ordinary least squares of used percent against time (not observation ordinal).
  * Affine-normalized time/percent coordinates preserve the same fit. Centering avoids
  * subtracting large timestamp squares. Fit every shown observation, across run breaks;
- * draw only between the earliest/latest observation, clipping the paint, not the fit.
+ * draw across the entire plot time domain (window start..reset when known), clipping
+ * the paint to the plot rectangle, not clamping the regression.
  */
 internal fun historyTrend(points: List<PlotPosition.Available>): HistoryChartLine? {
     if (points.size < 2) return null
@@ -25,5 +26,5 @@ internal fun historyTrend(points: List<PlotPosition.Available>): HistoryChartLin
     if (variance == 0.0) return null
     val slope = covariance / variance
     fun at(x: Double) = PlotPosition.Available(x, meanY + slope * (x - meanX), PlotRenderDetail.APPROXIMATE)
-    return HistoryChartLine(at(first), at(last))
+    return HistoryChartLine(at(0.0), at(1.0))
 }

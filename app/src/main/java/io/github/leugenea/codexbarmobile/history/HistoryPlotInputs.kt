@@ -19,11 +19,9 @@ internal object HistoryPlotInputs {
             (window.reference as? DistributionReference.Available)?.series
         }.distinctBy { it.window to it.segment }
         val observed = selected.mapNotNull { it.second.source.point?.observedAt }
-        // Multi-observation compact charts end at the latest measurement, not a page cutoff
-        // or the future reset. Singletons retain nominal context without inventing a span.
-        val measuredTime = HistoryPlotCoordinates.timeDomain(observed)
-        val time = if (source.request is HistoryPresentationRequest.Current && measuredTime?.extent == PlotTimeExtent.SPAN)
-            measuredTime else HistoryPlotCoordinates.timeDomain(observed + references.flatMap { listOf(it.start.at, it.end.at) })
+        val window = source.query.window?.takeIf { it.kind == kind }
+            ?: selected.map { it.second.source.point?.segment?.window }.distinct().singleOrNull()
+        val time = historyPlotTimeDomain(window, observed, references, authoritative = source.query.currentOnly)
         val measuredDomain = time?.let { HistoryPlotDomain(it, HistoryPlotCoordinates.percent) }
         val deltaDomain = time?.let { HistoryPlotDomain(it, HistoryPlotCoordinates.delta) }
         val samples = selected.map { (entry, window) -> sample(entry, window, measuredDomain, deltaDomain) }

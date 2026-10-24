@@ -39,6 +39,20 @@ internal object HistoryChartFixture {
         return entries
     }
 
+    /** Two interior measurements with a fit that crosses both percent boundaries. */
+    fun fullWindowPage(): List<HistoryEntry> {
+        val reset = at.epochSecond + 10800
+        val start = reset - 18000
+        var cursor = HistoryCursor(HistoryTextFixture.partition)
+        return listOf(7200L to 20, 10800L to 80).map { (seconds, percent) ->
+            val input = Input.Value(WindowInput(Input.Value(18000L), Input.Value(BigDecimal(percent)), Input.Value(reset)))
+            val usage = UsageNormalizer.normalize(UsageInput(input), Instant.ofEpochSecond(start + seconds))
+            val result = reduce(cursor, HistoryEvent.Observed(usage), seconds * 1000)
+            cursor = result.cursor
+            result.entry
+        }
+    }
+
     private fun reduce(cursor: HistoryCursor, event: HistoryEvent, millis: Long): HistoryReduction.Applied =
         WindowHistory.append(cursor, HistoryAdmission(cursor.partition, cursor.nextId()!!,
             HistoryClock(epoch, millis), event)) as HistoryReduction.Applied

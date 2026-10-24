@@ -63,10 +63,19 @@ REMAINING_TIME_JVM = {
 
 
 CURRENT_HISTORY_JVM = {
+    "io.github.leugenea.codexbarmobile.HistoryWindowChartTest": {
+        "interiorObservationsUseFullWindowAndTrendEndpointsNotMeasurementEdges",
+        "singleKeyedPointWithoutBaselineStillHasFullWindowAxisAndVisibleTick",
+        "unknownBoundsFallBackToMeasuredRangeIncludingCenteredSingleton",
+        "continuousPolylineSortsAcrossBackwardsRunsWithoutRewritingAdmissionOrder",
+        "overflowAndOutOfWindowLegacyFactsFallBackWithoutClampingOrCrashing",
+    },
+
     "io.github.leugenea.codexbarmobile.HistoryTrendTest": {
         "emptyObservationsHaveNoTrend",
         "singleObservationHasNoTrend",
-        "twoObservationsFitExactlyWithinTheirTimeRange",
+        "fullWindowFitRemainsUnclampedForCanvasClipping",
+        "twoObservationsFitExactlyAndExtendAcrossFullDomain",
         "identicalTimesWithVerticalSpreadHaveNoTrend",
         "flatObservationsFitAHorizontalLine",
         "risingFitUsesTimeSpacingRatherThanObservationIndex",
@@ -97,6 +106,7 @@ CURRENT_HISTORY_NATIVE = {
         "currentPeriodBehindArchivedPagesHasExactMeasuredReferencePaintInProductionDark",
         "expiryChangedResetUnknownAndAmbiguousRetireCurrentChartsWithoutArchivedFallback",
         "dormantRestoreHasTextHistoryButNoCurrentChartAndOpeningAddsNoRequests",
+        "singleObservationDisplaysFullWindowAxesAndVisibleTickWithoutTrend",
     },
     "io.github.leugenea.codexbarmobile.CurrentWindowRetirementTest": {
         "lateCurrentQueryCannotReplayRetiredAccountIntoProductionSuccessorChart",
@@ -240,7 +250,7 @@ HISTORY_CHART_CLASS = "io.github.leugenea.codexbarmobile.HistoryChartComponentTe
 HISTORY_CHART_CASES = {
     "singleMeasuredTickAndDashedNominalAreSeparateActualPixels",
     "connectedMeasurementsDrawStraightEdgesAndPercentAxisInDarkPortrait",
-    "gapsCorrectionsAndResetChangesHaveNoPaintedBridgeInLandscapeDark",
+    "gapsCorrectionsAndResetChangesHaveContinuousPaintInLandscapeDark",
     "emptyStatusOnlyLoadingAndErrorsNeverInventACanvasOrZero",
     "typedUnavailableGeometryAndUnderflowKeepExactFactsInsteadOfClamping",
     "unknownBaselineLargeFontKeepsSinglePointCompleteLabelsAndReachableDetails",
@@ -322,6 +332,7 @@ DASHBOARD_JVM = {
         'metadataTicksReuseWholeWindowGraphAndDrawingInputsWhileKeepingLiveMetadataAndPaceCurrent',
         'changedPageQueryGenerationPartitionRequestAndSelectionRebuildWholeWindowInputs',
         'cachedCurrentInputsNeverBypassPeriodOrDisplayRevocation',
+        'changedWindowBoundsInvalidateCachedGeometryWithoutChangingTheRetainedPage',
     },
     'io.github.leugenea.codexbarmobile.DashboardPresentationTest': {
         'compactChartEquivalentUsesOriginalExactFactsAndIndependentReferences',
@@ -333,7 +344,7 @@ DASHBOARD_JVM = {
         'paceLineNearZeroAndAdjacentBoundaryValuesNeverShowSignedZero',
         'paceLineKeepsOneDecimalAndLocaleSeparator',
         'compactPaceBeyondFirst32ObservationsMatchesAcceptedHeadlineAndClock',
-        'compactWholeWindowLastPointEndLabelAndTrendReachLatestObservationBeyond32',
+        'compactWholeWindowMapsAllObservationsBeyond32BetweenWindowStartAndReset',
         'compactPaceKeepsIndependentlyAgingFiveHourAndWeeklyObservationsSeparate',
         'compactPaceNeverFallsBackWhenAcceptedComparisonIsMissingOrIneligible',
         'chartTimeLabelsUseYearlessLocalePatternsAndContainingHour',

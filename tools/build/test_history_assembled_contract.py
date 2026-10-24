@@ -122,7 +122,7 @@ class HistoryAssembledContracts(unittest.TestCase):
         self.assertIn('assertFalse("The plot\'s legend explanation must remain accessible", hidden)', collector)
         self.assertIn('hasTestTag("$tag-legend") or hasText(legend)', collector)
         self.assertIn("visible.assertCountEquals(0)", collector)
-        for line in ("Solid line: measured observations within each run; isolated observation: short tick",
+        for line in ("Solid line: measured observations connected in time order; single observation: short tick",
                      "Faint short dashes: least-squares usage trend when available",
                      "Long dashes: nominal analytical full-quota reference, not a forecast"):
             self.assertIn(line, collector)

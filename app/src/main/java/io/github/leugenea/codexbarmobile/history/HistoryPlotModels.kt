@@ -6,7 +6,7 @@ import java.time.Instant
 /** Page/selection content is orthogonal to readiness, baseline availability and recorder errors. */
 internal enum class HistoryPlotContent { NO_PAGE, EMPTY_PAGE, FILTERED_EMPTY, STATUS_ONLY, SINGLE_POINT, MULTIPLE_POINTS }
 internal enum class PlotTimeExtent { SINGLE_INSTANT, SPAN }
-internal enum class PlotRenderProblem { DECIMAL_CAPACITY, OUTSIDE_VALUE_DOMAIN }
+internal enum class PlotRenderProblem { DECIMAL_CAPACITY, OUTSIDE_VALUE_DOMAIN, OUTSIDE_TIME_DOMAIN }
 internal enum class PlotRenderDetail { APPROXIMATE, NONZERO_UNDERFLOW }
 internal enum class PlotReferenceMeaning { NOMINAL_EVEN_DISTRIBUTION }
 

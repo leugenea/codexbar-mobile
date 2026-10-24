@@ -61,9 +61,9 @@ class HistoryChartComponentTest {
     @Test fun singleMeasuredTickAndDashedNominalAreSeparateActualPixels() {
         val plot = HistoryTextFixture.plot()
         launch(plot).use {
-            counts("Measured observations: 1 · Within-run connections: 0 · Nominal reference lines: 1")
+            counts("Measured observations: 1 · Measured connections: 0 · Nominal reference lines: 1")
             compose.onNodeWithTag("history-chart-weekly-counts").assertTextEquals(
-                "Measured observations: 1 · Within-run connections: 0 · Nominal reference lines: 1")
+                "Measured observations: 1 · Measured connections: 0 · Nominal reference lines: 1")
             verifyLabels("$five-title", "$five-legend", "$five-first", "$five-last")
             compose.onNodeWithTag("$five-first").assertTextEquals("Time axis start: Oct 8, 20:00")
             compose.onNodeWithTag("$five-last").assertTextEquals("Time axis end: Oct 9, 01:00")
@@ -97,8 +97,8 @@ class HistoryChartComponentTest {
 
     @Test fun connectedMeasurementsDrawStraightEdgesAndPercentAxisInDarkPortrait() {
         val plot = HistoryTextFixture.plot(HistoryChartFixture.page(spread = true))
-        launch(plot, dark = true).use {
-            counts("Measured observations: 4 · Within-run connections: 3 · Nominal reference lines: 0")
+        launch(plot, dark = true).use { scenario ->
+            counts("Measured observations: 4 · Measured connections: 3 · Nominal reference lines: 0")
             verifyLabels("$five-title", "$five-legend", "$five-counts", "$five-first", "$five-last")
             val scope = hasAnyAncestor(hasTestTag(five))
             for (value in listOf("100%", "50%", "0%")) compose.onAllNodes(scope and hasText(value)).assertCountEquals(1)
@@ -108,10 +108,13 @@ class HistoryChartComponentTest {
                 trendPixels(bitmap, plot.fiveHour)
             }
             capture("history-chart-measured-portrait-dark", plot, dark = true)
+            val full = HistoryTextFixture.plot(HistoryChartFixture.fullWindowPage())
+            render(scenario, full, dark = true)
+            withCanvas { clippedWindowTrendPixels(it, full.fiveHour) }
         }
     }
 
-    @Test fun gapsCorrectionsAndResetChangesHaveNoPaintedBridgeInLandscapeDark() {
+    @Test fun gapsCorrectionsAndResetChangesHaveContinuousPaintInLandscapeDark() {
         val correction = HistoryTextFixture.plot(HistoryChartFixture.page(correction = true))
         val changedReset = HistoryTextFixture.plot(HistoryChartFixture.page(changedReset = true))
         val gapped = HistoryTextFixture.plot(HistoryChartFixture.page(gap = true))
@@ -138,7 +141,7 @@ class HistoryChartComponentTest {
                 render(scenario, plot)
                 compose.onNodeWithTag("$five-canvas").assertDoesNotExist()
                 compose.onNodeWithTag("$five-no-geometry").assertExists()
-                counts("Measured observations: 0 · Within-run connections: 0 · Nominal reference lines: 0")
+                counts("Measured observations: 0 · Measured connections: 0 · Nominal reference lines: 0")
                 compose.onNodeWithTag("history-readiness").assertTextEquals(
                     InstrumentationRegistry.getInstrumentation().targetContext.getString(historyStateResource(plot.source.readiness)))
                 verifyLabels("$five-content", "$five-no-geometry")
@@ -149,13 +152,13 @@ class HistoryChartComponentTest {
     @Test fun typedUnavailableGeometryAndUnderflowKeepExactFactsInsteadOfClamping() {
         val capacity = HistoryChartFixture.invalidGeometry(BigDecimal("0." + "1".repeat(1025)))
         launch(capacity).use { scenario ->
-            counts("Measured observations: 0 · Within-run connections: 0 · Nominal reference lines: 0")
+            counts("Measured observations: 0 · Measured connections: 0 · Nominal reference lines: 0")
             verifyLabels("$five-geometry-DECIMAL_CAPACITY")
             withCanvas { bitmap -> assertFalse(pixelMatches(bitmap, 0.5, 0.0, measured)) }
             capture("history-chart-invalid-portrait-light", capacity, dark = false)
             render(scenario, HistoryChartFixture.invalidGeometry(BigDecimal("101")))
             verifyLabels("$five-geometry-OUTSIDE_VALUE_DOMAIN")
-            counts("Measured observations: 0 · Within-run connections: 0 · Nominal reference lines: 0")
+            counts("Measured observations: 0 · Measured connections: 0 · Nominal reference lines: 0")
             click("history-details-toggle")
             compose.onNodeWithText("Measured used percent (exact %): 101").performScrollTo().assertIsDisplayed()
             val tiny = HistoryChartFixture.invalidGeometry(BigDecimal("1E-10000"))
@@ -170,7 +173,7 @@ class HistoryChartComponentTest {
     @Test fun unknownBaselineLargeFontKeepsSinglePointCompleteLabelsAndReachableDetails() {
         val plot = HistoryTextFixture.plot(listOf(HistoryTextFixture.measured(reset = false)))
         launch(plot, font = 2f).use {
-            counts("Measured observations: 1 · Within-run connections: 0 · Nominal reference lines: 0")
+            counts("Measured observations: 1 · Measured connections: 0 · Nominal reference lines: 0")
             verifyLabels("$five-title", "$five-legend", "$five-counts", "$five-no-baseline", "$five-first", "$five-last")
             withCanvas { observationPixels(it, plot.fiveHour) }
             capture("history-chart-unknown-large-font", plot, dark = false)
@@ -297,23 +300,21 @@ class HistoryChartComponentTest {
     }
 
     private fun boundaryPixels(plot: HistoryPlotSnapshot) {
-        counts("Measured observations: 4 · Within-run connections: 2 · Nominal reference lines: 0")
+        counts("Measured observations: 4 · Measured connections: 3 · Nominal reference lines: 0")
         withCanvas { bitmap ->
             observationPixels(bitmap, plot.fiveHour)
             edgePixels(bitmap, plot.fiveHour)
             val a = plot.fiveHour.segments[0].points.last().position as PlotPosition.Available
             val b = plot.fiveHour.segments[1].points.first().position as PlotPosition.Available
-            assertFalse("No measured bridge across a supplied run boundary",
+            assertTrue("Continuous measured bridge across a supplied run boundary",
                 pixelMatches(bitmap, (a.x + b.x) / 2, (a.y + b.y) / 2, measured))
         }
     }
 
     private fun edgePixels(bitmap: Bitmap, series: HistoryPlotSeries) {
-        val edges = series.segments.flatMap { it.points.zipWithNext() }
+        val edges = historyChartDrawing(series).measured
         assertTrue("Positive straight-edge evidence required", edges.isNotEmpty())
-        for ((a, b) in edges) {
-            val one = a.position as PlotPosition.Available
-            val two = b.position as PlotPosition.Available
+        for ((one, two) in edges) {
             for (fraction in listOf(0.25, 0.5, 0.75)) {
                 assertTrue("Actual straight measured connection", pixelMatches(bitmap,
                     one.x + (two.x - one.x) * fraction, one.y + (two.y - one.y) * fraction, measured))
@@ -332,6 +333,33 @@ class HistoryChartComponentTest {
         assertTrue("Translucent trend has actual painted pixels", hits.count { it } >= 10)
         assertTrue("Trend is dashed, not solid", hits.count { !it } >= 10)
         assertNotEquals("Trend is not opaque measured paint", measured.toArgb(), expected.toArgb())
+    }
+
+    private fun clippedWindowTrendPixels(bitmap: Bitmap, series: HistoryPlotSeries) {
+        val line = historyChartDrawing(series).trend!!
+        assertEquals(0.0, line.start.x, 0.0)
+        assertEquals(1.0, line.end.x, 0.0)
+        assertEquals(-1.0, line.start.y, 1e-12)
+        assertEquals(2.0, line.end.y, 1e-12)
+        val expected = measured.copy(alpha = 0.45f).compositeOver(Color(bitmap.getPixel(0, 0)))
+        // Outside the measured interval, inside the visible clipped trend; nominal is elsewhere.
+        val hits = (340..395).map { n ->
+            val x = n / 1000.0
+            pixelMatches(bitmap, x, line.start.y + (line.end.y - line.start.y) * x, expected)
+        }
+        assertTrue("Full-window extension has painted translucent dashes", hits.count { it } >= 3)
+        assertTrue("Full-window extension still has dash gaps", hits.count { !it } >= 3)
+        val inset = 8 * density
+        // Sweep the upper inset along the hypothetical unclipped line, not a single
+        // pixel that could happen to be a dash gap. This spans more than the 4dp off phase.
+        val outside = (8..49).map { n ->
+            val yFraction = 1 + n / 1000.0
+            val xFraction = (yFraction - line.start.y) / (line.end.y - line.start.y)
+            val x = (inset + xFraction * (bitmap.width - 2 * inset)).roundToInt()
+            val y = (inset + (1 - yFraction) * (bitmap.height - 2 * inset)).roundToInt()
+            colorMatches(bitmap.getPixel(x, y), expected)
+        }
+        assertFalse("Trend paint is clipped above the percent plot across dash phases", outside.any { it })
     }
 
     private fun pixelMatches(bitmap: Bitmap, x: Double, y: Double, expected: Color): Boolean {

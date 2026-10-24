@@ -152,9 +152,10 @@ class DashboardHistoryIsolationTest {
             assertEquals(340L, recordedHistory(owner).storage!!.lastAdmitted!!.ordinal)
             val complete = recordedHistory(owner)
             val series = HistoryPlotInputs.project(complete).fiveHour
-            assertEquals(complete.points.last().observedAt, series.measuredDomain!!.time.last)
-            assertEquals(1.0, historyChartDrawing(series).observations.last().x, 0.0)
-            val expectedLastLabel = checkNotNull(TimePresentation.chartTime(complete.points.last().observedAt,
+            assertEquals(complete.query.window!!.resetAt, series.measuredDomain!!.time.last)
+            val lastX = historyChartDrawing(series).observations.last().x
+            assertTrue("Last measurement stays inside the complete window", lastX > 0.0 && lastX < 1.0)
+            val expectedLastLabel = checkNotNull(TimePresentation.chartTime(complete.query.window.resetAt,
                 java.time.ZoneOffset.UTC, java.util.Locale.US, "MMM d, HH:mm")) {
                 "The latest synthetic current observation must have a representable chart label"
             }
