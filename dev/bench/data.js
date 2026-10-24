@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792866255990,
+  "lastUpdate": 1792866259242,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -5261,6 +5261,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/be3aeb2f9c5626fcec681896ee000ba5bb46c424"
         },
         "date": 1792826068640,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a509eb8f0339e743e83b22591304910138940fcd",
+          "message": "fix(ui): hide sign-in actions for connected accounts (#186) (#187)",
+          "timestamp": "2026-10-24T21:23:45+03:00",
+          "tree_id": "b34063eeca2c8b76cfb61bca8c7b4d3939accab0",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/a509eb8f0339e743e83b22591304910138940fcd"
+        },
+        "date": 1792866258632,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
