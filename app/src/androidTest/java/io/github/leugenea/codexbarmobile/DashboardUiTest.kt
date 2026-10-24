@@ -100,11 +100,20 @@ class DashboardUiTest {
             compose.onNodeWithTag("live-refresh").performScrollTo().assertIsEnabled()
             compose.onNodeWithTag("account-name-edit").assertDoesNotExist()
             compose.onNodeWithTag("remove-account").assertDoesNotExist()
+            val before = fixture.transport.counts()
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
+            assertConnectedAccountActions()
+            returnDashboard(compose, owner)
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
+            assertConnectedAccountActions()
+            assertEquals(before, fixture.transport.counts())
         }
         fixture.freshRuntime()
         launch().use {
             await("dormant restored phase") { owner.state.value.phase == ConnectionPhase.RESTORED }
             val before = fixture.transport.counts()
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
+            assertConnectedAccountActions() // RESTORED has no AuthState.Connected projection yet.
             openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
             await("dormant stored facts") { recordedHistory(owner).storage?.lastAdmitted?.ordinal == 1L }
             returnDashboard(compose, owner)
@@ -125,6 +134,7 @@ class DashboardUiTest {
             compose.onNodeWithTag("account-settings").assertExists()
             assertConnectionHasNoDiagnosticDump(compose)
             compose.onNodeWithTag("connect").performScrollTo().assertTextEquals("Add account").assertIsEnabled()
+            compose.onNodeWithTag("cancel-connect").assertDoesNotExist()
             compose.onNodeWithTag("account-name-edit").assertDoesNotExist()
             compose.onNodeWithTag("remove-account").performScrollTo().assertIsNotEnabled()
             assertEquals(0L, fixture.transport.requests.get())
@@ -289,7 +299,9 @@ class DashboardUiTest {
             capture.capture("dashboard-main-landscape-dark-large-font", scenario, fixture, "history-chart-five-hour-pace", WindowKind.FIVE_HOUR)
             openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
             HistoryAcceptanceCapture(compose).label("account-name")
-            listOf("account-name-edit", "connect", "cancel-connect", "remove-account").forEach {
+            compose.onNodeWithTag("connect").assertDoesNotExist()
+            compose.onNodeWithTag("cancel-connect").assertDoesNotExist()
+            listOf("account-name-edit", "remove-account").forEach {
                 val node = compose.onNodeWithTag(it).performScrollTo().assertIsDisplayed().assertHasClickAction().fetchSemanticsNode()
                 assertTrue(node.size.height >= 48 * scenarioDensity(scenario))
             }
@@ -301,6 +313,14 @@ class DashboardUiTest {
             await("large-font stored page") { recordedHistory(owner).storage != null }
             capture.capture("dashboard-local-history-details-large-font", scenario, fixture, "history-page-cursor")
         }
+    }
+
+    private fun assertConnectedAccountActions() {
+        compose.onNodeWithTag("account-settings").assertExists()
+        compose.onNodeWithTag("connect").assertDoesNotExist()
+        compose.onNodeWithTag("cancel-connect").assertDoesNotExist()
+        compose.onNodeWithTag("account-name-edit").performScrollTo().assertIsEnabled()
+        compose.onNodeWithTag("remove-account").performScrollTo().assertIsEnabled()
     }
 
     private fun assertBankedTableReadable() {

@@ -32,14 +32,17 @@ private fun AccountSignIn(state: ConnectionState, controller: ConnectionControll
             Text(stringResource(R.string.gate_browser))
         }
     }
-    Button(onClick = controller::connect, enabled = !state.busy,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("connect")) {
-        Text(stringResource(if (state.phase == ConnectionPhase.REAUTH_REQUIRED) R.string.gate_reauth else R.string.account_add))
+    if (state.phase !in setOf(ConnectionPhase.RESTORED, ConnectionPhase.READING, ConnectionPhase.OBSERVED)) {
+        Button(onClick = controller::connect, enabled = !state.busy,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("connect")) {
+            Text(stringResource(if (state.phase == ConnectionPhase.REAUTH_REQUIRED) R.string.gate_reauth else R.string.account_add))
+        }
     }
-    OutlinedButton(onClick = controller::cancel,
-        enabled = state.phase !in setOf(ConnectionPhase.RESTORING, ConnectionPhase.SIGNING_OUT),
-        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("cancel-connect")) {
-        Text(stringResource(R.string.gate_cancel))
+    if (state.phase == ConnectionPhase.AUTHENTICATING) {
+        OutlinedButton(onClick = controller::cancel,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("cancel-connect")) {
+            Text(stringResource(R.string.gate_cancel))
+        }
     }
 }
 
