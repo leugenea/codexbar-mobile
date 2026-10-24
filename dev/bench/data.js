@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792802776872,
+  "lastUpdate": 1792802779495,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -5125,6 +5125,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/4d2aa6bfe4b35a1c745a0e675d0ee59607d975d7"
         },
         "date": 1792792808183,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7447edae1a5ec918c9f97ca59b62e5bdf0595168",
+          "message": "feat(ui): declutter the usage window card on the main screen (#183)\n\n* feat(ui): declutter the usage window card on the main screen (#182)\n\n* test(ui): assert non-null chart label before exact text check (#182)\n\n* test(ui): assert dashboard chart legend via accessibility description (#182)\n\n* fix(a11y): announce start/end for prefix-free compact axis labels (#182)",
+          "timestamp": "2026-10-24T03:45:49+03:00",
+          "tree_id": "0e846d37c98459740eb0ff951c99cdfedade1e9b",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/7447edae1a5ec918c9f97ca59b62e5bdf0595168"
+        },
+        "date": 1792802779110,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
