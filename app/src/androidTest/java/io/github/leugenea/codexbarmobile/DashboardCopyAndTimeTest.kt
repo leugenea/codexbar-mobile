@@ -164,7 +164,13 @@ class DashboardCopyAndTimeTest {
             .assert(!SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
         val capture = HistoryAcceptanceCapture(compose)
         for ((suffix, expected) in listOf("first" to first, "last" to "Jan 15, 09:00")) {
+            val description = if (suffix == "first") "Time axis start: $expected" else "Time axis end: $expected"
             val node = compose.onNodeWithTag("$tag-$suffix").performScrollTo().assertTextEquals(expected)
+                .assertContentDescriptionEquals(description)
+                .assert(!SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+            compose.onAllNodes(hasAnyAncestor(hasTestTag(tag)) and hasContentDescription(description),
+                useUnmergedTree = true).assertCountEquals(1)
+            compose.onAllNodesWithText(description, useUnmergedTree = true).assertCountEquals(0)
             assertEquals("Normal-font axis labels fit one line", 1, capture.layout(node).lineCount)
         }
     }

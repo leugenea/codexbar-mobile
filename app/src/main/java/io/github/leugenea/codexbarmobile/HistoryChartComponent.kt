@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
@@ -93,7 +94,10 @@ internal fun HistoryAxisTimes(first: Instant, last: Instant, zone: ZoneId, local
 private fun HistoryAxisTime(at: Instant, resource: Int, zone: ZoneId, locale: Locale,
     tag: String, modifier: Modifier, align: TextAlign, showPrefix: Boolean) {
     val label = chartTimeLabel(at, zone, locale)
-    Text(if (showPrefix) stringResource(resource, label) else label, modifier.testTag(tag), textAlign = align)
+    val description = stringResource(resource, label)
+    // One Text node owns the endpoint; its description replaces the bare timestamp announcement.
+    val axisModifier = if (showPrefix) modifier else modifier.semantics { contentDescription = description }
+    Text(if (showPrefix) description else label, axisModifier.testTag(tag), textAlign = align)
 }
 
 /** Shared yearless locale skeleton with the existing phone zone and repeated-hour offsets.
