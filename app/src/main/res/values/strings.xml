@@ -307,10 +307,10 @@
     <string name="history_state_invalidfact_percent">percent</string>
     <string name="history_state_invalidfact_decimal_capacity">decimal capacity</string>
     <string name="history_assumption">The nominal baseline assumes evenly distributed full quota from reset minus window duration to reset. It is analytical, not measured usage or a prediction of exhaustion.</string>
-    <string name="history_sparse">Observations are sparse; gaps, reset changes and corrections are not joined.</string>
+    <string name="history_sparse">Observations are sparse; connecting lines do not establish measurements between readings. Recorded gaps, reset changes and corrections remain in the details.</string>
     <string name="history_chart_title">%1$s · observed usage chart</string>
-    <string name="history_chart_legend">Solid line: measured observations within each run; isolated observation: short tick\nFaint short dashes: least-squares usage trend when available\nLong dashes: nominal analytical full-quota reference, not a forecast</string>
-    <string name="history_chart_counts">Measured observations: %1$d · Within-run connections: %2$d · Nominal reference lines: %3$d</string>
+    <string name="history_chart_legend">Solid line: measured observations connected in time order; single observation: short tick\nFaint short dashes: least-squares usage trend when available\nLong dashes: nominal analytical full-quota reference, not a forecast</string>
+    <string name="history_chart_counts">Measured observations: %1$d · Measured connections: %2$d · Nominal reference lines: %3$d</string>
     <string name="history_chart_percent">%1$d%%</string>
     <string name="history_chart_time_first">Time axis start: %1$s</string>
     <string name="history_chart_time_last">Time axis end: %1$s</string>
@@ -318,6 +318,7 @@
     <string name="history_chart_no_baseline">Nominal reference unavailable for this series; exact reasons are in the observation details below.</string>
     <string name="history_chart_decimal_capacity">Measured geometry unavailable: decimal rendering capacity exceeded. Exact measurements remain in the text below.</string>
     <string name="history_chart_outside_domain">Measured geometry unavailable: outside the 0–100 percent axis. Exact measurements remain in the text below; values are not clamped.</string>
+    <string name="history_chart_outside_time_domain">Measured geometry unavailable: outside the current window. Exact observations remain in the text below; times are not moved.</string>
     <string name="history_chart_underflow">A nonzero measurement is too small for approximate drawing precision. Its exact nonzero value remains in the text below.</string>
     <string name="history_navigation_title">Local usage history</string>
     <string name="history_navigation_policy">Bounded pages preserve storage admission order. Current charts select only the authoritative live period; stored text starts with the earliest retained entries. Missing or truncated history remains incomplete.</string>

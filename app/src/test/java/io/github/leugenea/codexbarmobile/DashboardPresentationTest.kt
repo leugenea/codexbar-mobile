@@ -224,7 +224,7 @@ class DashboardPresentationTest {
         assertNull(TimePresentation.chartTime(Instant.MIN, ZoneId.of("America/Los_Angeles"), Locale.US, "MMM d, HH:mm", truncateToHour = false))
     }
 
-    @Test fun compactWholeWindowLastPointEndLabelAndTrendReachLatestObservationBeyond32() {
+    @Test fun compactWholeWindowMapsAllObservationsBeyond32BetweenWindowStartAndReset() {
         val start = Instant.parse("2027-01-15T01:00:00Z")
         val reset = Instant.parse("2027-01-15T05:00:00Z")
         val observations = List(320) { index ->
@@ -236,16 +236,16 @@ class DashboardPresentationTest {
         val last = observations.last().observedAt!!
         assertEquals(320, series.samples.size)
         assertEquals(last, series.samples.last().measured!!.source.observedAt)
-        assertEquals(start, series.measuredDomain!!.time.first)
-        assertEquals(last, series.measuredDomain.time.last)
-        assertEquals("Jan 15, 03:00", TimePresentation.chartTime(series.measuredDomain.time.last, ZoneOffset.UTC, Locale.US, "MMM d, HH:mm"))
+        assertEquals(reset.minusSeconds(18000), series.measuredDomain!!.time.first)
+        assertEquals(reset, series.measuredDomain.time.last)
+        assertEquals("Jan 15, 05:00", TimePresentation.chartTime(series.measuredDomain.time.last, ZoneOffset.UTC, Locale.US, "MMM d, HH:mm"))
         val drawing = historyChartDrawing(series)
         assertEquals(319, drawing.measured.size)
         assertTrue(drawing.isolated.isEmpty())
-        assertEquals(1.0, drawing.observations.last().x, 0.0)
+        assertEquals(0.2 + 9570.0 / 18000.0, drawing.observations.last().x, 1e-12)
         assertEquals(0.0, drawing.trend!!.start.x, 0.0)
         assertEquals(1.0, drawing.trend.end.x, 0.0)
-        assertEquals(0.7975, drawing.trend.end.y, 1e-12)
+        assertEquals(1.2, drawing.trend.end.y, 1e-12)
         val reference = series.references.single()
         assertEquals(0.0, (reference.start as PlotPosition.Available).x, 0.0)
         assertEquals(1.0, (reference.end as PlotPosition.Available).x, 0.0)

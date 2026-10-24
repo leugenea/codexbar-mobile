@@ -31,7 +31,7 @@ data class HistoryEvictionCutoff(val ordinal: Long) {
 /**
  * Bounded, detached, ascending-ordinal, single-partition snapshot. Segment starts refer to
  * actual observations, including when the first point of a segment was evicted or paged out.
- * A graph must not join across segment IDs or manufacture that missing first point.
+ * Segment IDs preserve provenance; charts may connect shown points, never manufacture a missing one.
  * Content describes this page only; EMPTY is independent of baseline availability.
  */
 class HistoryReadSnapshot(

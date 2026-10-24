@@ -4,6 +4,7 @@ EXPECTED_DASHBOARD_JVM = {
         "metadataTicksReuseWholeWindowGraphAndDrawingInputsWhileKeepingLiveMetadataAndPaceCurrent",
         "changedPageQueryGenerationPartitionRequestAndSelectionRebuildWholeWindowInputs",
         "cachedCurrentInputsNeverBypassPeriodOrDisplayRevocation",
+        "changedWindowBoundsInvalidateCachedGeometryWithoutChangingTheRetainedPage",
     },
     "io.github.leugenea.codexbarmobile.DashboardPresentationTest": {
         "compactChartEquivalentUsesOriginalExactFactsAndIndependentReferences",
@@ -15,7 +16,7 @@ EXPECTED_DASHBOARD_JVM = {
         "paceLineNearZeroAndAdjacentBoundaryValuesNeverShowSignedZero",
         "paceLineKeepsOneDecimalAndLocaleSeparator",
         "compactPaceBeyondFirst32ObservationsMatchesAcceptedHeadlineAndClock",
-        "compactWholeWindowLastPointEndLabelAndTrendReachLatestObservationBeyond32",
+        "compactWholeWindowMapsAllObservationsBeyond32BetweenWindowStartAndReset",
         "compactPaceKeepsIndependentlyAgingFiveHourAndWeeklyObservationsSeparate",
         "compactPaceNeverFallsBackWhenAcceptedComparisonIsMissingOrIneligible",
         "chartTimeLabelsUseYearlessLocalePatternsAndContainingHour",
@@ -128,7 +129,7 @@ EXPECTED_BANKED_TABLE_ROWS = [
 ]
 
 EXPECTED_COMPACT_LEGEND = (
-    "Solid line: measured observations within each run; isolated observation: short tick\n"
+    "Solid line: measured observations connected in time order; single observation: short tick\n"
     "Faint short dashes: least-squares usage trend when available\n"
     "Long dashes: nominal analytical full-quota reference, not a forecast"
 )
@@ -143,4 +144,4 @@ EXPECTED_CURRENT_HOST = {"context": "MATCH", "selection": "MATCH", "periods": "M
 
 # Literal review budgets, independently checked against the enumerated sets.
 EXPECTED_DASHBOARD_NATIVE_COUNT = 17
-EXPECTED_DASHBOARD_JVM_COUNT = 26
+EXPECTED_DASHBOARD_JVM_COUNT = 27

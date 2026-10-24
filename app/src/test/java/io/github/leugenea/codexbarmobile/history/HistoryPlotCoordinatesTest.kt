@@ -93,7 +93,8 @@ class HistoryPlotCoordinatesTest {
         val beyond = BigDecimal("0." + "1".repeat(1025))
         assertEquals(PlotPosition.Unavailable(PlotRenderProblem.DECIMAL_CAPACITY),
             HistoryPlotCoordinates.position(domain, at, beyond))
-        assertThrows(IllegalArgumentException::class.java) { HistoryPlotCoordinates.position(domain, at.plusNanos(1), BigDecimal.ZERO) }
+        assertEquals(PlotPosition.Unavailable(PlotRenderProblem.OUTSIDE_TIME_DOMAIN),
+            HistoryPlotCoordinates.position(domain, at.plusNanos(1), BigDecimal.ZERO))
     }
 
     @Test fun exactComparisonCanSurviveItsOwnRenderCapacityAndCannotBecomeAZeroDelta() {

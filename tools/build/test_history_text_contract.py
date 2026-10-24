@@ -109,7 +109,7 @@ class HistoryTextContracts(unittest.TestCase):
                     metadata["pixelSamples"] = self.assembled_samples(ASSEMBLED_COUNTS[name])
                     metadata["compactLegend"] = dict(
                         plotTag="history-chart-five-hour-plot",
-                        legendDescription=("Solid line: measured observations within each run; isolated observation: short tick\n"
+                        legendDescription=("Solid line: measured observations connected in time order; single observation: short tick\n"
                                            "Faint short dashes: least-squares usage trend when available\n"
                                            "Long dashes: nominal analytical full-quota reference, not a forecast"),
                         visibleLegendCount=0, hiddenFromAccessibility=False)
@@ -151,9 +151,9 @@ class HistoryTextContracts(unittest.TestCase):
     @staticmethod
     def assembled_samples(counts):
         samples = []
-        for kind, count in zip(("observation", "edge", "dash", "break"), (counts[0], counts[1], counts[2] * 56, counts[3])):
+        for kind, count in zip(("observation", "edge", "dash", "bridge"), (counts[0], counts[1], counts[2] * 56, counts[3])):
             for index in range(count):
-                matched = kind != "break" and (kind != "dash" or index < 28)
+                matched = kind != "dash" or index < 28
                 samples.append(dict(kind=kind, x=1, y=1, targetArgb=-16777216 if matched else -1,
                                     actualArgb=-16777216, matched=matched))
         return samples

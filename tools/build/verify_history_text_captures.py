@@ -32,7 +32,7 @@ CHART_CAPTURES = {
 CHART_COUNTS = {
     "history-chart-reference-portrait-light": (1, 0, 1),
     "history-chart-measured-portrait-dark": (4, 3, 0),
-    "history-chart-gap-landscape-dark": (4, 2, 0),
+    "history-chart-gap-landscape-dark": (4, 3, 0),
     "history-chart-unknown-large-font": (1, 0, 0),
     "history-chart-measured-landscape-light": (4, 3, 0),
     "history-chart-invalid-portrait-light": (0, 0, 0),
@@ -83,8 +83,8 @@ ASSEMBLED_CONTROLS = {
 }
 ASSEMBLED_COUNTS = {
     "history-assembled-single-portrait-dark": (1, 0, 1, 0),
-    "history-current-light-portrait": (5, 2, 2, 2),
-    "history-current-dark-portrait": (5, 2, 2, 2),
+    "history-current-light-portrait": (5, 4, 2, 2),
+    "history-current-dark-portrait": (5, 4, 2, 2),
 }
 CAPTURES.update(ASSEMBLED_CAPTURES)
 
@@ -385,7 +385,7 @@ def verify_sample(item: dict, actual: int) -> None:
     matched = all(abs(((actual >> shift) & 255) - ((target >> shift) & 255)) <= 12 for shift in (0, 8, 16))
     if type(item.get("actualArgb")) is not int or item["actualArgb"] != actual or item.get("matched") is not matched:
         raise ValueError("Assembled sample receipt disagrees with decoded PNG pixels")
-    required = {"observation": True, "edge": True, "break": False, "dash": matched}
+    required = {"observation": True, "edge": True, "bridge": True, "dash": matched}
     if item.get("kind") not in required or matched != required[item["kind"]]:
         raise ValueError("Assembled native paint oracle failed")
 
@@ -396,7 +396,7 @@ def verify_assembled_pixels(metadata: dict, name: str, image: bytes) -> None:
     if any(type(metadata.get(key)) is not int or metadata[key] != value for key, value in zip(keys, counts)):
         raise ValueError("Assembled drawing identities/counts changed")
     samples = metadata.get("pixelSamples")
-    expected = dict(zip(("observation", "edge", "dash", "break"), (counts[0], counts[1], counts[2] * 56, counts[3])))
+    expected = dict(zip(("observation", "edge", "dash", "bridge"), (counts[0], counts[1], counts[2] * 56, counts[3])))
     if not isinstance(samples, list) or not samples or len(samples) > 512 or any(not isinstance(item, dict) for item in samples):
         raise ValueError("Missing/bounded assembled PNG sample evidence")
     observed = {kind: sum(item.get("kind") == kind for item in samples) for kind in expected}
@@ -463,7 +463,7 @@ def verify_assembled_metadata(metadata: dict, name: str, size: tuple[int, int], 
 
 
 def verify_assembled_compact_legend(metadata: dict) -> None:
-    legend = ("Solid line: measured observations within each run; isolated observation: short tick\n"
+    legend = ("Solid line: measured observations connected in time order; single observation: short tick\n"
               "Faint short dashes: least-squares usage trend when available\n"
               "Long dashes: nominal analytical full-quota reference, not a forecast")
     expected = dict(plotTag="history-chart-five-hour-plot", legendDescription=legend,
@@ -612,7 +612,7 @@ def verify_dashboard_compact_copy(metadata: dict, kind: str, font: float) -> Non
         return
     copy = metadata.get("compactCopy")
     first = "Jan 8, 09:00" if kind == "WEEKLY" else "Jan 15, 04:00"
-    legend = ("Solid line: measured observations within each run; isolated observation: short tick\n"
+    legend = ("Solid line: measured observations connected in time order; single observation: short tick\n"
               "Faint short dashes: least-squares usage trend when available\n"
               "Long dashes: nominal analytical full-quota reference, not a forecast")
     expected = dict(updated="Updated Jan 15, 08:37", first=first, last="Jan 15, 09:00",

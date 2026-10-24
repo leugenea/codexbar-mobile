@@ -22,7 +22,9 @@ internal object HistoryPlotCoordinates {
         if (value < BigDecimal.valueOf(range.minimum.toLong()) || value > BigDecimal.valueOf(range.maximum.toLong())) {
             return PlotPosition.Unavailable(PlotRenderProblem.OUTSIDE_VALUE_DOMAIN)
         }
-        require(at >= domain.time.first && at <= domain.time.last)
+        if (at < domain.time.first || at > domain.time.last) {
+            return PlotPosition.Unavailable(PlotRenderProblem.OUTSIDE_TIME_DOMAIN)
+        }
         val approximate = value.toDouble()
         val y = (approximate - range.minimum) / (range.maximum.toDouble() - range.minimum)
         val detail = if (value.signum() != 0 && approximate == 0.0) PlotRenderDetail.NONZERO_UNDERFLOW

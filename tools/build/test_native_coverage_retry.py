@@ -97,8 +97,8 @@ class RetryContracts(unittest.TestCase):
                                                    self.identity, 7000)
 
     def test_synthetic_reports_keep_all_required_jvm_and_native_cases(self):
-        for kind, relative, count in (("jvm", "test-results/testDebugUnitTest", 111),
-                                      ("native", "outputs/androidTest-results/connected", 153)):
+        for kind, relative, count in (("jvm", "test-results/testDebugUnitTest", 118),
+                                      ("native", "outputs/androidTest-results/connected", 154)):
             with self.subTest(kind=kind):
                 self.assertEqual(verify_reports(self.build / relative, kind)["testCount"], count)
 
@@ -295,7 +295,7 @@ class RetryContracts(unittest.TestCase):
         self.assertEqual(HISTORY_CHART_CASES, RETAINED_CHART_CASES)
         path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
         cases = list(ET.parse(path).getroot().iter("testcase"))
-        self.assertEqual(len(cases), 153)
+        self.assertEqual(len(cases), 154)
         for classname, expected in ((HISTORY_TEXT_CLASS, RETAINED_TEXT_CASES),
                                     (HISTORY_CHART_CLASS, RETAINED_CHART_CASES)):
             self.assertEqual({case.get("name") for case in cases if case.get("classname") == classname}, expected)

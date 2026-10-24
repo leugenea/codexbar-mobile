@@ -292,9 +292,8 @@ that is non-increasing, same-epoch non-increasing/unavailable monotonic time, or
 wall/monotonic delta disagreement **>5 seconds** split continuity. Durations are compared
 without conversion to overflowing nanosecond/millisecond scalars. A fresh `ClockEpoch`
 splits by default; monotonic values are **never subtracted across epochs**. Multiple
-applicable break reasons are retained on immutable segment-start metadata. Graphs must
-not join different segment IDs, including after pagination or retention removes the
-segment's first real point. No artificial start/reset/endpoints or forward-filled points
+applicable break reasons are retained on immutable segment-start metadata. Segment IDs retain provenance even after pagination or retention removes the
+segment's first real point; issue 184 charts connect the shown points across these runs. No artificial start/reset/endpoints or forward-filled points
 are admitted.
 
 Baseline availability is orthogonal to measured history. `NominalStartConfidence` says
@@ -603,9 +602,9 @@ Fixed synthetic examples (same values in the literal JVM oracles):
 A late first measurement stays at its actual `observedAt`. Evaluating analytical
 endpoints or later Clock ticks never adds/moves measured points or advances an earlier
 delta: `compare` has **no now/tick argument**. Empty history stays empty. Graph consumers
-must keep the descriptor separate from measured points and must not join distinct
+must keep the descriptor separate from measured points and retain distinct
 segment IDs, even for the same canonical window or a retained/paginated segment whose
-origin is absent. Five-hour/weekly and same-kind reset changes stay independent; a
+origin is absent; the issue 184 renderer connects shown measurements across those runs. Five-hour/weekly and same-kind reset changes stay independent; a
 correction's uncertain start is never replaced with its first visible point. Reset
 cause stays UNKNOWN. Banked summary, inventory and expiry are not inputs to this API;
 they cannot reset a reference or establish rollover/manual activation.
@@ -681,7 +680,7 @@ math. The snapshot is detached and immutable, with:
 - The original `HistoryReadSnapshot`: entries, high-water, next-after/has-more, EMPTY /
   STATUS_ONLY / MEASUREMENTS content, retention truncation and ordinal eviction cutoffs.
   All page gap entries survive window selection. Actual points retain admission order even
-  for backwards wall time; consumers never sort away a discontinuity or join segment IDs.
+  for backwards wall time; the chart orders paint by time without rewriting discontinuities.
 - Each selected `HistoryGraphWindow` retains its immutable source facts, segment/window
   identity, break reasons, UNKNOWN reset cause, typed baseline eligibility and nominal-start
   confidence; `EvenDistribution.reference` / `compare` supply separate analytical reference
@@ -803,12 +802,12 @@ cases, dependencies, permissions and the coverage denominator/threshold are reta
 that unchanged textual equivalent; the caller supplies a detached page, B1 locale/
 zone/evaluation context and scrolling. Its optional kind selector keeps reusable
 both-kind rendering available while the production connection view shows one kind.
-`HistoryChartDrawing` maps only supplied runs into solid measured lines, without
-point markers. A single-observation run remains a minimal line-width tick. Separate
+`HistoryChartDrawing` maps all shown renderable points into one time-ordered solid
+measured polyline, without point markers. A single observation remains a minimal line-width tick. Separate
 nominal analytical endpoints retain long dashes; a least-squares usage trend uses
 semi-transparent short dashes, never measured endpoints or a forecast.
 Shape/line-style labels do not rely on color alone. No smoothing, clamping, fake
-measured start/reset point, sorting, quota calculation or cross-page cache is added.
+measured start/reset point, quota calculation or cross-page cache is added; sorting is paint-only.
 
 The fixed percent axis and B1 containing-hour time-domain labels wrap outside the
 Canvas; localized source timestamps, reset context, original measurements and
@@ -820,7 +819,7 @@ with no duplicated exact-value announcement or countdown live region.
 
 Seven deterministic `HistoryChartDrawingTest` cases cover drawing roles and boundary
 preservation. Eight mandatory `HistoryChartComponentTest` cases exercise production
-Canvas pixels, dashed gaps, singleton-tick/straight-edge visibility, absent run bridges,
+Canvas pixels, dashed gaps, singleton-tick/straight-edge visibility, continuous run bridges,
 labels/semantics/layout and reachable details across phone portrait/landscape,
 light/dark and doubled font scale. Six synthetic chart PNGs extend the existing
 collector without removing its four textual PNGs or 85 inherited native identities.
@@ -885,7 +884,7 @@ selected-page cursors; mode/current-key changes reset the cursor. Current kind c
 key; stored-text kind changes preserve the original ordinal cursor. There is no
 page stack or accumulated history. Current chart projection reuses the existing
 EvenDistribution, plot inputs, renderer and phone-local time labels, preserving
-actual within-run solid lines/singleton ticks and eligible dashed analytical references.
+a continuous measured polyline/singleton tick and eligible dashed analytical references.
 
 Selection and detail state are in-memory `remember`, not Bundle/saved snapshots.
 The recorder's one volatile display-context slot replaces its private Binding
@@ -1026,7 +1025,7 @@ an assertion that a newly authored test or screenshot has already passed:
 | Original criterion | Inherited source and evidence contract | Missing assembled evidence supplied by #83 |
 | --- | --- | --- |
 | Actual measurements versus even-distribution baseline, with units/reset context | `EvenDistribution` and `HistoryPlotInputs` preserve exact observed-only comparisons and separate analytical endpoints; `HistoryChartDrawing` and chart/text components label percent versus percentage points and reuse B1 reset formatting. `EvenDistributionTest`, `HistoryPlotInputsTest`, `HistoryChartDrawingTest`, `HistoryTextPresentationTest` and component native cases retain their deterministic, layout, semantics and actual-pixel oracles. | `freshInstallAndSingleObservationExposeNoInventedTrendAndObservedOnlySignedDeltas` requires a real-entry single marker, painted dashed reference plus unpainted dash gaps, exact negative/zero/positive observed-only deltas, UTC observation/reset facts and both window selections. |
-| Fresh installs and sparse/unknown history remain truthful; no fake trend | Pure plot tests and native component cases distinguish no/empty/status-only/single/multiple pages, unknown baseline/geometry, and breaks. Navigation/isolation tests retain bounded pagination, storage loss/retention and independent endpoint errors. | Fresh entry has unavailable facts, no Canvas, no detail/zero and no requests. `sparseGapCorrectionAndChangedResetRemainSeparatedInActualLandscapeDarkPixelsAndDetails` preserves reachable expired gap/correction/reset text with no archived Canvas. The current light/dark campaign above verifies five markers, two solid edges and two unpainted boundaries for the authoritative period. `unknownResetAndUnknownPercentAtActualLargeFontKeepCompleteAccessibleFactsAndReachableControls` preserves the unkeyed known point and unknown-percent facts as stored text, with no current or archived Canvas/zero. `truncatedPageLandscapeLightKeepsHonestLocalCursorAndEveryBoundedDetailReachable` requires explicit more-page copy, exclusive cursor 32, only ordinals 33..35, all three reachable entries, disabled terminal controls and unchanged admission high-water. |
+| Fresh installs and sparse/unknown history remain truthful; no fake trend | Pure plot tests and native component cases distinguish no/empty/status-only/single/multiple pages, unknown baseline/geometry, and breaks. Navigation/isolation tests retain bounded pagination, storage loss/retention and independent endpoint errors. | Fresh entry has unavailable facts, no Canvas, no detail/zero and no requests. `sparseGapCorrectionAndChangedResetRemainSeparatedInActualLandscapeDarkPixelsAndDetails` preserves reachable expired gap/correction/reset text with no archived Canvas. The current light/dark campaign above verifies five observations, four solid edges and two painted run bridges for the authoritative period. `unknownResetAndUnknownPercentAtActualLargeFontKeepCompleteAccessibleFactsAndReachableControls` preserves the unkeyed known point and unknown-percent facts as stored text, with no current or archived Canvas/zero. `truncatedPageLandscapeLightKeepsHonestLocalCursorAndEveryBoundedDetailReachable` requires explicit more-page copy, exclusive cursor 32, only ordinals 33..35, all three reachable entries, disabled terminal controls and unchanged admission high-water. |
 | Hosted phone layout/theme/readability/accessibility | Ten inherited synthetic reusable-component captures establish their component scopes, not integrated reachability; two inherited production-entry captures establish basic navigation. All owner/query/lifecycle/privacy adversaries remain required, not duplicated here. | Four new mandatory native methods add five representative real-entry viewports: fresh portrait/light, single portrait/dark, gap/correction/reset landscape/dark, unknown portrait/light at effective font scale 2, and bounded-page landscape/light. Native text-layout complete-line/ellipsis/extent checks, full versus independently clipped bounds, root containment, hidden decorative Canvas, exact-fact ownership and click/reachable-control assertions accompany them. Actual effective resource configuration is checked against native text-layout density/font scale, not inferred from filenames/requested settings. |
 
 The phone fixture changes hosted night/font settings and restores them on failure;
@@ -1043,7 +1042,7 @@ images, observed API/configuration, exact owner/page/request identities, per-fil
 hashes and checkout/source-head/run/attempt provenance. The assembled single and
 two current Canvas captures retain independent unclipped/clipped bounds; registered Bitmap pixel samples
 are compared again with bounded decoded RGB/RGBA PNG pixels on the host, so metadata or
-filenames alone cannot establish painted markers/edges, absent bridges or dash gaps.
+filenames alone cannot establish painted observations/edges, run bridges or dash gaps.
 Explicitly synthetic parser controls reject omitted/failed/errored/skipped methods,
 missing images, configuration drift, clipping, false paint receipts and changed PNG pixels.
 
@@ -1192,42 +1191,54 @@ compatible whole-handwritten>=90% INSTRUCTION union and APK acceptance are pendi
 until their exact candidate evidence is independently reviewed. No signed-release,
 live-provider or merge approval follows from source/static tooling.
 
-## Whole-window solid charts and linear trend (issue 174)
+## Continuous full-window charts and linear trend (issues 174, 184)
 
-Both compact and shared detail chart drawing connect consecutive observations with
-solid 2dp lines only within existing runs. There are no point markers. An isolated
-run uses a 2dp-long, 2dp-wide round-capped tick so a real lone measurement remains
-visible. The accessible legend distinguishes solid measured usage, faint short-dashed
-least-squares trend and the existing long-dashed nominal full-quota reference.
+Compact and shared detail chart drawing now connects every shown renderable measurement
+in timestamp order with one solid 2dp polyline, including gaps/corrections and different
+measurement runs. Original admission order, segment IDs, break reasons, measurements,
+comparison eligibility and exact textual facts remain unchanged in the pure projection;
+those runs now describe provenance rather than paint breaks. No cross-page accumulation,
+fake measured endpoints, interpolation, smoothing or point markers are introduced. A
+single measured point remains a minimal 2dp-long, 2dp-wide round-capped tick with no trend.
 
-`HistoryTrend` is pure Kotlin ordinary least squares over all renderable observations
-in the displayed series, fitting used percent against actual time, not ordinal index.
-Affine-normalized plot coordinates yield the same fit. Centered covariance/variance
-avoid large timestamp squares; repeated times contribute independently. Fewer than
-two points or zero time spread have no trend. The line spans only the earliest/latest
-observation, is painted at 45% opacity with 4dp/4dp dashes and clipped to the percent
-plot. Its analytical fit may span measured run breaks; solid lines never do.
+For one known usable window, the shared x domain is reset minus its SI-second duration
+through the exact reset, independent of the measured range, point count or availability
+of a nominal reference/pace comparison. Axis labels reuse B1's containing-hour format,
+phone zone/locale and repeated-hour offsets. Points remain at their proportional actual
+times. An authoritative current key always fixes the axis; any out-of-window observations
+keep typed unavailable geometry and exact text, never moved times or an expanded axis.
+Unknown/mixed bounds, unrepresentable starts and unscoped legacy observations outside a
+candidate's interval retain the existing points/reference-range fallback; singleton
+fallbacks use horizontal center. Empty history never becomes an analytical-only chart.
+This also gives keyed singletons without baseline eligibility a full-window axis.
 
-Compact Current requests now select all matching retained entries rather than 32.
-The same joint ascending scan, native batches<=256, initial high-water and 100000
-examined-entry ceiling remain. Space/time are O(retention ceiling), with at most
-100000 selected entry references per window; no downsampling, fake points, retention,
-SQLite port/schema or provider cadence change. Latest-admitted-entry provenance remains
-separate for pace (including status-only/latest-ineligible facts). Detail Page requests
-and their 32-entry ordinal pagination are unchanged.
+`HistoryTrend` fits ordinary least squares over all shown renderable observations,
+using actual time rather than ordinal spacing. Affine-normalized coordinates and centered
+covariance/variance preserve the fit without large timestamp squares. Fewer than two
+points or zero x spread have no trend. The fit extends across the entire plot domain
+(0..1, window start..reset when known) with 45% opacity and 4dp/4dp dashes. The existing
+Canvas plot rectangle clips the trend to 0..100 percent; endpoints are not clamped and
+the fit is not recomputed from clipped points. Nominal long-dashed references remain
+separate analytical descriptors, not forecasts or measured points.
 
-For multiple compact observation times, the axis spans the earliest/latest real
-measurement, so the last label and trend cannot stop at the first page. Eligible nominal
-references are analytically evaluated at their intersection with that visible span;
-no measured point changes. Single-time compact series retain existing nominal context.
-Detail components retain their original page-local domain. JVM regressions cover 640
-selected rows across native-sized batches and 320 observations through the compact
-projection, axis end and trend. Eight pure fit cases cover empty/single/two points,
-identical times, flat/rising/falling usage and vertical spread/axis overshoot. Existing
-native cases add no-marker and translucent dashed-trend pixel checks and whole-window
-production assertions without adding Activity campaigns. Capture receipts count
-observations, not rendered markers; exact report registries and synthetic budgets are
-updated. Native captures, Kotlin execution and compatible coverage still require CI.
+Current requests continue selecting all matching retained entries, with the same joint
+ascending scan, native batches<=256, initial high-water and 100000 examined-entry ceiling.
+No downsampling, schema/retention change or provider cadence change is introduced.
+Latest-admitted-entry provenance remains separate for #177 pace; detail Page requests
+and their 32-entry ordinal pagination are unchanged. #179's per-window cache still keys
+on retained page identity, generation, partition, query, request and selection: window
+duration/reset are immutable members of those keys, not new clock-tick inputs. Authority
+and latest-entry pace are checked outside the cache on every host pass.
+
+JVM regressions cover continuous edges across runs, time ordering, interior/full-window
+mapping, unknown-bound fallback, a keyed singleton with unavailable baseline, full-domain
+OLS endpoints and unchanged snapshot/cache/pace authority. Native source contracts add an
+actual dashboard singleton with full-window labels and tick pixels, positive run-bridge
+pixels and full-window translucent trend extension/clipping. Capture identities remain;
+connection counts and positive bridge receipts deliberately replace negative gap receipts.
+Mandatory report/retry registries and literal budgets are updated. Native execution,
+Kotlin compilation, lint, compatible >=90% coverage and actual-image review remain hosted
+acceptance gates, not claims established by quick static tooling.
 
 ## Simplified usage window cards (issue 173)
 

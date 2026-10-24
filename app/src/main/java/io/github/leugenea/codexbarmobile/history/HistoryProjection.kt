@@ -79,7 +79,8 @@ internal class HistoryDisplayPermission(
 /**
  * Detached bounded facts with nonpersistable, independently revocable display permission.
  * The facts are immutable; permission is not. A saved snapshot cannot authorize a retired login.
- * Keep analytical descriptors apart from actual points and never join different segment IDs.
+ * Keep analytical descriptors apart from actual points; segment IDs retain provenance.
+ * The chart renderer may connect shown measurements across runs, never across snapshots.
  */
 internal class HistoryGraphSnapshot(
     val readiness: HistoryReadiness = HistoryReadiness.UNAVAILABLE,

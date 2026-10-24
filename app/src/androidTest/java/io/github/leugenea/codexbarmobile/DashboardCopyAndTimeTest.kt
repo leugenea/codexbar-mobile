@@ -155,7 +155,7 @@ class DashboardCopyAndTimeTest {
     }
 
     private fun assertCompactChartCopy(tag: String, first: String) {
-        val legend = "Solid line: measured observations within each run; isolated observation: short tick\n" +
+        val legend = "Solid line: measured observations connected in time order; single observation: short tick\n" +
             "Faint short dashes: least-squares usage trend when available\n" +
             "Long dashes: nominal analytical full-quota reference, not a forecast"
         compose.onNodeWithTag("$tag-legend", useUnmergedTree = true).assertDoesNotExist()

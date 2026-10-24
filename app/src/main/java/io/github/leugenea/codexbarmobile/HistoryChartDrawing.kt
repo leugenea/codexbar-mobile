@@ -11,17 +11,18 @@ internal data class HistoryChartDrawing(
     val trend: HistoryChartLine? = null,
 )
 
-/** Only supplied runs authorize measured edges; a singleton gets a line-width tick.
+/** One continuous time-ordered polyline through the shown renderable measurements.
+ * Runs retain provenance, not paint breaks. A lone observation gets a line-width tick.
  * Reference endpoints never become observations. No cross-snapshot cache lives here.
  */
 internal fun historyChartDrawing(series: HistoryPlotSeries): HistoryChartDrawing {
-    val runs = series.segments.map { run -> run.points.map { chartPosition(it.position) } }
-    val observations = runs.flatten()
+    val observations = series.segments.flatMap { it.points }.sortedBy { it.source.observedAt }
+        .map { chartPosition(it.position) }
     return HistoryChartDrawing(
         observations,
-        runs.flatMap { run -> run.zipWithNext { first, last -> HistoryChartLine(first, last) } },
+        observations.zipWithNext { first, last -> HistoryChartLine(first, last) },
         series.references.map { HistoryChartLine(chartPosition(it.start), chartPosition(it.end)) },
-        runs.filter { it.size == 1 }.map { it.single() },
+        if (observations.size == 1) observations else emptyList(),
         historyTrend(observations),
     )
 }
