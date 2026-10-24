@@ -107,6 +107,12 @@ class HistoryTextContracts(unittest.TestCase):
                     metadata.update(pixelOraclePassed=True, canvasLeft=0.1, canvasTop=0.1, canvasRight=1.9, canvasBottom=1.9,
                                     canvasClippedLeft=0.1, canvasClippedTop=0.1, canvasClippedRight=1.9, canvasClippedBottom=1.9)
                     metadata["pixelSamples"] = self.assembled_samples(ASSEMBLED_COUNTS[name])
+                    metadata["compactLegend"] = dict(
+                        plotTag="history-chart-five-hour-plot",
+                        legendDescription=("Solid line: measured observations within each run; isolated observation: short tick\n"
+                                           "Faint short dashes: least-squares usage trend when available\n"
+                                           "Long dashes: nominal analytical full-quota reference, not a forecast"),
+                        visibleLegendCount=0, hiddenFromAccessibility=False)
             if name in PRODUCTION_ROUTES:
                 metadata["route"] = PRODUCTION_ROUTES[name]
             if name in ASSEMBLED_CAPTURES:

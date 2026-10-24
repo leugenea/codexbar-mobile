@@ -51,12 +51,15 @@ class DashboardCopyAndTimeTest {
     }
 
     @Test fun minutePrecisionMatchesDashboardWindowDetailsAndBankedExpiry() {
+        fixture.transport.advance(2_279_000)
         ActivityScenario.launch(MainActivity::class.java).use {
             awaitConnectionScreen(compose, owner)
             openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
             compose.onNodeWithTag("connect").performScrollTo().performClick()
             returnDashboard(compose, owner)
             await("initial usage settled") { owner.state.value.refresh.usage.success != null && !owner.state.value.refresh.refreshing }
+            assertEquals(java.time.Instant.parse("2027-01-15T08:37:59Z"), owner.state.value.refresh.usage.success!!.usage!!.observedAt)
+            compose.onNodeWithTag("dashboard-observed-at").assertTextEquals("Updated Jan 15, 08:37")
             val cases = listOf(59L to "less than a minute", 60L to "1 minute", 7500L to "2 hours 5 minutes",
                 86700L to "1 day 5 minutes", 259200L to "3 days")
             for ((seconds, duration) in cases) {
@@ -114,10 +117,12 @@ class DashboardCopyAndTimeTest {
             compose.onNodeWithTag("connect").performScrollTo().performClick()
             returnDashboard(compose, owner)
             await("initial current measurements settled") { recordedHistory(owner).points.size == 1 && !owner.state.value.refresh.refreshing }
-            val measured = "Measurement observed at (second precision): Jan 15, 2027, 8:00:00\u202fAM"
+            val measured = "Updated Jan 15, 08:00"
             compose.onNodeWithTag("dashboard-status").assertTextEquals("Last reported usage")
             compose.onAllNodesWithText(measured, useUnmergedTree = true).assertCountEquals(1)
             compose.onNodeWithTag("dashboard-observed-at").performScrollTo().assertTextEquals(measured)
+            assertCompactChartCopy("history-chart-five-hour", "Jan 15, 04:00")
+            assertCompactChartCopy("history-chart-weekly", "Jan 8, 09:00")
             val cards = hasAnyAncestor(hasTestTag("dashboard-FIVE_HOUR")) or hasAnyAncestor(hasTestTag("dashboard-WEEKLY"))
             compose.onAllNodes(cards and hasText("Measurement observed at", substring = true), useUnmergedTree = true).assertCountEquals(0)
             for (removed in listOf("Measured used percent", "Observed-only delta", "Recorded observation", "Recorded history is incomplete")) {
@@ -126,9 +131,9 @@ class DashboardCopyAndTimeTest {
             compose.onNodeWithTag("live-five-hour-reset-absolute").assertDoesNotExist()
             compose.onNodeWithTag("live-five-hour-reset-relative").assertTextEquals("Next reset in 1 hour")
             val first = compose.onNodeWithTag("history-chart-five-hour-first").performScrollTo()
-                .assertTextEquals("Time axis start: Jan 15, 04:00").fetchSemanticsNode().boundsInRoot
+                .assertTextEquals("Jan 15, 04:00").fetchSemanticsNode().boundsInRoot
             val last = compose.onNodeWithTag("history-chart-five-hour-last")
-                .assertTextEquals("Time axis end: Jan 15, 09:00").fetchSemanticsNode().boundsInRoot
+                .assertTextEquals("Jan 15, 09:00").fetchSemanticsNode().boundsInRoot
             assertTrue("Start is left of end", first.right <= last.left)
             assertEquals("Time labels share one row", first.top, last.top, 0f)
             assertTrue("Time labels are below the chart", compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true)
@@ -146,6 +151,27 @@ class DashboardCopyAndTimeTest {
                 }
                 pace.performScrollTo().assertTextEquals(label)
             }
+        }
+    }
+
+    private fun assertCompactChartCopy(tag: String, first: String) {
+        val legend = "Solid line: measured observations within each run; isolated observation: short tick\n" +
+            "Faint short dashes: least-squares usage trend when available\n" +
+            "Long dashes: nominal analytical full-quota reference, not a forecast"
+        compose.onNodeWithTag("$tag-legend", useUnmergedTree = true).assertDoesNotExist()
+        compose.onAllNodesWithText(legend, useUnmergedTree = true).assertCountEquals(0)
+        compose.onNodeWithTag("$tag-plot").assertContentDescriptionEquals(legend)
+            .assert(!SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+        val capture = HistoryAcceptanceCapture(compose)
+        for ((suffix, expected) in listOf("first" to first, "last" to "Jan 15, 09:00")) {
+            val description = if (suffix == "first") "Time axis start: $expected" else "Time axis end: $expected"
+            val node = compose.onNodeWithTag("$tag-$suffix").performScrollTo().assertTextEquals(expected)
+                .assertContentDescriptionEquals(description)
+                .assert(!SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
+            compose.onAllNodes(hasAnyAncestor(hasTestTag(tag)) and hasContentDescription(description),
+                useUnmergedTree = true).assertCountEquals(1)
+            compose.onAllNodesWithText(description, useUnmergedTree = true).assertCountEquals(0)
+            assertEquals("Normal-font axis labels fit one line", 1, capture.layout(node).lineCount)
         }
     }
 

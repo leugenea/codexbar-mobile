@@ -38,6 +38,7 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
         observer.hold()
         try {
             awaitRenderedSource(fixture.owner)
+            val compactCopy = if (kind != null) compactCopy(kind) else JSONObject.NULL
             val observed = compose.onNodeWithTag(label)
             val layouts = HistoryAcceptanceCapture(compose).layout(if (name == "dashboard-drawer-portrait-dark") observed else observed.performScrollTo())
             val observedLabel = observed.fetchSemanticsNode().config[SemanticsProperties.TestTag]
@@ -57,7 +58,7 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
                     .put("requests", fixture.transport.requests.get()).put("gets", fixture.transport.gets.get())
                     .put("layoutLabel", observedLabel).put("layoutFontScale", layouts.layoutInput.density.fontScale)
                     .put("layoutDensity", layouts.layoutInput.density.density)
-                    .put("sourceKind", kind?.name ?: "NONE")
+                    .put("sourceKind", kind?.name ?: "NONE").put("compactCopy", compactCopy)
                 val config = frame.configuration
                 data.put("orientation", config.orientation).put("fontScale", config.fontScale)
                     .put("density", frame.density).put("renderedLocale", config.locales[0].toLanguageTag())
@@ -180,6 +181,23 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
 
     private fun text(tag: String, unmerged: Boolean = false): String = compose.onNodeWithTag(tag, useUnmergedTree = unmerged)
         .fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
+
+    // Observed semantics/layout receipt; the header need not be visible in the saved chart viewport.
+    private fun compactCopy(kind: WindowKind): JSONObject {
+        val tag = if (kind == WindowKind.WEEKLY) "history-chart-weekly" else "history-chart-five-hour"
+        val layout = HistoryAcceptanceCapture(compose)
+        val data = JSONObject().put("updated", text("dashboard-observed-at"))
+        for (suffix in listOf("first", "last")) {
+            val result = layout.label("$tag-$suffix")
+            data.put(suffix, result.layoutInput.text.text).put("${suffix}LineCount", result.lineCount)
+        }
+        val plot = compose.onNodeWithTag("$tag-plot").fetchSemanticsNode()
+        assertFalse(plot.config.contains(SemanticsProperties.HideFromAccessibility))
+        val legend = plot.config[SemanticsProperties.ContentDescription].single()
+        val visibleLegend = compose.onAllNodes(hasTestTag("$tag-legend") or hasText(legend), useUnmergedTree = true)
+            .fetchSemanticsNodes().size
+        return data.put("legendDescription", legend).put("visibleLegendCount", visibleLegend)
+    }
 
     private fun bankedTableRows(): JSONArray = JSONArray((0..2).map { index ->
         val tag = "banked-disclosure-item-$index"

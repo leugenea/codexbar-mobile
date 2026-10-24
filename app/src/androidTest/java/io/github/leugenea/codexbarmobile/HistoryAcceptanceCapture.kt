@@ -115,7 +115,26 @@ internal class HistoryAcceptanceCapture(private val compose: ComposeTestRule) {
         return data
     }
 
+    // Compact charts expose the exact explanation on the plot, not a visible text label.
+    private fun compactLegend(): JSONObject {
+        val tag = "history-chart-five-hour"
+        val legend = "Solid line: measured observations within each run; isolated observation: short tick\n" +
+            "Faint short dashes: least-squares usage trend when available\n" +
+            "Long dashes: nominal analytical full-quota reference, not a forecast"
+        val plot = compose.onNodeWithTag("$tag-plot").assertIsDisplayed().assertContentDescriptionEquals(legend)
+            .fetchSemanticsNode()
+        val hidden = plot.config.contains(SemanticsProperties.HideFromAccessibility)
+        assertFalse("The plot's legend explanation must remain accessible", hidden)
+        val visible = compose.onAllNodes(hasTestTag("$tag-legend") or hasText(legend), useUnmergedTree = true)
+        visible.assertCountEquals(0)
+        return JSONObject().put("plotTag", "$tag-plot")
+            .put("legendDescription", plot.config[SemanticsProperties.ContentDescription].single())
+            .put("visibleLegendCount", visible.fetchSemanticsNodes().size).put("hiddenFromAccessibility", hidden)
+    }
+
     private fun chart(data: JSONObject, bitmap: Bitmap, fixture: HistoryNavigationFixture) {
+        assertEquals("Compact legend receipt belongs only to the dashboard", "DASHBOARD", data.getString("route"))
+        data.put("compactLegend", compactLegend())
         val node = compose.onNodeWithTag(canvasTag, useUnmergedTree = true).assertIsDisplayed().fetchSemanticsNode()
         assertTrue(node.config.contains(SemanticsProperties.HideFromAccessibility))
         val bounds = contained(node, Rect(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat()))

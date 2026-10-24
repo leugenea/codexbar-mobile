@@ -219,7 +219,7 @@ class HistoryAssembledAcceptanceTest {
     private fun chartLabels() {
         compose.onNodeWithTag("$five-pace").assertTextEquals("67.6% in reserve")
         assertCurrentDrawing(recordedHistory(fixture.owner), 1, 0, 1)
-        listOf("$five-title", "$five-legend", "$five-pace", "$five-first", "$five-last").forEach(capture::label)
+        listOf("$five-title", "$five-pace", "$five-first", "$five-last").forEach(capture::label)
         compose.onNodeWithTag("$five-canvas", useUnmergedTree = true).assert(
             SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility))
     }

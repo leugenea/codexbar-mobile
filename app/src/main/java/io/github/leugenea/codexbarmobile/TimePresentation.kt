@@ -155,15 +155,18 @@ object TimePresentation {
         null
     }
 
-    /** Yearless chart label using the platform's locale-aware MMMdHHmm skeleton pattern.
-     * Like reset labels, displays the containing hour and preserves repeated-hour offsets.
+    /** Yearless label using the platform's locale-aware MMMdHHmm skeleton pattern.
+     * Axes default to the containing hour. Observation headers disable truncateToHour
+     * to retain the source minute, flooring seconds/nanos without rounding up.
+     * Both preserve the existing repeated-hour offset policy and original source instant.
      * The pattern is injected so pure JVM tests need no Android formatting implementation.
      */
-    fun chartTime(target: Instant, zone: ZoneId, locale: Locale, pattern: String): String? = try {
+    fun chartTime(target: Instant, zone: ZoneId, locale: Locale, pattern: String, truncateToHour: Boolean = true): String? = try {
         val absolute = absolute(target, zone, locale)
         absolute?.let {
-            val hour = target.atZone(zone).toLocalDateTime().withMinute(0).withSecond(0).withNano(0)
-            val text = hour.format(DateTimeFormatter.ofPattern(pattern, locale))
+            val minute = target.atZone(zone).toLocalDateTime().withSecond(0).withNano(0)
+            val displayed = if (truncateToHour) minute.withMinute(0) else minute
+            val text = displayed.format(DateTimeFormatter.ofPattern(pattern, locale))
             if (it.utcOffset == null) text else "$text UTC${it.utcOffset}"
         }
     } catch (_: DateTimeException) {

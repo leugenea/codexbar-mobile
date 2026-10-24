@@ -127,6 +127,18 @@ EXPECTED_BANKED_TABLE_ROWS = [
          description="Banked reset 3, expiry unknown, state Unknown"),
 ]
 
+EXPECTED_COMPACT_LEGEND = (
+    "Solid line: measured observations within each run; isolated observation: short tick\n"
+    "Faint short dashes: least-squares usage trend when available\n"
+    "Long dashes: nominal analytical full-quota reference, not a forecast"
+)
+EXPECTED_COMPACT_COPY = {
+    # Chart captures observe 08:37:59: retain minutes, never truncate to 08:00 or round to 08:38.
+    kind: dict(updated="Updated Jan 15, 08:37", first=first, last="Jan 15, 09:00",
+               legendDescription=EXPECTED_COMPACT_LEGEND, visibleLegendCount=0)
+    for kind, first in (("FIVE_HOUR", "Jan 15, 04:00"), ("WEEKLY", "Jan 8, 09:00"))
+}
+
 EXPECTED_CURRENT_HOST = {"context": "MATCH", "selection": "MATCH", "periods": "MATCH", "projection": "MATCH"}
 
 # Literal review budgets, independently checked against the enumerated sets.

@@ -1,13 +1,14 @@
 package io.github.leugenea.codexbarmobile
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.usage.UsageObservation
@@ -22,10 +23,10 @@ internal fun CompactHistoryChart(series: HistoryPlotSeries, display: HistoryGrap
     val underflow = remember(series) {
         series.samples.any { (it.measured?.position as? PlotPosition.Available)?.detail == PlotRenderDetail.NONZERO_UNDERFLOW }
     }
+    val legend = stringResource(R.string.history_chart_legend)
     Column(Modifier.fillMaxWidth().testTag(tag), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.history_chart_legend), Modifier.testTag("$tag-legend"), style = MaterialTheme.typography.bodySmall)
-        HistoryPercentPlot(drawing, tag)
-        series.measuredDomain?.let { HistoryAxisTimes(it.time.first, it.time.last, time.zone, time.locale, tag) }
+        HistoryPercentPlot(drawing, tag, Modifier.testTag("$tag-plot").semantics { contentDescription = legend })
+        series.measuredDomain?.let { HistoryAxisTimes(it.time.first, it.time.last, time.zone, time.locale, tag, showPrefixes = false) }
         CompactHistoryPace(DashboardPresentation.paceComparison(display, observation, series.kind), time, tag)
         if (display.problem != null) Text(stringResource(R.string.dashboard_history_warning), Modifier.testTag("$tag-warning"))
         if (unavailableGeometry) Text(stringResource(R.string.dashboard_geometry_warning))

@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
@@ -81,27 +82,39 @@ private fun HistoryGeometryNotes(series: HistoryPlotSeries, tag: String) {
 }
 
 @Composable
-internal fun HistoryAxisTimes(first: Instant, last: Instant, zone: ZoneId, locale: Locale, tag: String) {
-    // Android supplies the locale's yearless date/time skeleton; B1 owns hour/offset handling.
-    val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMdHHmm")
+internal fun HistoryAxisTimes(first: Instant, last: Instant, zone: ZoneId, locale: Locale, tag: String, showPrefixes: Boolean = true) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Absolute.SpaceBetween) {
-        HistoryAxisTime(first, R.string.history_chart_time_first, zone, locale, pattern, "$tag-first", Modifier.weight(1f), TextAlign.Left)
+        HistoryAxisTime(first, R.string.history_chart_time_first, zone, locale, "$tag-first", Modifier.weight(1f), TextAlign.Left, showPrefixes)
         Spacer(Modifier.width(12.dp))
-        HistoryAxisTime(last, R.string.history_chart_time_last, zone, locale, pattern, "$tag-last", Modifier.weight(1f), TextAlign.Right)
+        HistoryAxisTime(last, R.string.history_chart_time_last, zone, locale, "$tag-last", Modifier.weight(1f), TextAlign.Right, showPrefixes)
     }
 }
 
 @Composable
-private fun HistoryAxisTime(at: Instant, resource: Int, zone: ZoneId, locale: Locale, pattern: String,
-    tag: String, modifier: Modifier, align: TextAlign) {
-    val label = TimePresentation.chartTime(at, zone, locale, pattern) ?: stringResource(R.string.time_unknown_target)
-    Text(stringResource(resource, label), modifier.testTag(tag), textAlign = align)
+private fun HistoryAxisTime(at: Instant, resource: Int, zone: ZoneId, locale: Locale,
+    tag: String, modifier: Modifier, align: TextAlign, showPrefix: Boolean) {
+    val label = chartTimeLabel(at, zone, locale)
+    val description = stringResource(resource, label)
+    // One Text node owns the endpoint; its description replaces the bare timestamp announcement.
+    val axisModifier = if (showPrefix) modifier else modifier.semantics { contentDescription = description }
+    Text(if (showPrefix) description else label, axisModifier.testTag(tag), textAlign = align)
+}
+
+/** Shared yearless locale skeleton with the existing phone zone and repeated-hour offsets.
+ * Axes default to containing-hour labels; Updated disables truncateToHour to floor only
+ * seconds/nanos and retain the observation minute (08:37:59 becomes 08:37, never 08:38).
+ * Source instants stay exact; second-precision details use TimePresentation.timestamp.
+ */
+@Composable
+internal fun chartTimeLabel(at: Instant, zone: ZoneId, locale: Locale, truncateToHour: Boolean = true): String {
+    val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMdHHmm")
+    return TimePresentation.chartTime(at, zone, locale, pattern, truncateToHour) ?: stringResource(R.string.time_unknown_target)
 }
 
 @Composable
-internal fun HistoryPercentPlot(drawing: HistoryChartDrawing, tag: String) {
+internal fun HistoryPercentPlot(drawing: HistoryChartDrawing, tag: String, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.height(176.dp).padding(vertical = 8.dp), verticalArrangement = Arrangement.SpaceBetween) {
             listOf(100, 50, 0).forEach { value -> Text(stringResource(R.string.history_chart_percent, value)) }
         }

@@ -455,8 +455,23 @@ def verify_assembled_metadata(metadata: dict, name: str, size: tuple[int, int], 
         if "uiCursor" in metadata or metadata.get("layoutLabel") != expected_label:
             raise ValueError("Dashboard must use its real compact label, not a hidden cursor")
     if name in ASSEMBLED_COUNTS:
+        verify_assembled_compact_legend(metadata)
         verify_integrated_canvas(metadata, size)
         verify_assembled_pixels(metadata, name, image)
+    elif "compactLegend" in metadata:
+        raise ValueError("Non-chart captures must not claim a compact legend")
+
+
+def verify_assembled_compact_legend(metadata: dict) -> None:
+    legend = ("Solid line: measured observations within each run; isolated observation: short tick\n"
+              "Faint short dashes: least-squares usage trend when available\n"
+              "Long dashes: nominal analytical full-quota reference, not a forecast")
+    expected = dict(plotTag="history-chart-five-hour-plot", legendDescription=legend,
+                    visibleLegendCount=0, hiddenFromAccessibility=False)
+    receipt = metadata.get("compactLegend")
+    if not isinstance(receipt, dict) or any(type(receipt.get(key)) is not type(value) or receipt[key] != value
+                                            for key, value in expected.items()):
+        raise ValueError("Assembled dashboard explanation must be exact, accessible and plot-only")
 
 
 def capture_receipt(path: Path) -> dict:
@@ -574,6 +589,7 @@ def dashboard_capture_receipt(path: Path) -> dict:
     if "currentHost" not in metadata or metadata["currentHost"] != host:
         raise ValueError("Dashboard lacks an actual matching current host/authority/selection receipt")
     verify_dashboard_windows(metadata)
+    verify_dashboard_compact_copy(metadata, kind, font)
     if path.stem == "dashboard-drawer-portrait-dark" and metadata.get("drawerLabels") != ["Full local history details", "Full live connection details", "Account settings"]:
         raise ValueError("Owner drawer rows changed")
     if path.stem in {"dashboard-banked-table-portrait-light", "dashboard-connection-details-landscape-dark"}:
@@ -587,6 +603,32 @@ def dashboard_capture_receipt(path: Path) -> dict:
         verify_dashboard_pixels(metadata, size, image)
     return dict(metadata, path=str(path), pngSha256=hashlib.sha256(image).hexdigest(),
                 metadataSha256=hashlib.sha256(path.with_suffix(".json").read_bytes()).hexdigest())
+
+
+def verify_dashboard_compact_copy(metadata: dict, kind: str, font: float) -> None:
+    if kind == "NONE":
+        if "compactCopy" not in metadata or metadata["compactCopy"] is not None:
+            raise ValueError("Non-chart captures must not claim compact chart copy")
+        return
+    copy = metadata.get("compactCopy")
+    first = "Jan 8, 09:00" if kind == "WEEKLY" else "Jan 15, 04:00"
+    legend = ("Solid line: measured observations within each run; isolated observation: short tick\n"
+              "Faint short dashes: least-squares usage trend when available\n"
+              "Long dashes: nominal analytical full-quota reference, not a forecast")
+    expected = dict(updated="Updated Jan 15, 08:37", first=first, last="Jan 15, 09:00",
+                    legendDescription=legend, visibleLegendCount=0)
+    if not isinstance(copy, dict) or any(copy.get(key) != value for key, value in expected.items()):
+        raise ValueError("Compact header/axes or accessible-only legend changed")
+    if type(copy["visibleLegendCount"]) is not int:
+        raise ValueError("Visible legend count must be an integer")
+    verify_compact_axis_lines(copy, font)
+
+
+def verify_compact_axis_lines(copy: dict, font: float) -> None:
+    for key in ("firstLineCount", "lastLineCount"):
+        lines = copy.get(key)
+        if type(lines) is not int or lines < 1 or (font == 1 and lines != 1):
+            raise ValueError("Compact axis labels must fit one line at normal font and remain complete at large font")
 
 
 def verify_dashboard_windows(metadata: dict) -> None:

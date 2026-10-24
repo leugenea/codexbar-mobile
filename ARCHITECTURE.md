@@ -1127,7 +1127,16 @@ current identity or actual renderable retained history has one concise no-inform
 line per window, no empty Canvas or analytical-only substitute. A single observation
 remains one minimal tick without an invented observed trend. `CompactHistoryChart` reuses the
 existing plot/drawing/axis/paint primitives and original observed comparison for its
-compact accessible equivalent. Each window keeps one UI-local plot cache, keyed by
+compact accessible equivalent. The dashboard alone hides the three-line legend from
+visible text and exposes the same explanation as the percent plot's content description.
+Its axis labels have no visible start/end prefixes and fit a single line at normal font;
+large-font labels may wrap without clipping. The top observation line is `Updated` plus
+the same yearless locale skeleton as chart clocks, retaining the observation minute
+and flooring seconds/nanos (08:37:59 displays 08:37, never 08:38). The shared
+`chartTimeLabel` keeps the phone zone and existing repeated-hour offset policy;
+only axes retain containing-hour display. Original instants and second-precision
+detail clocks remain unchanged. Full chart
+details keep their visible legend and prefixed axes. Each window keeps one UI-local plot cache, keyed by
 retained storage-page identity, generation, partition, query, request and selection;
 no retained-entry list comparison occurs on metadata ticks. Snapshot analytics are
 lazy, so fresh metadata wrappers do not rebuild comparisons. Stable immutable series

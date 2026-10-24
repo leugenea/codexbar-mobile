@@ -78,7 +78,7 @@ class DashboardPresentationTest {
         val accepted = acceptedUsage(observations.last())
         assertSame(observations.last(), accepted.observation)
         assertEquals("50", accepted.windows.first().percent)
-        assertEquals(TimePresentation.timestamp(observations.last().observedAt, ZoneOffset.UTC, Locale.US), accepted.observedAt)
+        assertEquals(observations.last().observedAt, accepted.observation!!.observedAt)
         assertEquals((1L..33L).toList(), display.entries.map { it.source.id.ordinal })
         assertFalse(display.hasMore)
         assertEquals(observations.last().observedAt, display.points.last().observedAt)
@@ -185,6 +185,19 @@ class DashboardPresentationTest {
         assertEquals("Jan 15, 08:00", TimePresentation.chartTime(at, ZoneOffset.UTC, Locale.US, "MMM d, HH:mm"))
         assertEquals("15. Jan., 09:00", TimePresentation.chartTime(at, ZoneId.of("Europe/Berlin"), Locale.GERMANY, "d. MMM, HH:mm"))
         assertEquals("Jan 15, 00:00", TimePresentation.chartTime(at, ZoneId.of("America/Los_Angeles"), Locale.US, "MMM d, HH:mm"))
+        val model = acceptedUsage(SyntheticHistory.usage(observedAt = at))
+        assertEquals(at, model.observation!!.observedAt)
+        assertEquals("Jan 15, 08:00", TimePresentation.chartTime(model.observation.observedAt!!, ZoneOffset.UTC, Locale.US, "MMM d, HH:mm"))
+        for (source in listOf("2027-01-15T08:37:00Z", "2027-01-15T08:37:59Z", "2027-01-15T08:37:59.999999999Z")) {
+            assertEquals("Jan 15, 08:37", TimePresentation.chartTime(Instant.parse(source), ZoneOffset.UTC,
+                Locale.US, "MMM d, HH:mm", truncateToHour = false))
+        }
+        assertEquals("Jan 15, 08:37", TimePresentation.chartTime(model.observation.observedAt, ZoneOffset.UTC,
+            Locale.US, "MMM d, HH:mm", truncateToHour = false))
+        assertEquals("15. Jan., 09:37", TimePresentation.chartTime(at, ZoneId.of("Europe/Berlin"),
+            Locale.GERMANY, "d. MMM, HH:mm", truncateToHour = false))
+        assertEquals("Jan 15, 00:37", TimePresentation.chartTime(at, ZoneId.of("America/Los_Angeles"),
+            Locale.US, "MMM d, HH:mm", truncateToHour = false))
         assertEquals(Instant.parse("2027-01-15T08:37:12.123456789Z"), at)
     }
 
@@ -194,11 +207,21 @@ class DashboardPresentationTest {
         assertEquals("Nov 1, 01:00 UTC-05:00", TimePresentation.chartTime(Instant.parse("2026-11-01T06:30:00Z"), ny, Locale.US, "MMM d, HH:mm"))
         assertEquals("Apr 5, 01:00 UTC+11:00", TimePresentation.chartTime(Instant.parse("2026-04-04T14:15:00Z"),
             ZoneId.of("Australia/Lord_Howe"), Locale.US, "MMM d, HH:mm"))
+        assertEquals("Nov 1, 01:30 UTC-04:00", TimePresentation.chartTime(Instant.parse("2026-11-01T05:30:59Z"),
+            ny, Locale.US, "MMM d, HH:mm", truncateToHour = false))
+        assertEquals("Nov 1, 01:30 UTC-05:00", TimePresentation.chartTime(Instant.parse("2026-11-01T06:30:59Z"),
+            ny, Locale.US, "MMM d, HH:mm", truncateToHour = false))
+        assertEquals("Apr 5, 01:15 UTC+11:00", TimePresentation.chartTime(Instant.parse("2026-04-04T14:15:59Z"),
+            ZoneId.of("Australia/Lord_Howe"), Locale.US, "MMM d, HH:mm", truncateToHour = false))
+        assertEquals("Apr 5, 01:45 UTC+10:30", TimePresentation.chartTime(Instant.parse("2026-04-04T15:15:59Z"),
+            ZoneId.of("Australia/Lord_Howe"), Locale.US, "MMM d, HH:mm", truncateToHour = false))
     }
 
     @Test fun chartTimeLabelsKeepUnrepresentableInstantsUnknown() {
         assertNull(TimePresentation.chartTime(Instant.MAX, ZoneOffset.UTC, Locale.US, "MMM d, HH:mm"))
         assertNull(TimePresentation.chartTime(Instant.MIN, ZoneId.of("America/Los_Angeles"), Locale.US, "MMM d, HH:mm"))
+        assertNull(TimePresentation.chartTime(Instant.MAX, ZoneOffset.UTC, Locale.US, "MMM d, HH:mm", truncateToHour = false))
+        assertNull(TimePresentation.chartTime(Instant.MIN, ZoneId.of("America/Los_Angeles"), Locale.US, "MMM d, HH:mm", truncateToHour = false))
     }
 
     @Test fun compactWholeWindowLastPointEndLabelAndTrendReachLatestObservationBeyond32() {

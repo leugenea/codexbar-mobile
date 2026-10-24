@@ -42,7 +42,6 @@ internal data class PresentedUsage(
     val allowedResource: Int,
     val limitResource: Int,
     val windows: List<PresentedUsageWindow>,
-    val observedAt: String? = null,
     val observation: UsageObservation? = null,
 )
 
@@ -63,7 +62,7 @@ internal object UsagePresentation {
             refresh.usage.stale && usage != null, connected && !state.busy && !refresh.refreshing,
             error?.let(::errorResource), flag(usage?.allowed, R.string.live_allowed, R.string.live_not_allowed),
             flag(usage?.limitReached, R.string.live_limit_reached, R.string.live_limit_not_reached), windows,
-            TimePresentation.timestamp(usage?.observedAt, zone, locale), usage,
+            usage,
         )
     }
 

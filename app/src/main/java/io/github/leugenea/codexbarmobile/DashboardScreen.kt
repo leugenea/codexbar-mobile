@@ -21,7 +21,7 @@ internal fun DashboardScreen(state: ConnectionState, controller: ConnectionContr
     val weekly = currentHistoryForDisplay(source, current, WindowKind.WEEKLY, authority)
     SideEffect { observer?.projectedCurrent(source, five, weekly, state.refresh.evaluatedAt) }
     Column(Modifier.fillMaxWidth().testTag("dashboard"), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        DashboardStatus(state, usage)
+        DashboardStatus(state, usage, time)
         DashboardActions(state, usage, controller, openAccountSettings)
         DashboardWindow(usage.windows[0], five, time, usage.observation)
         DashboardWindow(usage.windows[1], weekly, time, usage.observation)
@@ -30,10 +30,10 @@ internal fun DashboardScreen(state: ConnectionState, controller: ConnectionContr
 }
 
 @Composable
-private fun DashboardStatus(state: ConnectionState, model: PresentedUsage) {
+private fun DashboardStatus(state: ConnectionState, model: PresentedUsage, time: PhoneTimeConfiguration) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
         Text(stringResource(DashboardPresentation.status(model.status)), Modifier.testTag("dashboard-status"))
-        model.observedAt?.let { Text(stringResource(R.string.history_fact, stringResource(R.string.history_point_time), it),
+        model.observation?.observedAt?.let { Text(stringResource(R.string.dashboard_updated, chartTimeLabel(it, time.zone, time.locale, truncateToHour = false)),
             Modifier.testTag("dashboard-observed-at")) }
         if (model.refreshing) Text(stringResource(R.string.dashboard_refreshing))
         model.errorResource?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
