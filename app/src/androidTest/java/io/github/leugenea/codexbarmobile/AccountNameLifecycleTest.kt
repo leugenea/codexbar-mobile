@@ -124,9 +124,11 @@ class AccountNameLifecycleTest {
             assertArrayEquals(unchanged, nameFile().readBytes())
             label("Synthetic successor")
             assertEquals(counts, fixture.transport.counts())
-            // Explicit replacement is an Account settings action.
+            // Explicit replacement remains an owner API contract, not a connected UI action.
             openDetailRoute(compose, fixture.owner, DashboardRoute.ACCOUNT_SETTINGS)
-            click("connect")
+            compose.onNodeWithTag("connect").assertDoesNotExist()
+            fixture.owner.connect()
+            settleCommands("replacement connect command processed")
             await("replacement adopts a fresh unnamed account") {
                 fixture.owner.state.value.let { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing }
                     && fixture.owner.accountName.value?.edit?.let { it !== next } == true
@@ -179,8 +181,6 @@ class AccountNameLifecycleTest {
         compose.onNodeWithTag("account-name").performScrollTo().assertTextEquals(text).assertIsDisplayed()
     }
     private fun click(tag: String) {
-        if (tag == "connect" && fixture.owner.state.value.phase in setOf(ConnectionPhase.OBSERVED, ConnectionPhase.RESTORED, ConnectionPhase.READING))
-            compose.onNodeWithTag("account-settings").assertExists()
         val node = compose.onNodeWithTag(tag)
         if (tag in setOf("account-name-edit", "connect")) node.performScrollTo()
         node.performClick(); compose.waitForIdle()

@@ -19,6 +19,7 @@ import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -131,6 +132,8 @@ class ConnectionLifecycleTest {
             assertSavedStateHasNoSecrets(scenario)
             click("cancel-connect")
             await(scenario, "cancel clears code") { it.phase == ConnectionPhase.CANCELLED }
+            compose.onNodeWithTag("cancel-connect").assertDoesNotExist()
+            compose.onNodeWithTag("connect").performScrollTo().assertTextEquals("Add account").assertIsEnabled()
             assertEquals(1, fake.calls.size)
             fake.poll.complete(Unit)
             assertSavedStateHasNoSecrets(scenario)
@@ -194,8 +197,11 @@ class ConnectionLifecycleTest {
             openGate(scenario)
             click("connect")
             await(scenario, "synthetic pending code") { it.auth is AuthState.AwaitingUser }
+            compose.onNodeWithTag("connect").performScrollTo().assertTextEquals("Add account").assertIsNotEnabled()
+            compose.onNodeWithTag("cancel-connect").performScrollTo().assertTextEquals("Cancel work").assertIsEnabled()
             fake.poll.complete(Unit)
             await(scenario, "two independent reads") { it.phase == ConnectionPhase.OBSERVED }
+            assertConnectedAccountActions()
             var state: ConnectionState? = null
             scenario.onActivity { state = it.connection.state.value }
             val facts = state!!.observations!!
@@ -219,6 +225,8 @@ class ConnectionLifecycleTest {
             assertEquals(beforeRecreation + 2, fake.calls.size)
             click("remove-account"); click("remove-account-confirm")
             await(scenario, "local key and file deletion") { it.phase == ConnectionPhase.SIGNED_OUT }
+            compose.onNodeWithTag("connect").performScrollTo().assertTextEquals("Add account").assertIsEnabled()
+            compose.onNodeWithTag("cancel-connect").assertDoesNotExist()
             assertFalse(KeystoreCredentialStore.file(context, session).exists())
             assertFalse(keyExists(session))
             assertEquals(beforeRecreation + 2, fake.calls.size)
@@ -234,6 +242,8 @@ class ConnectionLifecycleTest {
             MainActivity.browserLauncher = { _, _ -> throw ActivityNotFoundException("SYNTHETIC sensitive platform text") }
             click("open-browser")
             await(scenario, "browser failure") { it.problem == ConnectionProblem.BROWSER }
+            compose.onNodeWithTag("connect").performScrollTo().assertIsEnabled()
+            compose.onNodeWithTag("cancel-connect").assertDoesNotExist()
             assertSavedStateHasNoSecrets(scenario)
             click("connect")
             await(scenario, "second code") { it.auth is AuthState.AwaitingUser }
@@ -282,6 +292,8 @@ class ConnectionLifecycleTest {
             await(scenario, "code before held read") { it.auth is AuthState.AwaitingUser }
             fake.poll.complete(Unit)
             bounded("first GET reached") { fake.reads.isNotEmpty() }
+            await(scenario, "connected read remains in flight") { it.phase == ConnectionPhase.READING }
+            assertConnectedAccountActions()
             click("remove-account"); click("remove-account-confirm")
             await(scenario, "logout cancels read") { it.phase == ConnectionPhase.SIGNED_OUT }
             assertTrue(fake.cancelledReads > 0)
@@ -340,11 +352,14 @@ class ConnectionLifecycleTest {
             assertFalse(KeystoreCredentialStore.file(context, slot).exists())
             openDetailRoute(compose, NativeConnection.get(context), DashboardRoute.ACCOUNT_SETTINGS)
             compose.onNodeWithTag("connect").performScrollTo().assertTextEquals("Sign in again")
+                .assertIsEnabled()
+            compose.onNodeWithTag("cancel-connect").assertDoesNotExist()
             assertSavedStateHasNoSecrets(scenario)
             fake.refreshStatus = 200
             fake.rejectOriginalBearer = false
             click("connect")
             await(scenario, "reauth replaces quarantined session") { it.phase == ConnectionPhase.OBSERVED }
+            assertConnectedAccountActions()
             click("remove-account"); click("remove-account-confirm")
             await(scenario, "reauthenticated local deletion") { it.phase == ConnectionPhase.SIGNED_OUT }
             assertFalse(keyExists(slot))
@@ -382,9 +397,13 @@ class ConnectionLifecycleTest {
                 assertEquals(REFRESH, saved.refreshToken!!.copyBytes().toString(Charsets.UTF_8))
             }
             assertSavedStateHasNoSecrets(scenario)
-            click("connect") // replacement also deletes the previous durable pair before auth.
+            // Replacement remains an owner API contract, not a settled-account UI action.
+            val predecessor = (NativeConnection.get(context).state.value.auth as AuthState.Connected).generation
+            NativeConnection.get(context).connect()
             settleOwnerCommands("explicit account replacement connect command processed")
-            await(scenario, "explicit account replacement") { it.phase == ConnectionPhase.OBSERVED }
+            await(scenario, "explicit account replacement") {
+                it.phase == ConnectionPhase.OBSERVED && (it.auth as? AuthState.Connected)?.generation?.let { next -> next !== predecessor } == true
+            }
             click("remove-account"); click("remove-account-confirm")
             await(scenario, "replacement local deletion") { it.phase == ConnectionPhase.SIGNED_OUT }
         }
@@ -696,6 +715,14 @@ class ConnectionLifecycleTest {
     }
 
     private fun launch(): ActivityScenario<MainActivity> = ActivityScenario.launch(MainActivity::class.java)
+
+    private fun assertConnectedAccountActions() {
+        compose.onNodeWithTag("account-settings").assertExists()
+        compose.onNodeWithTag("connect").assertDoesNotExist()
+        compose.onNodeWithTag("cancel-connect").assertDoesNotExist()
+        compose.onNodeWithTag("account-name-edit").performScrollTo().assertIsEnabled()
+        compose.onNodeWithTag("remove-account").performScrollTo().assertIsEnabled()
+    }
 
     private fun assertPresentedObservations(facts: FeasibilityObservations) {
         openDetailRoute(compose, NativeConnection.get(context), DashboardRoute.CONNECTION_DETAILS)
