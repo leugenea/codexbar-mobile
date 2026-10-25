@@ -12,7 +12,7 @@ from verify_test_reports import PERIODIC_REFRESH_JVM, PERIODIC_REFRESH_NATIVE, v
 from test_background_refresh_contract import mutate
 import test_workflow_contract as workflow
 from verify_manifests import ANDROID, TOOLS, SOURCE_PERMISSIONS, check_manifest, check_source_manifests, approved_work_removal
-from work_manifest_fixtures import COMPONENT_XML, components_apk
+from work_manifest_fixtures import COMPONENT_XML, STARTUP_APK, components_apk
 from work_manifest_policy import check_components, apk_components
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -108,19 +108,52 @@ class PeriodicRefreshContracts(unittest.TestCase):
                 with self.subTest(node=node.tag, mutation=mutation), self.assertRaises(ValueError):
                     check_components(bad, PACKAGE)
         provider = original.find('provider')
-        for attribute in ('name', 'value'):
-            bad = copy.deepcopy(original)
-            bad.find('provider/meta-data').set(ANDROID + attribute, 'unapproved')
-            with self.assertRaises(ValueError): check_components(bad, PACKAGE)
-        bad = copy.deepcopy(original); bad.find('provider').remove(bad.find('provider/meta-data'))
-        with self.assertRaises(ValueError): check_components(bad, PACKAGE)
-        self.assertEqual(len(provider.findall('meta-data')), 4)
+        for index in range(len(provider)):
+            for attribute in ('name', 'value'):
+                bad = copy.deepcopy(original)
+                bad.find('provider')[index].set(ANDROID + attribute, 'unapproved')
+                with self.subTest(initializer=index, attribute=attribute), self.assertRaises(ValueError):
+                    check_components(bad, PACKAGE)
+            for mutation in ('missing', 'duplicate', 'extra'):
+                bad = copy.deepcopy(original)
+                selected = bad.find('provider')[index]
+                if mutation == 'missing': bad.find('provider').remove(selected)
+                else:
+                    extra = copy.deepcopy(selected)
+                    if mutation == 'extra': extra.set(ANDROID + 'name', 'unapproved.Initializer')
+                    bad.find('provider').append(extra)
+                with self.subTest(initializer=index, mutation=mutation), self.assertRaises(ValueError):
+                    check_components(bad, PACKAGE)
+        self.assertEqual(len(provider.findall('meta-data')), 5)
         bad = copy.deepcopy(original); bad.find('provider').set(ANDROID + 'directBootAware', 'true')
         with self.assertRaises(ValueError): check_components(bad, PACKAGE)
         bad = copy.deepcopy(original)  # Exercise exact action membership.
         action = ET.SubElement(ET.SubElement(bad.find('receiver'), 'intent-filter'), 'action')
         action.set(ANDROID + 'name', 'unapproved')
         with self.assertRaises(ValueError): check_components(bad, PACKAGE)
+
+    def test_captured_apk_startup_metadata_preserves_exact_initializer_contract(self):
+        for package in ('io.github.leugenea.codexbarmobile', PACKAGE):
+            # The provider is last in the synthetic component fixture. Replace it
+            # with the independently captured APK block, not a rendered allowlist.
+            xmltree = '  E: application (line=22)\n' + components_apk(package).split('    E: provider ', 1)[0]
+            captured = STARTUP_APK.replace('PACKAGE', package)
+            apk_components(xmltree + captured, package)
+            for mutation in ('name', 'value', 'missing', 'duplicate', 'authority', 'export'):
+                bad = captured
+                if mutation == 'name': bad = bad.replace('okhttp3.internal.platform.PlatformInitializer', 'unapproved.Initializer')
+                elif mutation == 'value': bad = bad.replace('="androidx.startup"', '="unapproved"', 1)
+                elif mutation == 'missing': bad = bad.split('      E: meta-data (line=60)', 1)[0]
+                elif mutation == 'duplicate': bad += bad[bad.index('      E: meta-data (line=60)'):]
+                elif mutation == 'authority': bad = bad.replace(package + '.androidx-startup', 'wrong.androidx-startup')
+                else: bad = bad.replace('(type 0x12)0x0', '(type 0x12)0xffffffff', 1)
+                with self.subTest(package=package, mutation=mutation), self.assertRaises(ValueError):
+                    apk_components(xmltree + bad, package)
+
+    def test_os_dispatch_fixture_declares_its_room_superclass_on_test_compile_classpath(self):
+        build = (ROOT / 'app/build.gradle').read_text()
+        declarations = re.findall(r"(?m)^\s*(\w+)\s+'androidx.room:room-runtime:([^']+)'", build)
+        self.assertEqual(declarations, [('androidTestImplementation', '2.7.0')])
 
     def test_production_adapter_is_ordinary_lifetime_only_and_preserves_cancellation(self):
         source = (ROOT / 'app/src/main/java/io/github/leugenea/codexbarmobile/PeriodicUsageRefresh.kt').read_text()

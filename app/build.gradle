@@ -334,6 +334,8 @@ dependencies {
     androidTestImplementation 'androidx.test:runner:1.7.0'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
     androidTestImplementation 'androidx.work:work-testing:2.12.0'
+    // OS-dispatch fixture calls WorkDatabase; Room is runtime-only in WorkManager's API publication.
+    androidTestImplementation 'androidx.room:room-runtime:2.7.0'
     debugImplementation 'androidx.compose.ui:ui-test-manifest:1.12.1'
 }
 

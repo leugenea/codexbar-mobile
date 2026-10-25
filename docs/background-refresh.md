@@ -62,7 +62,10 @@ identify the release. The [runtime AAR](https://dl.google.com/dl/android/maven2/
 and [versioned source archive](https://dl.google.com/dl/android/maven2/androidx/work/work-runtime/2.12.0/work-runtime-2.12.0-sources.jar)
 are authoritative for this contract. Runtime contains CoroutineWorker already;
 no empty `work-runtime-ktx`, RxJava, multiprocess or Room compiler dependency is added.
-`work-testing:2.12.0` belongs only to the instrumentation classpath.
+`work-testing:2.12.0` belongs only to the instrumentation classpath. The OS-dispatch
+fixture also declares the already selected `room-runtime:2.7.0` on that classpath:
+it accesses WorkDatabase, whose RoomDatabase superclass is not exported by
+WorkManager's API dependency variant. This does not add a production dependency.
 The released AAR requires min SDK 24, compile SDK 35 and AGP 8.6.0; this app keeps
 its existing min 26 / compile 37 / AGP 9.4.1 toolchain.
 
@@ -82,7 +85,7 @@ all run in the default application process, with no external/isolated service:
 | `androidx.work.impl.background.systemalarm.RescheduleReceiver` | Nonexported, not direct-boot-aware; BOOT_COMPLETED only. Manifest-disabled by default, dynamically enabled for unfinished work. |
 | `androidx.work.impl.diagnostics.DiagnosticsReceiver` | Exported only under `android.permission.DUMP`; not direct-boot-aware; diagnostics action only. |
 | `androidx.room.MultiInstanceInvalidationService` | Room 2.7.0 transitive service; nonexported and direct-boot-aware, default process. WorkManager does not enable multi-instance invalidation; this dormant component is retained rather than adding another removal exception. |
-| `androidx.startup.InitializationProvider` | Nonexported `${applicationId}.androidx-startup`; WorkManagerInitializer plus existing ProcessLifecycle/EmojiCompat/ProfileInstaller initializers. Initializing the scheduler is not activating an account. |
+| `androidx.startup.InitializationProvider` | Nonexported `${applicationId}.androidx-startup`; exactly WorkManagerInitializer plus existing ProcessLifecycle/EmojiCompat/ProfileInstaller and OkHttp 5.5.0 `okhttp3.internal.platform.PlatformInitializer` metadata, each valued `androidx.startup`. Initializing the scheduler is not activating an account. |
 | Existing `androidx.profileinstaller.ProfileInstallReceiver` | Exported only under DUMP, not direct-boot-aware; four existing ProfileInstaller actions. |
 
 BIND_JOB_SERVICE and DUMP are component caller protections, **not app requested

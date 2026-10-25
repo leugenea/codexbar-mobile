@@ -16,6 +16,7 @@ COMPONENTS = {
 INITIALIZERS = {
     'androidx.work.WorkManagerInitializer', 'androidx.lifecycle.ProcessLifecycleInitializer',
     'androidx.profileinstaller.ProfileInstallerInitializer', 'androidx.emoji2.text.EmojiCompatInitializer',
+    'okhttp3.internal.platform.PlatformInitializer',
 }
 RECEIVER_ACTIONS = {
     WORK + 'impl.utils.ForceStopRunnable$BroadcastReceiver': set(),

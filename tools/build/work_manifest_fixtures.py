@@ -19,7 +19,31 @@ COMPONENT_XML = '''<application xmlns:android="http://schemas.android.com/apk/re
 <meta-data android:name="androidx.lifecycle.ProcessLifecycleInitializer" android:value="androidx.startup"/>
 <meta-data android:name="androidx.profileinstaller.ProfileInstallerInitializer" android:value="androidx.startup"/>
 <meta-data android:name="androidx.emoji2.text.EmojiCompatInitializer" android:value="androidx.startup"/>
+<meta-data android:name="okhttp3.internal.platform.PlatformInitializer" android:value="androidx.startup"/>
 </provider></application>'''
+
+# Captured aapt2 provider shape from the release APK with OkHttp Android 5.5.0.
+# Keep this observation independent of COMPONENT_XML and the policy's allowlist.
+STARTUP_APK = '''    E: provider (line=44)
+      A: android:name(0x01010003)="androidx.startup.InitializationProvider" (Raw: "androidx.startup.InitializationProvider")
+      A: android:exported(0x01010010)=(type 0x12)0x0
+      A: android:authorities(0x01010018)="PACKAGE.androidx-startup" (Raw: "PACKAGE.androidx-startup")
+      E: meta-data (line=48)
+        A: android:name(0x01010003)="androidx.work.WorkManagerInitializer" (Raw: "androidx.work.WorkManagerInitializer")
+        A: android:value(0x01010024)="androidx.startup" (Raw: "androidx.startup")
+      E: meta-data (line=51)
+        A: android:name(0x01010003)="androidx.emoji2.text.EmojiCompatInitializer" (Raw: "androidx.emoji2.text.EmojiCompatInitializer")
+        A: android:value(0x01010024)="androidx.startup" (Raw: "androidx.startup")
+      E: meta-data (line=54)
+        A: android:name(0x01010003)="androidx.lifecycle.ProcessLifecycleInitializer" (Raw: "androidx.lifecycle.ProcessLifecycleInitializer")
+        A: android:value(0x01010024)="androidx.startup" (Raw: "androidx.startup")
+      E: meta-data (line=57)
+        A: android:name(0x01010003)="okhttp3.internal.platform.PlatformInitializer" (Raw: "okhttp3.internal.platform.PlatformInitializer")
+        A: android:value(0x01010024)="androidx.startup" (Raw: "androidx.startup")
+      E: meta-data (line=60)
+        A: android:name(0x01010003)="androidx.profileinstaller.ProfileInstallerInitializer" (Raw: "androidx.profileinstaller.ProfileInstallerInitializer")
+        A: android:value(0x01010024)="androidx.startup" (Raw: "androidx.startup")
+'''
 
 
 def components_xml(package):
