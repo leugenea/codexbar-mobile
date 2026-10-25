@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792938754933,
+  "lastUpdate": 1792938757070,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -5533,6 +5533,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/11f09f18452330c0607eca4b99c2e19b9141f254"
         },
         "date": 1792926021324,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6b4c5477bebb7b1bafb04ad95e4f4822918f44a0",
+          "message": "feat: owner-scoped background refresh with durable history completion (#196)\n\n* feat: support owner-scoped background refresh and durable history (#194)\n\n* test: await completed relogin before capturing background enrollment",
+          "timestamp": "2026-10-25T17:32:08+03:00",
+          "tree_id": "79658d212cb062bce92aaf36eb16dc6bcd108387",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/6b4c5477bebb7b1bafb04ad95e4f4822918f44a0"
+        },
+        "date": 1792938756865,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
