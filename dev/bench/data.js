@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792917964535,
+  "lastUpdate": 1792917966737,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -5397,6 +5397,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/ec900a788af3f0eddf62c510e74bba41c9e87271"
         },
         "date": 1792877318523,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d57dfca57b530c99af67d27d00f8d25decea8321",
+          "message": "feat(ui): replace usage refresh button with pull to refresh (#180) (#191)",
+          "timestamp": "2026-10-25T11:45:39+03:00",
+          "tree_id": "37aab49bede61ff96ebe46577bcd7deabcbd23ce",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/d57dfca57b530c99af67d27d00f8d25decea8321"
+        },
+        "date": 1792917966466,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
