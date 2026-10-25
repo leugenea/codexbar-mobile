@@ -347,7 +347,7 @@ class ToolchainContract(unittest.TestCase):
         ET.parse(ROOT / "app/src/main/res/values/themes.xml")
         source = (ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile/MainActivity.kt").read_text()
         for snippet in ("ComponentActivity()", "setContent", "MaterialTheme", "Surface(",
-                        "WindowInsets.safeDrawing", "isSystemInDarkTheme()", "FLAG_SECURE",
+                        "WindowInsets.safeDrawing", "isSystemInDarkTheme()",
                         "ObserveUsageLifecycle(connection, lifecycle)", "ConnectionScreen(connectionState, connection"):
             self.assertIn(snippet, source)
         self.assertEqual(source.count("ObserveUsageLifecycle(connection, lifecycle)"), 1)
@@ -357,6 +357,16 @@ class ToolchainContract(unittest.TestCase):
         names = {element.get("name") for element in strings}
         self.assertFalse(names & {"offline_tab", "connection_tab", "preview_heading", "show_fixture", "reset_preview"})
         self.assertNotRegex(source, r"https?://|Socket|HttpClient|URLConnection|SharedPreferences")
+
+    def test_screen_capture_and_recents_use_normal_platform_policy(self):
+        production = ROOT / "app/src/main"
+        # All app windows, including Compose dialogs/popups, follow the ordinary
+        # platform policy. Do not reintroduce a capture block on another route.
+        blocked = r"FLAG_SECURE|setRecentsScreenshotEnabled|SecureFlagPolicy\s*\.\s*SecureOn"
+        for path in sorted(production.rglob("*")):
+            if path.suffix in {".kt", ".java", ".xml"}:
+                with self.subTest(path=path.relative_to(ROOT)):
+                    self.assertNotRegex(path.read_text(), blocked)
 
 
 if __name__ == "__main__":

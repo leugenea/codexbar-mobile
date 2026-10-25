@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.core.net.toUri
-import android.view.WindowManager
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.Lifecycle
@@ -34,7 +33,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         // Activities observe the process owner; destruction never closes its work.
         connection = NativeConnection.get(applicationContext)
         enableEdgeToEdge()

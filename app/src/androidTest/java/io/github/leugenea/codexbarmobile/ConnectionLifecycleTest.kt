@@ -152,16 +152,22 @@ class ConnectionLifecycleTest {
             openGate(scenario)
             click("connect")
             await(scenario, "pending code") { it.auth is AuthState.AwaitingUser }
+            compose.onNodeWithTag("device-code").performScrollTo().assertTextEquals(CODE)
+            assertPlatformScreenshot(compose, "pending-login", "device-code")
             scenario.onActivity { original = it.connection }
             assertSavedStateHasNoSecrets(scenario)
             scenario.recreate()
             await(scenario, "retained code") { it.auth is AuthState.AwaitingUser }
+            compose.onNodeWithTag("device-code").performScrollTo().assertTextEquals(CODE)
+            assertPlatformScreenshot(compose, "recreated-login", "device-code")
             scenario.onActivity { assertSame(original, it.connection) }
             assertEquals(1, factories)
             assertEquals(1, fake.calls.size)
             scenario.moveToState(Lifecycle.State.CREATED)
             scenario.moveToState(Lifecycle.State.RESUMED)
             await(scenario, "return from background") { it.auth is AuthState.AwaitingUser }
+            compose.onNodeWithTag("device-code").performScrollTo().assertTextEquals(CODE)
+            assertPlatformScreenshot(compose, "resumed-login", "device-code")
             assertEquals(1, fake.calls.size)
             assertSavedStateHasNoSecrets(scenario)
             scenario.close()
@@ -202,6 +208,8 @@ class ConnectionLifecycleTest {
             fake.poll.complete(Unit)
             await(scenario, "two independent reads") { it.phase == ConnectionPhase.OBSERVED }
             assertConnectedAccountActions()
+            compose.onNodeWithTag("account-settings-state").performScrollTo().assertExists()
+            assertPlatformScreenshot(compose, "connected-account", "account-settings-state")
             var state: ConnectionState? = null
             scenario.onActivity { state = it.connection.state.value }
             val facts = state!!.observations!!
@@ -813,7 +821,8 @@ class ConnectionLifecycleTest {
             scenario.onActivity {
                 InstrumentationRegistry.getInstrumentation().callActivityOnSaveInstanceState(it, bundle)
                 diagnostics = it.connection.state.value.toString() + it.connection.state.value.auth.toString()
-                assertTrue(it.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0)
+                assertEquals("Saving state cannot enable capture restrictions", 0,
+                    it.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE)
             }
         } finally {
             scenario.moveToState(Lifecycle.State.RESUMED)
@@ -825,6 +834,8 @@ class ConnectionLifecycleTest {
         scenario.onActivity {
             assertEquals("After saved-state capture", Lifecycle.State.RESUMED, it.lifecycle.currentState)
             assertSame("Saved-state capture must keep the connection owner", owner, it.connection)
+            assertEquals("Resuming cannot enable capture restrictions", 0,
+                it.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE)
         }
         // A resumed scenario alone is not proof that the Compose root is usable.
         // Query semantics on the test thread, never inside onActivity.
