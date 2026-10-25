@@ -4,6 +4,9 @@ from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DA
 from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT, verify_reports
 from verify_test_reports import HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE
 from verify_test_reports import HISTORY_IMPORT_JVM, HISTORY_IMPORT_NATIVE, REMAINING_TIME_JVM
+from verify_test_reports import BACKGROUND_REFRESH_JVM
+from background_refresh_contract_expectations import BACKGROUND_JVM_CLASS, BACKGROUND_JVM_CASES, BACKGROUND_NATIVE_CASES
+from test_background_refresh_contract import mutate
 import copy
 import json
 import os
@@ -60,6 +63,7 @@ def synthetic_reports(build, failed=False):
         current |= HISTORY_EXPORT_JVM if kind == "jvm" else HISTORY_EXPORT_NATIVE
         current |= HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
         current |= REMAINING_TIME_JVM if kind == "jvm" else {}
+        current |= BACKGROUND_REFRESH_JVM if kind == "jvm" else {}
         for classname, names in current.items():
             for name in sorted(names):
                 ET.SubElement(suite, "testcase", classname=classname, name=name)
@@ -97,8 +101,8 @@ class RetryContracts(unittest.TestCase):
                                                    self.identity, 7000)
 
     def test_synthetic_reports_keep_all_required_jvm_and_native_cases(self):
-        for kind, relative, count in (("jvm", "test-results/testDebugUnitTest", 118),
-                                      ("native", "outputs/androidTest-results/connected", 155)):
+        for kind, relative, count in (("jvm", "test-results/testDebugUnitTest", 135),
+                                      ("native", "outputs/androidTest-results/connected", 167)):
             with self.subTest(kind=kind):
                 self.assertEqual(verify_reports(self.build / relative, kind)["testCount"], count)
 
@@ -269,14 +273,17 @@ class RetryContracts(unittest.TestCase):
                 self.require()
 
     def test_default_launch_and_migrated_native_cases_fail_closed_before_retry(self):
-        migrated = ((CLASS["native"], EXPECTED["native"]),
-                    (LIVE_USAGE_CLASS, {"recreationKeepsRealScreenAndOwnerAndStoppedActivityAdmitsNoReads"}),
-                    (HISTORY_NAVIGATION_CLASS, {"defaultRestoredScreenAndHistoryNavigationNeverActivateTransportOrAddAdmissions"}))
-        for classname, names in migrated:
+        migrated = (("native", CLASS["native"], EXPECTED["native"]),
+                    ("native", LIVE_USAGE_CLASS, {"recreationKeepsRealScreenAndOwnerAndStoppedActivityAdmitsNoReads"}),
+                    ("native", HISTORY_NAVIGATION_CLASS, {"defaultRestoredScreenAndHistoryNavigationNeverActivateTransportOrAddAdmissions"}),
+                    ("native", HISTORY_SAMPLING_CLASS, BACKGROUND_NATIVE_CASES),
+                    ("jvm", BACKGROUND_JVM_CLASS, BACKGROUND_JVM_CASES))
+        for kind, classname, names in migrated:
             for name in names:
                 for mutation in ("missing", "failure", "error", "skipped", "wrong-class"):
                     synthetic_reports(self.build)
-                    path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
+                    relative = "outputs/androidTest-results/connected" if kind == "native" else "test-results/testDebugUnitTest"
+                    path = self.build / relative / "SYNTHETIC.xml"
                     tree = ET.parse(path)
                     root = tree.getroot()
                     case = next(item for item in root if item.get("classname") == classname and item.get("name") == name)
@@ -290,12 +297,27 @@ class RetryContracts(unittest.TestCase):
                     with self.subTest(classname=classname, name=name, mutation=mutation), self.assertRaises(ValueError):
                         self.require()
 
+    def test_duplicate_background_jvm_and_native_cases_prevent_retry(self):
+        families = (("test-results/testDebugUnitTest", BACKGROUND_JVM_CLASS, BACKGROUND_JVM_CASES),
+                    ("outputs/androidTest-results/connected", HISTORY_SAMPLING_CLASS, BACKGROUND_NATIVE_CASES))
+        for relative, classname, names in families:
+            for name in names:
+                synthetic_reports(self.build)
+                path = self.build / relative / "SYNTHETIC.xml"
+                tree = ET.parse(path)
+                suite = tree.getroot()
+                case = next(c for c in suite if c.get("classname") == classname and c.get("name") == name)
+                mutate(suite, case, "duplicate")
+                tree.write(path)
+                with self.subTest(classname=classname, name=name), self.assertRaises(ValueError):
+                    self.require()
+
     def test_retained_component_families_are_present_in_positive_retry_reports(self):
         self.assertEqual(HISTORY_TEXT_CASES, RETAINED_TEXT_CASES)
         self.assertEqual(HISTORY_CHART_CASES, RETAINED_CHART_CASES)
         path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
         cases = list(ET.parse(path).getroot().iter("testcase"))
-        self.assertEqual(len(cases), 155)
+        self.assertEqual(len(cases), 167)
         for classname, expected in ((HISTORY_TEXT_CLASS, RETAINED_TEXT_CASES),
                                     (HISTORY_CHART_CLASS, RETAINED_CHART_CASES)):
             self.assertEqual({case.get("name") for case in cases if case.get("classname") == classname}, expected)

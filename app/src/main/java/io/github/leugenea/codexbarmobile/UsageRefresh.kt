@@ -36,12 +36,12 @@ internal data class UsageRefreshState(
 /**
  * Subordinate scheduler on ConnectionController's lane/scope, never a session owner.
  * Authenticated reads and generation admission remain the owner's responsibility.
- * A fresh restored session is dormant until Connect/manual read, including on Activity launch.
+ * A fresh restored session is dormant until explicit foreground or enrolled background admission.
  */
 internal class UsageRefresh(
     private val scope: CoroutineScope,
     private val clock: TransportClock,
-    private val read: suspend (Boolean, Boolean, (EndpointObservation) -> Unit, (Long) -> Unit) -> Unit,
+    private val read: suspend (Boolean, Boolean, (EndpointObservation) -> Unit, (Long) -> Unit) -> RefreshReadCompletion?,
     private val changed: (UsageRefreshState) -> Unit,
 ) {
     var state = UsageRefreshState()
@@ -50,7 +50,7 @@ internal class UsageRefresh(
     private var lifecycleManaged = false
     private var activated = false
     private var epoch = 0L
-    private var flight: Job? = null
+    private var flight: UsageRefreshFlight? = null
     private var poll: Job? = null
     private var ticks: Job? = null
     private var pending = false
@@ -62,6 +62,7 @@ internal class UsageRefresh(
     private val eligible get() = !lifecycleManaged || visible
     internal val foregroundEligible get() = eligible
     internal val hasForegroundObservers get() = visible
+    internal val deferredUntilMillis get() = notBeforeMillis.takeIf { clock.now().monotonicMillis < it }
 
     fun foreground(observer: Any, foreground: Boolean) {
         val wasVisible = visible
@@ -69,11 +70,12 @@ internal class UsageRefresh(
         if (foreground) observers.add(observer) else observers.remove(observer)
         if (visible == wasVisible) return
         if (visible) {
+            flight?.foreground = true
             if (activated) { reevaluate(); startTicks(); request() }
         } else {
             poll?.cancel(); poll = null
             ticks?.cancel(); ticks = null
-            flight?.cancel()
+            flight?.let { it.foreground = false; cancelUnobserved(it) }
         }
     }
 
@@ -81,7 +83,7 @@ internal class UsageRefresh(
     fun request(refreshSession: Boolean = false, explicit: Boolean = false) {
         activated = true
         if (visible && ticks == null) startTicks()
-        if (flight?.isActive == true) return
+        if (flight?.job?.isActive == true) { flight?.foreground = eligible; return }
         pending = true
         forceSession = forceSession || refreshSession
         explicitRead = explicitRead || explicit
@@ -95,30 +97,58 @@ internal class UsageRefresh(
             poll?.cancel(); poll = null
             schedule(); return
         }
-        pending = false
         val force = forceSession.also { forceSession = false }
         val explicit = explicitRead.also { explicitRead = false }
+        pending = false
+        startFlight(force, explicit, foreground = true)
+    }
+
+    /** One bounded trigger; never activates foreground ticks, polling or explicit auth retry. */
+    fun retainBackgroundFlight(): UsageRefreshFlight? = flight?.takeIf { it.job.isActive }?.also { it.background++ }
+
+    fun background(): UsageRefreshFlight? {
+        retainBackgroundFlight()?.let { return it }
+        if (flight != null) return null
+        if (deferredUntilMillis != null) return null
+        return startFlight(false, false, foreground = visible).also { it.background++ }
+    }
+
+    fun releaseBackground(current: UsageRefreshFlight) {
+        check(current.background > 0)
+        current.background--
+        cancelUnobserved(current)
+    }
+
+    private fun cancelUnobserved(current: UsageRefreshFlight) {
+        if (!current.foreground && current.background == 0) current.job.cancel()
+    }
+
+    private fun startFlight(force: Boolean, explicit: Boolean, foreground: Boolean): UsageRefreshFlight {
         val owner = epoch
+        val current = UsageRefreshFlight(foreground)
         nextPollMillis = saturatedAdd(clock.now().monotonicMillis, POLL_MILLIS)
         poll?.cancel(); poll = null
         val job = scope.launch(start = CoroutineStart.LAZY) {
-            read(force, explicit, { observation ->
+            val result = read(force, explicit, { observation ->
                 currentCoroutineContextCheck(owner)
                 accept(observation)
             }, { at ->
                 currentCoroutineContextCheck(owner)
                 notBeforeMillis = maxOf(notBeforeMillis, at)
             })
+            current.result.complete(result)
         }
-        flight = job
+        current.job = job
+        flight = current
         // Completion also runs for cancellation before the coroutine body ever entered.
-        job.invokeOnCompletion { scope.launch { finished(job, owner) } }
+        job.invokeOnCompletion { current.result.complete(null); scope.launch { finished(current, owner) } }
         update(state.copy(refreshing = true))
         job.start()
+        return current
     }
 
-    private fun finished(job: Job, owner: Long) {
-        if (flight !== job) return
+    private fun finished(current: UsageRefreshFlight, owner: Long) {
+        if (flight !== current) return
         flight = null
         if (epoch == owner) update(state.copy(refreshing = false))
         drain()
@@ -126,7 +156,7 @@ internal class UsageRefresh(
     }
 
     private fun currentCoroutineContextCheck(owner: Long) {
-        if (owner != epoch || flight?.isActive != true) throw CancellationException()
+        if (owner != epoch || flight?.job?.isActive != true) throw CancellationException()
     }
 
     private fun accept(observation: EndpointObservation) {
@@ -179,7 +209,7 @@ internal class UsageRefresh(
         nextPollMillis = 0
         ticks?.cancel(); ticks = null
         poll?.cancel(); poll = null
-        flight?.cancel()
+        flight?.job?.cancel()
         update(UsageRefreshState(evaluatedAt = clock.now().wall))
     }
 

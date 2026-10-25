@@ -4,6 +4,7 @@ from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DA
 from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT
 from verify_test_reports import HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE
 from verify_test_reports import HISTORY_IMPORT_JVM, HISTORY_IMPORT_NATIVE, REMAINING_TIME_JVM
+from verify_test_reports import BACKGROUND_REFRESH_JVM
 import hashlib
 import json
 import os
@@ -844,6 +845,7 @@ class SyntheticReportTests(unittest.TestCase):
         current |= HISTORY_EXPORT_JVM if kind == "jvm" else HISTORY_EXPORT_NATIVE
         current |= HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
         current |= REMAINING_TIME_JVM if kind == "jvm" else {}
+        current |= BACKGROUND_REFRESH_JVM if kind == "jvm" else {}
         for classname, names in current.items():
             for name in sorted(names):
                 if name != missing:
@@ -865,7 +867,7 @@ class SyntheticReportTests(unittest.TestCase):
                 with self.subTest(kind=kind, container_depth=depth):
                     self.write_report(kind, container_depth=depth)
                     result = verify_reports(self.directory, kind)
-                    self.assertEqual(result["testCount"], 155 if kind == "native" else 118)
+                    self.assertEqual(result["testCount"], 167 if kind == "native" else 135)
 
     def test_remaining_time_jvm_cases_match_source_and_reject_incomplete_reports(self):
         self.assertEqual(sum(map(len, REMAINING_TIME_JVM.values())), 7)
