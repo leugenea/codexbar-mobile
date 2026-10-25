@@ -1,9 +1,11 @@
 package io.github.leugenea.codexbarmobile.history
 
 import io.github.leugenea.codexbarmobile.*
+import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.SyntheticAuth
 import io.github.leugenea.codexbarmobile.transport.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -204,6 +206,11 @@ class BackgroundRefreshTest {
         heldPath = null
         visible(true)
         owner.connect(); settle()
+        // runCurrent drains ingress, not the authenticator's five-second virtual poll delay.
+        assertEquals(ConnectionPhase.AUTHENTICATING, owner.state.value.phase)
+        assertTrue(owner.state.value.auth is AuthState.AwaitingUser)
+        assertNull(owner.backgroundRefreshTarget())
+        awaitEnrollmentReady("successor login and first history append", ConnectionPhase.OBSERVED)
         val successor = target()
         assertNotEquals(expected, successor)
         assertEquals(listOf(1L), journal.entries.map { it.id.ordinal })
@@ -296,11 +303,36 @@ class BackgroundRefreshTest {
         assertTrue(journal.entries.isEmpty())
     } }
 
-    private suspend fun RecordingFixture.target() = requireNotNull(owner.backgroundRefreshTarget())
+    private suspend fun RecordingFixture.target() = requireNotNull(owner.backgroundRefreshTarget()) {
+        "capture checked enrollment: ${enrollmentDiagnostics()}"
+    }
+
+    private suspend fun RecordingFixture.awaitEnrollmentReady(step: String, phase: ConnectionPhase) {
+        try { withTimeout(10_000) {
+            owner.commandsSettled() // Ingress receipt alone is not login or durable append completion.
+            owner.state.first { it.phase == phase && !it.refresh.refreshing }
+            if (phase == ConnectionPhase.OBSERVED) owner.historySnapshots.first {
+                it.readiness == HistoryReadiness.READY && it.partition != null && it.points.isNotEmpty()
+            }
+        } } catch (_: TimeoutCancellationException) {
+            throw AssertionError("$step: ${enrollmentDiagnostics()}")
+        }
+        settle()
+    }
+
+    private fun RecordingFixture.enrollmentDiagnostics(): String {
+        val state = owner.state.value
+        return "last phase=${state.phase}, auth=${state.auth.javaClass.simpleName}, refreshing=${state.refresh.refreshing}, " +
+            "session=${owner.session.snapshot().javaClass.simpleName}, coordinator=${owner.historyAvailability}, " +
+            "readiness=${snapshot.readiness}, partition=${snapshot.partition}, points=${snapshot.points.size}, " +
+            "journal=${journal.phase}, storagePending=${storage.pending}, requests=${fake.calls.size}, virtualMillis=${test.currentTime}"
+    }
 
     private suspend fun TestScope.fixture(block: suspend RecordingFixture.() -> Unit) {
         val fixture = RecordingFixture(this)
-        fixture.settle()
-        try { fixture.block() } finally { fixture.finish() }
+        try {
+            fixture.awaitEnrollmentReady("initial protected restoration", ConnectionPhase.RESTORED)
+            fixture.block()
+        } finally { fixture.finish() }
     }
 }
