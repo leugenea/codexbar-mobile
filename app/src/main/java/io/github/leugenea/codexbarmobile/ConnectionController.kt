@@ -54,6 +54,7 @@ internal class ConnectionController(
     refreshClock: io.github.leugenea.codexbarmobile.transport.TransportClock = reader.clock,
     private val history: HistoryLifetimeCoordinator? = null,
     historyQueueCapacity: Int = 16,
+    private val backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit = {},
 ) {
     internal val historyExportRequest = HistoryExportRequest()
     internal val historyImporterState = HistoryImporterState()
@@ -145,6 +146,7 @@ internal class ConnectionController(
         get() = history?.availability ?: HistoryAvailability.UNAVAILABLE
 
     private fun removeHistory() {
+        backgroundEnrollment(null)
         mutableAccountRemoval.value = AccountRemoval()
         mutableName.value = null
         backgroundSession = null
@@ -205,6 +207,7 @@ internal class ConnectionController(
                 pauseHistoryIfUnobserved()
                 bindHistory(terminal.generation)
                 publish(owner, ConnectionState(ConnectionPhase.RESTORED, terminal))
+                enrollBackground(terminal.generation)
                 usageRefresh.request()
             }
         }
@@ -212,7 +215,12 @@ internal class ConnectionController(
 
     fun readUsage(refreshSession: Boolean = false) = command {
         if (cleanupPending() || session.snapshot() !is SessionResult.Ready) return@command
+        generation?.let(::enrollBackground)
         usageRefresh.request(refreshSession, explicit = true)
+    }
+
+    private fun enrollBackground(active: SessionGeneration) {
+        history?.lifetime(active)?.let { backgroundEnrollment(BackgroundRefreshTarget(it)) }
     }
 
     /** Capture for enrollment only after protected restoration; construction/launch stays dormant. */
@@ -225,11 +233,14 @@ internal class ConnectionController(
     }
 
     /** A worker supplies its enrolled lifetime. It never retries auth as an explicit user action. */
-    internal suspend fun refreshInBackground(expected: BackgroundRefreshTarget): BackgroundRefreshOutcome = withContext(mutationDispatcher) {
+    internal suspend fun refreshInBackground(expected: BackgroundRefreshTarget,
+        minimumSuccessAgeMillis: Long = 0): BackgroundRefreshOutcome = withContext(mutationDispatcher) {
         val owner = revision
         if (mutableState.value.phase == ConnectionPhase.RESTORING) work?.join()
         val active = backgroundGeneration(owner, expected)
             ?: return@withContext BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME)
+        if (usageRefresh.recentSuccess(minimumSuccessAgeMillis))
+            return@withContext BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.RECENT_SUCCESS)
         val interest = BackgroundRefreshInterest(usageRefresh.retainBackgroundFlight())
         acquireBackgroundHistory(active)
         val settlement = ownerScope.async(start = CoroutineStart.UNDISPATCHED) {

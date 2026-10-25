@@ -17,7 +17,8 @@ Launch and Activity recreation always render this flow. There is no saved previe
 or tab selector, and no legacy Bundle selection can switch the destination.
 No storage migration is needed for the retired ephemeral UI choices.
 
-The source manifest requests INTERNET only, with `usesCleartextTraffic="false"`.
+The source manifest requests exactly INTERNET, ACCESS_NETWORK_STATE,
+RECEIVE_BOOT_COMPLETED and WAKE_LOCK, with `usesCleartextTraffic="false"`.
 Debug installs as `io.github.leugenea.codexbarmobile.dev`; release installs as
 `io.github.leugenea.codexbarmobile`. Classes and native/capture identities retain the
 namespace; package data is isolated without an upgrade/migration promise.
@@ -750,7 +751,7 @@ verified provider identity. `refreshInBackground(expected)` awaits restoration a
 that exact continuing partition together with the current owner revision and runtime
 `SessionGeneration`. A stale enrollment cannot activate a replacement login, missing
 credentials or terminal reauthorization. Ordinary construction, launch and restoration
-remain network-dormant. There is no Worker, persisted enrollment or scheduling in this unit.
+remain network-dormant. That seam itself adds no scheduling; issue 195's adapter below consumes it.
 
 The suspend ingress uses the same `NativeConnection.get(applicationContext)` owner and
 existing B2 flight, A10 session, transport and recorder/store. Foreground/background and
@@ -798,6 +799,49 @@ contracts, not a claim of local JVM/native execution. Exact-head hosted compilat
 lint, JVM/native/coverage and independent review remain acceptance gates. Fresh-holder
 restoration is not process-death/reboot proof; OS scheduling, force-stop limits and physical
 device battery/periodicity acceptance belong to #195 and parent #193.
+
+## Ordinary periodic background work (issue 195)
+
+`PeriodicUsageRefresh` is a minimal WorkManager 2.12.0 adapter, not another owner.
+Successful explicit sign-in or manual read enrolls a unique KEEP periodic request
+named for the existing opaque history lifetime. Its only input is that canonical
+UUID, never the credential-slot selector, token, provider identity or display name.
+WorkManager alone persists enrollment; there is no parallel preference/registry/store.
+Repeated activation preserves the request ID and timing. Removal and terminal cleanup
+cancel the refresh tag; a stale cold worker cancels only its own lifetime's unique
+name. Cancel/Activity STOP/holder shutdown do not delete a clean continuing enrollment.
+
+The ordinary interval and initial delay are 15 minutes, with connected-network and
+battery-not-low constraints, but no charging/idle requirement. There is no expedited
+work, foreground service, exact refresh alarm, exemption or persistent process timer.
+`PeriodicUsageRefreshWorker` obtains the same singleton NativeConnection and awaits
+issue 194's exact-target endpoint/durable-history receipt. Coroutine cancellation
+escapes unchanged and releases only its own interest. It neither creates another
+controller nor registers a fake UI observer or retries auth as a user.
+
+Periodic-only admission skips a completed cycle when both latest endpoints succeeded
+less than 15 monotonic minutes ago; manual behavior and issue 194's default admission
+remain unchanged. In-flight requests still join in either order. This freshness cache
+and Retry-After boundary are process-local, not persisted wall-clock promises across
+reboot. Expected transient/offline/storage/rate-limit failures consume this opportunity
+and wait for the next period, never WorkManager's default short `Result.retry()` loop.
+The existing bounded A2 retries still apply inside one endpoint operation. Scheduler
+`Result.success()` acknowledges only the opportunity, not endpoint or history success.
+
+Seven mandatory JVM admission cases and nine native `PeriodicUsageRefreshTest` cases
+extend, rather than replace, issue 194's isolation/receipt/rotation regressions. The
+native contract distinguishes TestDriver constraint/time control and direct worker
+mapping/cancellation from actual minimized real-WorkManager/JobService execution:
+the latter disables only that ID's Greedy delayed tracker, ages its test enqueue
+timestamp and forces its registered ordinary JobScheduler job, then checks the held
+owner ingress, RUNNING state, actual SQLite settlement and fresh-holder local reread.
+It does not call `doWork()` to claim OS dispatch, shorten the delivered interval or
+prove natural 15-minute timing. All registry/count/retry fail-closed controls retain
+the inherited cases. Local source/tooling checks are not hosted native/lint/coverage
+acceptance. Parent 193 still requires physical-phone timing/battery observation.
+
+The exact dependency, manifest/Startup/security surface, backup boundaries and honest
+process-loss/reboot/force-stop limitations are in [background refresh](docs/background-refresh.md).
 
 ## Bounded truthful plot inputs (M4b-1)
 
@@ -1177,7 +1221,7 @@ and actual transport counts; all existing image identities and guards remain req
 
 `ConnectionLaunchSmokeTest` enters the production launcher with an isolated real
 Keystore/SQLite and synthetic transport. Its disconnected, recreation/legacy-Bundle
-and landscape cases retain installed INTERNET plus AndroidX signature-only permission,
+and landscape cases retain the approved installed platform plus AndroidX signature-only permissions,
 cleartext-off and capture-enabled window assertions and real connection/history reachability.
 Ordinary full-display `UiAutomation.takeScreenshot()` captures are checked against
 registered native text pixels (including foreground glyphs, not merely a nonblank

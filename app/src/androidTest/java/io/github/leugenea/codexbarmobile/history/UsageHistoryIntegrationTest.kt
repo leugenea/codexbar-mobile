@@ -590,7 +590,7 @@ private class SamplingGate {
 }
 
 /** No raw/live inputs. A retained callback deliberately ignores cancellation to test the owner fence. */
-private class SyntheticSamplingTransport : AuthTransport {
+internal class SyntheticSamplingTransport : AuthTransport {
     class Call(private val terminal: (TransportResult) -> Unit) {
         @Volatile var cancelled = false
         fun reply(result: TransportResult) { terminal(result) }
@@ -599,7 +599,7 @@ private class SyntheticSamplingTransport : AuthTransport {
     val requests = AtomicLong()
     private val millis = AtomicLong()
     val clock = TransportClock { TransportTime(Instant.ofEpochSecond(1_800_000_000).plusMillis(millis.get()), millis.get()) }
-    @Volatile var usage = response(USAGE)
+    @Volatile var usage: TransportResult = response(USAGE)
     @Volatile var inventory = response("""{"available_count":0,"credits":[]}""")
     @Volatile var tokens = response("""{"access_token":"synthetic-sampling-access","refresh_token":"synthetic-sampling-refresh"}""")
     @Volatile var heldPath: String? = null

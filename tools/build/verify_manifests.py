@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
+from work_manifest_policy import apk_components, check_components
 
 ROOT = Path(__file__).resolve().parents[2]
 ANDROID = "{http://schemas.android.com/apk/res/android}"
@@ -12,9 +13,12 @@ PACKAGE = "io.github.leugenea.codexbarmobile"
 MAIN_ACTIVITY = PACKAGE + ".MainActivity"
 DEBUG_PACKAGE = PACKAGE + '.dev'
 RECEIVER_PERMISSION = DEBUG_PACKAGE + ".DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
-SOURCE_PERMISSIONS = frozenset({"android.permission.INTERNET"})
+SOURCE_PERMISSIONS = frozenset({"android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE",
+                                "android.permission.RECEIVE_BOOT_COMPLETED", "android.permission.WAKE_LOCK"})
 # androidx.core 1.18.0 already contributes this signature-only receiver permission.
 APP_PERMISSIONS = SOURCE_PERMISSIONS | {RECEIVER_PERMISSION}
+WORK_REMOVALS = {("uses-permission", "android.permission.FOREGROUND_SERVICE"),
+                 ("service", "androidx.work.impl.foreground.SystemForegroundService")}
 
 
 def permissions_for(package):
@@ -30,9 +34,11 @@ def check_permissions(permissions, expected=APP_PERMISSIONS) -> list[str]:
 
 
 def check_merge_policy(manifest, path: Path) -> None:
+    check_work_removal_placement(manifest)
     for node in manifest.iter():
         if node.get(TOOLS + "node") in {"remove", "removeAll", "replace"}:
-            raise ValueError(f"Destructive manifest merge directive: {path}")
+            if not approved_work_removal(node):
+                raise ValueError(f"Destructive manifest merge directive: {path}")
         for directive in ("remove", "replace"):
             attributes = node.get(TOOLS + directive)
             if attributes is None:
@@ -45,12 +51,33 @@ def check_merge_policy(manifest, path: Path) -> None:
             raise ValueError(f"Cleartext policy override is forbidden: {path}")
 
 
+def approved_work_removal(node):
+    return ((node.tag, node.get(ANDROID + "name")) in WORK_REMOVALS
+            and node.attrib == {ANDROID + "name": node.get(ANDROID + "name"), TOOLS + "node": "remove"}
+            and not len(node))
+
+
+def check_work_removal_placement(manifest):
+    parents = {child: parent for parent in manifest.iter() for child in parent}
+    markers = [node for node in manifest.iter() if approved_work_removal(node)]
+    keys = [(node.tag, node.get(ANDROID + 'name')) for node in markers]
+    if len(keys) != len(set(keys)):
+        raise ValueError('Duplicate scheduler removal marker')
+    for node in markers:
+        expected_parent = manifest if node.tag == 'uses-permission' else manifest.find('application')
+        if parents.get(node) is not expected_parent:
+            raise ValueError('Misplaced scheduler removal marker')
+
+
 def check_source_manifests(root: Path) -> dict:
     # App variants must inherit the reviewed main policy, not merge an overlay.
     overlays = sorted(path for path in (root / "app/src").glob("*/AndroidManifest.xml")
                       if path.parent.name not in {"main", "test", "androidTest"})
     if overlays:
         raise ValueError(f"App manifest source-set overlays are forbidden: {overlays}")
+    source = ET.parse(root / 'app/src/main/AndroidManifest.xml').getroot()
+    if {(node.tag, node.get(ANDROID + 'name')) for node in source.iter() if approved_work_removal(node)} != WORK_REMOVALS:
+        raise ValueError('Source must retain both exact scheduler removal markers')
     return check_manifest(root / "app/src/main/AndroidManifest.xml", SOURCE_PERMISSIONS)
 
 
@@ -74,7 +101,8 @@ def check_manifest(path: Path, expected=APP_PERMISSIONS) -> dict:
     if manifest.tag != "manifest":
         raise ValueError(f"Not an Android manifest: {path}")
     check_merge_policy(manifest, path)
-    nodes = [node for node in manifest if node.tag in ("uses-permission", "uses-permission-sdk-23")]
+    nodes = [node for node in manifest if node.tag in ("uses-permission", "uses-permission-sdk-23")
+             and not approved_work_removal(node)]
     if any(node.get(ANDROID + "maxSdkVersion") is not None for node in nodes):
         raise ValueError(f"Conditional manifest permission: {path}")
     permissions = check_permissions((node.get(ANDROID + "name") for node in nodes), expected)
@@ -88,6 +116,10 @@ def check_manifest(path: Path, expected=APP_PERMISSIONS) -> dict:
             or applications[0].get(ANDROID + "networkSecurityConfig") is not None):
         raise ValueError(f"Cleartext must be explicitly disabled without a policy override: {path}")
     check_process_owner(applications[0], path)
+    if expected != SOURCE_PERMISSIONS:
+        package = next(name.removesuffix('.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION')
+                       for name in expected if name.endswith('.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'))
+        check_components(applications[0], package)
     return {"manifest": str(path), "requestedPermissions": permissions, "cleartextPermitted": False,
             "mainActivityLaunchMode": "singleTask", "defaultProcessOnly": True}
 
@@ -162,6 +194,7 @@ def check_apk_dump(permissions: str, xmltree: str, package=DEBUG_PACKAGE) -> lis
             or "android:networkSecurityConfig(" in xmltree):
         raise ValueError("APK cleartext policy must be explicitly false without an override")
     check_apk_process_owner(xmltree)
+    apk_components(xmltree, package)
     return result
 
 

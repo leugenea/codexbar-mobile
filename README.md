@@ -42,6 +42,9 @@ there is no data migration between them.
 - Foreground refresh after explicit activation: coalesced connect/resume/manual triggers,
   polling no faster than 60 seconds, bounded cancellable reads and server Retry-After
   deferral. Local countdown/freshness ticks do not request provider data.
+- [Ordinary background refresh](docs/background-refresh.md) after explicit activation:
+  a 15-minute WorkManager target with network/battery constraints and normal OS delays,
+  sharing the same owner and durably recording real successful usage observations.
 - Read-only banked resets with provider summary/inventory counts, per-item status and
   simultaneous local absolute/relative expiry (including sub-minute and expired items).
   Empty, unknown with reasons, unsupported, inaccessible, malformed and conflicting
@@ -58,7 +61,8 @@ Refresh/rotation/local-logout verification on the exact candidate remains a sepa
 owner gate; CI uses only fake transport and synthetic data. Pending login lives only in memory: Activity
 recreation and finish/relaunch share one process-owned bounded attempt; no Activity
 owns or cancels it. Process death requires restarting login.
-Fresh-owner restored credentials remain unresolved and cause no automatic provider requests.
+Ordinary fresh-owner restoration remains unresolved and causes no provider requests.
+A previously enrolled periodic worker may read only its exact continuing local lifetime.
 Launch registers the existing STARTED observer directly. An already activated process
 owner may resume one bounded cycle on launch/recreation; concurrent triggers coalesce.
 
@@ -91,10 +95,11 @@ to 80 Unicode code points, sandbox-private but not Keystore-encrypted, and exclu
 backup like history. Saving a name makes no provider request. Drafts are memory-only;
 committed names survive Activity recreation and fresh-owner restoration from app storage.
 Stale editors cannot rename a successor; a storage failure is reported, not a successful save.
-Real accepted USAGE observations are now recorded only while a live observer is visible.
+Real accepted USAGE observations are recorded with a live observer or admitted bounded
+background storage interest; a worker does not impersonate a visible observer.
 Different successful reads at equal percent remain distinct; cache replay, inventory-only
 success, errors, local ticks and analytical baseline queries add no measured points.
-This is sparse foreground history, not a continuous record: background/error/field/clock
+This is sparse observed history, not a continuous record: background/error/field/clock
 gaps remain explicit, with no retrospective backfill. Bounded durable work reports lost or
 unconfirmed samples and categorical storage failures without replacing live quota.
 An immutable bounded history/query contract supplies measured segments and separate
@@ -110,11 +115,12 @@ exact-merge checks; see the original-parent map in [Architecture](ARCHITECTURE.m
 Native chart fixtures and integrated captures are synthetic, not live-provider evidence. The native
 contract exercises actual Keystore/SQLite with synthetic transport and fresh-runtime
 restoration, not literal process death or verified provider identity. There is no
-verified-account history, background refresh service or widget. CI debug APKs are
+verified-account history, permanent background/foreground service or widget. CI debug APKs are
 test outputs, not signed release deliverables. Minimum Android version is
 Android 8.0 (API 26).
 
-The app declares INTERNET, with cleartext traffic explicitly disabled.
+The app declares INTERNET plus network-state, boot and wake-lock permissions needed
+by ordinary WorkManager scheduling, with cleartext traffic explicitly disabled.
 Explicit connection is the only entry into the
 selected auth flow and two quota/reset GET endpoints; no activation/purchase, account
 header, desktop impersonation or extra route is used.

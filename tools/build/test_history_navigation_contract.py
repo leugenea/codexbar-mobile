@@ -1,6 +1,7 @@
 """Synthetic parser/source controls for production navigation; not Android runtime evidence."""
 from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT
 from background_refresh_contract_expectations import BACKGROUND_NATIVE_CASES
+from periodic_refresh_contract_expectations import PERIODIC_NATIVE_COUNT
 from dashboard_contract_expectations import EXPECTED_DASHBOARD_NATIVE_COUNT
 from verify_test_reports import HISTORY_EXPORT_NATIVE_COUNT, HISTORY_IMPORT_NATIVE_COUNT
 import json
@@ -35,7 +36,7 @@ class HistoryNavigationContracts(unittest.TestCase):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryNavigationTest.kt").read_text()
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_NAVIGATION_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 95 + len(BACKGROUND_NATIVE_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 95 + len(BACKGROUND_NATIVE_CASES) + PERIODIC_NATIVE_COUNT + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
         for name in HISTORY_NAVIGATION_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history navigation"):
@@ -59,7 +60,7 @@ class HistoryNavigationContracts(unittest.TestCase):
         source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryDisplayAuthorityTest.kt").read_text()
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_AUTHORITY_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 100 + len(BACKGROUND_NATIVE_CASES) + len(PHONE_TIME_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 100 + len(BACKGROUND_NATIVE_CASES) + PERIODIC_NATIVE_COUNT + len(PHONE_TIME_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
         for name in HISTORY_AUTHORITY_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history display authority"):

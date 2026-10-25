@@ -5,6 +5,7 @@ from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CUR
 from verify_test_reports import HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE
 from verify_test_reports import HISTORY_IMPORT_JVM, HISTORY_IMPORT_NATIVE, REMAINING_TIME_JVM
 from verify_test_reports import BACKGROUND_REFRESH_JVM
+from periodic_refresh_contract_expectations import PERIODIC_JVM, PERIODIC_NATIVE, PERIODIC_NATIVE_COUNT, PERIODIC_JVM_COUNT
 import hashlib
 import json
 import os
@@ -16,6 +17,7 @@ import sys
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
+from work_manifest_fixtures import components_apk, components_xml
 
 from verify_manifests import (APP_PERMISSIONS, DEBUG_PACKAGE as PACKAGE, MAIN_ACTIVITY, RECEIVER_PERMISSION, SOURCE_PERMISSIONS, check_apk_dump,
                               check_installed_dump, check_installed_path, check_manifest, check_permissions,
@@ -846,6 +848,7 @@ class SyntheticReportTests(unittest.TestCase):
         current |= HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
         current |= REMAINING_TIME_JVM if kind == "jvm" else {}
         current |= BACKGROUND_REFRESH_JVM if kind == "jvm" else {}
+        current |= PERIODIC_JVM if kind == "jvm" else PERIODIC_NATIVE
         for classname, names in current.items():
             for name in sorted(names):
                 if name != missing:
@@ -867,7 +870,7 @@ class SyntheticReportTests(unittest.TestCase):
                 with self.subTest(kind=kind, container_depth=depth):
                     self.write_report(kind, container_depth=depth)
                     result = verify_reports(self.directory, kind)
-                    self.assertEqual(result["testCount"], 167 if kind == "native" else 135)
+                    self.assertEqual(result["testCount"], 167 + PERIODIC_NATIVE_COUNT if kind == "native" else 135 + PERIODIC_JVM_COUNT)
 
     def test_remaining_time_jvm_cases_match_source_and_reject_incomplete_reports(self):
         self.assertEqual(sum(map(len, REMAINING_TIME_JVM.values())), 7)
@@ -1099,17 +1102,23 @@ class SyntheticReportTests(unittest.TestCase):
     def synthetic_manifest(self, permissions=APP_PERMISSIONS):
         declarations = (f'<permission android:name="{RECEIVER_PERMISSION}" android:protectionLevel="signature"/>'
                         if permissions == APP_PERMISSIONS else '')
+        permission_removal = ('<uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove"/>'
+                              if permissions == SOURCE_PERMISSIONS else '')
+        service_removal = ('<service android:name="androidx.work.impl.foreground.SystemForegroundService" tools:node="remove"/>'
+                           if permissions == SOURCE_PERMISSIONS else '')
         return ('<manifest xmlns:android="http://schemas.android.com/apk/res/android" '
                 'xmlns:tools="http://schemas.android.com/tools">'
                 + ''.join(f'<uses-permission android:name="{name}"/>' for name in sorted(permissions))
-                + declarations + '<application android:usesCleartextTraffic="false">'
+                + permission_removal + declarations + '<application android:usesCleartextTraffic="false">'
                 '<activity android:name=".MainActivity" android:launchMode="singleTask"/>'
-                '</application></manifest>')
+                + (components_xml(PACKAGE) if permissions == APP_PERMISSIONS else '')
+                + service_removal
+                + '</application></manifest>')
 
     def synthetic_apk_activity(self, name=MAIN_ACTIVITY):
         return ('    E: activity (line=5)\n'
                 f'      A: android:name(0x01010003)="{name}"\n'
-                '      A: android:launchMode(0x0101001d)=(type 0x10)0x2\n')
+                '      A: android:launchMode(0x0101001d)=(type 0x10)0x2\n' + components_apk(PACKAGE))
 
     def test_manifest_launcher_and_process_policy_rejects_synthetic_regressions(self):
         manifest = self.directory / "SYNTHETIC-AndroidManifest.xml"
@@ -1170,6 +1179,7 @@ class SyntheticReportTests(unittest.TestCase):
             'app/build/intermediates/merged_manifests/debug/processDebugManifest/AndroidManifest.xml': self.synthetic_manifest(),
             'app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml': self.synthetic_manifest(),
             'tools/build/verify_manifests.py': (ROOT / 'tools/build/verify_manifests.py').read_text(),
+            'tools/build/work_manifest_policy.py': (ROOT / 'tools/build/work_manifest_policy.py').read_text(),
         }
         for name, text in files.items():
             path = self.directory / name
@@ -1406,11 +1416,12 @@ else:
                 permissions = ''.join(f'<{tag} android:name="{name}"/>' for name in sorted(expected))
                 declaration = (f'<permission android:name="{RECEIVER_PERMISSION}" android:protectionLevel="signature"/>'
                                if expected == APP_PERMISSIONS else '')
-                valid = prefix + permissions + declaration + application + '</manifest>'
+                observed = application.replace('</application>', components_xml(PACKAGE) + '</application>') if declaration else application
+                valid = prefix + permissions + declaration + observed + '</manifest>'
                 manifest.write_text(valid)
                 self.assertEqual(check_manifest(manifest, expected)["requestedPermissions"], sorted(expected))
                 mutations = [
-                    (valid.replace(application, '<uses-permission android:name="android.permission.CAMERA"/>' + application), "allowlist"),
+                    (valid.replace(observed, '<uses-permission android:name="android.permission.CAMERA"/>' + observed), "allowlist"),
                     (valid.replace(permissions, ''), "allowlist"),
                     (valid.replace('usesCleartextTraffic="false"', 'usesCleartextTraffic="true"'), "Cleartext"),
                     (valid.replace('android:usesCleartextTraffic="false"', ''), "Cleartext"),

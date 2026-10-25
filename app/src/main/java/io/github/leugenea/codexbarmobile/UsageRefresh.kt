@@ -64,6 +64,16 @@ internal class UsageRefresh(
     internal val hasForegroundObservers get() = visible
     internal val deferredUntilMillis get() = notBeforeMillis.takeIf { clock.now().monotonicMillis < it }
 
+    /** Both endpoints must be recent; failures and clock rollback never masquerade as freshness. */
+    internal fun recentSuccess(ageMillis: Long): Boolean {
+        if (state.refreshing || ageMillis <= 0) return false
+        val now = clock.now().monotonicMillis
+        return listOf(state.usage, state.inventory).all { endpoint ->
+            val at = endpoint.successfulAtMillis
+            endpoint.attempt?.error == null && at != null && now >= at && now - at < ageMillis
+        }
+    }
+
     fun foreground(observer: Any, foreground: Boolean) {
         val wasVisible = visible
         lifecycleManaged = true

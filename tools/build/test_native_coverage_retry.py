@@ -5,6 +5,7 @@ from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CUR
 from verify_test_reports import HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE
 from verify_test_reports import HISTORY_IMPORT_JVM, HISTORY_IMPORT_NATIVE, REMAINING_TIME_JVM
 from verify_test_reports import BACKGROUND_REFRESH_JVM
+from periodic_refresh_contract_expectations import PERIODIC_JVM, PERIODIC_NATIVE, PERIODIC_NATIVE_COUNT, PERIODIC_JVM_COUNT
 from background_refresh_contract_expectations import BACKGROUND_JVM_CLASS, BACKGROUND_JVM_CASES, BACKGROUND_NATIVE_CASES
 from test_background_refresh_contract import mutate
 import copy
@@ -64,6 +65,7 @@ def synthetic_reports(build, failed=False):
         current |= HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
         current |= REMAINING_TIME_JVM if kind == "jvm" else {}
         current |= BACKGROUND_REFRESH_JVM if kind == "jvm" else {}
+        current |= PERIODIC_JVM if kind == "jvm" else PERIODIC_NATIVE
         for classname, names in current.items():
             for name in sorted(names):
                 ET.SubElement(suite, "testcase", classname=classname, name=name)
@@ -101,8 +103,8 @@ class RetryContracts(unittest.TestCase):
                                                    self.identity, 7000)
 
     def test_synthetic_reports_keep_all_required_jvm_and_native_cases(self):
-        for kind, relative, count in (("jvm", "test-results/testDebugUnitTest", 135),
-                                      ("native", "outputs/androidTest-results/connected", 167)):
+        for kind, relative, count in (("jvm", "test-results/testDebugUnitTest", 135 + PERIODIC_JVM_COUNT),
+                                      ("native", "outputs/androidTest-results/connected", 167 + PERIODIC_NATIVE_COUNT)):
             with self.subTest(kind=kind):
                 self.assertEqual(verify_reports(self.build / relative, kind)["testCount"], count)
 
@@ -277,7 +279,9 @@ class RetryContracts(unittest.TestCase):
                     ("native", LIVE_USAGE_CLASS, {"recreationKeepsRealScreenAndOwnerAndStoppedActivityAdmitsNoReads"}),
                     ("native", HISTORY_NAVIGATION_CLASS, {"defaultRestoredScreenAndHistoryNavigationNeverActivateTransportOrAddAdmissions"}),
                     ("native", HISTORY_SAMPLING_CLASS, BACKGROUND_NATIVE_CASES),
-                    ("jvm", BACKGROUND_JVM_CLASS, BACKGROUND_JVM_CASES))
+                    ("jvm", BACKGROUND_JVM_CLASS, BACKGROUND_JVM_CASES)) + tuple(
+                        (kind, classname, names) for kind, registry in (("jvm", PERIODIC_JVM), ("native", PERIODIC_NATIVE))
+                        for classname, names in registry.items())
         for kind, classname, names in migrated:
             for name in names:
                 for mutation in ("missing", "failure", "error", "skipped", "wrong-class"):
@@ -299,7 +303,10 @@ class RetryContracts(unittest.TestCase):
 
     def test_duplicate_background_jvm_and_native_cases_prevent_retry(self):
         families = (("test-results/testDebugUnitTest", BACKGROUND_JVM_CLASS, BACKGROUND_JVM_CASES),
-                    ("outputs/androidTest-results/connected", HISTORY_SAMPLING_CLASS, BACKGROUND_NATIVE_CASES))
+                    ("outputs/androidTest-results/connected", HISTORY_SAMPLING_CLASS, BACKGROUND_NATIVE_CASES)) + tuple(
+                        (relative, classname, names) for relative, registry in (
+                            ("test-results/testDebugUnitTest", PERIODIC_JVM), ("outputs/androidTest-results/connected", PERIODIC_NATIVE))
+                        for classname, names in registry.items())
         for relative, classname, names in families:
             for name in names:
                 synthetic_reports(self.build)
@@ -317,7 +324,7 @@ class RetryContracts(unittest.TestCase):
         self.assertEqual(HISTORY_CHART_CASES, RETAINED_CHART_CASES)
         path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
         cases = list(ET.parse(path).getroot().iter("testcase"))
-        self.assertEqual(len(cases), 167)
+        self.assertEqual(len(cases), 167 + PERIODIC_NATIVE_COUNT)
         for classname, expected in ((HISTORY_TEXT_CLASS, RETAINED_TEXT_CASES),
                                     (HISTORY_CHART_CLASS, RETAINED_CHART_CASES)):
             self.assertEqual({case.get("name") for case in cases if case.get("classname") == classname}, expected)

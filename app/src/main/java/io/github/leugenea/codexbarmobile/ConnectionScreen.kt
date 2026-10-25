@@ -47,14 +47,20 @@ internal object NativeConnection {
     }
 
     private fun create(context: Context): ConnectionController =
-        createController(context.applicationContext, null, SystemTransportClock) { delay(it) }
+        createController(context.applicationContext, null, SystemTransportClock, { delay(it) },
+            PeriodicUsageRefresh(androidx.work.WorkManager.getInstance(context.applicationContext))::enrollment)
 
     @VisibleForTesting(otherwise = VisibleForTesting.NONE)
     internal fun create(context: Context, transport: AuthTransport, clock: TransportClock,
-        pause: suspend (Long) -> Unit): ConnectionController = createController(context, transport, clock, pause)
+        pause: suspend (Long) -> Unit): ConnectionController = createController(context, transport, clock, pause, {})
+
+    @VisibleForTesting(otherwise = VisibleForTesting.NONE)
+    internal fun create(context: Context, transport: AuthTransport, clock: TransportClock,
+        pause: suspend (Long) -> Unit, backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit): ConnectionController =
+        createController(context, transport, clock, pause, backgroundEnrollment)
 
     private fun createController(context: Context, suppliedTransport: AuthTransport?, clock: TransportClock,
-        pause: suspend (Long) -> Unit): ConnectionController {
+        pause: suspend (Long) -> Unit, backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit): ConnectionController {
         val app = context.applicationContext
         val session = try { session(app) } catch (_: Exception) { null }
         val store = KeystoreCredentialStore(app, session ?: UUID.randomUUID())
@@ -62,7 +68,8 @@ internal object NativeConnection {
         return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),
             NativeFeasibilityReader(transport, clock, pause),
             CoroutineScope(SupervisorJob() + Dispatchers.IO), storageReady = session != null, refreshClock = clock,
-            history = HistoryLifetimeCoordinator(SQLiteHistoryLifetimeStorage(SQLiteHistoryStore.open(app))))
+            history = HistoryLifetimeCoordinator(SQLiteHistoryLifetimeStorage(SQLiteHistoryStore.open(app))),
+            backgroundEnrollment = backgroundEnrollment)
     }
 
     private fun productionTransport(context: Context): AuthTransport {

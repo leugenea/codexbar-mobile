@@ -288,6 +288,7 @@ class ConnectionLaunchSmokeTest {
         assertEquals(
             "Installed APK must request exactly the approved permission set",
             setOf("android.permission.INTERNET",
+                "android.permission.ACCESS_NETWORK_STATE", "android.permission.RECEIVE_BOOT_COMPLETED", "android.permission.WAKE_LOCK",
                 "${context.packageName}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"),
             info.requestedPermissions.orEmpty().toSet(),
         )

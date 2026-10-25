@@ -6,9 +6,11 @@
   comments and GitHub delivery text in English.
 - Preserve the independent unofficial application boundary. Do not introduce
   provider/auth/storage/history/graph behavior under a documentation task.
-- Preserve the exact INTERNET-only source permission set (plus the existing AndroidX
-  signature-only receiver permission in merged/APK/installed sets) and cleartext-off
-  policy in all app builds. Fresh restored owners remain dormant until explicit activation.
+- Preserve the exact source permission set: INTERNET, ACCESS_NETWORK_STATE,
+  RECEIVE_BOOT_COMPLETED and WAKE_LOCK (plus the existing AndroidX signature-only
+  receiver permission in merged/APK/installed sets). Keep cleartext off and the pinned
+  WorkManager component protections/removal markers narrow. Ordinary restoration is dormant;
+  only previously enrolled work may activate its exact continuing credential lifetime.
 - Add tests for behavior changes. No mandatory TDD, RED commit or test-first order.
 - Coverage minimum: **90%** JaCoCo **INSTRUCTION**, compatible JVM + instrumented
   union; never weaken the threshold or handwritten denominator/exclusions.
