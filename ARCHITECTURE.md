@@ -31,6 +31,12 @@ Debug/test builds do not opt into device cleartext; JVM local-server tests do no
 need that opt-in. Backup/extraction rules exclude app data. Fresh process-owner
 construction/restoration remains dormant before explicit activation, even on launch.
 
+Screenshots and ordinary Android Recents task previews use the normal platform policy
+throughout the app, including login and dialogs. MainActivity does not set a secure
+window flag or disable Recents screenshots; Compose dialogs inherit the parent window
+policy. There is no capture preference. This does not change credential protection,
+secret/log redaction, permissions, cleartext-off or backup/extraction exclusions.
+
 ## Native connection screen
 
 The default Connection screen consumes the real owner state:
@@ -1109,7 +1115,14 @@ and actual transport counts; all existing image identities and guards remain req
 `ConnectionLaunchSmokeTest` enters the production launcher with an isolated real
 Keystore/SQLite and synthetic transport. Its disconnected, recreation/legacy-Bundle
 and landscape cases retain installed INTERNET plus AndroidX signature-only permission,
-cleartext-off and FLAG_SECURE assertions and real connection/history reachability.
+cleartext-off and capture-enabled window assertions and real connection/history reachability.
+Ordinary full-display `UiAutomation.takeScreenshot()` captures are checked against
+registered native text pixels (including foreground glyphs, not merely a nonblank
+background) at launch and after navigation/recreation. Pending-login, connected and
+confirmation-dialog cases use the same assertion. These platform PNGs are separate
+from the unchanged Compose paint/layout gallery; neither gallery is Recents evidence.
+Hosted screenshot execution and actual Recents/physical-phone checks remain separate
+verification boundaries.
 Its activated-owner relaunch case acknowledges foreground loss and command completion,
 holds the automatically resumed usage operation, rejects duplicate admissions and
 requires exactly one usage/inventory pair plus one real history observation after the
@@ -1299,7 +1312,7 @@ These are authored contracts, not local Android runtime, lint or visual approval
 
 - `app/src/test`: JVM state transitions, restore behavior and percentage validation.
 - `app/src/androidTest`: real production Activity/launcher, exact installed permission
-  allowlist, effective cleartext-off policy and FLAG_SECURE, default connection flow,
+  allowlist, effective cleartext-off policy and capture-enabled windows, default connection flow,
   legacy-selection rejection, recreation, foreground coalescing and landscape UI checks.
 - `tools/build`: scaffold/workflow/toolchain/strict dependency contracts, manifests,
   JUnit and compatible class-ID/freshness/denominator coverage validation.

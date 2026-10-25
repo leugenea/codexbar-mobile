@@ -338,7 +338,8 @@ class WorkflowContracts(unittest.TestCase):
         native = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/ConnectionLaunchSmokeTest.kt").read_text()
         for actual in ("createEmptyComposeRule", "ActivityScenario.launch(intent)", "scenario.recreate()",
                        "compose.waitUntil", "last state=", "assertInstalledNetworkPolicy()",
-                       "assertSecureWindow(scenario)", "assertRetiredSurfaceAbsent()", "awaitConnectionScreen",
+                       "assertCaptureEnabledWindow(scenario)", "assertPlatformScreenshot(compose,",
+                       "assertRetiredSurfaceAbsent()", "awaitConnectionScreen",
                        "SemanticsActions.GetTextLayoutResult"):
             self.assertIn(actual, native)
         permission_set = re.search(r'setOf\((.*?)\),', native, re.S)

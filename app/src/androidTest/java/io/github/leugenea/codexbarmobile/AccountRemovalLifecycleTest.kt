@@ -44,6 +44,8 @@ class AccountRemovalLifecycleTest {
             returnDashboard(compose, owner)
             click("remove-account")
             dialogScope()
+            // AlertDialog's separate window must inherit the capture-enabled Activity policy.
+            assertPlatformScreenshot(compose, "account-removal-dialog", "remove-account-confirm")
             click("remove-account-cancel")
             awaitDialogDismissed("Cancel dismisses restored account confirmation")
             click("remove-account")

@@ -35,7 +35,11 @@ current attempt on the serial owner lane and marked sensitive before the clipboa
 Sensitivity suppresses system preview; it does not make the clipboard private storage.
 No automatic clipboard writes or clipboard reads occur. Device-auth IDs, verifiers and
 tokens never enter the clipboard; no code enters Bundle/SavedStateHandle, logs or
-exception diagnostics. The Activity sets FLAG_SECURE. Process death drops a
+exception diagnostics. Screenshots and the normal Android Recents preview are allowed
+throughout the app, including login and dialogs, without a privacy toggle. Visible
+content (including a pending user code) can therefore appear in user captures and
+task previews; screen capture is not a credential-storage or log-redaction boundary.
+Process death drops a
 pending login; encrypted credentials may restore only as unresolved, without automatic
 requests. Credentials use A6 AndroidKeyStore AES-GCM and an atomic no-backup ciphertext
 slot; its random local selector is also under noBackupFilesDir, not provider identity.

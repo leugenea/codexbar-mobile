@@ -46,7 +46,8 @@ class ConnectionLaunchSmokeTest {
             compose.onNodeWithTag("live-weekly-progress").assertDoesNotExist()
             assertRetiredSurfaceAbsent()
             assertInstalledNetworkPolicy()
-            assertSecureWindow(scenario)
+            assertCaptureEnabledWindow(scenario)
+            assertPlatformScreenshot(compose, "launch", "dashboard-status")
             compose.onNodeWithTag("open-account-settings").performScrollTo().assertIsDisplayed().assertHasClickAction()
             assertEquals(0L, fixture.transport.requests.get())
         }
@@ -65,13 +66,14 @@ class ConnectionLaunchSmokeTest {
                     scenario.recreate()
                     ready(ConnectionPhase.IDLE)
                     scenario.onActivity { assertSame(shared, it.connection) }
-                    assertSecureWindow(scenario)
+                    assertCaptureEnabledWindow(scenario)
                     assertRetiredSurfaceAbsent()
                     compose.onNodeWithTag("dashboard-status").assertTextEquals("Sign in to see your usage")
                     assertEquals(0L, fixture.transport.requests.get())
                 }
                 assertEquals(5, legacy.saved)
                 assertEquals(listOf("disconnected", "loading", "error", "demo", "future-invalid"), legacy.restored)
+                assertPlatformScreenshot(compose, "recreated-launch", "dashboard-status")
             }
         } finally { application.unregisterActivityLifecycleCallbacks(legacy) }
     }
@@ -92,9 +94,11 @@ class ConnectionLaunchSmokeTest {
             openDetailRoute(compose, fixture.owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
             compose.onNodeWithTag("connection-history").assertExists()
             compose.onNodeWithTag("history-readiness").performScrollTo().assertTextEquals("unavailable")
+            assertCaptureEnabledWindow(scenario)
+            assertPlatformScreenshot(compose, "history-navigation", "history-readiness")
             openDetailRoute(compose, fixture.owner, DashboardRoute.CONNECTION_DETAILS)
             compose.onNodeWithTag("live-usage").assertExists()
-            assertSecureWindow(scenario)
+            assertCaptureEnabledWindow(scenario)
             assertEquals(0L, fixture.transport.requests.get())
         }
     }
@@ -216,9 +220,10 @@ class ConnectionLaunchSmokeTest {
         compose.onNodeWithText("Sample: 58% used").assertDoesNotExist()
     }
 
-    private fun assertSecureWindow(scenario: ActivityScenario<MainActivity>) {
+    private fun assertCaptureEnabledWindow(scenario: ActivityScenario<MainActivity>) {
         scenario.onActivity {
-            assertTrue("Real launcher keeps FLAG_SECURE", it.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0)
+            assertEquals("Real launcher permits screenshots and task previews", 0,
+                it.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE)
             assertTrue(it.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
         }
     }
