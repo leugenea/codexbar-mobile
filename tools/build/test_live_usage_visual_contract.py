@@ -22,7 +22,8 @@ EXPECTED_LIVE_FACTS = {
     "live-weekly-reset-absolute": "Reset: Oct 10, 2026, 01:00",
     "live-weekly-reset-relative": "Reset: 2 days 1 hour remaining",
 }
-NEW_CASES = {"productionLiveLightPaintAndExactUsageResetCapture", "productionLiveDarkPaintAndLargeFontRemainReadable"}
+NEW_CASES = {"productionLiveLightPaintAndExactUsageResetCapture", "productionLiveDarkPaintAndLargeFontRemainReadable",
+             "pullRefreshActivatesDormantOwnerAndIndicatorWaitsForIndependentInventory"}
 
 
 class LiveUsageVisualContracts(unittest.TestCase):
@@ -82,6 +83,25 @@ class LiveUsageVisualContracts(unittest.TestCase):
         self.assertIn("R.string.history_point_time, TimePresentation.timestamp(point.observedAt, zone, locale)", history)
         self.assertEqual({tag for tag in EXPECTED_LIVE_FACTS if tag.endswith("-reset-absolute")},
                          {"live-five-hour-reset-absolute", "live-weekly-reset-absolute"})
+
+    def test_dashboard_pull_reuses_owner_eligibility_and_removes_both_retired_buttons(self):
+        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
+        refresh = (main / "DashboardRefresh.kt").read_text()
+        navigation = (main / "DashboardNavigation.kt").read_text()
+        self.assertIn("val enabled = UsagePresentation.refreshEnabled(state)", refresh)
+        self.assertIn("val refreshing = UsagePresentation.refreshing(state)", refresh)
+        self.assertIn("enabled = enabled, onRefresh = refresh", refresh)
+        self.assertIn("PullToRefreshDefaults.Indicator(isRefreshing = refreshing, state = pull", refresh)
+        self.assertIn("CustomAccessibilityAction(label) { refresh(); true }", refresh)
+        self.assertIn("else disabled()", refresh)
+        self.assertIn("DashboardRefresh(route == DashboardRoute.DASHBOARD, state, { controller.readUsage() })", navigation)
+        for name in ("DashboardScreen.kt", "LiveUsageScreen.kt"):
+            source = (main / name).read_text()
+            self.assertNotIn('testTag("live-refresh")', source)
+            self.assertNotIn("R.string.live_refresh)", source)
+        resources = (ROOT / "app/src/main/res/values/strings.xml").read_text()
+        self.assertNotIn('name="live_refresh"', resources)
+        self.assertIn('<string name="dashboard_refresh_action">Refresh</string>', resources)
 
     def test_hour_only_reset_copy_is_rejected_when_fixture_has_minutes(self):
         self.captures()

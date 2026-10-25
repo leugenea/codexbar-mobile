@@ -185,7 +185,8 @@ class HistoryNavigationTest {
             assertEquals(7L, fixture.transport.requests.get())
             assertEquals(4L, fixture.transport.gets.get())
             toggleHistoryDetails(compose, fixture.owner)
-            compose.onNodeWithTag("live-refresh").performScrollTo().assertIsEnabled()
+            compose.onNodeWithTag("live-refresh").assertDoesNotExist()
+            assertDashboardRefreshAction(compose, enabled = true)
         }
     }
 

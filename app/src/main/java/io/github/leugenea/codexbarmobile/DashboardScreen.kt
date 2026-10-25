@@ -13,7 +13,7 @@ import io.github.leugenea.codexbarmobile.usage.WindowKind
 import io.github.leugenea.codexbarmobile.usage.UsageObservation
 
 @Composable
-internal fun DashboardScreen(state: ConnectionState, controller: ConnectionController, openAccountSettings: () -> Unit,
+internal fun DashboardScreen(state: ConnectionState, openAccountSettings: () -> Unit,
     source: HistoryGraphSnapshot, current: HistoryPresentationRequest.Current, authority: HistoryDisplayContext?, observer: HistoryUiObserver?) {
     val time = phoneTimeConfiguration()
     val usage = UsagePresentation.present(state, time.zone, time.locale)
@@ -22,7 +22,7 @@ internal fun DashboardScreen(state: ConnectionState, controller: ConnectionContr
     SideEffect { observer?.projectedCurrent(source, five, weekly, state.refresh.evaluatedAt) }
     Column(Modifier.fillMaxWidth().testTag("dashboard"), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         DashboardStatus(state, usage, time)
-        DashboardActions(state, usage, controller, openAccountSettings)
+        if (DashboardPresentation.loginVisible(state.phase)) AccountSettingsLink(openAccountSettings)
         DashboardWindow(usage.windows[0], five, time, usage.observation)
         DashboardWindow(usage.windows[1], weekly, time, usage.observation)
         BankedResetCard(BankedResetPresentation.present(state, time.zone, time.locale), time)
@@ -38,15 +38,6 @@ private fun DashboardStatus(state: ConnectionState, model: PresentedUsage, time:
         if (model.refreshing) Text(stringResource(R.string.dashboard_refreshing))
         model.errorResource?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
         DashboardPresentation.problem(state.problem)?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
-    }
-}
-
-@Composable
-private fun DashboardActions(state: ConnectionState, model: PresentedUsage, controller: ConnectionController, openAccountSettings: () -> Unit) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (DashboardPresentation.loginVisible(state.phase)) AccountSettingsLink(openAccountSettings)
-        if (!DashboardPresentation.loginVisible(state.phase)) Button(onClick = { controller.readUsage() }, enabled = model.refreshEnabled,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("live-refresh")) { Text(stringResource(R.string.live_refresh)) }
     }
 }
 

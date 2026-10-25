@@ -222,6 +222,17 @@ retains percentages after reset passes. No tick requests I/O, invents zero, roll
 reset forward or adds history. Owner retirement synchronously invalidates this cache;
 old-generation/cancelled completions cannot publish or enqueue a successor read.
 
+The dashboard's pull-down gesture replaces the Refresh usage button (also removed
+from connection details). Material3 1.4.0's `Modifier.pullToRefresh` surrounds the
+existing full-height vertical scroll container only on the dashboard; its `enabled`
+flag uses the existing usage presentation's refresh eligibility, so disconnected,
+reauthorization and busy states consume no pull scroll. The Material3 indicator
+tracks the owner's entire `refreshing` cycle, including independent inventory
+completion and errors, rather than a gesture-owned timer. A custom accessibility
+Refresh action invokes the same `controller.readUsage()` command when eligible.
+Short/empty content still has a scrollable viewport; details navigation, account
+settings, controller ownership, coalescing and cache/history contracts are unchanged.
+
 Every state reports binding UNRESOLVED / identity UNVERIFIED. Token receipt and HTTP
 200 do not resolve account association. The owner accepted this single identity-unverified
 session under Q1 and recorded A8 GO on 2026-10-07 in issue #48. CI uses fake transport

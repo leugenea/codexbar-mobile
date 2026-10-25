@@ -47,6 +47,11 @@ internal data class PresentedUsage(
 
 /** Pure B2 -> UI projection. No transport, cache ownership, time arithmetic or entitlement UI. */
 internal object UsagePresentation {
+    fun refreshing(state: ConnectionState): Boolean = state.refresh.refreshing && state.phase in connectedPhases
+
+    fun refreshEnabled(state: ConnectionState): Boolean =
+        state.phase in connectedPhases && !state.busy && !state.refresh.refreshing
+
     fun present(state: ConnectionState, zone: ZoneId, locale: Locale): PresentedUsage {
         val refresh = state.refresh
         val connected = state.phase in connectedPhases
@@ -58,8 +63,8 @@ internal object UsagePresentation {
             window(usage?.weekly, R.string.live_weekly, "live-weekly", refresh, zone, locale),
         )
         return PresentedUsage(
-            status(state, usage != null, error), refresh.refreshing && connected,
-            refresh.usage.stale && usage != null, connected && !state.busy && !refresh.refreshing,
+            status(state, usage != null, error), refreshing(state),
+            refresh.usage.stale && usage != null, refreshEnabled(state),
             error?.let(::errorResource), flag(usage?.allowed, R.string.live_allowed, R.string.live_not_allowed),
             flag(usage?.limitReached, R.string.live_limit_reached, R.string.live_limit_not_reached), windows,
             usage,
