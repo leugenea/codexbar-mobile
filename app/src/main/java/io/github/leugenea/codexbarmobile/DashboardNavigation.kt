@@ -76,11 +76,13 @@ private fun ConnectionRoute(state: ConnectionState, controller: ConnectionContro
     val request = routeRequest(route, current, navigation)
     ObserveHistoryRequest(controller, authority, request, source.request)
     val scroll = key(route) { rememberScrollState() }
-    Column(Modifier.fillMaxSize().testTag("connection-screen").verticalScroll(scroll).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        RouteHeader(route, openDrawer, back)
-        RouteContent(route, state, controller, openBrowser, openAccountSettings, source, authority, current, navigation, observer, exporter, importer,
-            { kind = it.kind }, { after = it })
+    DashboardRefresh(route == DashboardRoute.DASHBOARD, state, { controller.readUsage() }) {
+        Column(Modifier.fillMaxSize().testTag("connection-screen").verticalScroll(scroll).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            RouteHeader(route, openDrawer, back)
+            RouteContent(route, state, controller, openBrowser, openAccountSettings, source, authority, current, navigation, observer, exporter, importer,
+                { kind = it.kind }, { after = it })
+        }
     }
 }
 
@@ -110,7 +112,7 @@ private fun RouteContent(route: DashboardRoute, state: ConnectionState, controll
     browser: () -> Unit, openAccountSettings: () -> Unit, source: HistoryGraphSnapshot, authority: HistoryDisplayContext?, current: HistoryPresentationRequest.Current,
     navigation: HistoryNavigation, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter, kind: (HistoryNavigation) -> Unit, page: (ObservationId?) -> Unit) {
     when (route) {
-        DashboardRoute.DASHBOARD -> DashboardScreen(state, controller, openAccountSettings, source, current, authority, observer)
+        DashboardRoute.DASHBOARD -> DashboardScreen(state, openAccountSettings, source, current, authority, observer)
         DashboardRoute.LOCAL_HISTORY_DETAILS -> {
             val display = historyForDisplay(source, navigation.query, authority)
             SideEffect { observer?.projected(source, display, state.refresh.evaluatedAt) }

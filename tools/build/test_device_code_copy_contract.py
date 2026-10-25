@@ -28,7 +28,7 @@ class DeviceCodeCopyContracts(unittest.TestCase):
         actual = set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source))
         self.assertTrue(DEVICE_CODE_COPY_CASES <= actual)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 121 + len(PHONE_TIME_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 122 + len(PHONE_TIME_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
         for name in DEVICE_CODE_COPY_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native device code copy"):

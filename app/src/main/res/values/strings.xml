@@ -66,7 +66,7 @@
     <string name="live_reauthorize">Authorization required · sign in again in Account settings</string>
     <string name="live_refreshing">Refreshing · last successful values retained</string>
     <string name="live_stale_detail">Usage has not succeeded for at least 15 minutes. These values may be out of date.</string>
-    <string name="live_refresh">Refresh usage</string>
+    <string name="dashboard_refresh_action">Refresh</string>
     <string name="live_five_hour">Five-hour window</string>
     <string name="live_weekly">Weekly window</string>
     <string name="live_window_available">Provider-reported usage</string>

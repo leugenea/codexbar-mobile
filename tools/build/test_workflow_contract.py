@@ -864,7 +864,7 @@ class SyntheticReportTests(unittest.TestCase):
                 with self.subTest(kind=kind, container_depth=depth):
                     self.write_report(kind, container_depth=depth)
                     result = verify_reports(self.directory, kind)
-                    self.assertEqual(result["testCount"], 154 if kind == "native" else 118)
+                    self.assertEqual(result["testCount"], 155 if kind == "native" else 118)
 
     def test_remaining_time_jvm_cases_match_source_and_reject_incomplete_reports(self):
         self.assertEqual(sum(map(len, REMAINING_TIME_JVM.values())), 7)
@@ -1047,7 +1047,7 @@ class SyntheticReportTests(unittest.TestCase):
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", native.read_text())), HISTORY_SAMPLING_CASES)
         self.assertEqual(sum(map(len, (EXPECTED["native"], CREDENTIAL_CASES, CONNECTION_CASES,
                                      USAGE_REFRESH_CASES, LIVE_USAGE_CASES, BANKED_RESET_CASES,
-                                     HISTORY_CASES, HISTORY_LIFETIME_CASES))), 75)
+                                     HISTORY_CASES, HISTORY_LIFETIME_CASES))), 76)
         for name in HISTORY_SAMPLING_CASES:
             self.write_report("native", missing=name)
             with self.assertRaisesRegex(ValueError, "Missing real native history sampling"):

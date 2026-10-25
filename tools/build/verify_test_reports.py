@@ -158,6 +158,7 @@ LIVE_USAGE_CASES = {
     "productionLiveDarkPaintAndLargeFontRemainReadable",
     "fractionalWeeklyOnlyAndMissingResetHaveExactAccessibleSemantics",
     "manualRefreshRetainsValuesAndAnnouncesRefreshingThenError",
+    "pullRefreshActivatesDormantOwnerAndIndicatorWaitsForIndependentInventory",
     "staleAndPassedResetReevaluateLocallyWithoutZeroOrNetwork",
     "exhaustedBarDoesNotOverrideAllowedAndMalformedSiblingsRemainVisible",
     "knownResetShowsSimultaneousLabelsAndRepeatedHourOffset",

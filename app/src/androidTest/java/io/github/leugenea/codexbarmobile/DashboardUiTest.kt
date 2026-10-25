@@ -90,6 +90,7 @@ class DashboardUiTest {
             compose.onNodeWithTag("connect").assertDoesNotExist()
             compose.onNodeWithTag("open-account-settings").assertTextEquals("Account settings")
             compose.onNodeWithTag("live-refresh").assertDoesNotExist()
+            assertDashboardRefreshAction(compose, enabled = false)
             openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             compose.onNodeWithTag("read-usage").performScrollTo().assertIsNotEnabled()
             openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
@@ -97,7 +98,8 @@ class DashboardUiTest {
             assertEquals(0L, fixture.transport.requests.get())
             login()
             compose.onNodeWithTag("connect").assertDoesNotExist()
-            compose.onNodeWithTag("live-refresh").performScrollTo().assertIsEnabled()
+            compose.onNodeWithTag("live-refresh").assertDoesNotExist()
+            assertDashboardRefreshAction(compose, enabled = true)
             compose.onNodeWithTag("account-name-edit").assertDoesNotExist()
             compose.onNodeWithTag("remove-account").assertDoesNotExist()
             val before = fixture.transport.counts()
@@ -290,10 +292,9 @@ class DashboardUiTest {
                 "history-chart-five-hour-first", "history-chart-five-hour-last", "history-chart-five-hour-pace").forEach {
                 HistoryAcceptanceCapture(compose).label(it)
             }
-            listOf("open-drawer", "live-refresh").forEach {
-                val node = compose.onNodeWithTag(it).performScrollTo().assertHasClickAction().fetchSemanticsNode()
-                assertTrue(node.size.height >= 48 * scenarioDensity(scenario))
-            }
+            val menu = compose.onNodeWithTag("open-drawer").performScrollTo().assertHasClickAction().fetchSemanticsNode()
+            assertTrue(menu.size.height >= 48 * scenarioDensity(scenario))
+            assertDashboardRefreshAction(compose, enabled = true)
             assertBankedTableReadable()
             HistoryAcceptanceCapture(compose).label("banked-disclosure-title")
             capture.capture("dashboard-main-landscape-dark-large-font", scenario, fixture, "history-chart-five-hour-pace", WindowKind.FIVE_HOUR)

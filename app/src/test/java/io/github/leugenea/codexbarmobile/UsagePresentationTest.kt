@@ -36,6 +36,10 @@ class UsagePresentationTest {
             assertSame(if (connected) retained.usage.success?.usage else null, model.observation)
             assertEquals(if (connected) NOW else null, model.observation?.observedAt)
             assertEquals(connected && phase != ConnectionPhase.READING, model.refreshEnabled)
+            assertEquals(connected && phase != ConnectionPhase.READING, UsagePresentation.refreshEnabled(ConnectionState(phase, refresh = retained)))
+            val inFlight = ConnectionState(phase, refresh = retained.copy(refreshing = true))
+            assertEquals(connected, UsagePresentation.refreshing(inFlight))
+            assertFalse(UsagePresentation.refreshEnabled(inFlight))
         }
     }
 

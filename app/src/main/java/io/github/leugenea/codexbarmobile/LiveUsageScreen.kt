@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +27,7 @@ import androidx.compose.ui.unit.dp
 
 /** Lives in the connection screen's one scroll container; facts come from the process owner. */
 @Composable
-internal fun LiveUsageScreen(state: ConnectionState, refresh: () -> Unit) {
+internal fun LiveUsageScreen(state: ConnectionState) {
     val time = phoneTimeConfiguration()
     val model = UsagePresentation.present(state, time.zone, time.locale)
     Column(Modifier.fillMaxWidth().testTag("live-usage"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -45,8 +44,6 @@ internal fun LiveUsageScreen(state: ConnectionState, refresh: () -> Unit) {
                     .semantics { liveRegion = LiveRegionMode.Polite })
                 model.errorResource?.let { Text(stringResource(it), Modifier.testTag("live-error")
                     .semantics { liveRegion = LiveRegionMode.Polite }) }
-                Button(onClick = refresh, enabled = model.refreshEnabled,
-                    modifier = Modifier.fillMaxWidth().testTag("live-refresh")) { Text(stringResource(R.string.live_refresh)) }
                 Text(stringResource(R.string.live_provider_allowed, stringResource(model.allowedResource)),
                     Modifier.testTag("live-allowed").semantics { liveRegion = LiveRegionMode.Polite })
                 Text(stringResource(R.string.live_provider_limit, stringResource(model.limitResource)),

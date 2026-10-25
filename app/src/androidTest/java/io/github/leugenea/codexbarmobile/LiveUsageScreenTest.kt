@@ -133,7 +133,7 @@ class LiveUsageScreenTest {
                 listOf("live-identity", "live-status", "live-allowed", "live-limit", "live-rounding",
                     "live-five-hour-percent", "live-weekly-percent", "live-five-hour-reset-absolute",
                     "live-weekly-reset-absolute", "live-five-hour-reset-relative", "live-weekly-reset-relative").forEach(::noOverflow)
-                compose.onNodeWithTag("live-refresh").performScrollTo().assertIsDisplayed().assertHasClickAction()
+                compose.onNodeWithTag("read-usage").performScrollTo().assertIsDisplayed().assertHasClickAction()
                 openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
                 compose.onNodeWithTag("history-select-FIVE_HOUR").performScrollTo().assertIsDisplayed()
             }
@@ -204,19 +204,77 @@ class LiveUsageScreenTest {
         launchLive().use {
             read()
             fake.hold = true
-            click("live-refresh")
+            refreshFromDashboard()
             waitFor("manual refresh reaches synthetic usage") { fake.held.size == 1 && owner.state.value.refresh.refreshing }
             text("live-refreshing", "Refreshing · last successful values retained")
             compose.onNodeWithTag("live-refreshing").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
-            compose.onNodeWithTag("live-refresh").assertIsNotEnabled()
+            returnDashboard(compose, owner)
+            assertDashboardRefreshAction(compose, enabled = false)
+            assertRefreshIndicator()
+            repeat(2) { pullDashboardRefresh(compose) }
+            settleConnectionCommands(compose, owner, "repeated error-cycle pulls coalesce")
+            assertEquals(3, fake.gets.get())
+            openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             text("live-five-hour-percent", "12.5% used")
+            returnDashboard(compose, owner)
+            assertRefreshIndicator()
             fake.held.single()(response("{}", 403))
             waitFor("manual error settles") { !owner.state.value.refresh.refreshing && owner.state.value.refresh.usage.attempt?.error == ReadError.FORBIDDEN }
+            compose.onNodeWithTag("dashboard-refresh-indicator").assertDoesNotExist()
+            assertDashboardRefreshAction(compose, enabled = true)
+            openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             text("live-error", "Usage access forbidden · this does not imply session expiry or zero quota")
             compose.onNodeWithTag("live-error").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
             text("live-five-hour-percent", "12.5% used")
             assertEquals(4, fake.gets.get())
         }
+    }
+
+    @Test fun pullRefreshActivatesDormantOwnerAndIndicatorWaitsForIndependentInventory() {
+        fake.hold = true
+        fake.holdInventory = true
+        launchLive().use {
+            returnDashboard(compose, owner)
+            assertDashboardRefreshAction(compose, enabled = true)
+            compose.onNodeWithTag("dashboard-refresh-indicator").assertDoesNotExist()
+            compose.onNodeWithTag("live-refresh").assertDoesNotExist()
+            pullDashboardRefresh(compose)
+            waitFor("dormant pull admits exactly one held usage GET") { fake.held.size == 1 && owner.state.value.refresh.refreshing }
+            assertEquals(1, fake.gets.get())
+            assertRefreshIndicator()
+            repeat(2) { pullDashboardRefresh(compose) }
+            settleConnectionCommands(compose, owner, "held first pull coalesces repeated gestures")
+            assertEquals(1, fake.gets.get())
+            assertEquals(0, fake.posts.get())
+            fake.held.single()(fake.usage)
+            waitFor("usage settles while independent inventory remains held") { fake.heldInventory.size == 1 }
+            assertEquals(2, fake.gets.get())
+            assertRefreshIndicator()
+            compose.onNodeWithTag("live-five-hour-percent").assertTextEquals("12.5% used")
+            fake.heldInventory.single()(fake.inventory)
+            waitFor("whole owner cycle completes and indicator leaves composition") {
+                !owner.state.value.refresh.refreshing && compose.onAllNodes(hasTestTag("dashboard-refresh-indicator")).fetchSemanticsNodes().isEmpty()
+            }
+            assertDashboardRefreshAction(compose, enabled = true)
+            assertEquals(2, fake.gets.get())
+            assertEquals(0, fake.posts.get())
+            fake.hold = false
+            fake.holdInventory = false
+            val previous = owner.state.value.refresh.usage.attempt
+            val action = compose.onNodeWithTag("dashboard-refresh").fetchSemanticsNode().config[SemanticsActions.CustomActions].single()
+            compose.runOnUiThread { assertTrue(action.action()) }
+            waitFor("accessible refresh invokes the same one-cycle owner command") {
+                owner.state.value.refresh.usage.attempt !== previous && !owner.state.value.refresh.refreshing
+            }
+            assertEquals(4, fake.gets.get())
+            assertEquals(0, fake.posts.get())
+        }
+    }
+
+    private fun assertRefreshIndicator() {
+        compose.onNodeWithTag("dashboard-refresh-indicator").assertIsDisplayed()
+        compose.onNode(hasAnyAncestor(hasTestTag("dashboard-refresh-indicator")) and
+            SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo.Indeterminate)).assertIsDisplayed()
     }
 
     @Test fun staleAndPassedResetReevaluateLocallyWithoutZeroOrNetwork() {
@@ -301,7 +359,7 @@ class LiveUsageScreenTest {
             read()
             noOverflow("live-error")
             noOverflow("live-status")
-            compose.onNodeWithTag("live-refresh").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("read-usage").performScrollTo().assertIsDisplayed()
         }
     }
 
@@ -345,9 +403,10 @@ class LiveUsageScreenTest {
             compose.waitForIdle()
             waitFor("no synthetic credentials restores disconnected") { owner.state.value.phase == ConnectionPhase.IDLE }
             awaitConnectionScreen(compose, owner)
+            assertDisabledPullHasNoRequests()
             openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             text("live-status", "Disconnected · add an account in Account settings")
-            compose.onNodeWithTag("live-refresh").assertIsNotEnabled()
+            compose.onNodeWithTag("read-usage").performScrollTo().assertIsNotEnabled()
             compose.onNodeWithTag("live-five-hour-progress").assertDoesNotExist()
             assertEquals(0, fake.gets.get())
         }
@@ -363,6 +422,7 @@ class LiveUsageScreenTest {
             compose.waitForIdle()
             waitFor("missing key publishes durable reauthorization") { owner.state.value.phase == ConnectionPhase.REAUTH_REQUIRED }
             awaitConnectionScreen(compose, owner)
+            assertDisabledPullHasNoRequests()
             openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             text("live-status", "Authorization required · sign in again in Account settings")
             compose.onNodeWithTag("live-status").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
@@ -487,7 +547,7 @@ class LiveUsageScreenTest {
             fake.usage = response("{}", 403)
             fake.holdInventory = true
             clock.advance(1_000)
-            click("live-refresh")
+            refreshFromDashboard()
             waitFor("usage-only failure published before held inventory") {
                 fake.heldInventory.size == 1 && owner.state.value.refresh.usage.attempt?.error == ReadError.FORBIDDEN
             }
@@ -525,7 +585,7 @@ class LiveUsageScreenTest {
             clock.advance(900_000)
             waitFor("banked inventory stales on its successful clock") { owner.state.value.refresh.inventory.stale }
             fake.holdInventory = true
-            click("live-refresh")
+            refreshFromDashboard()
             waitFor("fresh usage while inventory remains stale") { fake.heldInventory.size == 1 && !owner.state.value.refresh.usage.stale }
             text("banked-stale", "Inventory has not succeeded for at least 15 minutes. Retained entitlements may be out of date.")
             text("banked-refreshing", "Refresh cycle in progress · retained inventory shown")
@@ -547,7 +607,7 @@ class LiveUsageScreenTest {
         launchLive().use {
             read()
             fake.holdInventory = true
-            click("live-refresh")
+            refreshFromDashboard()
             waitFor("old banked inventory GET held") { fake.heldInventory.size == 1 }
             val old = fake.heldInventory.single()
             click("remove-account"); click("remove-account-confirm")
@@ -667,7 +727,7 @@ class LiveUsageScreenTest {
 
     private fun read() {
         val previous = owner.state.value.refresh.usage.attempt
-        click("live-refresh")
+        refreshFromDashboard()
         waitFor("requested usage cycle settles") {
             owner.state.value.refresh.usage.attempt !== previous && !owner.state.value.refresh.refreshing
         }
@@ -681,9 +741,30 @@ class LiveUsageScreenTest {
         node.performClick()
         compose.waitForIdle()
         if (tag in setOf("connect", "remove-account-confirm")) openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
-        if (tag in setOf("connect", "live-refresh", "remove-account-confirm")) {
+        if (tag in setOf("connect", "remove-account-confirm")) {
             settleConnectionCommands(compose, owner, "$tag owner admission")
         }
+    }
+
+    private fun refreshFromDashboard() {
+        returnDashboard(compose, owner)
+        pullDashboardRefresh(compose)
+        settleConnectionCommands(compose, owner, "dashboard gesture owner admission")
+        openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
+    }
+
+    private fun assertDisabledPullHasNoRequests() {
+        assertDashboardRefreshAction(compose, enabled = false)
+        repeat(2) { pullDashboardRefresh(compose) }
+        settleConnectionCommands(compose, owner, "disabled dashboard pulls leave owner dormant")
+        compose.onNodeWithTag("dashboard-refresh-indicator").assertDoesNotExist()
+        compose.onNodeWithTag("live-refresh").assertDoesNotExist()
+        assertEquals(0, fake.gets.get())
+        assertEquals(0, fake.posts.get())
+        // Disabled nested scroll does not intercept the unrelated account-settings action.
+        compose.onNodeWithTag("open-account-settings").performScrollTo().performClick()
+        compose.onNodeWithTag("account-settings").assertExists()
+        returnDashboard(compose, owner)
     }
 
     private fun text(tag: String, expected: String, scroll: Boolean = true) {

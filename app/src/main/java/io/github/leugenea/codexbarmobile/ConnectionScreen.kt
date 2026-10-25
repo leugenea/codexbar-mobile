@@ -97,7 +97,7 @@ internal object NativeConnection {
 
 @Composable
 internal fun ConnectionContent(state: ConnectionState, controller: ConnectionController, openAccountSettings: () -> Unit) {
-    LiveUsageScreen(state) { controller.readUsage() }
+    LiveUsageScreen(state)
     Text(stringResource(R.string.gate_identity))
     Text(stringResource(R.string.gate_boundary))
     Text(stringResource(R.string.gate_lifecycle))
