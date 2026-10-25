@@ -75,6 +75,8 @@ internal class ConnectionController(
     private var historyDeletion: Deferred<HistoryDeleteOutcome>? = null
     private var historyRestore: Job? = null
     private var historyImport: Deferred<HistoryImportOutcome>? = null
+    private var backgroundHistoryInterests = 0
+    private var backgroundSession: SessionGeneration? = null
     private var closed = false
     private val stopped = CompletableDeferred<Unit>()
     private val historyRecorder = UsageHistoryRecorder(ownerScope, storageDispatcher, historyQueueCapacity)
@@ -115,7 +117,7 @@ internal class ConnectionController(
     private suspend fun restoreHistory(active: SessionGeneration) {
         history?.open(active)
         ownerScope.async(storageDispatcher) { history?.restore(active) }.await()
-        if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
+        pauseHistoryIfUnobserved()
         bindHistory(active)
     }
 
@@ -145,6 +147,8 @@ internal class ConnectionController(
     private fun removeHistory() {
         mutableAccountRemoval.value = AccountRemoval()
         mutableName.value = null
+        backgroundSession = null
+        backgroundHistoryInterests = 0
         val coordinator = history ?: return
         if (historyDeletion != null) return
         historyRecorder.retire()
@@ -198,7 +202,7 @@ internal class ConnectionController(
                 if (!current(owner)) return
                 session.adopt(credentials.value)
                 publishName()
-                if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
+                pauseHistoryIfUnobserved()
                 bindHistory(terminal.generation)
                 publish(owner, ConnectionState(ConnectionPhase.RESTORED, terminal))
                 usageRefresh.request()
@@ -211,12 +215,90 @@ internal class ConnectionController(
         usageRefresh.request(refreshSession, explicit = true)
     }
 
+    /** Capture for enrollment only after protected restoration; construction/launch stays dormant. */
+    internal suspend fun backgroundRefreshTarget(): BackgroundRefreshTarget? = withContext(mutationDispatcher) {
+        val owner = revision
+        if (mutableState.value.phase == ConnectionPhase.RESTORING) work?.join()
+        if (!current(owner) || cleanupPending()) return@withContext null
+        val ready = session.snapshot() as? SessionResult.Ready ?: return@withContext null
+        history?.lifetime(ready.envelope.generation)?.let(::BackgroundRefreshTarget)
+    }
+
+    /** A worker supplies its enrolled lifetime. It never retries auth as an explicit user action. */
+    internal suspend fun refreshInBackground(expected: BackgroundRefreshTarget): BackgroundRefreshOutcome = withContext(mutationDispatcher) {
+        val owner = revision
+        if (mutableState.value.phase == ConnectionPhase.RESTORING) work?.join()
+        val active = backgroundGeneration(owner, expected)
+            ?: return@withContext BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME)
+        val interest = BackgroundRefreshInterest(usageRefresh.retainBackgroundFlight())
+        acquireBackgroundHistory(active)
+        val settlement = ownerScope.async(start = CoroutineStart.UNDISPATCHED) {
+            try { completeBackgroundRefresh(owner, active, expected, interest) }
+            finally { historyRecorder.settled(); releaseBackgroundHistory(active) }
+        }
+        try { settlement.await() }
+        finally {
+            interest.attached = false
+            interest.flight?.let { usageRefresh.releaseBackground(it) }
+        }
+    }
+
+    private suspend fun completeBackgroundRefresh(owner: Long, active: SessionGeneration,
+        expected: BackgroundRefreshTarget, interest: BackgroundRefreshInterest): BackgroundRefreshOutcome {
+        historyRestore?.join()
+        if (backgroundGeneration(owner, expected) !== active || !interest.attached)
+            return BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME)
+        bindHistory(active)
+        interest.flight = interest.flight ?: usageRefresh.background()
+        val admitted = interest.flight ?: return deferredBackground()
+        val result = admitted.result.await()
+        val recorded = result?.recording?.await()
+        return if (backgroundGeneration(owner, expected) !== active || result == null || recorded == null)
+            BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME)
+        else BackgroundRefreshOutcome.Completed(result.observations, recorded)
+    }
+
+    private fun backgroundGeneration(owner: Long, expected: BackgroundRefreshTarget): SessionGeneration? {
+        if (!current(owner) || cleanupPending()) return null
+        val ready = session.snapshot() as? SessionResult.Ready ?: return null
+        val active = ready.envelope.generation
+        return active.takeIf { history?.lifetime(it) == expected.partition }
+    }
+
+    private fun acquireBackgroundHistory(active: SessionGeneration) {
+        check(backgroundSession == null || backgroundSession === active)
+        backgroundSession = active
+        backgroundHistoryInterests++
+        historyRecorder.background(true)
+        resumeHistory()
+    }
+
+    private fun releaseBackgroundHistory(active: SessionGeneration) {
+        if (backgroundSession !== active) return
+        check(backgroundHistoryInterests > 0)
+        backgroundHistoryInterests--
+        historyRecorder.background(false)
+        if (backgroundHistoryInterests == 0) backgroundSession = null
+        if (!usageRefresh.hasForegroundObservers && backgroundHistoryInterests == 0) history?.pauseRuntime()
+    }
+
+    private fun pauseHistoryIfUnobserved() {
+        if (!usageRefresh.foregroundEligible && backgroundHistoryInterests == 0) history?.pauseRuntime()
+    }
+
+    private fun deferredBackground() = BackgroundRefreshOutcome.Rejected(
+        if (usageRefresh.deferredUntilMillis != null) BackgroundRefreshRejection.DEFERRED else BackgroundRefreshRejection.RETIRING,
+        usageRefresh.deferredUntilMillis)
+
+    @androidx.annotation.VisibleForTesting(otherwise = androidx.annotation.VisibleForTesting.NONE)
+    internal suspend fun backgroundRefreshInterests(): Int = withContext(mutationDispatcher) { backgroundHistoryInterests }
+
     /** Observer identities keep one Activity from cancelling another visible Activity. */
     fun usageForeground(observer: Any, foreground: Boolean) = command(UsageForegroundCommand(observer, foreground)) {
         usageRefresh.foreground(observer, foreground)
         historyRecorder.foreground(usageRefresh.hasForegroundObservers)
-        if (!usageRefresh.foregroundEligible) history?.pauseRuntime()
-        else if (foreground) resumeHistory()
+        pauseHistoryIfUnobserved()
+        if (foreground) resumeHistory()
         (session.snapshot() as? SessionResult.Ready)?.envelope?.generation?.let(::bindHistory)
     }
 
@@ -236,7 +318,7 @@ internal class ConnectionController(
     }
 
     private fun bindHistory(active: SessionGeneration) {
-        if (usageRefresh.hasForegroundObservers && store.isActive(active))
+        if ((usageRefresh.hasForegroundObservers || backgroundHistoryInterests > 0) && store.isActive(active))
             historyRecorder.bind(active, historyCapability(active), historyRestore?.isActive == true)
     }
 
@@ -249,7 +331,7 @@ internal class ConnectionController(
     /** Prepare while foreground authority is live, before SAF temporarily backgrounds the app. */
     internal suspend fun exportHistory(appVersion: String, exportedAt: java.time.Instant): String? = withContext(mutationDispatcher) {
         val active = generation ?: return@withContext null
-        if (closed || cleanupPending()) return@withContext null
+        if (closed || cleanupPending() || !usageRefresh.hasForegroundObservers) return@withContext null
         val access = historyCapability(active) ?: return@withContext null
         val encoded = withContext(storageDispatcher) { access.exportHistory(appVersion, exportedAt) }
         encoded.takeIf { generation === active && historyCapability(active) === access && !closed }
@@ -257,7 +339,7 @@ internal class ConnectionController(
 
     internal suspend fun historyImportTarget(): HistoryImportTarget? = withContext(mutationDispatcher) {
         val active = generation ?: return@withContext null
-        if (closed || cleanupPending()) return@withContext null
+        if (closed || cleanupPending() || !usageRefresh.hasForegroundObservers) return@withContext null
         historyCapability(active)?.let { HistoryImportTarget(active, it.partition) }
     }
 
@@ -314,9 +396,9 @@ internal class ConnectionController(
     }
 
     private suspend fun refreshUsage(refreshSession: Boolean, explicit: Boolean,
-        observed: (EndpointObservation) -> Unit, admissionDeferred: (Long) -> Unit) {
-        if (cleanupPending()) return
-        val active = session.snapshot() as? SessionResult.Ready ?: return
+        observed: (EndpointObservation) -> Unit, admissionDeferred: (Long) -> Unit): RefreshReadCompletion? {
+        if (cleanupPending()) return null
+        val active = session.snapshot() as? SessionResult.Ready ?: return null
         val owner = revision
         val auth = AuthState.Connected(active.envelope.generation)
         if (explicit) session.retryTransient()
@@ -325,21 +407,23 @@ internal class ConnectionController(
         val result = if (refreshSession) session.refresh(active.envelope, session.deadline()) else null
         bindHistory(active.envelope.generation)
         val admission = historyRecorder.capture(active.envelope.generation)
-        observe(owner, auth, { observation ->
+        val facts = observe(owner, auth, { observation ->
             observed(observation) // B2 cancellation/epoch check precedes subordinate sampling.
             if (current(owner) && store.isActive(active.envelope.generation)) historyRecorder.accept(admission, observation)
         }, admissionDeferred, result as? SessionResult.Failed)
+        if (!admission.delivered) admission.completion.complete(HistoryRecordingOutcome.NotObserved)
+        return RefreshReadCompletion(facts, admission.completion)
     }
 
     private suspend fun observe(owner: Long, auth: AuthState, observed: (EndpointObservation) -> Unit,
         admissionDeferred: (Long) -> Unit,
-        refreshFailure: SessionResult.Failed? = null) {
+        refreshFailure: SessionResult.Failed? = null): FeasibilityObservations {
         val facts = if (refreshFailure == null) authenticatedReader.read(observed, admissionDeferred) else FeasibilityObservations(
             EndpointObservation(io.github.leugenea.codexbarmobile.transport.ReadOperation.USAGE, error = refreshFailure.problem.readError()),
             EndpointObservation(io.github.leugenea.codexbarmobile.transport.ReadOperation.RESET_INVENTORY, error = refreshFailure.problem.readError()),
         ).also { observed(it.usage); observed(it.inventory) }
-        if (!current(owner) || session.snapshot() is SessionResult.Failed) return
-        publish(owner, observedState(auth, facts))
+        if (current(owner) && session.snapshot() !is SessionResult.Failed) publish(owner, observedState(auth, facts))
+        return facts
     }
 
     /** A10 terminal settlement must outlive the lifecycle-cancellable usage waiter. */
@@ -441,6 +525,8 @@ internal class ConnectionController(
         usageRefresh.reset()
         work?.cancel()
         authenticator.cancel()
+        backgroundSession = null
+        backgroundHistoryInterests = 0
         historyRecorder.retire()
         history?.retire()
         mutableName.value = null

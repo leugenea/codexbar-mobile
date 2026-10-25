@@ -50,6 +50,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
     private var generation: SessionGeneration? = null
     private var access: HistoryRuntimeAccess? = null
     private var staged: HistoryPartition? = null
+    private var lifetime: HistoryPartition? = null
     private var removal: HistoryDeletion? = null
     private var runtimeAllowed = true
     private var accountName: AccountNameState? = null
@@ -94,6 +95,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
             if (!accepts(generation)) { bound?.revoke(); return@synchronized }
             requiresRemoval = result == HistoryLifetimeOutcome.RemovalRequired
             staged = null
+            lifetime = bound?.partition
             adoptName(generation, bound?.partition, name)
             if (!runtimeAllowed) {
                 bound?.revoke()
@@ -134,6 +136,11 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         access.takeIf { accepts(generation) }
     }
 
+    /** Only a checked continuing ACTIVE binding supplies background enrollment identity. */
+    fun lifetime(generation: SessionGeneration): HistoryPartition? = synchronized(admission) {
+        lifetime.takeIf { accepts(generation) }
+    }
+
     /** Last foreground observer left: retain lifetime/generation, revoke every held runtime port. */
     fun pauseRuntime() = synchronized(admission) {
         runtimeAllowed = false
@@ -149,6 +156,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         access = null
         generation = null
         staged = null
+        lifetime = null
         accountName = null
         availability = HistoryAvailability.UNAVAILABLE
     }

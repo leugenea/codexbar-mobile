@@ -207,11 +207,13 @@ another session owner. The default Activity observes `repeatOnLifecycle(STARTED)
 identity-tagged observers keep one disappearing Activity from cancelling another
 visible observer. Connect/manual read activates refresh for the current generation.
 Protected restoration in a fresh owner remains dormant until an explicit action,
-including on default launch. Holder construction alone does not activate reads.
+including on default launch. A background caller may supply only its previously
+enrolled continuing history lifetime, as described below; holder construction alone does not activate reads.
 An already activated process owner becomes foreground eligible on Activity launch
 without a tab click. Foreground launch/recreation/resume requests one bounded cycle;
 manual/resume/connect triggers coalesce while a cycle is in flight. Foreground loss
-cancels eligible reads, local ticks and polls but never owns token rotation or auth.
+cancels reads only without an independent background consumer, and always stops local
+ticks and polls; it never owns token rotation or auth.
 A10's independent rotation settlement and durable quarantine rules are unchanged;
 only an explicit manual read unlocks a retained transient token-refresh failure,
 never an automatic poll or lifecycle-resume trigger.
@@ -435,8 +437,10 @@ UNRESOLVED remain unchanged.
 
 Runtime retirement revokes captured reads/appends immediately without waiting on SQLite
 I/O. The last existing B2 foreground observer leaving revokes history ports but retains the
-lifetime and credentials; return re-adopts ACTIVE through storage with fresh runtime
-capability. Cancel and holder shutdown also revoke without turning a clean lifetime into a
+lifetime and credentials, unless admitted background work still owns storage interest.
+In that case UI display authority is still revoked immediately, while the single storage
+port remains only through actual completion. Otherwise return re-adopts ACTIVE through storage
+with fresh runtime capability. Cancel and holder shutdown also revoke without turning a clean lifetime into a
 new login. Activities still only observe/command the process owner and do not delete it.
 An already irreversible-admitted append can finish, but removal fences and deletes it
 before terminal success. Already-captured reads recheck authority before returning.
@@ -660,8 +664,9 @@ lifecycle admission; it can attach only to the matching fresh capability. Failed
 discards it explicitly. Already-failed durable observations are never replayed or retried.
 A worker rechecks revocation before read and append, and the native store remains the
 irreversible-write authority. Publication rechecks the identity-bound runtime token and
-query revision. Last-observer loss, cancel, logout/replacement and shutdown immediately
-clear queued facts/views and retire publication authority; no held read/write can expose
+query revision. Last-observer loss without background interest, cancel, logout/replacement and shutdown immediately
+clear queued facts/views and retire publication authority; UI authority is also retired on STOP
+when background storage is retained. No held read/write can expose
 another login. An already irreversible-admitted commit may finish, but existing combined
 removal deletes it before terminal success. Fresh runtime reads are local and dormant:
 restoration or opening a history view never activates B2 provider requests.
@@ -735,6 +740,64 @@ these cases without removing the preceding 72. Native execution, exact-head inde
 review and >=90% compatible JVM/native INSTRUCTION coverage remain hosted gates; source or
 cached-toolchain compilation alone cannot establish those outcomes. #8 owns graph/UI/
 accessibility; #9 owns assembled release/live acceptance, with #69 separate.
+
+## Owner-scoped background refresh admission (issue 194)
+
+`ConnectionController.backgroundRefreshTarget()` captures the existing opaque ACTIVE
+history partition only after protected credential/history restoration. This is a local
+credential-lifetime enrollment value, not the connection-slot UUID, token contents or
+verified provider identity. `refreshInBackground(expected)` awaits restoration and checks
+that exact continuing partition together with the current owner revision and runtime
+`SessionGeneration`. A stale enrollment cannot activate a replacement login, missing
+credentials or terminal reauthorization. Ordinary construction, launch and restoration
+remain network-dormant. There is no Worker, persisted enrollment or scheduling in this unit.
+
+The suspend ingress uses the same `NativeConnection.get(applicationContext)` owner and
+existing B2 flight, A10 session, transport and recorder/store. Foreground/background and
+background/background overlap share the actual endpoint cycle and exactly-once recording
+ticket. Background interest is not a foreground observer: it does not activate one-second
+ticks, visible polling or explicit-user `retryTransient()`. A retained Retry-After boundary
+returns a categorical DEFERRED rejection with its process-local monotonic boundary instead
+of scheduling a hidden wakeup. An already retiring flight is also an honest rejection.
+
+`BackgroundRefreshOutcome.Completed` reports the actual independent endpoint outcomes
+and this admission's `HistoryRecordingOutcome`: acknowledged Stored ordinal, categorical
+Failed, NotObserved for a usage error, or Revoked. Completed is not itself a success flag;
+inventory success cannot turn failed usage into a stored measurement. The recorder carries
+the completion through its bounded waiting/append queue and settles it from the actual
+read/append outcome. A worker-idle join, command marker or `refreshing == false` is never a
+durable success receipt. The existing UI refreshing indicator still follows endpoint work,
+so it can finish before a held history append is acknowledged.
+
+The caller owns only its network interest. Cancellation detaches that caller and cancels
+the flight only without another UI/background consumer; it never calls global Cancel,
+Sign out or shutdown. A subordinate process child retains storage through an already
+accepted observation's real settlement, even if its caller is cancelled. The last storage
+interest releases the port when no UI remains. A10's independent accepted rotation child
+and quarantine/deletion rules are unchanged. Logout/replacement/terminal reauthorization
+synchronously retire the interest generation and recorder binding; old releases cannot
+decrement a successor's interest or acknowledge predecessor data as successor success.
+
+UI display permission is separate from that retained storage activity. STOP immediately
+clears the display slot, payload and endpoint metadata even while background work persists;
+return installs a fresh UI context/selection. Background-only recording publishes no page
+or display authority, and UI export/import-target admission still requires an actual
+foreground observer. Storage schema, retention, durable ordinal admission and the normal
+foreground accepted-observation path remain unchanged.
+
+Seventeen mandatory `BackgroundRefreshTest` JVM methods use the actual owner/B2/recorder
+topology and virtual time for overlap, cancellation, durable outcomes, dormant/mismatched
+restoration, Retry-After, no hidden ticks/polls, replacement, terminal auth and independent
+rotation settlement. Twelve added mandatory `UsageHistoryIntegrationTest` methods use
+actual isolated Keystore/SQLite and the production-default owner lane, real pre/post-write
+admission gates, Activity STOP, cold-holder restoration and late replies. The fail-closed
+report/retry contracts retain all inherited identities and require these additions,
+including duplicate rejection; captures, permissions, dependencies and the >=90% whole-
+handwritten compatible INSTRUCTION coverage policy are unchanged. These are authored test
+contracts, not a claim of local JVM/native execution. Exact-head hosted compilation,
+lint, JVM/native/coverage and independent review remain acceptance gates. Fresh-holder
+restoration is not process-death/reboot proof; OS scheduling, force-stop limits and physical
+device battery/periodicity acceptance belong to #195 and parent #193.
 
 ## Bounded truthful plot inputs (M4b-1)
 

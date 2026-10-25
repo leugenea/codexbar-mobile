@@ -1,0 +1,35 @@
+"""Independent issue-194 report oracle; not imported by the production report validator."""
+BACKGROUND_JVM_CLASS = "io.github.leugenea.codexbarmobile.history.BackgroundRefreshTest"
+BACKGROUND_JVM_CASES = {
+    "appendAndPreappendFailuresHaveHonestNonSuccessReceipts",
+    "automaticBackgroundDoesNotUnlockRetainedTransientRefreshFailure",
+    "backgroundFirstManualOverlapSharesEndpointPairAndAppend",
+    "backgroundHonorsRetryBoundaryWithoutSchedulingAHiddenWakeup",
+    "backgroundOnlyRecordsWithoutDisplayAuthorityPollingOrTicks",
+    "cancellationOfOnlyBackgroundConsumerCancelsReadAndRejectsLateReply",
+    "cancelledBackgroundConsumerPreservesIndependentBackgroundConsumer",
+    "cancelledBackgroundConsumerPreservesVisibleUiConsumer",
+    "cancellingWorkerNeverRetiresIndependentAcceptedTokenRotation",
+    "coldAdmissionWaitsForProtectedRestorationAndRejectsDifferentLifetimeWithoutRequests",
+    "lastUiStopHidesAuthorityWithoutCancellingBackgroundConsumer",
+    "manualFirstBackgroundOverlapSharesEndpointPairAndAppend",
+    "receiptWaitsForAdmittedStorageAndCancellationDoesNotDropAcceptedObservation",
+    "removalReloginAndLateReplyCannotReuseOldEnrollment",
+    "terminalReauthorizationRevokesEnrollmentAndCannotReturnStoredSuccess",
+    "unavailableRestorationNeverEnrolsOrActivatesProviderRequests",
+    "usageErrorIsNotAStoredMeasurementAndInventoryFailureDoesNotEraseStoredUsage",
+}
+BACKGROUND_NATIVE_CASES = {
+    "actualNativeAppendFailureCannotProduceSuccessfulBackgroundReceipt",
+    "backgroundFirstUiOverlapSharesOneCycleAndOneDurableObservation",
+    "backgroundOnlyRefreshReceiptWaitsForActualSQLiteAppendAndSurvivesFreshOwner",
+    "backgroundPreAndPostAdmissionWritesSettleBeforeRemovalWithoutSuccessReceipt",
+    "cancelledBackgroundWaiterDoesNotCancelVisibleUiFlightOrDuplicateAppend",
+    "cancelledOnlyBackgroundWaiterReleasesFlightAndRejectsLateReply",
+    "cancellingWorkerAfterEndpointDeliveryKeepsAdmittedActualSQLiteAppend",
+    "coldRestoredBackgroundRefreshChecksExpectedPartitionWithoutImplicitRequests",
+    "composeStopRevokesUiAuthorityButRetainedBackgroundRefreshStillPersists",
+    "noAccountAndTerminalReauthorizationCannotActivateBackgroundEnrollment",
+    "removalAndReloginRejectBackgroundLateRepliesAndOldEnrollment",
+    "uiFirstBackgroundOverlapSharesOneCycleAndOneDurableObservation",
+}

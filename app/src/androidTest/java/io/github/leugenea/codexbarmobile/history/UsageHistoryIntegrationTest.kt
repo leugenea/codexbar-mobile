@@ -39,6 +39,7 @@ class UsageHistoryIntegrationTest {
     private val gates = mutableListOf<SamplingGate>()
     private var hooks: HistoryStorageHooks? = null
     private var observer = Any()
+    private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Before fun prepare() {
         root = File(application.noBackupFilesDir, "synthetic-sampling-${UUID.randomUUID()}").canonicalFile
@@ -61,6 +62,7 @@ class UsageHistoryIntegrationTest {
 
     @After fun cleanup() {
         gates.forEach { it.release() }
+        background.cancel()
         try { NativeConnection.resetForTests() }
         finally {
             NativeConnection.factory = originalFactory
@@ -249,6 +251,283 @@ class UsageHistoryIntegrationTest {
         assertNotEquals(ConnectionPhase.SIGNED_OUT, current.state.value.phase)
     }
 
+    @Test fun backgroundOnlyRefreshReceiptWaitsForActualSQLiteAppendAndSurvivesFreshOwner() {
+        val (gate, armed) = appendGate()
+        val expected = enrolledDetachedOwner().second
+        NativeConnection.resetForTests()
+        val current = owner() // The suspend ingress, not a phase poll, awaits protected restoration.
+        armed.set(true)
+        val pending = launchBackground(current, expected)
+        try {
+            gate.await("background actual SQLite append reached")
+            phase(current, ConnectionPhase.OBSERVED)
+            assertFalse("network completion is not durable acknowledgement", pending.isCompleted)
+            assertNull(current.currentHistoryDisplayContext())
+            assertTrue(current.historySnapshots.value.points.isEmpty())
+        } finally { gate.release() }
+        val result = completed(pending, current, "background durable append acknowledged")
+        assertTrue(result.history is HistoryRecordingOutcome.Stored)
+        assertNull(result.observations.usage.error)
+        assertNull(result.observations.inventory.error)
+        assertEquals(4L, fake.gets.get())
+        reopenHistory(expected, 2)
+        assertEquals(4L, fake.gets.get())
+    }
+
+    @Test fun backgroundFirstUiOverlapSharesOneCycleAndOneDurableObservation() { overlapBackground(true) }
+    @Test fun uiFirstBackgroundOverlapSharesOneCycleAndOneDurableObservation() { overlapBackground(false) }
+
+    private fun overlapBackground(backgroundFirst: Boolean) {
+        val (current, expected) = enrolledDetachedOwner()
+        fake.heldPath = ReadOperation.USAGE.path
+        if (!backgroundFirst) { current.usageForeground(observer, true); settled(current) }
+        val pending = launchBackground(current, expected)
+        awaitConsumers(current, 1, "overlap background consumer admitted")
+        val held = fake.awaitHeld("overlap usage admitted")
+        if (backgroundFirst) { current.usageForeground(observer, true); settled(current) }
+        current.readUsage(); settled(current)
+        assertEquals(3L, fake.gets.get())
+        held.reply(fake.usage)
+        val result = completed(pending, current, "overlap actual write acknowledged")
+        assertTrue(result.history is HistoryRecordingOutcome.Stored)
+        history(current, "overlap has exactly one additional actual measurement") { it.points.size == 2 }
+        assertEquals(4L, fake.gets.get())
+        assertEquals(2, current.historySnapshots.value.storage!!.entries.count { it.windows.any { window -> window.point != null } })
+    }
+
+    @Test fun composeStopRevokesUiAuthorityButRetainedBackgroundRefreshStillPersists() {
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        val current = owner()
+        try {
+            awaitConnectionScreen(compose, current)
+            current.connect(); phase(current, ConnectionPhase.OBSERVED)
+            composeHistory(current, "real Activity seed persists") { recordedHistory(it).points.size == 1 }
+            val expected = target(current)
+            val permission = requireNotNull(current.historySnapshots.value.displayPermission)
+            fake.heldPath = ReadOperation.USAGE.path
+            val pending = launchBackground(current, expected)
+            awaitConsumers(current, 1, "worker interest attached before actual STOP")
+            val held = fake.awaitHeld("worker read reached before actual STOP")
+            scenario.moveToState(Lifecycle.State.CREATED)
+            composeHistory(current, "actual STOP retires display authority while storage is retained") {
+                it.readiness == HistoryReadiness.UNAVAILABLE && current.currentHistoryDisplayContext() == null
+            }
+            assertNull(permission.current())
+            assertFalse(held.cancelled)
+            held.reply(fake.usage)
+            assertTrue(completed(pending, current, "STOP background append acknowledged").history is HistoryRecordingOutcome.Stored)
+            assertEquals(HistoryAvailability.UNAVAILABLE, current.historyAvailability)
+            assertTrue(current.historySnapshots.value.points.isEmpty())
+            assertEquals(4L, fake.gets.get())
+            scenario.close()
+            reopenHistory(expected, 2)
+            assertEquals(4L, fake.gets.get())
+        } finally { scenario.close() }
+    }
+
+    @Test fun cancelledOnlyBackgroundWaiterReleasesFlightAndRejectsLateReply() {
+        val (current, expected) = enrolledDetachedOwner()
+        fake.heldPath = ReadOperation.USAGE.path
+        val pending = launchBackground(current, expected)
+        awaitConsumers(current, 1, "sole worker attached before cancellation")
+        val held = fake.awaitHeld("sole worker usage reached")
+        pending.cancel()
+        awaitConsumers(current, 0, "sole worker cancellation releases storage interest")
+        assertTrue(held.cancelled)
+        held.reply(fake.usage); settled(current)
+        assertEquals(3L, fake.gets.get())
+        reopenHistory(expected, 1)
+        assertEquals(3L, fake.gets.get())
+    }
+
+    @Test fun cancelledBackgroundWaiterDoesNotCancelVisibleUiFlightOrDuplicateAppend() {
+        val (current, expected) = enrolledDetachedOwner()
+        fake.heldPath = ReadOperation.USAGE.path
+        current.usageForeground(observer, true); settled(current)
+        val held = fake.awaitHeld("visible UI read reached")
+        val pending = launchBackground(current, expected)
+        awaitConsumers(current, 1, "worker joined UI read before cancellation")
+        pending.cancel()
+        bounded(current, "worker caller detaches while UI retains the read") { pending.join() }
+        assertFalse(held.cancelled)
+        held.reply(fake.usage)
+        history(current, "UI consumer records one actual observation after worker cancellation") { it.points.size == 2 }
+        assertEquals(4L, fake.gets.get())
+        assertEquals(listOf(1L, 2L, 3L), current.historySnapshots.value.storage!!.entries.map { it.id.ordinal })
+    }
+
+    @Test fun cancellingWorkerAfterEndpointDeliveryKeepsAdmittedActualSQLiteAppend() {
+        val (gate, armed) = appendGate()
+        val (current, expected) = enrolledDetachedOwner()
+        armed.set(true)
+        val pending = launchBackground(current, expected)
+        try {
+            gate.await("cancelled worker actual append reached")
+            phase(current, ConnectionPhase.OBSERVED)
+            assertFalse(pending.isCompleted)
+            pending.cancel()
+            bounded(current, "worker cancellation detaches caller from admitted append") { pending.join() }
+            awaitConsumers(current, 1, "process retains admitted storage after caller cancellation")
+            assertNull(current.currentHistoryDisplayContext())
+        } finally { gate.release() }
+        awaitConsumers(current, 0, "actual append acknowledgement releases final storage interest")
+        assertEquals(HistoryAvailability.UNAVAILABLE, current.historyAvailability)
+        reopenHistory(expected, 2)
+        assertEquals(4L, fake.gets.get())
+    }
+
+    @Test fun actualNativeAppendFailureCannotProduceSuccessfulBackgroundReceipt() {
+        val armed = java.util.concurrent.atomic.AtomicBoolean()
+        hooks = object : HistoryStorageHooks {
+            override fun beforeCommit() { if (armed.compareAndSet(true, false)) throw java.io.IOException("synthetic append failure") }
+        }
+        val (current, expected) = enrolledDetachedOwner()
+        armed.set(true)
+        val result = completed(launchBackground(current, expected), current, "actual native append failure acknowledged")
+        assertTrue(result.history is HistoryRecordingOutcome.Failed)
+        assertEquals(HistoryRecorderProblem.WRITE_FAILURE, (result.history as HistoryRecordingOutcome.Failed).problem)
+        assertNotNull(current.state.value.refresh.usage.success)
+        assertEquals(4L, fake.gets.get())
+        reopenHistory(expected, 1)
+        assertEquals(listOf(1L), owner().historySnapshots.value.storage!!.entries.map { it.id.ordinal })
+    }
+
+    @Test fun coldRestoredBackgroundRefreshChecksExpectedPartitionWithoutImplicitRequests() {
+        val expected = enrolledDetachedOwner().second
+        val requests = fake.requests.get()
+        NativeConnection.resetForTests()
+        val current = owner()
+        phase(current, ConnectionPhase.RESTORED)
+        assertEquals(requests, fake.requests.get())
+        assertEquals(expected, target(current))
+        val wrong = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
+        val rejected = bounded(current, "cold mismatched enrollment rejected") { current.refreshInBackground(wrong) }
+        assertEquals(BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME), rejected)
+        assertEquals(requests, fake.requests.get())
+        val result = completed(launchBackground(current, expected), current, "cold matching enrollment records")
+        assertTrue(result.history is HistoryRecordingOutcome.Stored)
+        assertEquals(requests + 2, fake.requests.get())
+        reopenHistory(expected, 2)
+    }
+
+    @Test fun removalAndReloginRejectBackgroundLateRepliesAndOldEnrollment() {
+        val (current, expected) = enrolledDetachedOwner()
+        fake.heldPath = ReadOperation.USAGE.path
+        val pending = launchBackground(current, expected)
+        awaitConsumers(current, 1, "removed lifetime worker attached")
+        val held = fake.awaitHeld("removed lifetime usage reached")
+        current.signOut(); phase(current, ConnectionPhase.SIGNED_OUT)
+        assertDeletion()
+        assertTrue(bounded(current, "removed worker returns rejection") { pending.await() } is BackgroundRefreshOutcome.Rejected)
+        assertTrue(held.cancelled)
+        fake.heldPath = null
+        current.usageForeground(observer, true); settled(current)
+        current.connect(); phase(current, ConnectionPhase.OBSERVED)
+        history(current, "successor login has only its own ordinal-one observation") { it.points.size == 1 }
+        val successor = target(current)
+        assertNotEquals(expected, successor)
+        val requests = fake.requests.get()
+        held.reply(fake.usage); settled(current)
+        val rejected = bounded(current, "old enrollment cannot target successor") { current.refreshInBackground(expected) }
+        assertTrue(rejected is BackgroundRefreshOutcome.Rejected)
+        assertEquals(requests, fake.requests.get())
+        assertEquals(successor.partition, current.historySnapshots.value.partition)
+        assertEquals(listOf(1L), current.historySnapshots.value.storage!!.entries.map { it.id.ordinal })
+    }
+
+    @Test fun backgroundPreAndPostAdmissionWritesSettleBeforeRemovalWithoutSuccessReceipt() {
+        for (irreversible in listOf(false, true)) {
+            val gate = SamplingGate().also { gates += it }
+            val armed = java.util.concurrent.atomic.AtomicBoolean()
+            hooks = object : HistoryStorageHooks {
+                override fun beforeWriteAdmission() { if (!irreversible && armed.compareAndSet(true, false)) gate.pause("background before write admission") }
+                override fun afterWriteAdmission() { if (irreversible && armed.compareAndSet(true, false)) gate.pause("background irreversible admission") }
+            }
+            NativeConnection.resetForTests()
+            val (current, expected) = enrolledDetachedOwner()
+            armed.set(true)
+            val pending = launchBackground(current, expected)
+            try {
+                gate.await("background actual held write reached")
+                current.signOut(); settled(current)
+                assertEquals(ConnectionPhase.SIGNING_OUT, current.state.value.phase)
+                assertFalse(pending.isCompleted)
+                assertTrue(current.historySnapshots.value.points.isEmpty())
+                awaitProtectedRemoval()
+            } finally { gate.release() }
+            phase(current, ConnectionPhase.SIGNED_OUT)
+            assertTrue(bounded(current, "removed held write cannot acknowledge success") { pending.await() } is BackgroundRefreshOutcome.Rejected)
+            assertDeletion()
+            hooks = null
+        }
+    }
+
+    @Test fun noAccountAndTerminalReauthorizationCannotActivateBackgroundEnrollment() {
+        val empty = owner(); phase(empty, ConnectionPhase.IDLE)
+        assertNull(bounded(empty, "no-account enrollment unavailable") { empty.backgroundRefreshTarget() })
+        val unknown = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
+        assertTrue(bounded(empty, "no-account background rejected") { empty.refreshInBackground(unknown) } is BackgroundRefreshOutcome.Rejected)
+        assertEquals(0L, fake.requests.get())
+        val (current, expected) = enrolledDetachedOwner()
+        fake.usage = response("{}", 401)
+        fake.tokens = response("""{"error":"invalid_grant"}""", 400)
+        val pending = launchBackground(current, expected)
+        assertTrue(bounded(current, "terminal worker cannot acknowledge stored success") { pending.await() } is BackgroundRefreshOutcome.Rejected)
+        phase(current, ConnectionPhase.REAUTH_REQUIRED)
+        assertDeletion()
+        assertNull(bounded(current, "terminal enrollment revoked") { current.backgroundRefreshTarget() })
+        val requests = fake.requests.get()
+        assertTrue(bounded(current, "old enrollment after reauthorization rejected") { current.refreshInBackground(expected) } is BackgroundRefreshOutcome.Rejected)
+        assertEquals(requests, fake.requests.get())
+    }
+
+    private fun appendGate(): Pair<SamplingGate, java.util.concurrent.atomic.AtomicBoolean> {
+        val gate = SamplingGate().also { gates += it }
+        val armed = java.util.concurrent.atomic.AtomicBoolean()
+        hooks = object : HistoryStorageHooks {
+            override fun beforeWriteAdmission() { if (armed.compareAndSet(true, false)) gate.pause("background SQLite append") }
+        }
+        return gate to armed
+    }
+
+    private fun enrolledDetachedOwner(): Pair<ConnectionController, BackgroundRefreshTarget> {
+        val current = login()
+        history(current, "enrollment seed observation persisted") { it.points.size == 1 }
+        val expected = target(current)
+        current.usageForeground(observer, false); settled(current)
+        assertNull(current.currentHistoryDisplayContext())
+        return current to expected
+    }
+
+    private fun target(current: ConnectionController) = requireNotNull(bounded(current, "capture checked lifetime") { current.backgroundRefreshTarget() })
+    private fun launchBackground(current: ConnectionController, expected: BackgroundRefreshTarget) =
+        background.async { current.refreshInBackground(expected) }
+    private fun completed(pending: Deferred<BackgroundRefreshOutcome>, current: ConnectionController, step: String) =
+        bounded(current, step) { pending.await() } as BackgroundRefreshOutcome.Completed
+
+    private fun <T> bounded(current: ConnectionController, step: String, action: suspend () -> T): T = runBlocking {
+        try { withTimeout(5_000) { action() } }
+        catch (_: TimeoutCancellationException) { throw AssertionError("$step: last state=${current.state.value}, history=${current.historyAvailability}") }
+    }
+
+    private fun awaitConsumers(current: ConnectionController, expected: Int, step: String) = bounded(current, step) {
+        var last = current.backgroundRefreshInterests()
+        try { withTimeout(4_000) {
+            while (last != expected) { delay(10); last = current.backgroundRefreshInterests() }
+        } } catch (_: TimeoutCancellationException) { throw AssertionError("$step: last background interests=$last, expected=$expected") }
+    }
+
+    private fun reopenHistory(expected: BackgroundRefreshTarget, points: Int) {
+        val count = fake.requests.get()
+        NativeConnection.resetForTests()
+        val restored = owner(); phase(restored, ConnectionPhase.RESTORED)
+        assertEquals(expected, target(restored))
+        restored.usageForeground(observer, true); settled(restored)
+        history(restored, "fresh owner rereads actual background SQLite rows") { it.points.size == points }
+        assertEquals(expected.partition, restored.historySnapshots.value.partition)
+        assertEquals(count, fake.requests.get())
+    }
+
     private fun owner() = NativeConnection.get(context)
     private fun login(): ConnectionController = owner().also {
         phase(it, ConnectionPhase.IDLE)
@@ -322,6 +601,7 @@ private class SyntheticSamplingTransport : AuthTransport {
     val clock = TransportClock { TransportTime(Instant.ofEpochSecond(1_800_000_000).plusMillis(millis.get()), millis.get()) }
     @Volatile var usage = response(USAGE)
     @Volatile var inventory = response("""{"available_count":0,"credits":[]}""")
+    @Volatile var tokens = response("""{"access_token":"synthetic-sampling-access","refresh_token":"synthetic-sampling-refresh"}""")
     @Volatile var heldPath: String? = null
     private val held = CopyOnWriteArrayList<Call>()
     private var reached = CountDownLatch(1)
@@ -346,7 +626,7 @@ private class SyntheticSamplingTransport : AuthTransport {
         ReadOperation.RESET_INVENTORY.path -> inventory
         "/api/accounts/deviceauth/usercode" -> response("""{"device_auth_id":"synthetic-sampling-device","user_code":"SYNTHETIC-SAMPLING"}""")
         "/api/accounts/deviceauth/token" -> response("""{"authorization_code":"synthetic-sampling-authorization","code_verifier":"synthetic-sampling-verifier"}""")
-        "/oauth/token" -> response("""{"access_token":"synthetic-sampling-access","refresh_token":"synthetic-sampling-refresh"}""")
+        "/oauth/token" -> tokens
         else -> throw AssertionError("Unexpected synthetic sampling route")
     }
     companion object {

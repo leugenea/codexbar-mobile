@@ -227,6 +227,18 @@ HISTORY_LIFETIME_CASES = {
 
 HISTORY_SAMPLING_CLASS = "io.github.leugenea.codexbarmobile.history.UsageHistoryIntegrationTest"
 HISTORY_SAMPLING_CASES = {
+    'actualNativeAppendFailureCannotProduceSuccessfulBackgroundReceipt',
+    'backgroundFirstUiOverlapSharesOneCycleAndOneDurableObservation',
+    'backgroundOnlyRefreshReceiptWaitsForActualSQLiteAppendAndSurvivesFreshOwner',
+    'backgroundPreAndPostAdmissionWritesSettleBeforeRemovalWithoutSuccessReceipt',
+    'cancelledBackgroundWaiterDoesNotCancelVisibleUiFlightOrDuplicateAppend',
+    'cancelledOnlyBackgroundWaiterReleasesFlightAndRejectsLateReply',
+    'cancellingWorkerAfterEndpointDeliveryKeepsAdmittedActualSQLiteAppend',
+    'coldRestoredBackgroundRefreshChecksExpectedPartitionWithoutImplicitRequests',
+    'composeStopRevokesUiAuthorityButRetainedBackgroundRefreshStillPersists',
+    'noAccountAndTerminalReauthorizationCannotActivateBackgroundEnrollment',
+    'removalAndReloginRejectBackgroundLateRepliesAndOldEnrollment',
+    'uiFirstBackgroundOverlapSharesOneCycleAndOneDurableObservation',
     "admittedEndpointPersistsThroughFreshRuntimeDormancyAndLogoutRejectsLateLoginData",
     "partialEndpointsPreserveActualUsageAndIndependentInventoryClocksWithoutReplay",
     "actualHeldWriteAdmissionAndCommittedWriteAreRevokedBeforeCombinedLogoutCompletion",
@@ -454,6 +466,29 @@ HISTORY_IMPORT_NATIVE = {
 }
 HISTORY_IMPORT_NATIVE_COUNT = sum(map(len, HISTORY_IMPORT_NATIVE.values()))
 
+BACKGROUND_REFRESH_JVM = {
+    'io.github.leugenea.codexbarmobile.history.BackgroundRefreshTest': {
+        'appendAndPreappendFailuresHaveHonestNonSuccessReceipts',
+        'automaticBackgroundDoesNotUnlockRetainedTransientRefreshFailure',
+        'backgroundFirstManualOverlapSharesEndpointPairAndAppend',
+        'backgroundHonorsRetryBoundaryWithoutSchedulingAHiddenWakeup',
+        'backgroundOnlyRecordsWithoutDisplayAuthorityPollingOrTicks',
+        'cancellationOfOnlyBackgroundConsumerCancelsReadAndRejectsLateReply',
+        'cancelledBackgroundConsumerPreservesIndependentBackgroundConsumer',
+        'cancelledBackgroundConsumerPreservesVisibleUiConsumer',
+        'cancellingWorkerNeverRetiresIndependentAcceptedTokenRotation',
+        'coldAdmissionWaitsForProtectedRestorationAndRejectsDifferentLifetimeWithoutRequests',
+        'lastUiStopHidesAuthorityWithoutCancellingBackgroundConsumer',
+        'manualFirstBackgroundOverlapSharesEndpointPairAndAppend',
+        'receiptWaitsForAdmittedStorageAndCancellationDoesNotDropAcceptedObservation',
+        'removalReloginAndLateReplyCannotReuseOldEnrollment',
+        'terminalReauthorizationRevokesEnrollmentAndCannotReturnStoredSuccess',
+        'unavailableRestorationNeverEnrolsOrActivatesProviderRequests',
+        'usageErrorIsNotAStoredMeasurementAndInventoryFailureDoesNotEraseStoredUsage',
+    },
+}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -483,7 +518,8 @@ def verify_reports(directory: Path, kind: str) -> dict:
     export = HISTORY_EXPORT_JVM if kind == "jvm" else HISTORY_EXPORT_NATIVE
     imported = HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
     remaining_time = REMAINING_TIME_JVM if kind == "jvm" else {}
-    for classname, required in (current_history | dashboard | export | imported | remaining_time).items():
+    background = BACKGROUND_REFRESH_JVM if kind == "jvm" else {}
+    for classname, required in (current_history | dashboard | export | imported | remaining_time | background).items():
         for name in required:
             matches = [case for case in cases if case["class"] == classname and case["name"] == name]
             if len(matches) != 1:
@@ -513,6 +549,10 @@ def verify_reports(directory: Path, kind: str) -> dict:
             if missing_names:
                 raise ValueError(f"Missing real native {label} tests: {sorted(missing_names)}")
     if kind == "native":
+        for name in HISTORY_SAMPLING_CASES:
+            matches = [case for case in cases if case["class"] == HISTORY_SAMPLING_CLASS and case["name"] == name]
+            if len(matches) != 1:
+                raise ValueError(f"Expected exactly one real native history sampling case: {name}")
         for name in PHONE_TIME_CASES:
             matches = [case for case in cases if case["class"] == HISTORY_NAVIGATION_CLASS and case["name"] == name]
             if len(matches) != 1:
