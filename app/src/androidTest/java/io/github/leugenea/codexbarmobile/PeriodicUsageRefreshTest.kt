@@ -157,11 +157,13 @@ class PeriodicUsageRefreshTest {
             driver.setPeriodDelayMet(work.id); driver.setAllConstraintsMet(work.id)
             val held = transport.awaitHeld("TestDriver third period enters actual worker")
             await("scheduled worker retains owner interest before OS-style stop") {
-                bounded("driver worker admitted") { owner.backgroundRefreshInterests() } == 1 && info(work.id).state == WorkInfo.State.RUNNING
+                bounded("driver worker admitted") { owner.backgroundRefreshNetworkInterests() == 1 && owner.backgroundRefreshInterests() == 1 } &&
+                    info(work.id).state == WorkInfo.State.RUNNING
             }
             driver.stopRunningWorkWithReason(work.id, WorkInfo.STOP_REASON_CONSTRAINT_BATTERY_NOT_LOW)
             await("scheduler stop propagates cancellation and releases sole owner interest") {
-                bounded("driver stopped worker released") { owner.backgroundRefreshInterests() } == 0 && held.cancelled && info(work.id).state == WorkInfo.State.ENQUEUED
+                bounded("driver stopped worker released") { owner.backgroundRefreshNetworkInterests() == 0 && owner.backgroundRefreshInterests() == 0 } &&
+                    held.cancelled && info(work.id).state == WorkInfo.State.ENQUEUED
             }
             assertTrue(owner.session.snapshot() is SessionResult.Ready)
             transport.heldPath = null; held.reply(transport.usage)
@@ -224,19 +226,39 @@ class PeriodicUsageRefreshTest {
         login(); detach(); transport.advance(900_000)
         for (visible in listOf(false, true)) {
             transport.heldPath = ReadOperation.USAGE.path
-            if (visible) { owner.usageForeground(observer, true); settled() }
+            if (visible) {
+                owner.usageForeground(observer, true); settled()
+                // A command receipt alone does not finish asynchronous history restoration.
+                await("UI history restored before shared worker admission") { recordedHistory(owner).points.size == 1 }
+            }
             val future = start(target())
             val held = transport.awaitHeld("worker request admitted before cancellation")
-            await("positive worker owner admission") { bounded("owner interest") { owner.backgroundRefreshInterests() } == 1 }
-            future.cancel(true)
-            await("worker interest released") { bounded("released owner interest") { owner.backgroundRefreshInterests() } == 0 }
+            await("positive worker network and storage admission; UI=$visible") {
+                bounded("owner interests") { owner.backgroundRefreshNetworkInterests() == 1 && owner.backgroundRefreshInterests() == 1 }
+            }
+            assertTrue("cancel the admitted worker; UI=$visible", future.cancel(true))
+            // Future cancellation is immediate, not a receipt that the owner-lane finally ran.
+            await("worker network detached; UI=$visible", { "directFutureDone=${future.isDone}, directFutureCancelled=${future.isCancelled}, heldCancelled=${held.cancelled}" }) {
+                bounded("remaining owner interests") {
+                    owner.backgroundRefreshNetworkInterests() == 0 &&
+                        owner.backgroundRefreshInterests() == (if (visible) 1 else 0)
+                } && (visible || held.cancelled)
+            }
             assertTrue(future.isCancelled)
             assertEquals(!visible, held.cancelled)
             transport.heldPath = null; held.reply(transport.usage)
             settled()
-            await("cancelled or shared endpoint flight settles") { !owner.state.value.refresh.refreshing }
+            // A UI-owned flight keeps process storage until its actual recording settles.
+            await("cancelled or shared endpoint and storage settle; UI=$visible") {
+                !owner.state.value.refresh.refreshing && bounded("settled storage interest") { owner.backgroundRefreshInterests() } == 0
+            }
             assertTrue(owner.session.snapshot() is SessionResult.Ready)
-            if (visible) { phase(ConnectionPhase.OBSERVED); detach() }
+            assertEquals(if (visible) 5L else 3L, transport.gets.get())
+            if (visible) {
+                phase(ConnectionPhase.OBSERVED)
+                assertEquals(2, recordedHistory(owner).points.size)
+                detach()
+            }
             transport.advance(900_000)
         }
     }
@@ -299,10 +321,13 @@ class PeriodicUsageRefreshTest {
         try { withTimeout(5_000) { action() } }
         catch (_: TimeoutCancellationException) { throw AssertionError("$step: last state=${owner.state.value}, history=${owner.historyAvailability}, requests=${transport.requests.get()}") }
     }
-    private fun await(step: String, predicate: () -> Boolean) {
+    private fun await(step: String, details: () -> String = { "" }, predicate: () -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 5_000, condition = predicate) }
-        catch (_: ComposeTimeoutException) { throw AssertionError("$step: last state=${owner.state.value}, history=${owner.historyAvailability}, GETs=${transport.gets.get()}, work=${activeWork().map { it.state }}") }
+        catch (_: ComposeTimeoutException) { throw AssertionError("$step: ${diagnostics()}, ${details()}") }
     }
+    private fun diagnostics() = "last state=${owner.state.value}, history=${owner.historyAvailability}, GETs=${transport.gets.get()}, " +
+        "networkInterests=${bounded("diagnostic network interests") { owner.backgroundRefreshNetworkInterests() }}, " +
+        "storageInterests=${bounded("diagnostic storage interests") { owner.backgroundRefreshInterests() }}, enrolledWork=${activeWork().map { it.state }}"
     private fun activeWork() = futureResult("query enrolled work", manager.getWorkInfosByTag(PeriodicUsageRefresh.TAG)).filterNot { it.state.isFinished }
     private fun unique(target: BackgroundRefreshTarget): List<WorkInfo> {
         var found = emptyList<WorkInfo>()

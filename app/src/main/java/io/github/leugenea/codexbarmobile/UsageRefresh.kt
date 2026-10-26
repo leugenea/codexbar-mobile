@@ -62,6 +62,8 @@ internal class UsageRefresh(
     private val eligible get() = !lifecycleManaged || visible
     internal val foregroundEligible get() = eligible
     internal val hasForegroundObservers get() = visible
+    /** Current-flight network waiters, not process-owned recording interests. */
+    internal val backgroundInterests get() = flight?.background ?: 0
     internal val deferredUntilMillis get() = notBeforeMillis.takeIf { clock.now().monotonicMillis < it }
 
     /** Both endpoints must be recent; failures and clock rollback never masquerade as freshness. */

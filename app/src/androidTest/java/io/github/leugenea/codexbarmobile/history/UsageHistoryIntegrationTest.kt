@@ -345,13 +345,17 @@ class UsageHistoryIntegrationTest {
         fake.heldPath = ReadOperation.USAGE.path
         current.usageForeground(observer, true); settled(current)
         val held = fake.awaitHeld("visible UI read reached")
+        history(current, "visible UI history restored before worker admission") { it.points.size == 1 }
         val pending = launchBackground(current, expected)
         awaitConsumers(current, 1, "worker joined UI read before cancellation")
         pending.cancel()
         bounded(current, "worker caller detaches while UI retains the read") { pending.join() }
+        assertEquals(0, bounded(current, "cancelled caller releases only its network interest") { current.backgroundRefreshNetworkInterests() })
+        assertEquals(1, bounded(current, "shared UI flight retains process storage") { current.backgroundRefreshInterests() })
         assertFalse(held.cancelled)
         held.reply(fake.usage)
         history(current, "UI consumer records one actual observation after worker cancellation") { it.points.size == 2 }
+        awaitConsumers(current, 0, "shared UI recording releases process storage after actual append")
         assertEquals(4L, fake.gets.get())
         assertEquals(listOf(1L, 2L, 3L), current.historySnapshots.value.storage!!.entries.map { it.id.ordinal })
     }

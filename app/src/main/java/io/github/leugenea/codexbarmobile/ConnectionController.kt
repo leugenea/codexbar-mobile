@@ -301,8 +301,12 @@ internal class ConnectionController(
         if (usageRefresh.deferredUntilMillis != null) BackgroundRefreshRejection.DEFERRED else BackgroundRefreshRejection.RETIRING,
         usageRefresh.deferredUntilMillis)
 
+    /** Process-owned storage interests can outlive a cancelled network waiter. */
     @androidx.annotation.VisibleForTesting(otherwise = androidx.annotation.VisibleForTesting.NONE)
     internal suspend fun backgroundRefreshInterests(): Int = withContext(mutationDispatcher) { backgroundHistoryInterests }
+
+    @androidx.annotation.VisibleForTesting(otherwise = androidx.annotation.VisibleForTesting.NONE)
+    internal suspend fun backgroundRefreshNetworkInterests(): Int = withContext(mutationDispatcher) { usageRefresh.backgroundInterests }
 
     /** Observer identities keep one Activity from cancelling another visible Activity. */
     fun usageForeground(observer: Any, foreground: Boolean) = command(UsageForegroundCommand(observer, foreground)) {
