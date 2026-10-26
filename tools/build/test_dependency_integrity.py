@@ -15,7 +15,7 @@ METADATA_PATH = "gradle/verification-metadata.xml"
 # Full reviewed union: base toolchain, M2 coverage and the A4 HTTP/JSON graph.
 # Dependency updates must review the XML pair delta and update this digest in
 # the same PR. No parallel artifact list or audit receipt is maintained.
-APPROVED_METADATA_SHA256 = "a0f4e01d616cdea284704c9fe193b12f45b23bd612a0b83b1bacf2adc3ef8fe7"
+APPROVED_METADATA_SHA256 = "e30031826134986538abdd6a2c0bfe9af2f5539770db390ae2036b0549409c3e"
 # Historical origin labels must match the unchanged, independently audited XML.
 APPROVED_ORIGINS = {
     f"Independent {milestone} audit: {evidence}; not authenticated publisher identity"

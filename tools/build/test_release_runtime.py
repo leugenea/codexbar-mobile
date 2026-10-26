@@ -150,6 +150,79 @@ class RuntimeTests(RuntimeFixture):
         with self.assertRaisesRegex(ValueError, 'Ambiguous'):
             runtime.reconcile(raw, EXPECTED, self.apk, self.classes)
 
+    def test_captured_workmanager_init_argument_classes_keep_exact_input_owner(self):
+        # Class rows captured from PR197's actual unsigned fixture APK (D8),
+        # SHA256 86920062c4b2e53ffb5ae268312b57ad5bb2bfc591a4a20a3212d85157854dfb.
+        # Archive bytes below are synthetic; these three spellings are not.
+        text = ('C d 0\t0\t36\tandroidx.work.impl.utils.futures.AbstractFuture-IA\n'
+                'C d 0\t0\t36\tandroidx.work.impl.background.greedy.GreedyScheduler-IA\n'
+                'C d 0\t0\t36\tandroidx.work.Operation-IA\n')
+        captured = runtime.defined_classes(text)
+        work = 'androidx.work:work-runtime:2.12.0'
+        source = self.root / 'work-runtime.jar'
+        source.write_bytes(archive([(name[:-3].replace('.', '/') + '.class', b'SYNTHETIC input')
+                                    for name in captured]))
+        raw = copy.deepcopy(self.raw)
+        raw['components'].append({'id': work, 'variants': []})
+        raw['edges'].append({'from': 'app', 'to': work, 'constraint': False})
+        raw['artifacts'].append({'component': work, 'path': str(source), **runtime.file_record(source)})
+        inv = runtime.reconcile(raw, EXPECTED, self.apk, self.classes + captured)
+        self.assertEqual(inv['unresolved'], [])
+        self.assertEqual([r for r in inv['classes'] if r['name'] in captured],
+                         [{'name': name, 'kind': 'd8-synthetic', 'component': work} for name in captured])
+        node = next(r for r in inv['resolution']['components'] if r['id'] == work)
+        self.assertEqual((node['status'], node['definedClassCount']), ('observed', 3))
+        # A synthetic-only JAR contributor still needs its own source-backed legal entry.
+        with self.assertRaisesRegex(ValueError, 'Missing source-backed runtime attribution'):
+            bundle.render(self.root, inv, self.receipt)
+        self.catalog['components'].append({**self.catalog['components'][0], 'id': work,
+                                           'name': 'androidx.work:work-runtime', 'version': '2.12.0'})
+        self.save_catalog()
+        bom = json.loads(bundle.render(self.root, inv, self.receipt)['runtime.cdx.json'])
+        self.assertIn(work, [r['bom-ref'] for r in bom['components']])
+
+    def test_d8_synthetics_inherit_project_or_library_context_not_namespace(self):
+        names = ['example.App-IA', 'example.Library-IA', 'example.Library$$ExternalSyntheticLambda0']
+        inv = runtime.reconcile(self.raw, EXPECTED, self.apk, self.classes + names)
+        rows = {r['name']: r for r in inv['classes']}
+        self.assertEqual(inv['unresolved'], [])
+        for name, owner in zip(names, ['app', COMPONENT, COMPONENT]):
+            self.assertEqual(rows[name], {'name': name, 'kind': 'd8-synthetic', 'component': owner})
+        node = next(r for r in inv['resolution']['components'] if r['id'] == COMPONENT)
+        self.assertEqual(node['definedClassCount'], 4)
+        for name in ('androidx.work.Unknown-IA', 'absent.Context-IA', 'example.Library-IAExtra',
+                     'example.Library-IA-IA', 'example.Library$$ExternalSynthetic',
+                     'example.Library$$ExternalSyntheticLambda0.extra'):
+            with self.subTest(name=name):
+                inv = runtime.reconcile(self.raw, EXPECTED, self.apk, self.classes + [name])
+                self.assertIn('Unmapped defined class: ' + name, inv['unresolved'])
+
+    def test_d8_context_collisions_fail_even_when_context_is_not_in_dex(self):
+        for suffix in ('-IA', '$$ExternalSyntheticLambda0'):
+            raw = copy.deepcopy(self.raw)
+            raw['projectClasses'].append('example.Library')
+            observed = ['example.App', 'example.Library' + suffix]
+            with self.subTest(collision='project/runtime', suffix=suffix), self.assertRaisesRegex(ValueError, 'Ambiguous'):
+                runtime.reconcile(raw, EXPECTED, self.apk, observed)
+            extra = self.root / 'collision.jar'
+            extra.write_bytes(archive([('example/Library.class', b'SYNTHETIC colliding source')]))
+            raw = copy.deepcopy(self.raw)
+            raw['artifacts'].append({'component': COMPONENT, 'path': str(extra), **runtime.file_record(extra)})
+            with self.subTest(collision='runtime/runtime', suffix=suffix), self.assertRaisesRegex(ValueError, 'Ambiguous'):
+                runtime.reconcile(raw, EXPECTED, self.apk, observed)
+
+    def test_exact_synthetic_shaped_input_is_authoritative_and_collision_checked(self):
+        source = self.root / 'shaped.jar'
+        name = 'example.Library-IA'
+        source.write_bytes(archive([(name.replace('.', '/') + '.class', b'SYNTHETIC actual input')]))
+        raw = copy.deepcopy(self.raw)
+        raw['artifacts'].append({'component': COMPONENT, 'path': str(source), **runtime.file_record(source)})
+        inv = runtime.reconcile(raw, EXPECTED, self.apk, self.classes + [name])
+        self.assertIn({'name': name, 'kind': 'runtime-input', 'component': COMPONENT}, inv['classes'])
+        raw['projectClasses'].append(name)
+        with self.assertRaisesRegex(ValueError, 'Ambiguous'):
+            runtime.reconcile(raw, EXPECTED, self.apk, self.classes + [name])
+
     def test_defined_only_parser_never_counts_reference_or_method_rows(self):
         text = 'P d 1 1 0 example\n C d 1 1 7 example.Library\n M d 0 1 7 example.Library.run()\n C r 0 0 0 unused.Reference\n'
         self.assertEqual(runtime.defined_classes(text), ['example.Library'])

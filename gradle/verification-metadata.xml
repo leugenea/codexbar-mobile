@@ -110,6 +110,11 @@
             <sha256 value="bfeb7bd84f3f7dda7bd73b6709d4a1f61f5a37f843728bae08a067e3df9a0aef" origin="Independent M1 audit: publisher SHA256 sidecar/module; not authenticated publisher identity" />
          </artifact>
       </component>
+      <component group="androidx.collection" name="collection-jvm" version="1.4.2">
+         <artifact name="collection-jvm-1.4.2.module">
+            <sha256 value="aad6b3536c0f0e570aa733d5141d70fa6b9b3add370f73a311ca4ca5dee25448" origin="Independent issue-195 audit: publisher SHA256 sidecar/module; not authenticated publisher identity" />
+         </artifact>
+      </component>
       <component group="androidx.collection" name="collection-jvm" version="1.5.0">
          <artifact name="collection-jvm-1.5.0.jar">
             <sha256 value="70b35924e4babcdffa37d0e575ee039c56a2d97123342624c48b603233704341" origin="Independent M1 audit: publisher SHA256 sidecar/module; not authenticated publisher identity" />
