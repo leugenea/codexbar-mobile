@@ -12,6 +12,7 @@ import zipfile
 
 import release_artifact as artifact
 import release_bundle as bundle
+from historical_apk_contract import check_binding
 from release_runtime import canonical, file_record, fingerprint, load, members, payload, safe_name
 
 from version_identity import official_inputs
@@ -128,7 +129,8 @@ def checksums(assets):
                    if name != 'SHA256SUMS').encode()
 
 
-def verify_assets(root, assets, sdk, reports, *, expected_certificate=None, expected_authority=None):
+def verify_assets(root, assets, sdk, reports, *, expected_certificate=None, expected_authority=None,
+                  expected_binding=None, apk_contract=None):
     """Re-derive delivered legal/SBOM bytes and inspect the downloaded signed APK; no rebuild."""
     record = json.loads(assets['release-manifest.json'], object_pairs_hook=_unique)
     if (set(record) != {'schema', 'kind', 'buildInputs', 'authority', 'certificateSha256',
@@ -136,6 +138,7 @@ def verify_assets(root, assets, sdk, reports, *, expected_certificate=None, expe
             or record['schema'] != 1 or record['kind'] != 'guarded-android-release'):
         raise ValueError('Unknown release manifest')
     expected = record['buildInputs']
+    check_binding(expected, expected_binding, apk_contract)
     if expected['channel'] not in ('rc', 'stable') or expected['versionName'] != expected['tag'][1:]:
         raise ValueError('Distributable assets require official RC/stable identity')
     official_inputs(expected['target'], expected['channel'], {'RELEASE_TAG': expected['tag'],
@@ -164,7 +167,7 @@ def verify_assets(root, assets, sdk, reports, *, expected_certificate=None, expe
     apk = reports / apk_name
     apk.write_bytes(assets[apk_name])
     inspection = artifact.inspect_apk(apk, expected, sdk, reports / 'inspection',
-                                      expected_signer=record['certificateSha256'])
+                                      expected_signer=record['certificateSha256'], apk_contract=apk_contract)
     inventory = json.loads(files['runtime-inventory.json'], object_pairs_hook=_unique)
     receipt = json.loads(files['artifact-manifest.json'], object_pairs_hook=_unique)
     if inventory['buildInputs'] != expected or manifest['buildInputs'] != expected:
