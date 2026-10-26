@@ -69,20 +69,27 @@ Do not run [run-hosted-native-smoke.sh](tools/build/run-hosted-native-smoke.sh) 
 
 ## Network policy
 
-The app source requests INTERNET only. Merged manifests, APKs and installed app
-packages must request exactly INTERNET plus the existing AndroidX Core signature-only
-receiver permission; no extra permission is accepted. Cleartext is explicitly off
+The app source requests exactly INTERNET, ACCESS_NETWORK_STATE, RECEIVE_BOOT_COMPLETED
+and WAKE_LOCK. Merged manifests, APKs and installed packages add only the existing
+AndroidX Core signature-only receiver permission; no extra permission is accepted.
+WorkManager 2.12.0's FOREGROUND_SERVICE permission and SystemForegroundService are
+removed by exactly two reviewed `tools:node="remove"` markers, not a general merger
+exception. Services, receivers, Startup initializers, caller protections and the default
+process are checked against the [pinned scheduler contract](docs/background-refresh.md).
+Cleartext is explicitly off
 in every app build, with no debug/test override. JVM local-server fixtures do not
 need device cleartext access. The permission enables only the selected auth/usage routes. A fresh process owner
-restores credentials without requests; an explicit action activates foreground reads.
+restores credentials without requests; an explicit action activates foreground reads
+and enrolls ordinary periodic work for that continuing local lifetime. A cold worker
+may activate only its exact previously enrolled lifetime, never a successor login.
 The real connection/live flow is the default launcher and recreation destination.
 An already activated owner may resume a bounded read cycle on Activity STARTED.
 
 Both hosted graphs generate `processReleaseManifest` as well as the debug manifest;
 the shared gate requires both generated policies. The build job additionally assembles
 the unsigned release APK and runs full `lintRelease` with strict dependency verification.
-App variant manifest overlays and destructive/protected-policy merge directives
-are rejected. The native script checks the debug APK, binds its SHA-256, reinstalls
+App variant overlays and other destructive/protected-policy merge directives are
+rejected. The native script checks the debug APK, binds its SHA-256, reinstalls
 that same file after AGP test cleanup, requires a package-specific `pm path`, checks
 actual `dumpsys` requested permissions, then uninstalls with a recorded status.
 

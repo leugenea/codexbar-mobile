@@ -10,6 +10,7 @@ from unittest.mock import patch
 import zipfile
 
 import release_artifact as artifact
+from work_manifest_fixtures import components_apk
 from verify_manifests import MAIN_ACTIVITY, PACKAGE, permissions_for
 
 EXPECTED = {'source': {'sha': 'a' * 40, 'tree': 'b' * 40}, 'target': '0.1.0', 'channel': 'dev',
@@ -30,7 +31,7 @@ TREE = f'''E: manifest (line=1)
       A: android:name(0x01010003)="{MAIN_ACTIVITY}"
       A: android:launchMode(0x0101001d)=(type 0x10)0x2
       A: android:exported(0x01010010)=(type 0x12)0xffffffff
-'''
+''' + components_apk(PACKAGE)
 BADGING = (f"package: name='{PACKAGE}' versionCode='1' versionName='{EXPECTED['versionName']}' platformBuildVersionName='37'\n"
            f"launchable-activity: name='{MAIN_ACTIVITY}' label='Synthetic' icon=''\n")
 SIGNATURE = 'DOES NOT VERIFY\nERROR: Missing META-INF/MANIFEST.MF\n'

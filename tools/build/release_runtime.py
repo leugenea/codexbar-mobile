@@ -200,6 +200,38 @@ def archive_inputs(row):
     return classes, file_evidence, sorted(nested, key=lambda r: r['member']), packages, merged
 
 
+def input_owner(name, owners, project):
+    """Resolve exact original input identities, including synthetic contexts."""
+    matches = owners.get(name, [])
+    if len(matches) > 1 or matches and name in project:
+        raise ValueError('Ambiguous runtime class owner: ' + name)
+    if matches:
+        return matches[0][0]
+    return 'app' if name in project else None
+
+
+def synthetic_context(name):
+    # D8 SyntheticNaming.INIT_TYPE_ARGUMENT is a fixed -IA suffix on the
+    # constructor holder/nest host. It is not an arbitrary AndroidX package rule.
+    if name.endswith('-IA'):
+        return name[:-3]
+    match = re.fullmatch(r'(.+)\$\$ExternalSynthetic[A-Za-z0-9_$]+', name)
+    return match[1] if match else None
+
+
+def class_owner(name, owners, project, generated_packages):
+    owner = input_owner(name, owners, project)
+    if owner is not None:
+        return ('project' if name in project else 'runtime-input'), owner
+    if any(name == p + '.R' or name.startswith(p + '.R$') for p in generated_packages):
+        return 'generated-resource-class', 'app'
+    context = synthetic_context(name)
+    owner = input_owner(context, owners, project) if context is not None else None
+    if owner is not None:
+        return 'd8-synthetic', owner
+    return 'unresolved', 'app'
+
+
 def reconcile(raw, expected, apk, classes):
     validate_resolution(raw, expected, apk)
     unique(classes, 'defined DEX class')
@@ -224,20 +256,9 @@ def reconcile(raw, expected, apk, classes):
     unknown = []
     class_rows = []
     for name in sorted(observed):
-        matches = owners.get(name, [])
-        if len(matches) > 1 or matches and name in project:
-            raise ValueError('Ambiguous runtime class owner: ' + name)
-        if matches:
-            kind, owner = 'runtime-input', matches[0][0]
-        elif name in project:
-            kind, owner = 'project', 'app'
-        elif any(name == p + '.R' or name.startswith(p + '.R$') for p in generated_packages):
-            kind, owner = 'generated-resource-class', 'app'
-        elif '$$ExternalSynthetic' in name and name.split('$$ExternalSynthetic', 1)[0] in (project | owners.keys()):
-            kind, owner = 'd8-synthetic', 'app'
-        else:
+        kind, owner = class_owner(name, owners, project, generated_packages)
+        if kind == 'unresolved':
             unknown.append('Unmapped defined class: ' + name)
-            kind, owner = 'unresolved', 'app'
         class_rows.append({'name': name, 'kind': kind, 'component': owner})
     apk_members = members(apk.read_bytes())
     member_rows = []
@@ -267,7 +288,9 @@ def reconcile(raw, expected, apk, classes):
         if node['id'] == 'app':
             continue
         artifacts = [r for r in input_rows if r['component'] == node['id']]
-        class_count = sum(len(r['definedClasses']) for r in artifacts)
+        # Synthetic-only contributors still ship code and require attribution.
+        # Artifact definedClasses remains the exact direct-input intersection.
+        class_count = sum(r['component'] == node['id'] for r in class_rows)
         copied = [r['path'] for r in member_rows if any(i['component'] == node['id'] for i in r['inputs'])]
         merged = any(r['mergedInputs'] for r in artifacts)
         incoming = [e for e in raw['edges'] if e['to'] == node['id']]

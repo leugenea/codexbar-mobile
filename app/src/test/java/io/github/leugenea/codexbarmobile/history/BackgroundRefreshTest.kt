@@ -86,6 +86,7 @@ class BackgroundRefreshTest {
         val held = gets.single()
         pending.cancel(); settle()
         assertTrue(held.cancelled)
+        assertEquals(0, owner.backgroundRefreshNetworkInterests())
         assertEquals(0, owner.backgroundRefreshInterests())
         held.reply(usage); settle()
         assertEquals(1, gets.size)
@@ -101,10 +102,14 @@ class BackgroundRefreshTest {
         val pending = test.backgroundScope.async { owner.refreshInBackground(expected) }
         settle()
         assertEquals(1, owner.backgroundRefreshInterests())
+        assertEquals(1, owner.backgroundRefreshNetworkInterests())
         val held = gets.single()
         pending.cancel(); settle()
+        assertEquals(0, owner.backgroundRefreshNetworkInterests())
+        assertEquals(1, owner.backgroundRefreshInterests())
         assertFalse(held.cancelled)
         held.reply(usage); settle()
+        assertEquals(0, owner.backgroundRefreshInterests())
         assertEquals(2, gets.size)
         assertEquals(1, snapshot.points.size)
         assertEquals(listOf(1L), journal.admissions.map { it.id.ordinal })
@@ -117,12 +122,17 @@ class BackgroundRefreshTest {
         val second = test.backgroundScope.async { owner.refreshInBackground(expected) }
         settle()
         assertEquals(2, owner.backgroundRefreshInterests())
+        assertEquals(2, owner.backgroundRefreshNetworkInterests())
         first.cancel(); settle()
+        assertEquals(1, owner.backgroundRefreshNetworkInterests())
+        assertEquals(2, owner.backgroundRefreshInterests())
         assertFalse(gets.single().cancelled)
         gets.single().reply(usage); settle()
         assertTrue((second.await() as BackgroundRefreshOutcome.Completed).history is HistoryRecordingOutcome.Stored)
         assertEquals(2, gets.size)
         assertEquals(1, points().size)
+        assertEquals(0, owner.backgroundRefreshNetworkInterests())
+        assertEquals(0, owner.backgroundRefreshInterests())
     } }
 
     @Test fun receiptWaitsForAdmittedStorageAndCancellationDoesNotDropAcceptedObservation() = runTest { fixture {

@@ -22,6 +22,10 @@ other whitespace checks and corpus paths retain the normal gate.
   source-archive SHA-256 and member associations. Shared Apache terms are preserved
   in `Apache-2.0.txt`. Source-set attribution can be broader than the selected Android
   payload; it is not an assertion that every source member survives packaging.
+  WorkManager and its selected Room/framework-SQLite/Lifecycle/futures/tracing
+  additions use these same versioned-source compilations. Their Android runtime
+  artifacts add no separately bundled native SQLite engine; the actual release
+  graph/APK still selects contributors, and work-testing is not a shipping input.
 - `emoji2/`: Google/FlatBuffers Apache and Google 2008 BSD-3-Clause material, plus
   generated AOSP metadata headers. The catalog binds Emoji2's exact
   `libs/repackaged.jar` hash. The candidate FlatBuffers snapshot is explicitly

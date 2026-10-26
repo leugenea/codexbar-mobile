@@ -1,6 +1,7 @@
 """Chart parser/source contract controls; synthetic metadata is NOT native visual evidence."""
 from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT
 from background_refresh_contract_expectations import BACKGROUND_NATIVE_CASES
+from periodic_refresh_contract_expectations import PERIODIC_NATIVE_COUNT
 from dashboard_contract_expectations import EXPECTED_DASHBOARD_NATIVE_COUNT
 from verify_test_reports import HISTORY_EXPORT_NATIVE_COUNT, HISTORY_IMPORT_NATIVE_COUNT
 import json
@@ -45,7 +46,7 @@ class HistoryChartContracts(unittest.TestCase):
         self.assertEqual(HISTORY_CHART_CASES, RETAINED_CHART_CASES)
         self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), RETAINED_CHART_CASES)
         self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 88 + len(BACKGROUND_NATIVE_CASES) + len(RETAINED_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
+        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 88 + len(BACKGROUND_NATIVE_CASES) + PERIODIC_NATIVE_COUNT + len(RETAINED_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
         for name in RETAINED_CHART_CASES:
             self.fixture.report(name)
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history chart"):

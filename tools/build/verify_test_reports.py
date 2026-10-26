@@ -489,6 +489,28 @@ BACKGROUND_REFRESH_JVM = {
 }
 
 
+PERIODIC_REFRESH_JVM = {'io.github.leugenea.codexbarmobile.history.PeriodicRefreshAdmissionTest': {
+    'dormantRestoreAndForegroundObservationNeverEnrollUntilExplicitActivation',
+    'successfulInteractiveLoginEnrollsOnlyItsNewActiveLifetime',
+    'periodicRecentSuccessSkipsBothEndpointsAndExactFifteenMinuteBoundaryRuns',
+    'failedOrPartialEndpointDoesNotBecomeARecentSuccessfulCycle',
+    'periodicManualOverlapInBothOrdersStillJoinsActualFlightOnce',
+    'periodicRateLimitAndErrorsRemainBoundedWithoutHiddenPeriodicRetries',
+    'staleLifetimeIsRejectedBeforeRecentSuccessAndTerminalAuthCancelsEnrollment',
+}}
+PERIODIC_REFRESH_NATIVE = {'io.github.leugenea.codexbarmobile.PeriodicUsageRefreshTest': {
+    'explicitActivationKeepsOneLifetimeScopedOrdinaryFifteenMinuteRequest',
+    'minimizedAppRunsThroughRealSystemJobServiceAndDurableHistorySurvivesReopen',
+    'testDriverRequiresNetworkBatteryAndInitialPeriodWithoutClaimingOsTiming',
+    'workerRecentSuccessAndMalformedInputReturnWithoutAnyAdditionalRequests',
+    'coldWorkerRestoresOnlyMatchingEnrolledLifetimeAndCannotReadSuccessor',
+    'workerCancellationReleasesOnlyItsInterestWithAndWithoutUiConsumer',
+    'removalAndTerminalReauthorizationCancelEnrolledWorkWithoutSuccessorReads',
+    'installedSchedulerComponentsKeepCallerProtectionsAndDefaultProcessWithoutForegroundService',
+    'expectedOfflineErrorsAndRetryAfterFinishOpportunityWithoutWorkManagerRetryLoop',
+}}
+
+
 def verify_reports(directory: Path, kind: str) -> dict:
     reports = sorted(directory.rglob("*.xml"))
     if not reports:
@@ -519,7 +541,8 @@ def verify_reports(directory: Path, kind: str) -> dict:
     imported = HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
     remaining_time = REMAINING_TIME_JVM if kind == "jvm" else {}
     background = BACKGROUND_REFRESH_JVM if kind == "jvm" else {}
-    for classname, required in (current_history | dashboard | export | imported | remaining_time | background).items():
+    periodic = PERIODIC_REFRESH_JVM if kind == "jvm" else PERIODIC_REFRESH_NATIVE
+    for classname, required in (current_history | dashboard | export | imported | remaining_time | background | periodic).items():
         for name in required:
             matches = [case for case in cases if case["class"] == classname and case["name"] == name]
             if len(matches) != 1:

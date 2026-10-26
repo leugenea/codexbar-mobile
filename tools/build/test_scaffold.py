@@ -6,7 +6,7 @@ import re
 import unittest
 import xml.etree.ElementTree as ET
 
-from verify_manifests import check_source_manifests
+from verify_manifests import approved_work_removal, check_source_manifests
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -324,12 +324,13 @@ class ToolchainContract(unittest.TestCase):
     def test_app_manifest_overlays_cannot_broaden_network_policy(self):
         check_source_manifests(ROOT)
 
-    def test_internet_only_cleartext_off_and_default_real_connection_screen(self):
+    def test_exact_scheduler_permissions_cleartext_off_and_default_real_connection_screen(self):
         ns = "{http://schemas.android.com/apk/res/android}"
         manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
         permissions = {node.get(ns + "name") for node in manifest
-                       if node.tag in ("uses-permission", "uses-permission-sdk-23")}
-        self.assertEqual(permissions, {"android.permission.INTERNET"})
+                       if node.tag in ("uses-permission", "uses-permission-sdk-23") and not approved_work_removal(node)}
+        self.assertEqual(permissions, {"android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE",
+                                      "android.permission.RECEIVE_BOOT_COMPLETED", "android.permission.WAKE_LOCK"})
         application = manifest.find("application")
         assert application is not None
         self.assertEqual(application.get(ns + "usesCleartextTraffic"), "false")

@@ -11,7 +11,8 @@ Release attribution is produced by the [APK-bound pipeline](CONTRIBUTING.md#apk-
 not by enumerating verification XML. The
 [reviewed candidate catalog](tools/build/runtime-licenses.json) and
 [preserved full texts](docs/legal/runtime/README.md) cover exact versions of the
-AndroidX/Compose, Kotlin/coroutines/serialization, OkHttp/Okio and annotation inputs,
+AndroidX/Compose, WorkManager/Room/framework-SQLite adapters,
+Kotlin/coroutines/serialization, OkHttp/Okio and annotation inputs,
 plus known nested, native and generated-data portions. A catalog entry is not proof
 that it ships: build/test-only inputs and constraint-only BOMs are excluded from the
 shipping SBOM. Only the fresh exact release graph and actual APK determine that list.
@@ -51,6 +52,7 @@ not an owner publication or activation GO.
 | JUnit 4.13.2 | JVM tests; EPL-1.0 |
 | MockWebServer3 5.5.0 / OkHttp JVM 5.5.0 | Localhost JVM-test support; Square and Lysine contributors; Apache-2.0; not release-runtime declarations |
 | AndroidX Compose UI tests/manifest, test runner 1.7.0 and test-ext JUnit 1.3.0 | Native test APK/debug-only support; Apache-2.0 |
+| AndroidX WorkManager work-testing 2.12.0 | Native scheduler/worker test support; Apache-2.0; not a release-runtime declaration |
 | JaCoCo 0.8.15 / ASM | Debug coverage; EPL-2.0 / BSD-3-Clause |
 | Python and typing-extensions | CI validators; PSF / PSF-2.0 plus bundled notices |
 | tree-sitter 0.25.2 / tree-sitter-kotlin 1.1.0 | Metrics-only wheels; MIT / MIT |

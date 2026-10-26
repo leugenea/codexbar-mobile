@@ -15,7 +15,7 @@ METADATA_PATH = "gradle/verification-metadata.xml"
 # Full reviewed union: base toolchain, M2 coverage and the A4 HTTP/JSON graph.
 # Dependency updates must review the XML pair delta and update this digest in
 # the same PR. No parallel artifact list or audit receipt is maintained.
-APPROVED_METADATA_SHA256 = "1a4bb1ba071de078de6c6a2031f78a25075111bcdae6f2496c5b7114e84f3121"
+APPROVED_METADATA_SHA256 = "e30031826134986538abdd6a2c0bfe9af2f5539770db390ae2036b0549409c3e"
 # Historical origin labels must match the unchanged, independently audited XML.
 APPROVED_ORIGINS = {
     f"Independent {milestone} audit: {evidence}; not authenticated publisher identity"
@@ -25,6 +25,8 @@ APPROVED_ORIGINS = {
 }
 # Exact reviewed A4 annotations, not prefix matching or checksum-only identity claims.
 APPROVED_ORIGINS |= {
+    "Independent issue-195 audit: publisher SHA256 sidecar/module; not authenticated publisher identity",
+    "Independent issue-195 audit: weaker published SHA1 + freshly retrieved original SHA256; not authenticated publisher identity",
     "Independent A4 audit: PGP signature verified against upstream-pinned fingerprint "
     "5DD80B0DDCCBE005F0A47FD66751E1A6E2001B8D; published SHA1 also checked",
     "Independent A4 audit: T2-published-SHA256; publisher identity not authenticated",

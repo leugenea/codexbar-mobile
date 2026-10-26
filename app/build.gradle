@@ -323,6 +323,7 @@ dependencies {
     implementation 'androidx.compose.material3:material3:1.4.0'
     implementation 'androidx.activity:activity-compose:1.13.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+    implementation 'androidx.work:work-runtime:2.12.0'
     implementation 'com.squareup.okhttp3:okhttp:5.5.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0'
     testImplementation 'com.squareup.okhttp3:mockwebserver3:5.5.0'
@@ -332,6 +333,9 @@ dependencies {
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4:1.12.1'
     androidTestImplementation 'androidx.test:runner:1.7.0'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+    androidTestImplementation 'androidx.work:work-testing:2.12.0'
+    // OS-dispatch fixture calls WorkDatabase; Room is runtime-only in WorkManager's API publication.
+    androidTestImplementation 'androidx.room:room-runtime:2.7.0'
     debugImplementation 'androidx.compose.ui:ui-test-manifest:1.12.1'
 }
 

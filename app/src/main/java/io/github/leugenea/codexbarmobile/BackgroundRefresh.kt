@@ -11,7 +11,7 @@ internal data class BackgroundRefreshTarget(val partition: HistoryPartition) {
     override fun toString() = "BackgroundRefreshTarget(redacted)"
 }
 
-internal enum class BackgroundRefreshRejection { STALE_LIFETIME, DEFERRED, RETIRING }
+internal enum class BackgroundRefreshRejection { STALE_LIFETIME, DEFERRED, RETIRING, RECENT_SUCCESS }
 
 /** Endpoint delivery and durable measurement acknowledgement are deliberately independent. */
 internal sealed interface BackgroundRefreshOutcome {
