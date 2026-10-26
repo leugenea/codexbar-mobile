@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792938757070,
+  "lastUpdate": 1793000132275,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2777,6 +2777,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/6b4c5477bebb7b1bafb04ad95e4f4822918f44a0"
         },
         "date": 1792938754628,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ba4fd3ad485a5a12d12e60719630a4350df33938",
+          "message": "feat: schedule battery-friendly periodic usage refresh (#197)\n\n* feat: schedule battery-friendly periodic usage refresh (#195)\n\n* fix: include existing initializer and Room test compile dependency\n\n* fix: verify collection metadata and attribute D8 interface synthetics\n\n* test: distinguish worker network detachment from durable settlement",
+          "timestamp": "2026-10-26T10:35:04+03:00",
+          "tree_id": "ff7104c8e6d2bbad359d48fc7e5aa2726efacb01",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/ba4fd3ad485a5a12d12e60719630a4350df33938"
+        },
+        "date": 1793000131607,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
