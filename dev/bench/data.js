@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793015043567,
+  "lastUpdate": 1793015046397,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -5669,6 +5669,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/ba4fd3ad485a5a12d12e60719630a4350df33938"
         },
         "date": 1793000134728,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5cfb6f9e3f1e06ea6cea415acdad34a210984568",
+          "message": "fix: bind historical APK contracts to verified release sources (#202)",
+          "timestamp": "2026-10-26T14:43:37+03:00",
+          "tree_id": "830f21a42e920fd8abd3694b8301885a694bb053",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/5cfb6f9e3f1e06ea6cea415acdad34a210984568"
+        },
+        "date": 1793015045988,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
