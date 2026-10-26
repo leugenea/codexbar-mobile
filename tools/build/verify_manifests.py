@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
 from work_manifest_policy import apk_components, check_components
+from historical_apk_contract import is_legacy
 
 ROOT = Path(__file__).resolve().parents[2]
 ANDROID = "{http://schemas.android.com/apk/res/android}"
@@ -156,7 +157,7 @@ def check_apk_process_owner(xmltree: str) -> None:
         raise ValueError("APK MainActivity must declare singleTask launch mode")
 
 
-def check_apk_dump(permissions: str, xmltree: str, package=DEBUG_PACKAGE) -> list[str]:
+def check_apk_dump(permissions: str, xmltree: str, package=DEBUG_PACKAGE, *, apk_contract=None) -> list[str]:
     if not re.search(r"(?m)^package: " + re.escape(package) + r"\s*$", permissions):
         raise ValueError("Missing APK package identity")
     names = []
@@ -167,7 +168,8 @@ def check_apk_dump(permissions: str, xmltree: str, package=DEBUG_PACKAGE) -> lis
                 raise ValueError("Malformed or conditional APK permission")
             names.append(match[1])
     receiver = package + '.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
-    result = check_permissions(names, permissions_for(package))
+    expected = (frozenset({'android.permission.INTERNET', receiver}) if is_legacy(apk_contract) else permissions_for(package))
+    result = check_permissions(names, expected)
     declarations = []
     # aapt XML-tree elements are nested by indentation; read only each declaration.
     lines = xmltree.splitlines()
@@ -194,7 +196,7 @@ def check_apk_dump(permissions: str, xmltree: str, package=DEBUG_PACKAGE) -> lis
             or "android:networkSecurityConfig(" in xmltree):
         raise ValueError("APK cleartext policy must be explicitly false without an override")
     check_apk_process_owner(xmltree)
-    apk_components(xmltree, package)
+    apk_components(xmltree, package, apk_contract)
     return result
 
 

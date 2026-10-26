@@ -183,11 +183,15 @@ class SigningTests(unittest.TestCase):
 
 
 class AssetTests(RuntimeFixture):
+    def build_inputs(self):
+        return {**EXPECTED, 'channel': 'rc', 'tag': 'v0.1.0-rc.1', 'versionName': '0.1.0-rc.1'}
+
     def setUp(self):
         super().setUp()
-        self.expected = {**EXPECTED, 'channel': 'rc', 'tag': 'v0.1.0-rc.1', 'versionName': '0.1.0-rc.1'}
+        self.expected = self.build_inputs()
         self.inventory['buildInputs'] = self.expected
         self.receipt['buildInputs'] = self.expected
+        self.receipt['source'] = self.expected['source']
         self.signed = self.root / signing.asset_names(self.expected)[0]
         self.signed.write_bytes(archive([*runtime.members(self.apk.read_bytes()).items(),
                                         ('META-INF/CERT.SF', b'SYNTHETIC'), ('META-INF/CERT.RSA', b'NOT A SIGNATURE')]))

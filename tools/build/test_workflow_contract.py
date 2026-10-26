@@ -1180,6 +1180,7 @@ class SyntheticReportTests(unittest.TestCase):
             'app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml': self.synthetic_manifest(),
             'tools/build/verify_manifests.py': (ROOT / 'tools/build/verify_manifests.py').read_text(),
             'tools/build/work_manifest_policy.py': (ROOT / 'tools/build/work_manifest_policy.py').read_text(),
+            'tools/build/historical_apk_contract.py': (ROOT / 'tools/build/historical_apk_contract.py').read_text(),
         }
         for name, text in files.items():
             path = self.directory / name

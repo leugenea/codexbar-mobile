@@ -1,6 +1,7 @@
 """Exact effective component contract for the pinned WorkManager release (minSdk 26)."""
 import re
 import xml.etree.ElementTree as ET
+from historical_apk_contract import is_legacy
 
 ANDROID = '{http://schemas.android.com/apk/res/android}'
 WORK = 'androidx.work.'
@@ -17,6 +18,14 @@ INITIALIZERS = {
     'androidx.work.WorkManagerInitializer', 'androidx.lifecycle.ProcessLifecycleInitializer',
     'androidx.profileinstaller.ProfileInstallerInitializer', 'androidx.emoji2.text.EmojiCompatInitializer',
     'okhttp3.internal.platform.PlatformInitializer',
+}
+LEGACY_COMPONENTS = {
+    ('receiver', 'androidx.profileinstaller.ProfileInstallReceiver'),
+    ('provider', 'androidx.startup.InitializationProvider'),
+}
+LEGACY_INITIALIZERS = {
+    'androidx.lifecycle.ProcessLifecycleInitializer', 'androidx.profileinstaller.ProfileInstallerInitializer',
+    'androidx.emoji2.text.EmojiCompatInitializer', 'okhttp3.internal.platform.PlatformInitializer',
 }
 RECEIVER_ACTIONS = {
     WORK + 'impl.utils.ForceStopRunnable$BroadcastReceiver': set(),
@@ -43,26 +52,28 @@ def check_component(node):
             raise ValueError(f'Scheduler receiver actions mismatch: {key}')
 
 
-def check_startup(startup, package):
+def check_startup(startup, package, contract=None):
     if startup.get(ANDROID + 'directBootAware') not in {None, 'false'}:
         raise ValueError('Scheduler Startup may not run before unlock')
     if startup.get(ANDROID + 'authorities') != package + '.androidx-startup':
         raise ValueError('Scheduler Startup authority mismatch')
     initializers = [(node.get(ANDROID + 'name'), node.get(ANDROID + 'value')) for node in startup.findall('meta-data')]
-    if len(initializers) != len(INITIALIZERS) or set(initializers) != {(name, 'androidx.startup') for name in INITIALIZERS}:
+    expected = LEGACY_INITIALIZERS if is_legacy(contract) else INITIALIZERS
+    if len(initializers) != len(expected) or set(initializers) != {(name, 'androidx.startup') for name in expected}:
         raise ValueError('Scheduler Startup initializer contract mismatch')
 
 
-def check_components(application, package):
+def check_components(application, package, contract=None):
     if application.get(ANDROID + 'process') is not None:
         raise ValueError('Application process override')
     nodes = [node for node in application if node.tag in {'service', 'receiver', 'provider'}]
     keys = [(node.tag, node.get(ANDROID + 'name')) for node in nodes]
-    if len(keys) != len(set(keys)) or set(keys) != set(COMPONENTS):
+    expected = LEGACY_COMPONENTS if is_legacy(contract) else set(COMPONENTS)
+    if len(keys) != len(set(keys)) or set(keys) != expected:
         raise ValueError(f'Pinned scheduler component allowlist mismatch: {keys}')
     for node in nodes:
         check_component(node)
-    check_startup(next(node for node in nodes if node.tag == 'provider'), package)
+    check_startup(next(node for node in nodes if node.tag == 'provider'), package, contract)
 
 
 def decoded_attribute(value):
@@ -75,7 +86,7 @@ def decoded_attribute(value):
     return value.split('=', 1)[-1].split(' ', 1)[0]
 
 
-def apk_components(xmltree, package):
+def apk_components(xmltree, package, contract=None):
     """Decode aapt2 indentation (including attributes) before applying the same contract."""
     root = ET.Element('root')
     stack = [(-1, root)]
@@ -96,4 +107,4 @@ def apk_components(xmltree, package):
                 stack[-1][1].set(ANDROID + attribute.group(1), decoded_attribute('=' + attribute.group(2)))
     if application is None:
         raise ValueError('APK application node missing')
-    check_components(application, package)
+    check_components(application, package, contract)

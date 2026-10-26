@@ -254,7 +254,11 @@ class CandidateTests(unittest.TestCase):
         self.model = PolicyAPI(self.ctx)
         self.api = wrapper(self.model)
         self.record, self.expected, self.origin = policy.admit(self.api, configuration(), self.ctx)
-        self.model.archive = zip_bytes({'release-manifest.json': b'SYNTHETIC not a real signature'})
+        self.manifest = {'buildInputs': self.expected,
+                         'authority': {'repository': self.api.repository, 'workflowId': 8,
+                                       'controllerSha': 'c' * 40, 'runId': 90, 'runAttempt': 2}}
+        self.assets = {'release-manifest.json': canonical(self.manifest)}  # Synthetic, no signature.
+        self.model.archive = zip_bytes(self.assets)
         self.artifact = {'id': 80, 'name': 'signed-90-2', 'expired': False,
                          'digest': 'sha256:' + fingerprint(self.model.archive)['sha256'],
                          'workflow_run': {'id': 90, 'head_sha': 'c' * 40}}
@@ -268,9 +272,10 @@ class CandidateTests(unittest.TestCase):
         return policy.candidate_assets(self.api, self.record, self.expected, self.origin, self.path, self.path)
 
     def test_real_wrapper_resolves_retained_candidate_and_independent_verifier_inputs(self):
-        with patch.object(policy, 'verify_assets', return_value=({'buildInputs': self.expected}, None)) as verify:
-            self.assertEqual(self.read(), {'release-manifest.json': b'SYNTHETIC not a real signature'})
+        with patch.object(policy, 'verify_assets', return_value=(self.manifest, None)) as verify:
+            self.assertEqual(self.read(), self.assets)
             self.assertEqual(verify.call_args.kwargs, {'expected_certificate': 'd' * 64,
+                'expected_binding': {key: self.expected[key] for key in ('tag', 'source')}, 'apk_contract': None,
                 'expected_authority': {'repository': self.api.repository, 'workflowId': 8,
                                       'controllerSha': 'c' * 40, 'runId': 90, 'runAttempt': 2}})
         for key, value in [('tag', 'v0.1.0-rc.2'), ('channel', 'stable'), ('source', {'sha': 'e' * 40, 'tree': 'b' * 40}),
@@ -318,15 +323,17 @@ class HistoryTests(unittest.TestCase):
 
     def published(self, code=9, tag='v0.1.0-rc.2', run_id=90):
         expected = {**self.expected, 'versionCode': code, 'tag': tag, 'versionName': tag[1:]}
-        assets = {'release-manifest.json': b'synthetic manifest, not a real signature'}
+        manifest = {'buildInputs': expected, 'bundleManifestSha256': 'f' * 64,
+                    'authority': {'repository': self.api.repository, 'workflowId': 8, 'controllerSha': 'c' * 40,
+                                  'runId': run_id, 'runAttempt': 2}}
+        assets = {'release-manifest.json': canonical(manifest)}  # Synthetic, no signature.
         from release_publication import marker
         self.api.records = [{'id': 5, 'tag_name': tag, 'target_commitish': 'a' * 40, 'name': tag[1:],
                              'body': marker(assets), 'draft': False, 'prerelease': True}]
-        return assets, {'buildInputs': expected, 'bundleManifestSha256': 'f' * 64,
-                        'authority': {'repository': self.api.repository, 'workflowId': 8, 'controllerSha': 'c' * 40,
-                                      'runId': run_id, 'runAttempt': 2}}
+        return assets, manifest
 
     def published_api(self, assets, manifest, notes=''):
+        assets['release-manifest.json'] = canonical(manifest)
         from release_mock import ReleaseAPI
         from release_publication import publish
         remote = ReleaseAPI()
@@ -432,22 +439,25 @@ class HistoryTests(unittest.TestCase):
                 policy.history(api, record, expected, self.reports, self.reports)
 
     def test_retained_official_candidate_reserves_tag_and_expired_unknown_blocks(self):
-        raw = zip_bytes({'release-manifest.json': b'synthetic'})
         path = '/actions/workflows/8/runs?event=workflow_dispatch'
         run = {'id': 90, 'status': 'completed', 'conclusion': 'success', 'path': policy.WORKFLOW,
                'event': 'workflow_dispatch', 'head_branch': 'main', 'repository': {'id': 7},
                'head_sha': 'c' * 40, 'run_number': 9}
         self.api.overrides[path] = [run]
-        artifact = {'id': 80, 'name': 'signed-90-2', 'expired': False, 'digest': 'sha256:' + fingerprint(raw)['sha256']}
-        self.api.overrides['/actions/runs/90/artifacts'] = [artifact]
         manifest = {'buildInputs': {**self.expected, 'versionCode': 9},
                     'authority': {'runId': 90, 'workflowId': 8, 'repository': self.api.repository,
                                   'controllerSha': 'c' * 40, 'runAttempt': 2}}
-        with patch.object(self.api, 'request', return_value=raw, create=True), \
+        raw = zip_bytes({'release-manifest.json': canonical(manifest)})
+        artifact = {'id': 80, 'name': 'signed-90-2', 'expired': False, 'digest': 'sha256:' + fingerprint(raw)['sha256']}
+        self.api.overrides['/actions/runs/90/artifacts'] = [artifact]
+        with patch.object(self.api, 'request', return_value=raw, create=True) as download, \
                 patch.object(policy, 'verify_assets', return_value=(manifest, None)):
             with self.assertRaisesRegex(ValueError, 'Tag already admitted'):
                 self.read()
             manifest['buildInputs']['tag'] = 'v0.1.0-rc.2'
+            raw = zip_bytes({'release-manifest.json': canonical(manifest)})
+            artifact['digest'] = 'sha256:' + fingerprint(raw)['sha256']
+            download.return_value = raw
             self.assertEqual(self.read(), (0, False))
             artifact['expired'] = True
             with self.assertRaisesRegex(ValueError, 'Expired unresolved'):

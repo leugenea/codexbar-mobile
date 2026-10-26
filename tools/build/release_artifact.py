@@ -10,6 +10,7 @@ import zipfile
 
 from verify_manifests import check_apk_dump, xmltree_elements, MAIN_ACTIVITY, PACKAGE
 from version_identity import resolve, git
+from historical_apk_contract import check_binding, is_legacy
 
 
 def run_tool(command):
@@ -161,7 +162,11 @@ def signer_certificate(output, expected):
     return expected
 
 
-def inspect_apk(apk, expected, sdk, report_dir, *, expected_signer=None):
+def inspect_apk(apk, expected, sdk, report_dir, *, expected_signer=None, apk_contract=None):
+    if is_legacy(apk_contract):
+        check_binding(expected, {key: expected[key] for key in ('tag', 'source')}, apk_contract)
+        if expected_signer is None:
+            raise ValueError('Historical APK contract is only for retained signed assets')
     report_dir.mkdir(parents=True, exist_ok=True)
     tools = sdk / 'build-tools/36.0.0'
     results = {}
@@ -169,7 +174,7 @@ def inspect_apk(apk, expected, sdk, report_dir, *, expected_signer=None):
                              ('manifest', ['xmltree', 'AndroidManifest.xml']),
                              ('badging', ['badging'])):
         results[label] = dump_apk(tools, apk, label, arguments, report_dir)
-    permissions = check_apk_dump(results['permissions'], results['manifest'], expected['releasePackage'])
+    permissions = check_apk_dump(results['permissions'], results['manifest'], expected['releasePackage'], apk_contract=apk_contract)
     package = re.findall(r"(?m)^package: name='([^']+)' versionCode='([^']+)' versionName='([^']+)'", results['badging'])
     identity = (expected['releasePackage'], str(expected['versionCode']), expected['versionName'])
     if package != [identity]:
