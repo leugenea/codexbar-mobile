@@ -1,13 +1,12 @@
 """Offline, explicitly synthetic native-coverage retry/runner regressions; no emulator/Gradle."""
-from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DASHBOARD_NATIVE,
-                                             EXPECTED_CURRENT_READ_JVM, SCANNER_CLASS)
+from verify_test_reports import DASHBOARD_JVM, DASHBOARD_NATIVE
 from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT, verify_reports
 from verify_test_reports import HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE
 from verify_test_reports import HISTORY_IMPORT_JVM, HISTORY_IMPORT_NATIVE, REMAINING_TIME_JVM
 from verify_test_reports import BACKGROUND_REFRESH_JVM
 from periodic_refresh_contract_expectations import PERIODIC_JVM, PERIODIC_NATIVE, PERIODIC_NATIVE_COUNT, PERIODIC_JVM_COUNT
 from background_refresh_contract_expectations import BACKGROUND_JVM_CLASS, BACKGROUND_JVM_CASES, BACKGROUND_NATIVE_CASES
-from test_background_refresh_contract import mutate
+
 import copy
 import json
 import os
@@ -60,7 +59,7 @@ def synthetic_reports(build, failed=False):
                                         (LIVE_USAGE_CLASS, LIVE_USAGE_CASES), (BANKED_RESET_CLASS, BANKED_RESET_CASES), (HISTORY_CLASS, HISTORY_CASES), (HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES), (HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES), (HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES), (HISTORY_CHART_CLASS, HISTORY_CHART_CASES), (HISTORY_NAVIGATION_CLASS, HISTORY_NAVIGATION_CASES), (HISTORY_AUTHORITY_CLASS, HISTORY_AUTHORITY_CASES), (HISTORY_ISOLATION_CLASS, HISTORY_ISOLATION_CASES), (HISTORY_ASSEMBLED_CLASS, HISTORY_ASSEMBLED_CASES), (ACCOUNT_NAME_CLASS, ACCOUNT_NAME_CASES), (ACCOUNT_REMOVAL_CLASS, ACCOUNT_REMOVAL_CASES), (DEVICE_CODE_COPY_CLASS, DEVICE_CODE_COPY_CASES)):
                 for name in sorted(required):
                     ET.SubElement(suite, "testcase", classname=classname, name=name)
-        current = (CURRENT_HISTORY_JVM | {SCANNER_CLASS: EXPECTED_CURRENT_READ_JVM} | EXPECTED_DASHBOARD_JVM) if kind == "jvm" else (CURRENT_HISTORY_NATIVE | EXPECTED_DASHBOARD_NATIVE)
+        current = (CURRENT_HISTORY_JVM | DASHBOARD_JVM) if kind == "jvm" else (CURRENT_HISTORY_NATIVE | DASHBOARD_NATIVE)
         current |= HISTORY_EXPORT_JVM if kind == "jvm" else HISTORY_EXPORT_NATIVE
         current |= HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
         current |= REMAINING_TIME_JVM if kind == "jvm" else {}
@@ -314,9 +313,29 @@ class RetryContracts(unittest.TestCase):
                 tree = ET.parse(path)
                 suite = tree.getroot()
                 case = next(c for c in suite if c.get("classname") == classname and c.get("name") == name)
-                mutate(suite, case, "duplicate")
+                ET.SubElement(suite, "testcase", attrib=dict(case.attrib))
                 tree.write(path)
                 with self.subTest(classname=classname, name=name), self.assertRaises(ValueError):
+                    self.require()
+
+    def test_each_phone_time_case_prevents_retry_on_omission_failure_error_skip_spoof_or_duplicate(self):
+        for name in PHONE_TIME_CASES:
+            for mutation in ("missing", "failure", "error", "skipped", "wrong-class", "duplicate"):
+                synthetic_reports(self.build)
+                path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
+                tree = ET.parse(path)
+                root = tree.getroot()
+                case = next(item for item in root if item.get("name") == name)
+                if mutation == "missing":
+                    root.remove(case)
+                elif mutation == "wrong-class":
+                    case.set("classname", "SYNTHETIC-wrong-class")
+                elif mutation == "duplicate":
+                    root.append(copy.deepcopy(case))
+                else:
+                    ET.SubElement(case, mutation)
+                tree.write(path)
+                with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
                     self.require()
 
     def test_retained_component_families_are_present_in_positive_retry_reports(self):

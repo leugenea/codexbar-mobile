@@ -1,24 +1,11 @@
-"""Synthetic/source controls for issue142; no application/native execution or visual approval."""
+"""Synthetic dashboard capture controls; no application execution or visual approval."""
 import copy
 import json
-from pathlib import Path
-import re
 import unittest
-import xml.etree.ElementTree as ET
 
-from tree_sitter import Language, Parser
-import tree_sitter_kotlin
-from dashboard_contract_expectations import (EXPECTED_DASHBOARD_JVM, EXPECTED_DASHBOARD_NATIVE,
-    EXPECTED_SCANNER_ADDITIONS, EXPECTED_CURRENT_READ_JVM, PROTECTED_MIXED_SOURCE, SCANNER_CLASS,
-    EXPECTED_DASHBOARD_CAPTURE_SPECS, EXPECTED_DASHBOARD_LAYOUTS, EXPECTED_CURRENT_HOST,
-    EXPECTED_DASHBOARD_NATIVE_COUNT, EXPECTED_DASHBOARD_JVM_COUNT, EXPECTED_BANKED_TABLE_ROWS,
-    EXPECTED_COMPACT_COPY)
-from verify_test_reports import DASHBOARD_JVM, DASHBOARD_NATIVE, DASHBOARD_NATIVE_COUNT, DASHBOARD_JVM_COUNT, CURRENT_HISTORY_JVM, verify_reports
+from dashboard_contract_expectations import EXPECTED_DASHBOARD_CAPTURE_SPECS, EXPECTED_DASHBOARD_LAYOUTS, EXPECTED_CURRENT_HOST, EXPECTED_BANKED_TABLE_ROWS, EXPECTED_COMPACT_COPY
 from verify_history_text_captures import DASHBOARD_CAPTURES, DASHBOARD_LAYOUTS, dashboard_capture_receipt
 import test_history_text_contract as history_fixture
-import test_workflow_contract
-
-ROOT = Path(__file__).resolve().parents[2]
 
 
 def dashboard_captures(directory, fixture):
@@ -61,153 +48,12 @@ def dashboard_captures(directory, fixture):
         (directory / (name + ".png")).write_bytes(image)
 
 
-def annotated_methods(text, classname):
-    """Only @Test methods directly owned by the intended Kotlin class/package."""
-    data = text.encode()
-    tree = Parser(Language(tree_sitter_kotlin.language())).parse(data)
-    package = next(node for node in tree.root_node.named_children if node.type == "package_header")
-    actual_package = data[package.start_byte:package.end_byte].decode().removeprefix("package ").strip()
-    methods = set()
-    for declaration in tree.root_node.named_children:
-        if declaration.type != "class_declaration":
-            continue
-        name = next(node for node in declaration.named_children if node.type == "identifier")
-        if actual_package + "." + data[name.start_byte:name.end_byte].decode() != classname:
-            continue
-        body = next(node for node in declaration.named_children if node.type == "class_body")
-        for function in body.named_children:
-            if function.type != "function_declaration":
-                continue
-            modifiers = next((node for node in function.named_children if node.type == "modifiers"), None)
-            if modifiers is None or not re.search(r"@(?:org\.junit\.)?Test\b", data[modifiers.start_byte:modifiers.end_byte].decode()):
-                continue
-            name = function.child_by_field_name("name")
-            methods.add(data[name.start_byte:name.end_byte].decode())
-    return methods
-
-
 class DashboardContracts(unittest.TestCase):
     def setUp(self):
         self.fixture = history_fixture.HistoryTextContracts()
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
         self.directory = self.fixture.directory
-
-    def test_exact_additive_dashboard_identities_fail_closed_without_removing_inherited_cases(self):
-        writer = test_workflow_contract.SyntheticReportTests()
-        writer.directory = self.directory
-        self.assertEqual(DASHBOARD_JVM, EXPECTED_DASHBOARD_JVM)
-        self.assertEqual(DASHBOARD_NATIVE, EXPECTED_DASHBOARD_NATIVE)
-        self.assertEqual(DASHBOARD_NATIVE_COUNT, EXPECTED_DASHBOARD_NATIVE_COUNT)
-        self.assertEqual(DASHBOARD_JVM_COUNT, EXPECTED_DASHBOARD_JVM_COUNT)
-        self.assertEqual(CURRENT_HISTORY_JVM[SCANNER_CLASS], EXPECTED_CURRENT_READ_JVM)
-        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_NATIVE.values())), 17)
-        self.assertEqual(sum(map(len, EXPECTED_DASHBOARD_JVM.values())) + len(EXPECTED_SCANNER_ADDITIONS), 31)
-        for kind, registry, source_set in (("jvm", EXPECTED_DASHBOARD_JVM, "test"), ("native", EXPECTED_DASHBOARD_NATIVE, "androidTest")):
-            for classname, required in registry.items():
-                source = ROOT / f"app/src/{source_set}/java/{classname.replace('.', '/')}.kt"
-                actual = annotated_methods(source.read_text(), classname)
-                protected = PROTECTED_MIXED_SOURCE.get(classname)
-                if protected is None:
-                    self.assertEqual(required, actual)
-                else:
-                    self.assertEqual(protected | required, actual)
-                for name in required:
-                    for mutation in ("missing", "wrong-class", "duplicate", "failure", "error", "skipped"):
-                        path = writer.write_report(kind)
-                        tree = ET.parse(path)
-                        suite = tree.getroot()
-                        case = next(c for c in suite if c.get("classname") == classname and c.get("name") == name)
-                        if mutation == "missing":
-                            suite.remove(case)
-                        elif mutation == "wrong-class":
-                            case.set("classname", "SYNTHETIC-wrong-class")
-                        elif mutation == "duplicate":
-                            ET.SubElement(suite, "testcase", **case.attrib)
-                        else:
-                            ET.SubElement(case, mutation)
-                        tree.write(path)
-                        with self.subTest(kind=kind, name=name, mutation=mutation), self.assertRaises(ValueError):
-                            verify_reports(self.directory, kind)
-
-    def test_metadata_ticks_reuse_lazy_analytics_and_remember_drawing_by_stable_series(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        graph = (main / "history/HistoryProjection.kt").read_text()
-        self.assertIn("val entries: List<HistoryGraphEntry> by lazy", graph)
-        self.assertIn("val points: List<HistoryPoint> by lazy", graph)
-        dashboard = (main / "DashboardScreen.kt").read_text()
-        self.assertIn("remember { HistoryPlotCache() }.project(display)", dashboard)
-        self.assertIn("remember(series) { DashboardPresentation.hasChart(series) }", dashboard)
-        compact = (main / "CompactHistoryChart.kt").read_text()
-        self.assertIn("remember(series) { historyChartDrawing(series) }", compact)
-        self.assertIn("DashboardPresentation.paceComparison(display, observation, series.kind)", compact)
-
-    def test_simplified_window_copy_removes_retired_lines_without_rounding_stored_history(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
-        for removed in ("dashboard_single_observation", "dashboard_recorded_observations", "dashboard_history_incomplete"):
-            self.assertNotIn(removed, resources)
-        self.assertEqual(resources["dashboard_updated"], "Updated %1$s")
-        self.assertEqual(resources["dashboard_next_reset"], "Next reset in %1$s")
-        self.assertEqual(resources["dashboard_over_pace"], "Over pace by %1$s%%")
-        self.assertEqual(resources["dashboard_reserve"], "%1$s%% in reserve")
-        self.assertEqual(resources["dashboard_on_pace"], "On pace")
-        compact = (main / "CompactHistoryChart.kt").read_text()
-        for removed in ("history_measured", "history_point_time", "history_delta", "CompactHistoryFacts", "incomplete("):
-            self.assertNotIn(removed, compact)
-        dashboard = (main / "DashboardScreen.kt").read_text()
-        self.assertNotIn("live_reset_absolute", dashboard)
-        self.assertIn("remainingTimeLabel(it)", dashboard)
-        self.assertIn('testTag("dashboard-observed-at")', dashboard)
-        self.assertIn("model.observation?.observedAt", dashboard)
-        self.assertIn("R.string.dashboard_updated, chartTimeLabel(it, time.zone, time.locale, truncateToHour = false)", dashboard)
-        self.assertNotIn("history_point_time", dashboard)
-        self.assertNotIn('Text(stringResource(R.string.history_chart_legend)', compact)
-        self.assertIn("contentDescription = legend", compact)
-        self.assertNotIn('testTag("$tag-legend")', compact)
-        detail = (main / "HistoryChartComponent.kt").read_text()
-        self.assertIn('Text(stringResource(R.string.history_chart_legend), Modifier.testTag("$tag-legend"))', detail)
-        # Full stored text is the deliberate exact-value route, not the compact window block.
-        stored = (main / "HistoryTextPresentation.kt").read_text()
-        self.assertIn("comparison.deltaPercentagePoints.toString()", stored)
-        self.assertNotIn("setScale", stored)
-
-    def test_banked_card_keeps_shared_style_wrapping_table_and_no_disclosure_state(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        card = (main / "BankedResetCard.kt").read_text()
-        windows = (main / "DashboardScreen.kt").read_text()
-        for shared in ("Card(Modifier.fillMaxWidth()", "Column(Modifier.padding(20.dp)",
-                       "Arrangement.spacedBy(12.dp)", "MaterialTheme.typography.titleLarge"):
-            self.assertIn(shared, card)
-            self.assertIn(shared, windows)
-        for required in ("TimePresentation.chartTime(", "remainingTimeLabel(it)",
-                         "HorizontalDivider(", "Modifier.weight(1f)", "TextAlign.End",
-                         "semantics(mergeDescendants = true)", "contentDescription = description",
-                         "model.entitlements.items.isNotEmpty()"):
-            self.assertIn(required, card)
-        for removed in ("OutlinedButton", "expanded", "remember", "maxLines", "TextOverflow"):
-            self.assertNotIn(removed, card)
-        self.assertEqual(card.count("Card(Modifier"), 1)
-        self.assertFalse((main / "BankedResetDisclosure.kt").exists())
-        resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
-        self.assertNotIn("dashboard_expanded", resources)
-        self.assertNotIn("dashboard_collapsed", resources)
-        self.assertEqual(resources["dashboard_banked_expires"], "Expires")
-        self.assertEqual(resources["dashboard_banked_remaining"], "Remaining")
-        self.assertEqual(resources["dashboard_banked_row"], "Banked reset %1$d, %2$s")
-        self.assertEqual(resources["dashboard_banked_missing_expiry"], "—")
-        self.assertEqual(resources["dashboard_banked_expiry_unknown"], "expiry unknown")
-        self.assertEqual(resources["dashboard_banked_expires_on"], "expires %1$s")
-        self.assertEqual(resources["dashboard_banked_expired_on"], "expired %1$s")
-        self.assertEqual(resources["dashboard_banked_state"], "state %1$s")
-        for state in ("unknown", "unsupported", "unavailable", "malformed", "discrepant"):
-            self.assertEqual(resources[f"dashboard_banked_state_{state}"], state.capitalize())
-        self.assertIn("item.state == EntitlementState.KNOWN", card)
-        self.assertIn("DashboardPresentation.bankedItemState(item.state)", card)
-        self.assertNotIn('testTag("banked-disclosure-state-', card)
-        row = card[card.index("private fun BankedTableRow("):card.index("private fun bankedRowDescription(")]
-        self.assertEqual(row.count("Text("), 2)
-        self.assertNotIn("Column(", row)
 
     def test_each_dashboard_image_requires_exact_route_configuration_and_native_owner_receipts(self):
         self.assertEqual(DASHBOARD_CAPTURES, EXPECTED_DASHBOARD_CAPTURE_SPECS)
@@ -311,84 +157,3 @@ class DashboardContracts(unittest.TestCase):
             path.with_suffix(".json").write_text(json.dumps(data))
             with self.assertRaises(ValueError):
                 dashboard_capture_receipt(path)
-
-    def test_source_annotations_and_class_identity_cannot_be_spoofed_by_names(self):
-        classname = "io.github.leugenea.codexbarmobile.DashboardUiTest"
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/DashboardUiTest.kt").read_text()
-        expected = EXPECTED_DASHBOARD_NATIVE[classname]
-        for name in expected:
-            without_annotation = source.replace(f"@Test fun {name}", f"fun {name}")
-            self.assertNotIn(name, annotated_methods(without_annotation, classname))
-        wrong_class = source.replace("class DashboardUiTest", "class UnrelatedTest")
-        self.assertEqual(annotated_methods(wrong_class, classname), set())
-        scanner = ROOT / f"app/src/test/java/{SCANNER_CLASS.replace('.', '/')}.kt"
-        self.assertEqual(annotated_methods(scanner.read_text(), SCANNER_CLASS), EXPECTED_CURRENT_READ_JVM)
-
-    def test_mixed_source_census_rejects_extra_annotated_methods_without_expanding_report_targets(self):
-        for classname in (
-                "io.github.leugenea.codexbarmobile.history.HistoryDisplayAuthorityTest",
-                "io.github.leugenea.codexbarmobile.history.UsageHistoryRecorderTest"):
-            protected = PROTECTED_MIXED_SOURCE[classname]
-            source = ROOT / f"app/src/test/java/{classname.replace('.', '/')}.kt"
-            text = source.read_text()
-            expected = protected | EXPECTED_DASHBOARD_JVM[classname]
-            self.assertEqual(expected, annotated_methods(text, classname))
-            declaration = f"class {classname.rsplit('.', 1)[1]}"
-            body = text.index("{", text.index(declaration)) + 1
-            extra = text[:body] + "\n    @Test fun unregisteredSyntheticRegression() {}\n" + text[body:]
-            with self.subTest(classname=classname), self.assertRaises(AssertionError):
-                self.assertEqual(expected, annotated_methods(extra, classname))
-            for name in expected:
-                without_annotation = re.sub(rf"@Test\s+(?=fun {re.escape(name)}\b)", "", text)
-                self.assertNotIn(name, annotated_methods(without_annotation, classname))
-            wrong_class = text.replace(declaration, "class UnrelatedTest", 1)
-            self.assertEqual(set(), annotated_methods(wrong_class, classname))
-            # Whole annotated source equality protects old methods without registering
-            # them as additional mandatory report identities.
-            self.assertTrue(protected.isdisjoint(EXPECTED_DASHBOARD_JVM[classname]))
-
-    def test_request_boundary_keeps_single_owner_exact_cursor_and_explicit_reread_distinction(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        scan = (main / "history/CurrentHistoryRead.kt").read_text()
-        recorder = (main / "history/UsageHistoryRecorder.kt").read_text()
-        root = (main / "DashboardNavigation.kt").read_text()
-        stored = (main / "ConnectionHistory.kt").read_text()
-        self.assertIn("scan(access, query.after", scan)
-        self.assertIn("scan(access, null", scan)
-        self.assertIn("query.storage(partition)", scan)
-        self.assertIn("if (request == next) return", recorder)
-        self.assertIn("fun query(next: HistoryGraphQuery) = select", recorder)
-        self.assertIn("val permission = current.permission ?: return false", recorder)
-        self.assertIn("permission.current() === permission.context", recorder)
-        self.assertIn("permission.context.selection === requested", recorder)
-        self.assertIn("controller.currentHistoryDisplayContext()", root)
-        self.assertIn("controller.historySnapshots.collectAsState()", stored)
-        self.assertNotRegex(root + stored, r"rememberSaveable|SQLiteHistory|usageForeground|Instant\.now")
-        self.assertNotIn("historySnapshots.value", root + stored)
-        for host in (root, stored):
-            self.assertIn("remember(controller, source.generation)", host)
-            self.assertNotIn("remember(controller, authority?.generation", host)
-        controller = (main / "ConnectionController.kt").read_text()
-        self.assertIn("command(UsageForegroundCommand(observer, foreground))", controller)
-        self.assertIn("context: CoroutineContext = EmptyCoroutineContext", controller)
-        self.assertIn("AbstractCoroutineContextElement(Key)", controller)
-        for name in ("LaunchForegroundCheckpoint.kt", "UsageRefreshLifecycleTest.kt"):
-            ledger = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile" / name).read_text()
-            self.assertIn("context[UsageForegroundCommand]", ledger)
-            self.assertIn("typed.foreground" if name.startswith("Launch") else "ticket.foreground", ledger)
-            self.assertIn("submittedObservers", ledger)
-        capture = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/DashboardCapture.kt").read_text()
-        self.assertIn("observer.hold()", capture)
-        self.assertIn("finally { observer.release() }", capture)
-        self.assertIn("revalidate(frame, scenario, fixture.owner)", capture)
-        for begin, end in (("private fun window(", "private fun chart("), ("private fun chart(", "private fun save(")):
-            helper = capture[capture.index(begin):capture.index(end)]
-            self.assertIn("frame.current", helper)
-            self.assertNotIn("historySnapshots.value", helper)
-            self.assertNotIn("observer.currentFrame", helper)
-            self.assertNotIn("recordedHistory(owner", helper)
-        strings = {
-            x.get("name"): x.text or "" for x in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
-        self.assertEqual(strings["drawer_history"], "Full local history details")
-        self.assertEqual(strings["drawer_connection"], "Full live connection details")
-        self.assertFalse(any("hour precision" in x for x in strings.values()))

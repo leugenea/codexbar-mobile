@@ -318,6 +318,7 @@ class DashboardUiTest {
 
     private fun assertConnectedAccountActions() {
         compose.onNodeWithTag("account-settings").assertExists()
+        assertSame("Account settings has no history-page interest", HistoryPresentationRequest.Idle, owner.historySnapshots.value.request)
         compose.onNodeWithTag("connect").assertDoesNotExist()
         compose.onNodeWithTag("cancel-connect").assertDoesNotExist()
         compose.onNodeWithTag("account-name-edit").performScrollTo().assertIsEnabled()

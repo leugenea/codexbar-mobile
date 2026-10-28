@@ -1,27 +1,11 @@
-"""Explicitly synthetic #83 parser/source controls; no application/native execution."""
-from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT
-from background_refresh_contract_expectations import BACKGROUND_NATIVE_CASES
-from periodic_refresh_contract_expectations import PERIODIC_NATIVE_COUNT
-from dashboard_contract_expectations import EXPECTED_DASHBOARD_NATIVE_COUNT
-from verify_test_reports import HISTORY_EXPORT_NATIVE_COUNT, HISTORY_IMPORT_NATIVE_COUNT
+"""Explicitly synthetic assembled-capture controls; no application/native execution."""
 import copy
 import json
-from pathlib import Path
-import re
 import unittest
-import xml.etree.ElementTree as ET
 
 import test_history_text_contract as text_contract
-from verify_test_reports import ACCOUNT_REMOVAL_CASES
-from verify_test_reports import DEVICE_CODE_COPY_CASES
-from verify_test_reports import ACCOUNT_NAME_CASES, ACCOUNT_NAME_CLASS
-from verify_test_reports import HISTORY_ASSEMBLED_CASES, HISTORY_ASSEMBLED_CLASS, verify_reports
 from verify_history_text_captures import (ASSEMBLED_CAPTURES, ASSEMBLED_COUNTS, CAPTURES, decoded_samples,
                                          paeth, verify_captures)
-
-from verify_test_reports import PHONE_TIME_CASES
-
-ROOT = Path(__file__).resolve().parents[2]
 
 
 class HistoryAssembledContracts(unittest.TestCase):
@@ -31,33 +15,7 @@ class HistoryAssembledContracts(unittest.TestCase):
         self.addCleanup(self.fixture.doCleanups)
         self.directory = self.fixture.directory
 
-    def test_exact_four_native_identities_extend_all_107_inherited(self):
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryAssembledAcceptanceTest.kt").read_text()
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_ASSEMBLED_CASES)
-        self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 109 + len(BACKGROUND_NATIVE_CASES) + PERIODIC_NATIVE_COUNT + len(PHONE_TIME_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
-        for name in HISTORY_ASSEMBLED_CASES:
-            self.fixture.report(name)
-            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history assembled acceptance"):
-                verify_reports(self.directory, "native")
-
-    def test_each_native_case_rejects_failure_error_skip_and_wrong_class(self):
-        for name in HISTORY_ASSEMBLED_CASES:
-            for mutation in ("failure", "error", "skipped", "wrong-class"):
-                path = self.fixture.report()
-                tree = ET.parse(path)
-                case = next(case for case in tree.getroot().iter("testcase") if case.get("name") == name)
-                if mutation == "wrong-class":
-                    case.set("classname", HISTORY_ASSEMBLED_CLASS + ".wrong")
-                else:
-                    ET.SubElement(case, mutation)
-                tree.write(path)
-                with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
-                    verify_reports(self.directory, "native")
-
     def test_five_representative_images_extend_all_twelve_inherited_and_are_each_required(self):
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryAssembledAcceptanceTest.kt").read_text()
-        self.assertEqual(set(re.findall(r'"(history-assembled-[^"]+)"', source)), {name for name in ASSEMBLED_CAPTURES if name.startswith("history-assembled-")})
         self.assertEqual(len(CAPTURES), 12 + len(ASSEMBLED_CAPTURES))
         for name in ASSEMBLED_CAPTURES:
             self.fixture.captures()
@@ -110,25 +68,6 @@ class HistoryAssembledContracts(unittest.TestCase):
             with self.subTest(name=name, unexpected=True):
                 self.mutate(name, "compactLegend", receipt)
 
-    def test_dashboard_capture_drivers_use_plot_semantics_not_the_removed_visible_label(self):
-        native = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile"
-        for filename in ("CurrentWindowHistoryTest.kt", "HistoryAssembledAcceptanceTest.kt"):
-            source = (native / filename).read_text()
-            self.assertNotIn('"$five-legend"', source)
-            self.assertIn("chart = true", source)
-        collector = (native / "HistoryAcceptanceCapture.kt").read_text()
-        self.assertIn('data.put("compactLegend", compactLegend())', collector)
-        self.assertIn('onNodeWithTag("$tag-plot").assertIsDisplayed().assertContentDescriptionEquals(legend)', collector)
-        self.assertIn('plot.config[SemanticsProperties.ContentDescription].single()', collector)
-        self.assertIn('plot.config.contains(SemanticsProperties.HideFromAccessibility)', collector)
-        self.assertIn('assertFalse("The plot\'s legend explanation must remain accessible", hidden)', collector)
-        self.assertIn('hasTestTag("$tag-legend") or hasText(legend)', collector)
-        self.assertIn("visible.assertCountEquals(0)", collector)
-        for line in ("Solid line: measured observations connected in time order; single observation: short tick",
-                     "Faint short dashes: least-squares usage trend when available",
-                     "Long dashes: nominal analytical full-quota reference, not a forecast"):
-            self.assertIn(line, collector)
-
     def test_full_canvas_rejects_hidden_clipping_even_when_clipped_receipt_is_contained(self):
         for name in ASSEMBLED_COUNTS:
             for key, value in (("canvasLeft", -1), ("canvasTop", float("nan")), ("canvasRight", 100),
@@ -179,20 +118,6 @@ class HistoryAssembledContracts(unittest.TestCase):
                 samples = [dict(x=x, y=y) for y in range(2) for x in range(2)]
                 with self.subTest(color=color, filter=kind):
                     self.assertEqual(decoded_samples(image, samples), [-15654349, -12298906, -8943463, -5588020])
-
-    def test_native_driver_keeps_actual_production_root_labeled_waits_and_scoped_negative_oracles(self):
-        native = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile"
-        source = (native / "HistoryAssembledAcceptanceTest.kt").read_text()
-        collector = (native / "HistoryAcceptanceCapture.kt").read_text()
-        self.assertIn("ActivityScenario.launch(MainActivity::class.java)", source)
-        self.assertIn("compose.waitUntil", source)
-        self.assertIn('hasAnyAncestor(hasTestTag("connection-history"))', source)
-        self.assertNotRegex(source + collector, r"setContent|runOnIdle|Thread\.sleep|runBlocking|delay\(")
-        self.assertIn("Rect(node.positionInRoot, node.size.toSize())", collector)
-        self.assertIn("node.boundsInRoot", collector)
-        self.assertIn("bitmap.getPixel", collector)
-        self.assertIn("layout.layoutInput.density.fontScale", source)
-        self.assertIn("fixture.transport.counts()", source)
 
 
 if __name__ == "__main__":

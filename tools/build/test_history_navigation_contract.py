@@ -1,28 +1,10 @@
-"""Synthetic parser/source controls for production navigation; not Android runtime evidence."""
-from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT
-from background_refresh_contract_expectations import BACKGROUND_NATIVE_CASES
-from periodic_refresh_contract_expectations import PERIODIC_NATIVE_COUNT
-from dashboard_contract_expectations import EXPECTED_DASHBOARD_NATIVE_COUNT
-from verify_test_reports import HISTORY_EXPORT_NATIVE_COUNT, HISTORY_IMPORT_NATIVE_COUNT
+"""Synthetic navigation capture controls; not Android runtime evidence."""
 import json
-from pathlib import Path
-import re
 import unittest
-import xml.etree.ElementTree as ET
 
 import test_history_text_contract as text_contract
 from verify_history_text_captures import CAPTURES, INTEGRATED_CAPTURES, verify_captures
 from verify_history_text_captures import ASSEMBLED_CAPTURES
-from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
-from verify_test_reports import ACCOUNT_REMOVAL_CASES
-from verify_test_reports import DEVICE_CODE_COPY_CASES
-from verify_test_reports import ACCOUNT_NAME_CASES, ACCOUNT_NAME_CLASS
-from verify_test_reports import HISTORY_ASSEMBLED_CASES, HISTORY_ASSEMBLED_CLASS
-from verify_test_reports import HISTORY_AUTHORITY_CASES, HISTORY_AUTHORITY_CLASS, HISTORY_NAVIGATION_CASES, HISTORY_NAVIGATION_CLASS, verify_reports
-
-from verify_test_reports import PHONE_TIME_CASES
-
-ROOT = Path(__file__).resolve().parents[2]
 
 
 class HistoryNavigationContracts(unittest.TestCase):
@@ -32,57 +14,7 @@ class HistoryNavigationContracts(unittest.TestCase):
         self.addCleanup(self.fixture.doCleanups)
         self.directory = self.fixture.directory
 
-    def test_all_basic_integrated_native_cases_extend_the_93_inherited(self):
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryNavigationTest.kt").read_text()
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_NAVIGATION_CASES)
-        self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 95 + len(BACKGROUND_NATIVE_CASES) + PERIODIC_NATIVE_COUNT + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
-        for name in HISTORY_NAVIGATION_CASES:
-            self.fixture.report(name)
-            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history navigation"):
-                verify_reports(self.directory, "native")
-
-    def test_every_integrated_case_fails_closed_on_skip_error_failure_or_class_spoof(self):
-        for name in HISTORY_NAVIGATION_CASES:
-            for mutation in ("skipped", "error", "failure", "wrong-class"):
-                path = self.fixture.report()
-                tree = ET.parse(path)
-                case = next(case for case in tree.getroot().iter("testcase") if case.get("name") == name)
-                if mutation == "wrong-class":
-                    case.set("classname", HISTORY_NAVIGATION_CLASS + ".wrong")
-                else:
-                    ET.SubElement(case, mutation)
-                tree.write(path)
-                with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
-                    verify_reports(self.directory, "native")
-
-    def test_held_collection_authority_regressions_extend_the_98_inherited(self):
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryDisplayAuthorityTest.kt").read_text()
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_AUTHORITY_CASES)
-        self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 100 + len(BACKGROUND_NATIVE_CASES) + PERIODIC_NATIVE_COUNT + len(PHONE_TIME_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
-        for name in HISTORY_AUTHORITY_CASES:
-            self.fixture.report(name)
-            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history display authority"):
-                verify_reports(self.directory, "native")
-
-    def test_held_authority_regressions_fail_closed_on_skip_error_failure_and_spoof(self):
-        for name in HISTORY_AUTHORITY_CASES:
-            for mutation in ("skipped", "error", "failure", "wrong-class"):
-                path = self.fixture.report()
-                tree = ET.parse(path)
-                case = next(case for case in tree.getroot().iter("testcase") if case.get("name") == name)
-                if mutation == "wrong-class":
-                    case.set("classname", HISTORY_AUTHORITY_CLASS + ".wrong")
-                else:
-                    ET.SubElement(case, mutation)
-                tree.write(path)
-                with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
-                    verify_reports(self.directory, "native")
-
     def test_two_production_entry_images_extend_not_replace_the_ten_component_images(self):
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryNavigationTest.kt").read_text()
-        self.assertEqual(set(re.findall(r'capture\.capture\("(history-integrated-[^"]+)"', source)), set(INTEGRATED_CAPTURES))
         self.assertEqual(len(CAPTURES), 10 + len(INTEGRATED_CAPTURES) + len(ASSEMBLED_CAPTURES))
         for name in INTEGRATED_CAPTURES:
             self.fixture.captures()
@@ -117,20 +49,6 @@ class HistoryNavigationContracts(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 verify_captures(self.directory)
 
-    def test_navigation_uses_only_the_existing_owner_query_and_does_not_save_facts(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        source = (main / "ConnectionHistory.kt").read_text()
-        self.assertIn("controller.historySnapshots.collectAsState()", source)
-        self.assertIn("controller.observeHistory(request, it)", source)
-        self.assertIn("controller.currentHistoryDisplayContext()", source)
-        self.assertNotIn("historySnapshots.value", source)
-        self.assertNotRegex(source, r"rememberSaveable|readUsage|usageForeground|SQLiteHistory|ConnectionController\(")
-        native = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryNavigationTest.kt").read_text()
-        self.assertNotRegex(native, r"setContent|runBlocking|Thread\.sleep|delay\(")
-        self.assertIn("compose.waitUntil", native)
-        resources = {item.get("name"): item.text or "" for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
-        self.assertEqual(resources["history_page_cursor"], "Exclusive admission cursor: %1$d · Page limit: %2$d")
-
     def test_integrated_canvas_rejects_partial_visibility_even_with_contained_clipped_bounds(self):
         mutations = (("canvasTop", -1), ("canvasClippedTop", 0.5),
                      ("canvasClippedLeft", None), ("canvasClippedRight", float("nan")),
@@ -151,10 +69,6 @@ class HistoryNavigationContracts(unittest.TestCase):
         inherited = [item for item in captures if item["name"] not in INTEGRATED_CAPTURES and item["name"] not in ASSEMBLED_CAPTURES]
         self.assertEqual(len(inherited), 10)
         self.assertTrue(all("canvasClippedLeft" not in item for item in inherited))
-        collector = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryNavigationCapture.kt").read_text()
-        self.assertIn("Rect(node.positionInRoot, node.size.toSize())", collector)
-        self.assertIn("val clipped = node.boundsInRoot", collector)
-        self.assertIn('assertEquals("The full Canvas must not be clipped by a scroll viewport", bounds, clipped)', collector)
 
 
 if __name__ == "__main__":

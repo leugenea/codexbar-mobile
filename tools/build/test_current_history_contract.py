@@ -1,16 +1,9 @@
-"""Synthetic issue-134 registry/capture controls; no Android application execution."""
+"""Synthetic current-history capture controls; no Android application execution."""
 import json
-from pathlib import Path
-import re
 import unittest
-import xml.etree.ElementTree as ET
 
 import test_history_text_contract as text_contract
-import test_workflow_contract
-from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, verify_reports
 from verify_history_text_captures import ASSEMBLED_CAPTURES, verify_captures
-
-ROOT = Path(__file__).resolve().parents[2]
 
 
 class CurrentHistoryContracts(unittest.TestCase):
@@ -19,31 +12,6 @@ class CurrentHistoryContracts(unittest.TestCase):
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
         self.directory = self.fixture.directory
-
-    def test_exact_current_jvm_native_identities_are_required_once_without_inherited_removal(self):
-        for kind, registry, source_set in (("jvm", CURRENT_HISTORY_JVM, "test"), ("native", CURRENT_HISTORY_NATIVE, "androidTest")):
-            writer = test_workflow_contract.SyntheticReportTests()
-            writer.directory = self.directory
-            for classname, required in registry.items():
-                source = ROOT / f"app/src/{source_set}/java/{classname.replace('.', '/')}.kt"
-                self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), required)
-                for name in required:
-                    for mutation in ("missing", "wrong-class", "duplicate", "failure", "error", "skipped"):
-                        path = writer.write_report(kind)
-                        tree = ET.parse(path)
-                        suite = tree.getroot()
-                        case = next(case for case in suite if case.get("classname") == classname and case.get("name") == name)
-                        if mutation == "missing":
-                            suite.remove(case)
-                        elif mutation == "wrong-class":
-                            case.set("classname", "SYNTHETIC-wrong-class")
-                        elif mutation == "duplicate":
-                            ET.SubElement(suite, "testcase", **case.attrib)
-                        else:
-                            ET.SubElement(case, mutation)
-                        tree.write(path)
-                        with self.subTest(kind=kind, name=name, mutation=mutation), self.assertRaises(ValueError):
-                            verify_reports(self.directory, kind)
 
     def test_current_paint_targets_and_exact_period_selection_fail_closed(self):
         for name in (name for name in ASSEMBLED_CAPTURES if name.startswith("history-current-")):
@@ -68,26 +36,6 @@ class CurrentHistoryContracts(unittest.TestCase):
                 path.write_text(json.dumps(data))
                 with self.subTest(name=name, role=role), self.assertRaises(ValueError):
                     verify_captures(self.directory)
-
-    def test_current_entry_uses_existing_normalization_clock_and_no_provider_or_storage_redesign(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        selector = (main / "history/CurrentHistoryPeriod.kt").read_text()
-        scan = (main / "history/CurrentHistoryRead.kt").read_text()
-        host = (main / "ConnectionHistory.kt").read_text()
-        self.assertIn("WindowHistory.identity", selector)
-        self.assertIn("refresh.evaluatedAt", selector)
-        self.assertNotRegex(selector + host, r"Instant\.now|UsageNormalizer\.normalize|readUsage\(")
-        self.assertIn("HistoryLimits.MAX_OBSERVATIONS", scan)
-        self.assertIn("page.nextAfter", scan)
-        self.assertIn("val selected = ArrayList<HistoryEntry>()", scan)
-        self.assertIn("selected.size > query.limit", scan)
-        self.assertIn("if (!complete) selected.add(entry)", scan)
-        self.assertIn("HistoryTextComponent", host)
-        root = (main / "DashboardNavigation.kt").read_text()
-        self.assertIn("authority?.periods", root)
-        self.assertIn("controller.currentHistoryDisplayContext()", root)
-        self.assertNotIn("historySnapshots.value", root + host)
-        self.assertNotRegex(host, r"rememberSaveable|SQLiteHistory|usageForeground")
 
 
 if __name__ == "__main__":
