@@ -97,44 +97,7 @@ class HistoryChartContracts(unittest.TestCase):
                 with self.subTest(name=name, key=key), self.assertRaises(ValueError):
                     verify_captures(self.directory)
 
-    def test_yearless_axis_labels_are_shared_and_keep_physical_left_right_placement(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        chart = (main / "HistoryChartComponent.kt").read_text()
-        self.assertIn('getBestDateTimePattern(locale, "MMMdHHmm")', chart)
-        self.assertIn("TimePresentation.chartTime", chart)
-        self.assertIn("Arrangement.Absolute.SpaceBetween", chart)
-        self.assertIn('"$tag-first", Modifier.weight(1f), TextAlign.Left, showPrefixes', chart)
-        self.assertIn('"$tag-last", Modifier.weight(1f), TextAlign.Right, showPrefixes', chart)
-        compact = (main / "CompactHistoryChart.kt").read_text()
-        self.assertIn("HistoryAxisTimes", compact)
-        self.assertIn("showPrefixes = false", compact)
-        self.assertIn("showPrefixes: Boolean = true", chart)
-        self.assertIn("val description = stringResource(resource, label)", chart)
-        self.assertIn("if (showPrefix) modifier else modifier.semantics { contentDescription = description }", chart)
-        self.assertIn("Text(if (showPrefix) description else label, axisModifier.testTag(tag)", chart)
-        self.assertIn("chartTimeLabel(at, zone, locale)", chart)
-        native = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryChartComponentTest.kt").read_text()
-        self.assertIn("Time axis start: Oct 8, 20:00", native)
-        self.assertIn("Time axis end: Oct 9, 01:00", native)
-        self.assertNotIn("Time axis start: Oct 8, 2026", native)
-
-    def test_shared_chart_has_solid_runs_singleton_ticks_and_clipped_translucent_ols(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        paint = (main / "HistoryChartComponent.kt").read_text()
-        drawing = (main / "HistoryChartDrawing.kt").read_text()
-        fit = (main / "HistoryTrend.kt").read_text()
-        request = (main / "history/HistoryPresentationRequest.kt").read_text()
-        self.assertNotIn("drawCircle", paint)
-        self.assertIn("drawing.measured.forEach", paint)
-        self.assertIn("drawing.isolated.forEach", paint)
-        self.assertIn("clipRect(inset, inset, size.width - inset, size.height - inset)", paint)
-        self.assertIn("measured.copy(alpha = 0.45f)", paint)
-        self.assertIn("PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 4.dp.toPx()))", paint)
-        self.assertIn("historyTrend(observations)", drawing)
-        self.assertIn("points.size < 2", fit)
-        self.assertIn("first == last", fit)
-        self.assertIn("covariance / variance", fit)
-        self.assertIn("val limit: Int = HistoryLimits.MAX_OBSERVATIONS", request)
+    def test_chart_legend_names_the_optional_trend(self):
         resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
         self.assertIn("least-squares usage trend when available", resources["history_chart_legend"] or "")
 

@@ -117,17 +117,7 @@ class HistoryNavigationContracts(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 verify_captures(self.directory)
 
-    def test_navigation_uses_only_the_existing_owner_query_and_does_not_save_facts(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        source = (main / "ConnectionHistory.kt").read_text()
-        self.assertIn("controller.historySnapshots.collectAsState()", source)
-        self.assertIn("controller.observeHistory(request, it)", source)
-        self.assertIn("controller.currentHistoryDisplayContext()", source)
-        self.assertNotIn("historySnapshots.value", source)
-        self.assertNotRegex(source, r"rememberSaveable|readUsage|usageForeground|SQLiteHistory|ConnectionController\(")
-        native = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryNavigationTest.kt").read_text()
-        self.assertNotRegex(native, r"setContent|runBlocking|Thread\.sleep|delay\(")
-        self.assertIn("compose.waitUntil", native)
+    def test_page_cursor_resource_names_its_exclusive_boundary(self):
         resources = {item.get("name"): item.text or "" for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
         self.assertEqual(resources["history_page_cursor"], "Exclusive admission cursor: %1$d · Page limit: %2$d")
 

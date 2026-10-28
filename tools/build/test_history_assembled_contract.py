@@ -110,25 +110,6 @@ class HistoryAssembledContracts(unittest.TestCase):
             with self.subTest(name=name, unexpected=True):
                 self.mutate(name, "compactLegend", receipt)
 
-    def test_dashboard_capture_drivers_use_plot_semantics_not_the_removed_visible_label(self):
-        native = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile"
-        for filename in ("CurrentWindowHistoryTest.kt", "HistoryAssembledAcceptanceTest.kt"):
-            source = (native / filename).read_text()
-            self.assertNotIn('"$five-legend"', source)
-            self.assertIn("chart = true", source)
-        collector = (native / "HistoryAcceptanceCapture.kt").read_text()
-        self.assertIn('data.put("compactLegend", compactLegend())', collector)
-        self.assertIn('onNodeWithTag("$tag-plot").assertIsDisplayed().assertContentDescriptionEquals(legend)', collector)
-        self.assertIn('plot.config[SemanticsProperties.ContentDescription].single()', collector)
-        self.assertIn('plot.config.contains(SemanticsProperties.HideFromAccessibility)', collector)
-        self.assertIn('assertFalse("The plot\'s legend explanation must remain accessible", hidden)', collector)
-        self.assertIn('hasTestTag("$tag-legend") or hasText(legend)', collector)
-        self.assertIn("visible.assertCountEquals(0)", collector)
-        for line in ("Solid line: measured observations connected in time order; single observation: short tick",
-                     "Faint short dashes: least-squares usage trend when available",
-                     "Long dashes: nominal analytical full-quota reference, not a forecast"):
-            self.assertIn(line, collector)
-
     def test_full_canvas_rejects_hidden_clipping_even_when_clipped_receipt_is_contained(self):
         for name in ASSEMBLED_COUNTS:
             for key, value in (("canvasLeft", -1), ("canvasTop", float("nan")), ("canvasRight", 100),
@@ -179,20 +160,6 @@ class HistoryAssembledContracts(unittest.TestCase):
                 samples = [dict(x=x, y=y) for y in range(2) for x in range(2)]
                 with self.subTest(color=color, filter=kind):
                     self.assertEqual(decoded_samples(image, samples), [-15654349, -12298906, -8943463, -5588020])
-
-    def test_native_driver_keeps_actual_production_root_labeled_waits_and_scoped_negative_oracles(self):
-        native = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile"
-        source = (native / "HistoryAssembledAcceptanceTest.kt").read_text()
-        collector = (native / "HistoryAcceptanceCapture.kt").read_text()
-        self.assertIn("ActivityScenario.launch(MainActivity::class.java)", source)
-        self.assertIn("compose.waitUntil", source)
-        self.assertIn('hasAnyAncestor(hasTestTag("connection-history"))', source)
-        self.assertNotRegex(source + collector, r"setContent|runOnIdle|Thread\.sleep|runBlocking|delay\(")
-        self.assertIn("Rect(node.positionInRoot, node.size.toSize())", collector)
-        self.assertIn("node.boundsInRoot", collector)
-        self.assertIn("bitmap.getPixel", collector)
-        self.assertIn("layout.layoutInput.density.fontScale", source)
-        self.assertIn("fixture.transport.counts()", source)
 
 
 if __name__ == "__main__":

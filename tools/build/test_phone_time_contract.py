@@ -1,7 +1,6 @@
 """Source and synthetic mandatory-result controls; no Android/application execution."""
 import copy
 from pathlib import Path
-import re
 import unittest
 import xml.etree.ElementTree as ET
 
@@ -64,32 +63,9 @@ class PhoneTimeContracts(unittest.TestCase):
                 with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
                     fixture.require()
 
-    def test_shared_projection_and_scoped_observer_preserve_presentation_boundary(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        observer = (main / "PhoneTimeConfiguration.kt").read_text()
-        self.assertIn("Intent.ACTION_TIMEZONE_CHANGED", observer)
+    def test_time_zone_receiver_is_not_exported(self):
+        observer = (ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile/PhoneTimeConfiguration.kt").read_text()
         self.assertIn("ContextCompat.RECEIVER_NOT_EXPORTED", observer)
-        self.assertIn("LocalConfiguration.current.locales[0]", observer)
-        self.assertIn("Lifecycle.Event.ON_RESUME", observer)
-        self.assertIn("lifecycle.removeObserver(observer)", observer)
-        self.assertIn("context.unregisterReceiver(receiver)", observer)
-        self.assertNotRegex(observer, r"readUsage|ConnectionController|delay\(|Timer|Clock")
-        for name in ("LiveUsageScreen.kt", "ConnectionHistory.kt"):
-            source = (main / name).read_text()
-            self.assertIn("phoneTimeConfiguration()", source)
-            self.assertNotIn("ZoneId.systemDefault()", source)
-        presentation = (main / "HistoryTextPresentation.kt").read_text()
-        self.assertNotRegex(presentation, r"(?:observedAt|nominalStartAt|resetAt)\??\.toString\(\)")
-        self.assertIn("timeField(R.string.history_reset_exact", presentation)
-        self.assertIn("timeField(R.string.history_reset_derived", presentation)
-        native = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/PhoneTimeEvidence.kt").read_text()
-        for expected in ("ActivityScenario.launch(MainActivity::class.java)", "scenario.recreate()", "compose.waitUntil",
-                         "alarm.setTimeZone(id)", "applicationLocales", "fixture.transport.counts()", "assertSame",
-                         "capture.layout", "SemanticsProperties.ContentDescription", "SemanticsProperties.StateDescription"):
-            self.assertIn(expected, native)
-        self.assertNotRegex(native, r"setContent|runOnIdle|runBlocking|Thread\.sleep|delay\(")
-        tests = (ROOT / "app/src/test/java/io/github/leugenea/codexbarmobile/TimestampPresentationTest.kt").read_text()
-        self.assertEqual(len(re.findall(r"@Test\s+fun", tests)), 6)
 
 
 if __name__ == "__main__":

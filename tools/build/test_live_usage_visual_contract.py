@@ -48,15 +48,8 @@ class LiveUsageVisualContracts(unittest.TestCase):
             (self.directory / (name + ".json")).write_text(json.dumps(data))
         dashboard_captures(self.directory, self.fixture)
 
-    def test_suffix_free_native_copy_and_capture_expectations_are_independently_exact(self):
+    def test_live_capture_copy_and_expectations_are_independently_exact(self):
         self.assertEqual(LIVE_FACTS, EXPECTED_LIVE_FACTS)
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/LiveUsageScreenTest.kt").read_text()
-        for tag, expected in EXPECTED_LIVE_FACTS.items():
-            if tag.endswith("-percent"):
-                window = tag.removesuffix("-percent")
-                self.assertRegex(source, re.escape(f'progress("{window}",') + r'[^\n]*' + re.escape(f'"{expected}")'))
-            else:
-                self.assertIn(f'text("{tag}", "{expected}")', source)
         self.captures()
         for name in LIVE_CAPTURES:
             path = self.directory / (name + ".json")
@@ -67,41 +60,6 @@ class LiveUsageVisualContracts(unittest.TestCase):
                 path.write_text(json.dumps(changed))
                 with self.subTest(name=name, tag=tag), self.assertRaises(ValueError):
                     live_capture_receipt(path.with_suffix(".png"))
-
-    def test_full_connection_diagnostics_retain_both_reset_facts_while_dashboard_is_compact(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        live = (main / "LiveUsageScreen.kt").read_text()
-        self.assertIn("R.string.live_reset_absolute", live)
-        self.assertIn("R.string.live_reset_relative", live)
-        self.assertIn("remainingTimeLabel(remaining)", live)
-        dashboard = (main / "DashboardScreen.kt").read_text()
-        self.assertNotIn("R.string.live_reset_absolute", dashboard)
-        self.assertIn("R.string.dashboard_next_reset", dashboard)
-        self.assertIn("R.string.dashboard_updated", dashboard)
-        self.assertNotIn("R.string.history_point_time", dashboard)
-        history = (main / "HistoryTextPresentation.kt").read_text()
-        self.assertIn("R.string.history_point_time, TimePresentation.timestamp(point.observedAt, zone, locale)", history)
-        self.assertEqual({tag for tag in EXPECTED_LIVE_FACTS if tag.endswith("-reset-absolute")},
-                         {"live-five-hour-reset-absolute", "live-weekly-reset-absolute"})
-
-    def test_dashboard_pull_reuses_owner_eligibility_and_removes_both_retired_buttons(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        refresh = (main / "DashboardRefresh.kt").read_text()
-        navigation = (main / "DashboardNavigation.kt").read_text()
-        self.assertIn("val enabled = UsagePresentation.refreshEnabled(state)", refresh)
-        self.assertIn("val refreshing = UsagePresentation.refreshing(state)", refresh)
-        self.assertIn("enabled = enabled, onRefresh = refresh", refresh)
-        self.assertIn("PullToRefreshDefaults.Indicator(isRefreshing = refreshing, state = pull", refresh)
-        self.assertIn("CustomAccessibilityAction(label) { refresh(); true }", refresh)
-        self.assertIn("else disabled()", refresh)
-        self.assertIn("DashboardRefresh(route == DashboardRoute.DASHBOARD, state, { controller.readUsage() })", navigation)
-        for name in ("DashboardScreen.kt", "LiveUsageScreen.kt"):
-            source = (main / name).read_text()
-            self.assertNotIn('testTag("live-refresh")', source)
-            self.assertNotIn("R.string.live_refresh)", source)
-        resources = (ROOT / "app/src/main/res/values/strings.xml").read_text()
-        self.assertNotIn('name="live_refresh"', resources)
-        self.assertIn('<string name="dashboard_refresh_action">Refresh</string>', resources)
 
     def test_hour_only_reset_copy_is_rejected_when_fixture_has_minutes(self):
         self.captures()

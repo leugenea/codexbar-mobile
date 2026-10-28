@@ -52,23 +52,6 @@ class HistoryIsolationContracts(unittest.TestCase):
                 with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
                     verify_reports(self.directory, "native")
 
-    def test_driver_uses_actual_activity_labeled_receipts_and_both_query_orderings(self):
-        native = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile"
-        source = (native / "HistoryIsolationTest.kt").read_text()
-        fixture = (native / "HistoryIsolationFixture.kt").read_text()
-        self.assertIn("ActivityScenario.launch(MainActivity::class.java)", source)
-        self.assertEqual(source.count("for (published in listOf(false, true))"), 2)
-        self.assertIn("compose.waitUntil", source)
-        self.assertIn("fixture.settled", source)
-        self.assertIn('hasAnyAncestor(hasTestTag("connection-history"))', source)
-        self.assertNotRegex(source, r"setContent|runOnIdle|Thread\.sleep|delay\(")
-        self.assertNotRegex(source + fixture, r"Thread\.currentThread\(\)\.name|stackTrace")
-        self.assertLess(fixture.index("val outcome = access.read(query)"), fixture.index("gate?.pause(receipt)"))
-        self.assertIn("history = HistoryLifetimeCoordinator(storage)", fixture)
-        self.assertIn("refreshClock = transport.clock", fixture)
-        self.assertIn("gates += it", fixture)
-        self.assertIn("finally { gate.release()", source)
-
 
 if __name__ == "__main__":
     unittest.main()

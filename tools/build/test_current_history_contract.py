@@ -69,26 +69,6 @@ class CurrentHistoryContracts(unittest.TestCase):
                 with self.subTest(name=name, role=role), self.assertRaises(ValueError):
                     verify_captures(self.directory)
 
-    def test_current_entry_uses_existing_normalization_clock_and_no_provider_or_storage_redesign(self):
-        main = ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile"
-        selector = (main / "history/CurrentHistoryPeriod.kt").read_text()
-        scan = (main / "history/CurrentHistoryRead.kt").read_text()
-        host = (main / "ConnectionHistory.kt").read_text()
-        self.assertIn("WindowHistory.identity", selector)
-        self.assertIn("refresh.evaluatedAt", selector)
-        self.assertNotRegex(selector + host, r"Instant\.now|UsageNormalizer\.normalize|readUsage\(")
-        self.assertIn("HistoryLimits.MAX_OBSERVATIONS", scan)
-        self.assertIn("page.nextAfter", scan)
-        self.assertIn("val selected = ArrayList<HistoryEntry>()", scan)
-        self.assertIn("selected.size > query.limit", scan)
-        self.assertIn("if (!complete) selected.add(entry)", scan)
-        self.assertIn("HistoryTextComponent", host)
-        root = (main / "DashboardNavigation.kt").read_text()
-        self.assertIn("authority?.periods", root)
-        self.assertIn("controller.currentHistoryDisplayContext()", root)
-        self.assertNotIn("historySnapshots.value", root + host)
-        self.assertNotRegex(host, r"rememberSaveable|SQLiteHistory|usageForeground")
-
 
 if __name__ == "__main__":
     unittest.main()

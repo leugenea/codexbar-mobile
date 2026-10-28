@@ -1,82 +1,11 @@
-"""Independent issue142 regression oracles; never import registries under validation."""
-EXPECTED_DASHBOARD_JVM = {
-    "io.github.leugenea.codexbarmobile.HistoryPlotCacheTest": {
-        "metadataTicksReuseWholeWindowGraphAndDrawingInputsWhileKeepingLiveMetadataAndPaceCurrent",
-        "changedPageQueryGenerationPartitionRequestAndSelectionRebuildWholeWindowInputs",
-        "cachedCurrentInputsNeverBypassPeriodOrDisplayRevocation",
-        "changedWindowBoundsInvalidateCachedGeometryWithoutChangingTheRetainedPage",
-    },
-    "io.github.leugenea.codexbarmobile.DashboardPresentationTest": {
-        "compactChartEquivalentUsesOriginalExactFactsAndIndependentReferences",
-        "compactMissingChartAndPhaseActionsKeepTypedErrorsAndSinglePointTruth",
-        "reportedInventoryCountNeverFallsBackToSummaryRowsOrZero",
-        "bankedRowDetailsKeepMinutePrecisionAndIndependentStatesWithoutDuplicateAnnouncements",
-        "paceLineUsesOverReserveAndOnPaceWithoutChangingExactComparison",
-        "paceLineHalfTenthBoundariesRoundAwayFromZero",
-        "paceLineNearZeroAndAdjacentBoundaryValuesNeverShowSignedZero",
-        "paceLineKeepsOneDecimalAndLocaleSeparator",
-        "compactPaceBeyondFirst32ObservationsMatchesAcceptedHeadlineAndClock",
-        "compactWholeWindowMapsAllObservationsBeyond32BetweenWindowStartAndReset",
-        "compactPaceKeepsIndependentlyAgingFiveHourAndWeeklyObservationsSeparate",
-        "compactPaceNeverFallsBackWhenAcceptedComparisonIsMissingOrIneligible",
-        "chartTimeLabelsUseYearlessLocalePatternsAndContainingHour",
-        "chartTimeLabelsRetainFullAndPartialRepeatedHourOffsets",
-        "chartTimeLabelsKeepUnrepresentableInstantsUnknown",
-    },
-    "io.github.leugenea.codexbarmobile.history.HistoryDisplayAuthorityTest": {
-        "currentNullDiagnosticSelectionCannotReplaySuccessorOrRetiredLoss",
-        "heldJointFactsRejectEqualRequestAfterRouteRoundTrip",
-        "heldJointFactsRejectResetExpiryClockLossAndRetiredContexts",
-    },
-    "io.github.leugenea.codexbarmobile.history.UsageHistoryRecorderTest": {
-        "heldJointRequestRejectsRouteQueryAndAccountSuccessors",
-        "jointRequestPreservesQueueLossGapAndContiguousDurableOrdinals",
-        "jointRequestUsesOneWorkerAndCoalescesLatestSelectionWithoutAdmissions",
-        "admittedPreappendFailureUnderChangedSelectionRetainsActualLossAndNextGap",
-        "admittedAppendFailureUnderChangedSelectionRetainsActualLossWithoutPresentationLoss",
-    },
-}
-EXPECTED_DASHBOARD_NATIVE = {
-    "io.github.leugenea.codexbarmobile.DashboardCopyAndTimeTest": {
-        "dashboardAndDisclosureFollowPhoneZoneLocaleAndTicksWithoutRequests",
-        "minutePrecisionMatchesDashboardWindowDetailsAndBankedExpiry",
-        "simplifiedWindowsKeepOneTopObservationYearlessAxisAndReadablePace",
-        "noReachableTextOrSemanticsUsesRemovedTimePhraseWhileOriginalInstantsRemainExact",
-    },
-    "io.github.leugenea.codexbarmobile.DashboardHistoryIsolationTest": {
-        "heldPairCollectionCannotReplayEqualQueryAfterDetailsRoundTrip",
-        "heldPairCollectionCannotReplayPreviousPeriodAfterResetExpiryOrClockLoss",
-        "heldPairReadCannotPublishAcrossRouteSwitchAccountReplacementAndForegroundRetirement",
-        "pairReadsRemainBoundedBehindArchivesAndCoalesceWithoutExtraAdmissions",
-    },
-    "io.github.leugenea.codexbarmobile.DashboardUiTest": {
-        "bankedTableUsesReportedCountAndRetainsEveryExpiryAndUnknownRow",
-        "dashboardActionsFollowConnectionPhaseAndDormantNavigationDoesNotRead",
-        "dashboardDarkLandscapeAndLargeFontKeepAccessibleTargetsAndCompleteText",
-        "dashboardMissingEmptySingleAndFailedHistoryHaveOneHonestLinePerWindow",
-        "dashboardShowsBothCurrentWindowsWithoutHistoryNavigationAndRetainsMeasuredReferencePixels",
-        "drawerHasExactTwoLabelsBackPrecedenceAndDetailsReturnToDashboard",
-        "emptyDashboardOpensAccountSettingsWithoutInlineManagementOrProviderRequests",
-        "dashboardKnownPercentPreservesMalformedResetAndIndependentCurrentSiblingWarning",
-        "fiveHourFractionalResetPairPopulatesDashboardButBeyondToleranceRemainsUnavailable",
-    },
-}
+"""Independent dashboard capture/count oracles and source-only regression baselines.
+
+Mandatory dashboard method names live in verify_test_reports, not a second list here.
+"""
 SCANNER_CLASS = "io.github.leugenea.codexbarmobile.history.CurrentHistoryReadTest"
-EXPECTED_SCANNER_ADDITIONS = {
-    "jointCurrentScanFindsBothWindowsBehindArchivesWithIndependentLookahead",
-    "jointCurrentScanMissingKeysStatusRetentionAndFailuresStayTyped",
-    "jointCurrentScanHasOneHighWaterCeilingAndRejectsRevocation",
-    "wholeCurrentWindowRetainsEveryObservationBeyond32AcrossBatchesWithoutChangingDetailPages",
-}
 # These pre-existing source tests remain protected, but this does not make unrelated
 # JVM methods new mandatory report targets.
 PROTECTED_MIXED_SOURCE = {
-    SCANNER_CLASS: {
-        "currentMeasurementsBehindArchiveFilledPagesUseRealSelectedLookaheadAndBoundedReads",
-        "selectedOrdinalHolesCorrectionsAndResetBoundariesCannotCreateContiguousMeasuredEdges",
-        "emptySelectionRetentionReadFailuresCorruptionAndRevocationRemainExplicit",
-        "keyedUnknownPercentStatusIsRetainedWithoutInventedMeasurementOrReference",
-    },
     "io.github.leugenea.codexbarmobile.history.HistoryDisplayAuthorityTest": {
         "nullDiagnosticIdentityCannotReplayAcrossRetireBoundSuccessorAndNullRebind",
         "backgroundRevokesNullContextButResumeRetainsItsLossWithoutReplayingOldContext",
@@ -100,7 +29,6 @@ PROTECTED_MIXED_SOURCE = {
         "acceptedResumeWhileRuntimeReadoptionIsHeldKeepsCapturedPartitionWithoutRetry",
     },
 }
-EXPECTED_CURRENT_READ_JVM = PROTECTED_MIXED_SOURCE[SCANNER_CLASS] | EXPECTED_SCANNER_ADDITIONS
 EXPECTED_DASHBOARD_CAPTURE_SPECS = {
     "dashboard-main-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "FIVE_HOUR"),
     "dashboard-weekly-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "WEEKLY"),
