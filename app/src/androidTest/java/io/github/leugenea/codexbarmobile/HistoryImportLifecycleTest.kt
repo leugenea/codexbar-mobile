@@ -55,6 +55,7 @@ class HistoryImportLifecycleTest {
                 await("initial recording") { fixture.owner.state.value.phase == ConnectionPhase.OBSERVED &&
                     !fixture.owner.state.value.refresh.refreshing && recordedHistory(fixture.owner).storage?.entries?.size == 1 }
                 fixture.seedLocalPage()
+                val requests = fixture.transport.requests.get()
                 val ready = fixture.owner.session.snapshot() as SessionResult.Ready
                 val access = requireNotNull(fixture.owner.historyCapability(ready.envelope.generation))
                 val text = requireNotNull(access.exportHistory("native", Instant.EPOCH))
@@ -79,6 +80,7 @@ class HistoryImportLifecycleTest {
                 assertEquals(text, access.exportHistory("native", Instant.EPOCH))
                 verifyContinuation(access)
                 verifyAtomicSQLiteRollback()
+                assertEquals(requests, fixture.transport.requests.get())
                 access.revoke()
                 assertEquals(HistoryImportOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED), access.importHistory(text, Instant.now()))
             }

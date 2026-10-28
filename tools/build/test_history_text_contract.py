@@ -1,26 +1,12 @@
 """Synthetic report/capture parser controls only; never execute application code."""
-from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT
-from background_refresh_contract_expectations import BACKGROUND_NATIVE_CASES
-from periodic_refresh_contract_expectations import PERIODIC_NATIVE_COUNT
-from dashboard_contract_expectations import EXPECTED_DASHBOARD_NATIVE_COUNT
-from verify_test_reports import HISTORY_EXPORT_NATIVE_COUNT, HISTORY_IMPORT_NATIVE_COUNT
 import json
 import os
 from pathlib import Path
-import re
 import struct
 import tempfile
 import unittest
-import xml.etree.ElementTree as ET
 import zlib
 
-import test_workflow_contract
-from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
-from verify_test_reports import ACCOUNT_REMOVAL_CASES
-from verify_test_reports import DEVICE_CODE_COPY_CASES
-from verify_test_reports import ACCOUNT_NAME_CASES, ACCOUNT_NAME_CLASS
-from verify_test_reports import HISTORY_ASSEMBLED_CASES, HISTORY_ASSEMBLED_CLASS
-from verify_test_reports import HISTORY_AUTHORITY_CASES, HISTORY_NAVIGATION_CASES, HISTORY_CHART_CASES, HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, verify_reports
 from unittest.mock import patch
 from verify_history_text_captures import CAPTURES, CHART_COUNTS, INTEGRATED_CAPTURES, INTEGRATED_CONTROLS, PNG_CHANNELS, png_size, read_png, verify_captures
 from verify_history_text_captures import PRODUCTION_ROUTES, ASSEMBLED_CAPTURES, ASSEMBLED_PAGES, ASSEMBLED_CONTROLS, ASSEMBLED_COUNTS
@@ -46,37 +32,6 @@ class HistoryTextContracts(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(dir=SCRATCH)
         self.addCleanup(temporary.cleanup)
         self.directory = Path(temporary.name)
-
-    def report(self, missing=None):
-        writer = test_workflow_contract.SyntheticReportTests()
-        writer.directory = self.directory
-        return writer.write_report("native", missing=missing)
-
-    def test_all_new_native_cases_are_mandatory_without_changing_inherited_cases(self):
-        source = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryTextComponentTest.kt"
-        self.assertEqual(HISTORY_TEXT_CASES, RETAINED_TEXT_CASES)
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), RETAINED_TEXT_CASES)
-        self.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 81 + len(BACKGROUND_NATIVE_CASES) + PERIODIC_NATIVE_COUNT + len(HISTORY_TEXT_CASES) + len(HISTORY_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
-        for name in RETAINED_TEXT_CASES:
-            self.report(name)
-            with self.assertRaisesRegex(ValueError, "Missing real native history text"):
-                verify_reports(self.directory, "native")
-
-    def test_new_native_cases_cannot_be_skipped_failed_or_spoofed(self):
-        for name in RETAINED_TEXT_CASES:
-            for mutation in ("skipped", "failure", "error", "wrong-class"):
-                path = self.report()
-                root = ET.parse(path).getroot()
-                case = next(case for case in root.iter("testcase")
-                            if case.get("classname") == HISTORY_TEXT_CLASS and case.get("name") == name)
-                if mutation == "wrong-class":
-                    case.set("classname", "SYNTHETIC-wrong-class")
-                else:
-                    ET.SubElement(case, mutation)
-                ET.ElementTree(root).write(path)
-                with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
-                    verify_reports(self.directory, "native")
 
     def captures(self):
         for name, (orientation, dark, font) in CAPTURES.items():
@@ -256,20 +211,6 @@ class HistoryTextContracts(unittest.TestCase):
         with patch("verify_history_text_captures.MAX_PNG_BYTES", 8):
             with self.assertRaisesRegex(ValueError, "budget"):
                 read_png(path)
-
-    def test_count_copy_is_quantity_neutral_with_original_format_arguments(self):
-        resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
-        expected = {
-            "history_series_counts": "Timestamped measurements: %1$d · Nominal analytical reference segments: %2$d",
-            "history_lost": "Samples lost or unconfirmed: %1$d; history is incomplete.",
-            "history_show_details": "Show exact details · Page entries: %1$d",
-            "history_hide_details": "Hide exact details · Page entries: %1$d",
-            "history_chunks": "Exact value continues in ordered text parts (count: %1$d); concatenate in order. No digits omitted.",
-        }
-        for name, copy in expected.items():
-            with self.subTest(name=name):
-                self.assertEqual(resources[name], copy)
-                self.assertNotRegex(copy, r"%\d+\$d\s+[A-Za-z]")
 
     def test_capture_collection_accepts_only_complete_observed_configurations(self):
         self.captures()

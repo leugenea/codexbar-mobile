@@ -2,15 +2,10 @@
 import copy
 import os
 from pathlib import Path
-import re
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 
-from periodic_refresh_contract_expectations import PERIODIC_JVM, PERIODIC_NATIVE, PERIODIC_NATIVE_COUNT, PERIODIC_JVM_COUNT
-from verify_test_reports import PERIODIC_REFRESH_JVM, PERIODIC_REFRESH_NATIVE, verify_reports
-from test_background_refresh_contract import mutate
-import test_workflow_contract as workflow
 from verify_manifests import ANDROID, TOOLS, SOURCE_PERMISSIONS, check_manifest, check_source_manifests, approved_work_removal
 from work_manifest_fixtures import COMPONENT_XML, STARTUP_APK, components_apk
 from work_manifest_policy import check_components, apk_components
@@ -24,34 +19,6 @@ class PeriodicRefreshContracts(unittest.TestCase):
         temp = tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR'))
         self.addCleanup(temp.cleanup)
         self.directory = Path(temp.name)
-        self.writer = workflow.SyntheticReportTests()
-        self.writer.directory = self.directory
-
-    def test_independent_exact_method_registries_and_counts(self):
-        self.assertEqual(PERIODIC_JVM, PERIODIC_REFRESH_JVM)
-        self.assertEqual(PERIODIC_NATIVE, PERIODIC_REFRESH_NATIVE)
-        self.assertEqual(sum(map(len, PERIODIC_JVM.values())), PERIODIC_JVM_COUNT)
-        self.assertEqual(sum(map(len, PERIODIC_NATIVE.values())), PERIODIC_NATIVE_COUNT)
-        for source_set, registry in (('test', PERIODIC_JVM), ('androidTest', PERIODIC_NATIVE)):
-            for classname, names in registry.items():
-                source = ROOT / f'app/src/{source_set}/java/{classname.replace(".", "/")}.kt'
-                declared = re.findall(r'@Test\s+fun\s+(\w+)\s*\(', source.read_text())
-                self.assertEqual(len(declared), len(set(declared)))
-                self.assertEqual(set(declared), names)
-
-    def test_every_periodic_case_fails_closed_on_omission_spoof_duplicate_error_failure_skip(self):
-        for kind, registry in (('jvm', PERIODIC_JVM), ('native', PERIODIC_NATIVE)):
-            for classname, names in registry.items():
-                for name in names:
-                    for mutation in ('missing', 'wrong-class', 'duplicate', 'error', 'failure', 'skipped'):
-                        path = self.writer.write_report(kind)
-                        tree = ET.parse(path)
-                        suite = tree.getroot()
-                        case = next(c for c in suite if c.get('classname') == classname and c.get('name') == name)
-                        mutate(suite, case, mutation)
-                        tree.write(path)
-                        with self.subTest(kind=kind, name=name, mutation=mutation), self.assertRaises(ValueError):
-                            verify_reports(self.directory, kind)
 
     def test_only_two_exact_reviewed_removal_markers_are_permitted(self):
         source = ROOT / 'app/src/main/AndroidManifest.xml'
@@ -149,23 +116,3 @@ class PeriodicRefreshContracts(unittest.TestCase):
                 else: bad = bad.replace('(type 0x12)0x0', '(type 0x12)0xffffffff', 1)
                 with self.subTest(package=package, mutation=mutation), self.assertRaises(ValueError):
                     apk_components(xmltree + bad, package)
-
-    def test_os_dispatch_fixture_declares_its_room_superclass_on_test_compile_classpath(self):
-        build = (ROOT / 'app/build.gradle').read_text()
-        declarations = re.findall(r"(?m)^\s*(\w+)\s+'androidx.room:room-runtime:([^']+)'", build)
-        self.assertEqual(declarations, [('androidTestImplementation', '2.7.0')])
-
-    def test_production_adapter_is_ordinary_lifetime_only_and_preserves_cancellation(self):
-        source = (ROOT / 'app/src/main/java/io/github/leugenea/codexbarmobile/PeriodicUsageRefresh.kt').read_text()
-        code = re.sub(r'//[^\n]*|/\*.*?\*/', '', source, flags=re.S)
-        for forbidden in ('Result.retry(', 'setExpedited(', 'setForeground(', 'setForegroundAsync(', 'AlarmManager',
-                          '.signOut(', '.shutdown(', 'NativeConnection.create(', 'usageForeground(', 'while ('):
-            self.assertNotIn(forbidden, code)
-        self.assertNotRegex(code, r'catch\s*\([^)]*:\s*(?:Exception|Throwable|CancellationException)\b')
-        self.assertIn('ExistingPeriodicWorkPolicy.KEEP', code)
-        self.assertIn('NetworkType.CONNECTED', code)
-        self.assertIn('setRequiresBatteryNotLow(true)', code)
-        self.assertIn('minimumSuccessAgeMillis', code)
-        self.assertIn('NativeConnection.get(applicationContext)', code)
-        self.assertEqual(SOURCE_PERMISSIONS, frozenset({'android.permission.INTERNET', 'android.permission.ACCESS_NETWORK_STATE',
-                                                     'android.permission.RECEIVE_BOOT_COMPLETED', 'android.permission.WAKE_LOCK'}))

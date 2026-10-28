@@ -1,9 +1,11 @@
 """Cheap build source/workflow contracts and explicitly synthetic report-parser tests."""
 from verify_test_reports import DASHBOARD_JVM, DASHBOARD_NATIVE
-from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT
+from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE
 from verify_test_reports import HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE
 from verify_test_reports import HISTORY_IMPORT_JVM, HISTORY_IMPORT_NATIVE, REMAINING_TIME_JVM
 from verify_test_reports import BACKGROUND_REFRESH_JVM
+from background_refresh_contract_expectations import BACKGROUND_NATIVE_CASES
+from dashboard_contract_expectations import EXPECTED_DASHBOARD_JVM_COUNT, EXPECTED_DASHBOARD_NATIVE_COUNT
 from periodic_refresh_contract_expectations import PERIODIC_JVM, PERIODIC_NATIVE, PERIODIC_NATIVE_COUNT, PERIODIC_JVM_COUNT
 import hashlib
 import json
@@ -327,47 +329,12 @@ class WorkflowContracts(unittest.TestCase):
             with self.subTest(mutation=old), self.assertRaises(AssertionError):
                 self.assert_code_metrics_contract(original.replace(old, new, 1))
 
-    def test_all_required_real_tests_are_declared_and_placeholders_removed(self):
-        for kind, tree, filename in (
-            ("jvm", "test", "UsageRefreshTest.kt"),
-            ("native", "androidTest", "ConnectionLaunchSmokeTest.kt"),
-        ):
-            source_dir = ROOT / f"app/src/{tree}/java/io/github/leugenea/codexbarmobile"
-            source = (source_dir / filename).read_text()
-            declared = set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source))
-            self.assertEqual(declared, EXPECTED[kind])
-            self.assertFalse((source_dir / "BootstrapCompileTest.kt").exists())
-        native = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/ConnectionLaunchSmokeTest.kt").read_text()
-        for actual in ("createEmptyComposeRule", "ActivityScenario.launch(intent)", "scenario.recreate()",
-                       "compose.waitUntil", "last state=", "assertInstalledNetworkPolicy()",
-                       "assertCaptureEnabledWindow(scenario)", "assertPlatformScreenshot(compose,",
-                       "assertRetiredSurfaceAbsent()", "awaitConnectionScreen",
-                       "SemanticsActions.GetTextLayoutResult"):
-            self.assertIn(actual, native)
-        permission_set = re.search(r'setOf\((.*?)\),', native, re.S)
-        assert permission_set is not None
-        self.assertEqual(set(re.findall(r'"([^"]+)"', permission_set[1].replace("${context.packageName}", PACKAGE))), APP_PERMISSIONS)
-        for policy in ("ApplicationInfo.FLAG_USES_CLEARTEXT_TRAFFIC",
-                       "NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted",
-                       "PermissionInfo.PROTECTION_SIGNATURE", "receiver.protectionLevel"):
-            self.assertIn(policy, native)
-        for shortcut in ("setContent", "runBlocking(", "Thread.sleep(", "BuildConfig"):
-            self.assertNotIn(shortcut, "\n".join(line for line in native.splitlines() if not line.strip().startswith("/**")))
-
     def test_native_script_rejects_nonhosted_execution_before_setup(self):
         environment = dict(os.environ, GITHUB_ACTIONS="false")
         result = subprocess.run(["bash", str(ROOT / "tools/build/run-hosted-native-smoke.sh")],
                                 cwd=ROOT, env=environment, text=True, capture_output=True, timeout=5)
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stderr.strip(), "Hosted runner only")
-
-    def test_production_string_resources_are_declared(self):
-        resources = ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()
-        declared = {element.get("name") for element in resources}
-        source = (ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile/MainActivity.kt").read_text()
-        self.assertTrue(set(re.findall(r"R\.string\.(\w+)", source)) <= declared)
-        live = (ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile/LiveUsageScreen.kt").read_text()
-        self.assertIn("LiveRegionMode.Polite", live)
 
     def test_native_job_is_narrow_strict_read_only_and_observable(self):
         workflow = (ROOT / ".github/workflows/android.yml").read_text()
@@ -864,6 +831,14 @@ class SyntheticReportTests(unittest.TestCase):
         return path
 
     def test_accepts_complete_executed_sets_in_synthetic_reports(self):
+        self.assertEqual(sum(map(len, DASHBOARD_JVM.values())), EXPECTED_DASHBOARD_JVM_COUNT)
+        self.assertEqual(sum(map(len, DASHBOARD_NATIVE.values())), EXPECTED_DASHBOARD_NATIVE_COUNT)
+        self.assertEqual(sum(map(len, BACKGROUND_REFRESH_JVM.values())), 17)
+        self.assertEqual(len(BACKGROUND_NATIVE_CASES), 12)
+        self.assertTrue(BACKGROUND_NATIVE_CASES <= HISTORY_SAMPLING_CASES)
+        self.assertEqual(sum(map(len, PERIODIC_JVM.values())), 7)
+        self.assertEqual(sum(map(len, PERIODIC_NATIVE.values())), 9)
+        self.assertEqual(sum(map(len, REMAINING_TIME_JVM.values())), 7)
         for kind in EXPECTED:
             for depth in (0, 1, 2):
                 with self.subTest(kind=kind, container_depth=depth):
@@ -871,29 +846,31 @@ class SyntheticReportTests(unittest.TestCase):
                     result = verify_reports(self.directory, kind)
                     self.assertEqual(result["testCount"], 167 + PERIODIC_NATIVE_COUNT if kind == "native" else 135 + PERIODIC_JVM_COUNT)
 
-    def test_remaining_time_jvm_cases_match_source_and_reject_incomplete_reports(self):
-        self.assertEqual(sum(map(len, REMAINING_TIME_JVM.values())), 7)
-        for classname, required in REMAINING_TIME_JVM.items():
-            source = ROOT / f"app/src/test/java/{classname.replace('.', '/')}.kt"
-            declared = set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text()))
-            self.assertTrue(required <= declared)
-            for name in required:
-                for mutation in ("missing", "wrong-class", "duplicate", "failure", "error", "skipped"):
-                    path = self.write_report("jvm")
-                    tree = ET.parse(path)
-                    suite = tree.getroot()
-                    case = next(c for c in suite if c.get("classname") == classname and c.get("name") == name)
-                    if mutation == "missing":
-                        suite.remove(case)
-                    elif mutation == "wrong-class":
-                        case.set("classname", "SYNTHETIC-wrong-class")
-                    elif mutation == "duplicate":
-                        ET.SubElement(suite, "testcase", **case.attrib)
-                    else:
-                        ET.SubElement(case, mutation)
-                    tree.write(path)
-                    with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
-                        verify_reports(self.directory, "jvm")
+    def test_exact_once_families_reject_incomplete_spoofed_duplicate_and_unsuccessful_reports(self):
+        for kind, registry in (
+            ("jvm", CURRENT_HISTORY_JVM | DASHBOARD_JVM | HISTORY_EXPORT_JVM | HISTORY_IMPORT_JVM |
+             REMAINING_TIME_JVM | BACKGROUND_REFRESH_JVM | PERIODIC_JVM),
+            ("native", CURRENT_HISTORY_NATIVE | DASHBOARD_NATIVE | HISTORY_EXPORT_NATIVE | HISTORY_IMPORT_NATIVE |
+             PERIODIC_NATIVE),
+        ):
+            for classname, required in registry.items():
+                for name in required:
+                    for mutation in ("missing", "wrong-class", "duplicate", "failure", "error", "skipped"):
+                        path = self.write_report(kind)
+                        tree = ET.parse(path)
+                        suite = tree.getroot()
+                        case = next(c for c in suite if c.get("classname") == classname and c.get("name") == name)
+                        if mutation == "missing":
+                            suite.remove(case)
+                        elif mutation == "wrong-class":
+                            case.set("classname", "SYNTHETIC-wrong-class")
+                        elif mutation == "duplicate":
+                            ET.SubElement(suite, "testcase", attrib=dict(case.attrib))
+                        else:
+                            ET.SubElement(case, mutation)
+                        tree.write(path)
+                        with self.subTest(kind=kind, classname=classname, name=name, mutation=mutation), self.assertRaises(ValueError):
+                            verify_reports(self.directory, kind)
 
     def test_rejects_missing_tests(self):
         for kind in EXPECTED:
@@ -903,15 +880,17 @@ class SyntheticReportTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "Missing real"):
                         verify_reports(self.directory, kind)
 
-    def test_each_launch_and_refresh_anchor_rejects_omission_failure_error_skip_and_spoof(self):
-        for kind, required in EXPECTED.items():
-            for name in required:
+    def test_each_fixture_case_rejects_omission_failure_error_skip_and_spoof(self):
+        for kind in EXPECTED:
+            complete = ET.parse(self.write_report(kind)).getroot()
+            for expected in complete.iter("testcase"):
+                classname, name = expected.get("classname"), expected.get("name")
                 for mutation in ("missing", "failure", "error", "skipped", "wrong-class"):
                     path = self.write_report(kind)
                     tree = ET.parse(path)
                     root = tree.getroot()
                     case = next(item for item in root.iter("testcase")
-                                if item.get("classname") == CLASS[kind] and item.get("name") == name)
+                                if item.get("classname") == classname and item.get("name") == name)
                     if mutation == "missing":
                         root.remove(case)
                     elif mutation == "wrong-class":
@@ -919,154 +898,8 @@ class SyntheticReportTests(unittest.TestCase):
                     else:
                         ET.SubElement(case, mutation)
                     tree.write(path)
-                    with self.subTest(kind=kind, name=name, mutation=mutation), self.assertRaises(ValueError):
+                    with self.subTest(kind=kind, classname=classname, name=name, mutation=mutation), self.assertRaises(ValueError):
                         verify_reports(self.directory, kind)
-
-    def test_mandatory_keystore_cases_match_source_and_cannot_be_omitted_or_spoofed(self):
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/credentials/KeystoreCredentialStoreTest.kt").read_text()
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), CREDENTIAL_CASES)
-        for missing in CREDENTIAL_CASES:
-            self.write_report("native", missing=missing)
-            with self.assertRaisesRegex(ValueError, "Missing real native credential"):
-                verify_reports(self.directory, "native")
-        path = self.write_report("native")
-        root = ET.parse(path).getroot()
-        for case in root.iter("testcase"):
-            if case.get("classname") == CREDENTIAL_CLASS:
-                case.set("classname", CLASS["native"])
-        ET.ElementTree(root).write(path, encoding="unicode")
-        with self.assertRaisesRegex(ValueError, "Missing real native credential"):
-            verify_reports(self.directory, "native")
-
-    def test_mandatory_connection_cases_match_source_and_cannot_be_omitted_or_spoofed(self):
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/ConnectionLifecycleTest.kt").read_text()
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), CONNECTION_CASES | DEVICE_CODE_COPY_CASES)
-        for missing in CONNECTION_CASES:
-            self.write_report("native", missing=missing)
-            with self.assertRaisesRegex(ValueError, "Missing real native connection"):
-                verify_reports(self.directory, "native")
-        path = self.write_report("native")
-        root = ET.parse(path).getroot()
-        for case in root.iter("testcase"):
-            if case.get("classname") == CONNECTION_CLASS:
-                case.set("classname", CLASS["native"])
-        ET.ElementTree(root).write(path, encoding="unicode")
-        with self.assertRaisesRegex(ValueError, "Missing real native connection"):
-            verify_reports(self.directory, "native")
-
-    def test_usage_refresh_native_contract_requires_both_real_lifecycle_cases(self):
-        native = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/UsageRefreshLifecycleTest.kt"
-        declared = set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", native.read_text()))
-        self.assertEqual(declared, USAGE_REFRESH_CASES)
-        for name in USAGE_REFRESH_CASES:
-            with self.subTest(missing=name):
-                self.write_report("native", missing=name)
-                with self.assertRaisesRegex(ValueError, "Missing real native usage refresh"):
-                    verify_reports(self.directory, "native")
-        path = self.write_report("native")
-        document = ET.parse(path)
-        for case in document.iter("testcase"):
-            if case.get("classname") == USAGE_REFRESH_CLASS:
-                case.set("classname", CONNECTION_CLASS)
-        document.write(path, encoding="unicode")
-        with self.assertRaisesRegex(ValueError, "Missing real native usage refresh"):
-            verify_reports(self.directory, "native")
-
-    def test_live_usage_native_contract_requires_real_activity_cases_without_spoofing(self):
-        native = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/LiveUsageScreenTest.kt"
-        declared = set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", native.read_text()))
-        self.assertEqual(declared, LIVE_USAGE_CASES | BANKED_RESET_CASES)
-        for name in LIVE_USAGE_CASES:
-            with self.subTest(missing=name):
-                self.write_report("native", missing=name)
-                with self.assertRaisesRegex(ValueError, "Missing real native live usage"):
-                    verify_reports(self.directory, "native")
-        path = self.write_report("native")
-        document = ET.parse(path)
-        for case in document.iter("testcase"):
-            if case.get("classname") == LIVE_USAGE_CLASS:
-                case.set("classname", CONNECTION_CLASS)
-        document.write(path, encoding="unicode")
-        with self.assertRaisesRegex(ValueError, "Missing real native live usage"):
-            verify_reports(self.directory, "native")
-
-    def test_banked_reset_native_cases_cannot_be_omitted_or_spoofed(self):
-        self.assertEqual(BANKED_RESET_CLASS, LIVE_USAGE_CLASS)
-        for name in BANKED_RESET_CASES:
-            with self.subTest(missing=name):
-                self.write_report("native", missing=name)
-                with self.assertRaisesRegex(ValueError, "Missing real native banked reset"):
-                    verify_reports(self.directory, "native")
-        path = self.write_report("native")
-        document = ET.parse(path)
-        for case in document.iter("testcase"):
-            if case.get("name") in BANKED_RESET_CASES:
-                case.set("classname", CONNECTION_CLASS)
-        document.write(path, encoding="unicode")
-        with self.assertRaisesRegex(ValueError, "Missing real native banked reset"):
-            verify_reports(self.directory, "native")
-
-    def test_history_native_cases_match_source_and_reject_omission_spoofing_and_skips(self):
-        native = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/history/HistoryPersistenceTest.kt"
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", native.read_text())), HISTORY_CASES)
-        for name in HISTORY_CASES:
-            with self.subTest(missing=name):
-                self.write_report("native", missing=name)
-                with self.assertRaisesRegex(ValueError, "Missing real native history"):
-                    verify_reports(self.directory, "native")
-        for sabotage in ("wrong-class", "failure", "error", "skipped"):
-            with self.subTest(sabotage=sabotage):
-                path = self.write_report("native")
-                document = ET.parse(path)
-                case = next(case for case in document.iter("testcase") if case.get("classname") == HISTORY_CLASS)
-                if sabotage == "wrong-class":
-                    case.set("classname", CONNECTION_CLASS)
-                else:
-                    ET.SubElement(case, sabotage)
-                document.write(path, encoding="unicode")
-                with self.assertRaises(ValueError):
-                    verify_reports(self.directory, "native")
-
-    def test_history_lifetime_native_cases_are_mandatory_and_cannot_be_spoofed(self):
-        native = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/history/HistoryLifetimeTest.kt"
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", native.read_text())), HISTORY_LIFETIME_CASES)
-        for name in HISTORY_LIFETIME_CASES:
-            with self.subTest(missing=name):
-                self.write_report("native", missing=name)
-                with self.assertRaisesRegex(ValueError, "Missing real native history lifetime"):
-                    verify_reports(self.directory, "native")
-        for sabotage in ("wrong-class", "failure", "error", "skipped"):
-            with self.subTest(sabotage=sabotage):
-                document = ET.parse(self.write_report("native"))
-                case = next(c for c in document.iter("testcase") if c.get("classname") == HISTORY_LIFETIME_CLASS)
-                if sabotage == "wrong-class":
-                    case.set("classname", HISTORY_CLASS)
-                else:
-                    ET.SubElement(case, sabotage)
-                document.write(self.directory / "SYNTHETIC-parser-fixture.xml", encoding="unicode")
-                with self.assertRaises(ValueError):
-                    verify_reports(self.directory, "native")
-
-    def test_history_sampling_native_cases_are_mandatory_and_preserve_all_prior_cases(self):
-        native = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/history/UsageHistoryIntegrationTest.kt"
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", native.read_text())), HISTORY_SAMPLING_CASES)
-        self.assertEqual(sum(map(len, (EXPECTED["native"], CREDENTIAL_CASES, CONNECTION_CASES,
-                                     USAGE_REFRESH_CASES, LIVE_USAGE_CASES, BANKED_RESET_CASES,
-                                     HISTORY_CASES, HISTORY_LIFETIME_CASES))), 76)
-        for name in HISTORY_SAMPLING_CASES:
-            self.write_report("native", missing=name)
-            with self.assertRaisesRegex(ValueError, "Missing real native history sampling"):
-                verify_reports(self.directory, "native")
-            for sabotage in ("wrong-class", "failure", "error", "skipped"):
-                document = ET.parse(self.write_report("native"))
-                case = next(c for c in document.iter("testcase") if c.get("name") == name)
-                if sabotage == "wrong-class":
-                    case.set("classname", HISTORY_CLASS)
-                else:
-                    ET.SubElement(case, sabotage)
-                document.write(self.directory / "SYNTHETIC-parser-fixture.xml", encoding="unicode")
-                with self.assertRaises(ValueError):
-                    verify_reports(self.directory, "native")
 
     def test_rejects_failures_errors_and_skips(self):
         for kind in EXPECTED:

@@ -58,9 +58,9 @@ check final artifacts where appropriate. Do not add Python checks for Kotlin cal
 spelling, function placement, Compose expressions or test-driver implementation.
 Parsed resource copy, security policy and fail-closed artifact/report checks remain
 useful tooling contracts; none substitutes for hosted runtime or visual evidence.
-The dashboard report fixtures reuse the mandatory method registry, while annotated
-source membership, independent family counts and omission/class/failure/error/skip/
-duplicate controls still guard required execution. Keep separate expectation lists
+Synthetic report fixtures reuse the mandatory method registries; independent family
+counts and omission/class/failure/error/skip/duplicate controls check the report parser,
+not Kotlin source membership or producer authenticity. Keep separate expectation lists
 only when they supply a distinct oracle, not another copy of the same registry.
 
 CI-first is the default. Under the current owner host policy, local work is limited

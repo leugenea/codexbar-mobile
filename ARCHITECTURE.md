@@ -1367,9 +1367,9 @@ OLS endpoints and unchanged snapshot/cache/pace authority. Native source contrac
 actual dashboard singleton with full-window labels and tick pixels, positive run-bridge
 pixels and full-window translucent trend extension/clipping. Capture identities remain;
 connection counts and positive bridge receipts deliberately replace negative gap receipts.
-Mandatory report/retry registries retain these cases; dashboard fixtures share the
-report registry, checked against annotated source membership and independent family
-counts rather than duplicated method lists. Native execution,
+Mandatory report/retry registries retain these cases; synthetic fixtures share the
+report registries, with independent family counts and missing/class/failure/error/skip/
+duplicate controls rather than Kotlin source membership checks. Native execution,
 Kotlin compilation, lint, compatible >=90% coverage and actual-image review remain hosted
 acceptance gates, not claims established by quick static tooling.
 

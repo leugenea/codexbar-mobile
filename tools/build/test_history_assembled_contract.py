@@ -1,27 +1,11 @@
-"""Explicitly synthetic #83 parser/source controls; no application/native execution."""
-from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT
-from background_refresh_contract_expectations import BACKGROUND_NATIVE_CASES
-from periodic_refresh_contract_expectations import PERIODIC_NATIVE_COUNT
-from dashboard_contract_expectations import EXPECTED_DASHBOARD_NATIVE_COUNT
-from verify_test_reports import HISTORY_EXPORT_NATIVE_COUNT, HISTORY_IMPORT_NATIVE_COUNT
+"""Explicitly synthetic assembled-capture controls; no application/native execution."""
 import copy
 import json
-from pathlib import Path
-import re
 import unittest
-import xml.etree.ElementTree as ET
 
 import test_history_text_contract as text_contract
-from verify_test_reports import ACCOUNT_REMOVAL_CASES
-from verify_test_reports import DEVICE_CODE_COPY_CASES
-from verify_test_reports import ACCOUNT_NAME_CASES, ACCOUNT_NAME_CLASS
-from verify_test_reports import HISTORY_ASSEMBLED_CASES, HISTORY_ASSEMBLED_CLASS, verify_reports
 from verify_history_text_captures import (ASSEMBLED_CAPTURES, ASSEMBLED_COUNTS, CAPTURES, decoded_samples,
                                          paeth, verify_captures)
-
-from verify_test_reports import PHONE_TIME_CASES
-
-ROOT = Path(__file__).resolve().parents[2]
 
 
 class HistoryAssembledContracts(unittest.TestCase):
@@ -31,33 +15,7 @@ class HistoryAssembledContracts(unittest.TestCase):
         self.addCleanup(self.fixture.doCleanups)
         self.directory = self.fixture.directory
 
-    def test_exact_four_native_identities_extend_all_107_inherited(self):
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryAssembledAcceptanceTest.kt").read_text()
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)), HISTORY_ASSEMBLED_CASES)
-        self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 109 + len(BACKGROUND_NATIVE_CASES) + PERIODIC_NATIVE_COUNT + len(PHONE_TIME_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
-        for name in HISTORY_ASSEMBLED_CASES:
-            self.fixture.report(name)
-            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history assembled acceptance"):
-                verify_reports(self.directory, "native")
-
-    def test_each_native_case_rejects_failure_error_skip_and_wrong_class(self):
-        for name in HISTORY_ASSEMBLED_CASES:
-            for mutation in ("failure", "error", "skipped", "wrong-class"):
-                path = self.fixture.report()
-                tree = ET.parse(path)
-                case = next(case for case in tree.getroot().iter("testcase") if case.get("name") == name)
-                if mutation == "wrong-class":
-                    case.set("classname", HISTORY_ASSEMBLED_CLASS + ".wrong")
-                else:
-                    ET.SubElement(case, mutation)
-                tree.write(path)
-                with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
-                    verify_reports(self.directory, "native")
-
     def test_five_representative_images_extend_all_twelve_inherited_and_are_each_required(self):
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryAssembledAcceptanceTest.kt").read_text()
-        self.assertEqual(set(re.findall(r'"(history-assembled-[^"]+)"', source)), {name for name in ASSEMBLED_CAPTURES if name.startswith("history-assembled-")})
         self.assertEqual(len(CAPTURES), 12 + len(ASSEMBLED_CAPTURES))
         for name in ASSEMBLED_CAPTURES:
             self.fixture.captures()

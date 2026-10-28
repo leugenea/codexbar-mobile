@@ -1,34 +1,8 @@
-"""Independent dashboard capture/count oracles and source-only regression baselines.
+"""Independent dashboard capture/count oracles.
 
 Mandatory dashboard method names live in verify_test_reports, not a second list here.
 """
-SCANNER_CLASS = "io.github.leugenea.codexbarmobile.history.CurrentHistoryReadTest"
-# These pre-existing source tests remain protected, but this does not make unrelated
-# JVM methods new mandatory report targets.
-PROTECTED_MIXED_SOURCE = {
-    "io.github.leugenea.codexbarmobile.history.HistoryDisplayAuthorityTest": {
-        "nullDiagnosticIdentityCannotReplayAcrossRetireBoundSuccessorAndNullRebind",
-        "backgroundRevokesNullContextButResumeRetainsItsLossWithoutReplayingOldContext",
-        "nullAccessWithExistingBindingKeepsItsContextAndBoundWorkerAdmission",
-        "sameSlotRevokesHeldWorkerBeforeReadAndAllowsSuccessorDrain",
-    },
-    "io.github.leugenea.codexbarmobile.history.UsageHistoryRecorderTest": {
-        "weeklyAcceptedObservationsKeepExactAbsoluteIdentitiesAndDiscrepantPointsIsolated",
-        "historicalWeeklyDiscrepancyFlagIsConsumedWithoutRenormalizingStoredFacts",
-        "acceptedEqualPercentReadsHaveDistinctIdsButCoalescingTicksAndQueriesDoNotSample",
-        "usageDeliveryPersistsBeforeInventoryCompletionAndPartialFailuresNeverReplayCache",
-        "dormantRestoreOffscreenReadAndInventoryOnlyNeverInventMeasurements",
-        "lastObserverLossAndCancelRejectHeldResponsesAndWritesWithoutBackfill",
-        "queueOverflowIsBoundedExplicitLossAndNextObservationBreaksWithoutRetry",
-        "logoutWhileDurableWorkIsHeldCannotPublishOrResurrectIntoNewLogin",
-        "categoricalWriteReadCorruptionAndThrownFailuresKeepLiveQuotaUsable",
-        "realCorrectionsResetUnknownAndClockDiscontinuitiesKeepMathAndSegmentsTruthful",
-        "orderedBoundedQueriesExposePaginationSelectionAndIndependentStaleness",
-        "automaticCadenceAndRetryAfterRemainB2OwnedWithNoHistoryRetryWork",
-        "heldQueriesRejectEarlierSelectionAndLogoutResultsWithoutExtraProviderWork",
-        "acceptedResumeWhileRuntimeReadoptionIsHeldKeepsCapturedPartitionWithoutRetry",
-    },
-}
+
 EXPECTED_DASHBOARD_CAPTURE_SPECS = {
     "dashboard-main-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "FIVE_HOUR"),
     "dashboard-weekly-portrait-light": (1, False, 1.0, "DASHBOARD", "CURRENT", "WEEKLY"),

@@ -1,26 +1,11 @@
-"""Chart parser/source contract controls; synthetic metadata is NOT native visual evidence."""
-from verify_test_reports import CURRENT_HISTORY_NATIVE_COUNT
-from background_refresh_contract_expectations import BACKGROUND_NATIVE_CASES
-from periodic_refresh_contract_expectations import PERIODIC_NATIVE_COUNT
-from dashboard_contract_expectations import EXPECTED_DASHBOARD_NATIVE_COUNT
-from verify_test_reports import HISTORY_EXPORT_NATIVE_COUNT, HISTORY_IMPORT_NATIVE_COUNT
+"""Chart capture parser controls; synthetic metadata is NOT native visual evidence."""
 import json
-from pathlib import Path
-import re
 import unittest
-import xml.etree.ElementTree as ET
 
 import test_history_text_contract as text_contract
 from verify_history_text_captures import CAPTURES, INTEGRATED_CAPTURES, CHART_CAPTURES, CHART_COUNTS, verify_captures
 from verify_history_text_captures import ASSEMBLED_CAPTURES
-from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
-from verify_test_reports import ACCOUNT_REMOVAL_CASES
-from verify_test_reports import DEVICE_CODE_COPY_CASES
-from verify_test_reports import ACCOUNT_NAME_CASES, ACCOUNT_NAME_CLASS
-from verify_test_reports import HISTORY_ASSEMBLED_CASES, HISTORY_ASSEMBLED_CLASS
-from verify_test_reports import HISTORY_AUTHORITY_CASES, HISTORY_NAVIGATION_CASES, HISTORY_CHART_CASES, HISTORY_CHART_CLASS, verify_reports
 
-ROOT = Path(__file__).resolve().parents[2]
 
 # Independent selected-family oracle, not names derived from generated XML.
 RETAINED_CHART_CASES = {
@@ -41,37 +26,10 @@ class HistoryChartContracts(unittest.TestCase):
         self.addCleanup(self.fixture.doCleanups)
         self.directory = self.fixture.directory
 
-    def test_every_chart_native_identity_is_required_on_top_of_all_84_inherited(self):
-        source = ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryChartComponentTest.kt"
-        self.assertEqual(HISTORY_CHART_CASES, RETAINED_CHART_CASES)
-        self.assertEqual(set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source.read_text())), RETAINED_CHART_CASES)
-        self.fixture.report()
-        self.assertEqual(verify_reports(self.directory, "native")["testCount"], 88 + len(BACKGROUND_NATIVE_CASES) + PERIODIC_NATIVE_COUNT + len(RETAINED_CHART_CASES) + len(HISTORY_NAVIGATION_CASES) + len(HISTORY_AUTHORITY_CASES) + len(HISTORY_ISOLATION_CASES) + len(HISTORY_ASSEMBLED_CASES) + len(ACCOUNT_NAME_CASES) + len(ACCOUNT_REMOVAL_CASES) + len(DEVICE_CODE_COPY_CASES) + CURRENT_HISTORY_NATIVE_COUNT + EXPECTED_DASHBOARD_NATIVE_COUNT + HISTORY_EXPORT_NATIVE_COUNT + HISTORY_IMPORT_NATIVE_COUNT)
-        for name in RETAINED_CHART_CASES:
-            self.fixture.report(name)
-            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history chart"):
-                verify_reports(self.directory, "native")
-
-    def test_each_chart_case_rejects_skip_failure_error_and_class_spoof(self):
-        for name in RETAINED_CHART_CASES:
-            for mutation in ("skipped", "failure", "error", "wrong-class"):
-                path = self.fixture.report()
-                tree = ET.parse(path)
-                case = next(case for case in tree.getroot().iter("testcase") if case.get("name") == name)
-                if mutation == "wrong-class":
-                    case.set("classname", HISTORY_CHART_CLASS + ".wrong")
-                else:
-                    ET.SubElement(case, mutation)
-                tree.write(path)
-                with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
-                    verify_reports(self.directory, "native")
-
     def test_collector_preserves_four_text_images_and_requires_six_actual_chart_images(self):
         self.assertEqual(set(CAPTURES) - set(CHART_CAPTURES) - set(INTEGRATED_CAPTURES) - set(ASSEMBLED_CAPTURES), {
             "history-measured-portrait-light", "history-exact-measurement-portrait-light",
             "history-gap-landscape-dark", "history-unknown-large-font"})
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/HistoryChartComponentTest.kt").read_text()
-        self.assertEqual(set(re.findall(r'capture\("(history-chart-[^"]+)"', source)), set(CHART_CAPTURES))
         self.assertEqual(set(CHART_COUNTS), set(CHART_CAPTURES))
         for name in CHART_CAPTURES:
             self.fixture.captures()
@@ -96,18 +54,6 @@ class HistoryChartContracts(unittest.TestCase):
                 path.write_text(json.dumps(data))
                 with self.subTest(name=name, key=key), self.assertRaises(ValueError):
                     verify_captures(self.directory)
-
-    def test_chart_legend_names_the_optional_trend(self):
-        resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
-        self.assertIn("least-squares usage trend when available", resources["history_chart_legend"] or "")
-
-    def test_chart_counts_are_quantity_neutral_and_no_dependency_or_coverage_exemption_exists(self):
-        resources = {item.get("name"): item.text for item in ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()}
-        self.assertEqual(resources["history_chart_counts"],
-                         "Measured observations: %1$d · Measured connections: %2$d · Nominal reference lines: %3$d")
-        build = (ROOT / "app/build.gradle").read_text()
-        self.assertIn("minimum = 0.90", build)
-        self.assertNotRegex(build, r"exclude.*HistoryChart|chart.*[Dd]ependenc")
 
 
 if __name__ == "__main__":

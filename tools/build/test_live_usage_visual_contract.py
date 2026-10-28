@@ -1,18 +1,15 @@
 """Synthetic child130 collector/report controls only; no application execution."""
 import copy
 import json
-from pathlib import Path
-import re
 import unittest
 import xml.etree.ElementTree as ET
 
 from test_history_text_contract import HistoryTextContracts
 from test_native_coverage_retry import RetryContracts, synthetic_reports
-from verify_test_reports import LIVE_USAGE_CLASS, LIVE_USAGE_CASES, verify_reports
+from verify_test_reports import LIVE_USAGE_CLASS, verify_reports
 from test_dashboard_contract import dashboard_captures
 from verify_history_text_captures import LIVE_CAPTURES, LIVE_FACTS, live_capture_receipt, verify_gallery
 
-ROOT = Path(__file__).resolve().parents[2]
 # Independent native-copy expectations; the fixture never copies the validator's subject.
 EXPECTED_LIVE_FACTS = {
     "live-five-hour-percent": "12.5% used",
@@ -70,13 +67,6 @@ class LiveUsageVisualContracts(unittest.TestCase):
             path.write_text(json.dumps(data))
             with self.subTest(name=name), self.assertRaises(ValueError):
                 live_capture_receipt(path.with_suffix(".png"))
-
-    def test_new_cases_are_registered_and_keep_all_inherited_cases(self):
-        source = (ROOT / "app/src/androidTest/java/io/github/leugenea/codexbarmobile/LiveUsageScreenTest.kt").read_text()
-        self.assertTrue(NEW_CASES <= LIVE_USAGE_CASES)
-        self.assertEqual(len(LIVE_USAGE_CASES), 8 + len(NEW_CASES))
-        self.assertTrue(NEW_CASES <= set(re.findall(r"@Test\s+fun\s+(\w+)\s*\(", source)))
-        self.assertEqual(set(re.findall(r'"(live-usage-portrait-[^"]+)"', source)), set(LIVE_CAPTURES))
 
     def test_new_native_cases_fail_closed_in_reports_and_retry(self):
         retry_fixture = RetryContracts()
