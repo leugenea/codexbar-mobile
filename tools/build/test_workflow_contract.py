@@ -37,10 +37,10 @@ SCRATCH = Path(os.environ.get("RUNNER_TEMP", os.environ.get("BUILD_CONTRACT_SCRA
 
 
 class WorkflowContracts(unittest.TestCase):
-    def android_build_steps(self, workflow):
+    def android_build_steps(self, workflow, job_name="build"):
         # Existing workflow contracts parse named step boundaries with stdlib only.
         # Android's isolated metrics venv deliberately has no YAML dependency.
-        job = re.search(r"(?ms)^  build:\n(.*?)(?=^  \w+:\n|\Z)", workflow)
+        job = re.search(r"(?ms)^  " + re.escape(job_name) + r":\n(.*?)(?=^  \w+:\n|\Z)", workflow)
         self.assertIsNotNone(job)
         steps = []
         for block in re.split(r"(?m)^      - name: ", job.group(1))[1:]:
@@ -74,7 +74,7 @@ class WorkflowContracts(unittest.TestCase):
         for flag in ("--require-hashes", "--no-deps", "--no-cache-dir", "--disable-pip-version-check", "--timeout 30", "--retries 1"):
             self.assertIn(flag, setup)
         self.assertEqual(re.findall(r"-r\s+(\S+)", setup),
-                         [".github/requirements-metrics.txt", "tools/research/requirements.txt"])
+                         [".github/requirements-metrics.txt", "tools/research/requirements.txt", ".github/requirements-captures.txt"])
         consumer = steps[discovery]["run"].replace("\\\n", " ")
         self.assertIn(f"{python} -B -m unittest discover -s tools/build -p 'test_*.py' -v", consumer)
         self.assertNotIn("-m pip", consumer)
@@ -98,6 +98,22 @@ class WorkflowContracts(unittest.TestCase):
     def test_android_offline_discovery_uses_prepared_hash_pinned_isolated_parser_python(self):
         self.assert_android_offline_parser_environment((ROOT / ".github/workflows/android.yml").read_text())
 
+    def test_native_capture_consumer_uses_its_prepared_hash_pinned_python(self):
+        steps = self.android_build_steps((ROOT / ".github/workflows/android.yml").read_text(), "instrumented")
+        prepare = next(i for i, step in enumerate(steps) if step["name"] == "Prepare native release parser environment")
+        collect = next(i for i, step in enumerate(steps) if step["name"] == "Record native task outcomes (all outcomes)")
+        self.assertLess(prepare, collect)
+        setup = steps[prepare]["run"]
+        python = '"$RUNNER_TEMP/native-release-venv/bin/python"'
+        self.assertIn('python3 -m venv "$RUNNER_TEMP/native-release-venv"', setup)
+        self.assertIn(python + " -m pip install", setup)
+        self.assertIn("--require-hashes --no-deps", setup)
+        self.assertIn("-r .github/requirements-captures.txt", setup)
+        self.assertNotIn("if", steps[prepare])
+        self.assertNotIn("continue-on-error", steps[prepare])
+        self.assertEqual(steps[collect]["if"], "always()")
+        self.assertIn(python + " tools/build/verify_history_text_captures.py", steps[collect]["run"])
+
     def test_android_offline_parser_environment_rejects_missing_late_or_bare_python_bootstrap(self):
         original = (ROOT / ".github/workflows/android.yml").read_text()
         prepare = re.search(r"(?ms)^      - name: Prepare hash-pinned offline parser environment\n.*?(?=^      - name: )", original).group()
@@ -111,6 +127,7 @@ class WorkflowContracts(unittest.TestCase):
             ('--require-hashes', ''), ('--no-deps', ''),
             ('-r .github/requirements-metrics.txt', '-r .github/requirements-policy.txt'),
             ('-r tools/research/requirements.txt', ''),
+            ('-r .github/requirements-captures.txt', ''),
             ('android-build-contract-venv/bin/python" -B', 'other-venv/bin/python" -B'),
             ('timeout --signal=TERM --kill-after=10s 3m', ''),
             ('--timeout 30', ''), ('--retries 1', ''),
@@ -147,7 +164,7 @@ class WorkflowContracts(unittest.TestCase):
         self.assertIn("run: bash tools/check.sh", workflow)
         self.assertIn("--require-hashes --no-deps", workflow)
         for requirements in (".github/requirements-policy.txt", "tools/research/requirements.txt",
-                             ".github/requirements-metrics.txt"):
+                             ".github/requirements-metrics.txt", ".github/requirements-captures.txt"):
             self.assertIn("-r " + requirements, workflow)
         self.assertIn('python -m venv "$RUNNER_TEMP/policy-venv"', workflow)
         for tool, version, archive, checksum in (

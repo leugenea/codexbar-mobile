@@ -40,7 +40,7 @@ jobs:
             python3 -m venv "$RUNNER_TEMP/android-build-contract-venv" &&
             timeout --signal=TERM --kill-after=10s 3m "$RUNNER_TEMP/android-build-contract-venv/bin/python" -m pip install \
               --require-hashes --no-deps --no-cache-dir --disable-pip-version-check --timeout 30 --retries 1 \
-              -r .github/requirements-metrics.txt -r tools/research/requirements.txt
+              -r .github/requirements-metrics.txt -r tools/research/requirements.txt -r .github/requirements-captures.txt
           } 2>&1 | tee evidence/offline-parser-setup.log
           setup_status=("${PIPESTATUS[@]}")
           set -e
@@ -253,7 +253,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/native-release-venv"
           timeout --signal=TERM --kill-after=10s 3m "$RUNNER_TEMP/native-release-venv/bin/python" -m pip install \
             --require-hashes --no-deps --no-cache-dir --disable-pip-version-check --timeout 30 --retries 1 \
-            -r tools/research/requirements.txt
+            -r tools/research/requirements.txt -r .github/requirements-captures.txt
       - name: Prepare disposable signed RC and mock download
         timeout-minutes: 15
         run: '"$RUNNER_TEMP/native-release-venv/bin/python" tools/build/hosted_signed_release_fixture.py'
@@ -303,7 +303,7 @@ jobs:
         if: always()
         run: |
           python3 tools/build/coverage_gate.py phases
-          python3 tools/build/verify_history_text_captures.py
+          "$RUNNER_TEMP/native-release-venv/bin/python" tools/build/verify_history_text_captures.py
       - name: Upload instrumented logs and outputs (all outcomes)
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

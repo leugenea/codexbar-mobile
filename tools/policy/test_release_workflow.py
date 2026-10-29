@@ -81,7 +81,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
         check = next(i for i, step in enumerate(steps) if step.get('run') == 'bash tools/check.sh')
         self.assertLess(prepare, check)
         for requirement in ('.github/requirements-policy.txt', 'tools/research/requirements.txt',
-                            '.github/requirements-metrics.txt'):
+                            '.github/requirements-metrics.txt', '.github/requirements-captures.txt'):
             self.assertIn('-r ' + requirement, steps[prepare]['run'])
         self.assertIn('--require-hashes --no-deps', steps[prepare]['run'])
         self.assertIn('"$RUNNER_TEMP/policy-venv/bin/python" -m pip', steps[prepare]['run'])

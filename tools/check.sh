@@ -5,7 +5,7 @@
 #   uv venv -p /usr/bin/python3.13 /path/to/venv
 #   uv pip install --python /path/to/venv/bin/python --require-hashes --no-deps \
 #     -r .github/requirements-policy.txt -r tools/research/requirements.txt \
-#     -r .github/requirements-metrics.txt
+#     -r .github/requirements-metrics.txt -r .github/requirements-captures.txt
 #   CHECK_PYTHON=/path/to/venv/bin/python bash tools/check.sh
 # ACTIONLINT/SHELLCHECK may select exact binaries; neither check can be skipped.
 # DEPENDABOT_SCHEMA may supply an offline copy; its pinned checksum is verified.
@@ -17,8 +17,8 @@ shellcheck=${SHELLCHECK:-shellcheck}
 for executable in "$python" "$actionlint" "$shellcheck"; do
   command -v "$executable" >/dev/null || { printf 'Required executable missing: %s\n' "$executable" >&2; exit 1; }
 done
-"$python" -c 'import yaml, jsonschema, tree_sitter, tree_sitter_kotlin' || {
-  printf '%s\n' 'Install all three hash-pinned requirements files into CHECK_PYTHON venv (see tools/check.sh).' >&2
+"$python" -c 'import yaml, jsonschema, tree_sitter, tree_sitter_kotlin; from PIL import Image' || {
+  printf '%s\n' 'Install all four hash-pinned requirements files into CHECK_PYTHON venv (see tools/check.sh).' >&2
   exit 1
 }
 "$actionlint" --version

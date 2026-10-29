@@ -42,7 +42,7 @@ ShellCheck 0.11.0 on PATH (or select binaries with `ACTIONLINT`/`SHELLCHECK`):
 uv venv -p /usr/bin/python3.13 ../codexbar-check-venv
 uv pip install --python ../codexbar-check-venv/bin/python --require-hashes --no-deps \
   -r .github/requirements-policy.txt -r tools/research/requirements.txt \
-  -r .github/requirements-metrics.txt
+  -r .github/requirements-metrics.txt -r .github/requirements-captures.txt
 CHECK_PYTHON=../codexbar-check-venv/bin/python bash tools/check.sh
 git diff --check
 ```
@@ -52,6 +52,8 @@ public contribution-safety checks, pinned Dependabot schema validation, shell pa
 ShellCheck and actionlint. It does not build Android or install an SDK/emulator.
 It fetches the pinned schema unless `DEPENDABOT_SCHEMA` supplies a checksum-valid
 offline copy. Hash locks cover the supported wheel platform, not every platform.
+Pillow is a tooling-only dependency for bounded saved-PNG decoding/sample checks;
+the capture lock also supports the Android runner's Python 3.12 and local 3.14.
 
 Documentation links, command/catalogue lists, prose and the check-context table are
 reviewed as documentation, not enforced by a parallel Python inventory. Public
