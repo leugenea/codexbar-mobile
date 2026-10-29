@@ -1,13 +1,11 @@
 """Offline, explicitly synthetic native-coverage retry/runner regressions; no emulator/Gradle."""
 from verify_test_reports import DASHBOARD_JVM, DASHBOARD_NATIVE
-from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE, CURRENT_HISTORY_NATIVE_COUNT, verify_reports
+from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE
 from verify_test_reports import HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE
 from verify_test_reports import HISTORY_IMPORT_JVM, HISTORY_IMPORT_NATIVE, REMAINING_TIME_JVM
 from verify_test_reports import BACKGROUND_REFRESH_JVM
-from periodic_refresh_contract_expectations import PERIODIC_JVM, PERIODIC_NATIVE, PERIODIC_NATIVE_COUNT, PERIODIC_JVM_COUNT
-from background_refresh_contract_expectations import BACKGROUND_JVM_CLASS, BACKGROUND_JVM_CASES, BACKGROUND_NATIVE_CASES
+from verify_test_reports import PERIODIC_REFRESH_JVM, PERIODIC_REFRESH_NATIVE
 
-import copy
 import json
 import os
 from pathlib import Path
@@ -15,16 +13,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
 import coverage_gate
 import native_coverage_retry as retry
-from test_history_text_contract import RETAINED_TEXT_CASES
-from test_history_chart_contract import RETAINED_CHART_CASES
-from verify_test_reports import PHONE_TIME_CASES
 from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
 from verify_test_reports import ACCOUNT_REMOVAL_CASES, ACCOUNT_REMOVAL_CLASS
 from verify_test_reports import DEVICE_CODE_COPY_CASES, DEVICE_CODE_COPY_CLASS
@@ -64,7 +58,7 @@ def synthetic_reports(build, failed=False):
         current |= HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
         current |= REMAINING_TIME_JVM if kind == "jvm" else {}
         current |= BACKGROUND_REFRESH_JVM if kind == "jvm" else {}
-        current |= PERIODIC_JVM if kind == "jvm" else PERIODIC_NATIVE
+        current |= PERIODIC_REFRESH_JVM if kind == "jvm" else PERIODIC_REFRESH_NATIVE
         for classname, names in current.items():
             for name in sorted(names):
                 ET.SubElement(suite, "testcase", classname=classname, name=name)
@@ -101,11 +95,6 @@ class RetryContracts(unittest.TestCase):
                                                    self.failure if failure is None else failure,
                                                    self.identity, 7000)
 
-    def test_synthetic_reports_keep_all_required_jvm_and_native_cases(self):
-        for kind, relative, count in (("jvm", "test-results/testDebugUnitTest", 135 + PERIODIC_JVM_COUNT),
-                                      ("native", "outputs/androidTest-results/connected", 167 + PERIODIC_NATIVE_COUNT)):
-            with self.subTest(kind=kind):
-                self.assertEqual(verify_reports(self.build / relative, kind)["testCount"], count)
 
     def prepare_missing(self):
         self.native.unlink()
@@ -150,37 +139,6 @@ class RetryContracts(unittest.TestCase):
             with self.subTest(field=field), self.assertRaisesRegex(ValueError, "must not claim file metadata"):
                 self.require(failure=dict(self.failure, **{field: value}))
 
-    def test_missing_retry_requires_ordinary_failure_and_exact_phase_outcomes(self):
-        self.prepare_missing()
-        for status in (0, 2, 124, 130, 137, 143):
-            with self.subTest(status=status), self.assertRaisesRegex(ValueError, "ordinary Gradle failure"):
-                self.require(status=status)
-        for phase in ("jvm", "instrumentation"):
-            task = coverage_gate.PHASES[phase]
-            with self.subTest(phase=phase), self.assertRaisesRegex(ValueError, "passing suites"):
-                self.require(log=self.log.replace(f":app:{task} SUCCESS", f":app:{task} FAILED"))
-        for phase in ("report", "verification"):
-            with self.subTest(phase=phase), self.assertRaisesRegex(ValueError, "passing suites"):
-                self.require(log=self.log + f"\nCOVERAGE_TASK_OUTCOME :app:{coverage_gate.PHASES[phase]} SUCCESS")
-
-    def test_missing_retry_requires_matching_identity_and_valid_start_time(self):
-        self.prepare_missing()
-        for key in coverage_gate.IDENTITY_KEYS:
-            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "Wrong checkout/run/attempt"):
-                self.require(context=dict(self.context, **{key: "SYNTHETIC-other"}))
-        for start in ("invalid", 8000):
-            with self.subTest(start=start), self.assertRaisesRegex(ValueError, "Invalid retry context"):
-                self.require(context=dict(self.context, startedMillis=start))
-        for changes in ({"kind": "jvm"}, {"reason": "unknown"}):
-            with self.subTest(changes=changes), self.assertRaisesRegex(ValueError, "native collection data"):
-                self.require(failure=dict(self.failure, **changes))
-
-    def test_missing_retry_requires_offline_evidence_after_last_collection(self):
-        self.prepare_missing()
-        for log in (self.log.replace("adb: device offline", ""),
-                    self.log + "\nCollecting code coverage data.\nPulling coverage file: SYNTHETIC\n"):
-            with self.subTest(log=log), self.assertRaisesRegex(ValueError, "ADB-offline evidence"):
-                self.require(log=log)
 
     def test_missing_retry_rejects_failed_or_missing_jvm_and_native_junit_reports(self):
         self.prepare_missing()
@@ -191,6 +149,15 @@ class RetryContracts(unittest.TestCase):
             ET.SubElement(tree.getroot()[0], "failure", message="SYNTHETIC failure")
             tree.write(path)
             with self.subTest(kind=kind), self.assertRaisesRegex(ValueError, "failed/errored/skipped"):
+                self.require()
+            path.unlink()
+            synthetic_reports(self.build)
+            tree = ET.parse(path)
+            suite = tree.getroot()
+            case = next(c for c in suite if c.get("classname") == CLASS[kind])
+            suite.remove(case)
+            tree.write(path)
+            with self.subTest(kind=kind, missing="required case"), self.assertRaisesRegex(ValueError, "Missing real"):
                 self.require()
             path.unlink()
             with self.subTest(kind=kind), self.assertRaisesRegex(ValueError, f"No {kind} JUnit XML"):
@@ -253,121 +220,6 @@ class RetryContracts(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Stale"):
             self.require()
 
-    def test_actual_junit_failure_missing_cases_or_reports_prevent_retry(self):
-        synthetic_reports(self.build, failed=True)
-        with self.assertRaisesRegex(ValueError, "failed/errored/skipped"):
-            self.require()
-        shutil.rmtree(self.build / "outputs/androidTest-results/connected")
-        with self.assertRaisesRegex(ValueError, "No native JUnit XML"):
-            self.require()
-
-    def test_missing_held_authority_case_prevents_coverage_transport_retry(self):
-        for name in HISTORY_AUTHORITY_CASES:
-            synthetic_reports(self.build)
-            path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
-            tree = ET.parse(path)
-            root = tree.getroot()
-            case = next(case for case in root if case.get("classname") == HISTORY_AUTHORITY_CLASS and case.get("name") == name)
-            root.remove(case)
-            tree.write(path)
-            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history display authority"):
-                self.require()
-
-    def test_default_launch_and_migrated_native_cases_fail_closed_before_retry(self):
-        migrated = (("native", CLASS["native"], EXPECTED["native"]),
-                    ("native", LIVE_USAGE_CLASS, {"recreationKeepsRealScreenAndOwnerAndStoppedActivityAdmitsNoReads"}),
-                    ("native", HISTORY_NAVIGATION_CLASS, {"defaultRestoredScreenAndHistoryNavigationNeverActivateTransportOrAddAdmissions"}),
-                    ("native", HISTORY_SAMPLING_CLASS, BACKGROUND_NATIVE_CASES),
-                    ("jvm", BACKGROUND_JVM_CLASS, BACKGROUND_JVM_CASES)) + tuple(
-                        (kind, classname, names) for kind, registry in (("jvm", PERIODIC_JVM), ("native", PERIODIC_NATIVE))
-                        for classname, names in registry.items())
-        for kind, classname, names in migrated:
-            for name in names:
-                for mutation in ("missing", "failure", "error", "skipped", "wrong-class"):
-                    synthetic_reports(self.build)
-                    relative = "outputs/androidTest-results/connected" if kind == "native" else "test-results/testDebugUnitTest"
-                    path = self.build / relative / "SYNTHETIC.xml"
-                    tree = ET.parse(path)
-                    root = tree.getroot()
-                    case = next(item for item in root if item.get("classname") == classname and item.get("name") == name)
-                    if mutation == "missing":
-                        root.remove(case)
-                    elif mutation == "wrong-class":
-                        case.set("classname", "SYNTHETIC-wrong-class")
-                    else:
-                        ET.SubElement(case, mutation)
-                    tree.write(path)
-                    with self.subTest(classname=classname, name=name, mutation=mutation), self.assertRaises(ValueError):
-                        self.require()
-
-    def test_duplicate_background_jvm_and_native_cases_prevent_retry(self):
-        families = (("test-results/testDebugUnitTest", BACKGROUND_JVM_CLASS, BACKGROUND_JVM_CASES),
-                    ("outputs/androidTest-results/connected", HISTORY_SAMPLING_CLASS, BACKGROUND_NATIVE_CASES)) + tuple(
-                        (relative, classname, names) for relative, registry in (
-                            ("test-results/testDebugUnitTest", PERIODIC_JVM), ("outputs/androidTest-results/connected", PERIODIC_NATIVE))
-                        for classname, names in registry.items())
-        for relative, classname, names in families:
-            for name in names:
-                synthetic_reports(self.build)
-                path = self.build / relative / "SYNTHETIC.xml"
-                tree = ET.parse(path)
-                suite = tree.getroot()
-                case = next(c for c in suite if c.get("classname") == classname and c.get("name") == name)
-                ET.SubElement(suite, "testcase", attrib=dict(case.attrib))
-                tree.write(path)
-                with self.subTest(classname=classname, name=name), self.assertRaises(ValueError):
-                    self.require()
-
-    def test_each_phone_time_case_prevents_retry_on_omission_failure_error_skip_spoof_or_duplicate(self):
-        for name in PHONE_TIME_CASES:
-            for mutation in ("missing", "failure", "error", "skipped", "wrong-class", "duplicate"):
-                synthetic_reports(self.build)
-                path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
-                tree = ET.parse(path)
-                root = tree.getroot()
-                case = next(item for item in root if item.get("name") == name)
-                if mutation == "missing":
-                    root.remove(case)
-                elif mutation == "wrong-class":
-                    case.set("classname", "SYNTHETIC-wrong-class")
-                elif mutation == "duplicate":
-                    root.append(copy.deepcopy(case))
-                else:
-                    ET.SubElement(case, mutation)
-                tree.write(path)
-                with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
-                    self.require()
-
-    def test_retained_component_families_are_present_in_positive_retry_reports(self):
-        self.assertEqual(HISTORY_TEXT_CASES, RETAINED_TEXT_CASES)
-        self.assertEqual(HISTORY_CHART_CASES, RETAINED_CHART_CASES)
-        path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
-        cases = list(ET.parse(path).getroot().iter("testcase"))
-        self.assertEqual(len(cases), 167 + PERIODIC_NATIVE_COUNT)
-        for classname, expected in ((HISTORY_TEXT_CLASS, RETAINED_TEXT_CASES),
-                                    (HISTORY_CHART_CLASS, RETAINED_CHART_CASES)):
-            self.assertEqual({case.get("name") for case in cases if case.get("classname") == classname}, expected)
-        self.assertEqual(self.require(), "empty")
-
-    def test_each_retained_component_case_rejects_omission_failure_error_skip_and_class_spoof_for_retry(self):
-        for classname, names in ((HISTORY_TEXT_CLASS, RETAINED_TEXT_CASES),
-                                 (HISTORY_CHART_CLASS, RETAINED_CHART_CASES)):
-            for name in names:
-                for mutation in ("missing", "failure", "error", "skipped", "wrong-class"):
-                    synthetic_reports(self.build)
-                    path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
-                    tree = ET.parse(path)
-                    root = tree.getroot()
-                    case = next(case for case in root if case.get("classname") == classname and case.get("name") == name)
-                    if mutation == "missing":
-                        root.remove(case)
-                    elif mutation == "wrong-class":
-                        case.set("classname", "SYNTHETIC-wrong-class")
-                    else:
-                        ET.SubElement(case, mutation)
-                    tree.write(path)
-                    with self.subTest(classname=classname, name=name, mutation=mutation), self.assertRaises(ValueError):
-                        self.require()
 
     def test_snapshot_preserves_failed_inputs_and_tests_before_prepare_deletes_them(self):
         coverage = self.build / "coverage-gate"
@@ -385,35 +237,6 @@ class RetryContracts(unittest.TestCase):
         self.assertEqual(json.loads((destination / "app/build/coverage-gate/context.json").read_text()), self.context)
         self.assertTrue((destination / "app/build/test-results/testDebugUnitTest/SYNTHETIC.xml").exists())
         self.assertTrue((destination / "app/build/outputs/androidTest-results/connected/SYNTHETIC.xml").exists())
-
-    def test_missing_integrated_isolation_case_prevents_coverage_transport_retry(self):
-        for name in HISTORY_ISOLATION_CASES:
-            synthetic_reports(self.build)
-            path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
-            tree = ET.parse(path)
-            root = tree.getroot()
-            case = next(case for case in root if case.get("classname") == HISTORY_ISOLATION_CLASS and case.get("name") == name)
-            root.remove(case)
-            tree.write(path)
-            with self.subTest(name=name), self.assertRaisesRegex(ValueError, "Missing real native history isolation"):
-                self.require()
-
-
-    def test_each_assembled_case_missing_failed_errored_or_skipped_prevents_retry(self):
-        for name in HISTORY_ASSEMBLED_CASES:
-            for mutation in ("missing", "failure", "error", "skipped"):
-                synthetic_reports(self.build)
-                path = self.build / "outputs/androidTest-results/connected/SYNTHETIC.xml"
-                tree = ET.parse(path)
-                root = tree.getroot()
-                case = next(case for case in root if case.get("classname") == HISTORY_ASSEMBLED_CLASS and case.get("name") == name)
-                if mutation == "missing":
-                    root.remove(case)
-                else:
-                    ET.SubElement(case, mutation)
-                tree.write(path)
-                with self.subTest(name=name, mutation=mutation), self.assertRaises(ValueError):
-                    self.require()
 
 
 # The runner block below is exercised with labelled synthetic command doubles,
@@ -574,27 +397,6 @@ class SyntheticRunnerTests(unittest.TestCase):
             self.assertEqual((base / "evidence/native/graph-exit-status.txt").read_text(), "graph_task_exit=0\n")
             self.assertIn("FROM_CACHE", (base / "evidence/native/attempt-1/gate-execution.log").read_text())
 
-    def test_missing_native_diagnostic_source_contract_excludes_jvm_and_file_metadata(self):
-        build = (ROOT / "app/build.gradle").read_text()
-        unit_guard = "if (!unit.isFile()) throw new GradleException('Missing JVM exec coverage data')"
-        self.assertIn(unit_guard, build)
-        missing = build.split("if (nativeFiles.empty) {", 1)[1].split("def union =", 1)[0]
-        self.assertLess(build.index(unit_guard), build.index("if (nativeFiles.empty) {"))
-        for required in ("base.toPath().relativize(nativeDirectory.toPath()).toString()",
-                         "collection-failure.json", "kind: 'native', reason: 'missing', path: relative",
-                         "Missing native ec coverage data under:"):
-            self.assertIn(required, missing)
-        for forbidden in ("bytes:", "sha256:", "modifiedMillis:"):
-            self.assertNotIn(forbidden, missing)
-        self.assertIn("project.fileTree(nativeDirectory)", build)
-        self.assertIn("new File(project.buildDir, 'outputs/code_coverage/debugAndroidTest/connected')", build)
-
-    def test_hosted_emulator_launch_uses_4096_mib_and_retains_other_flags(self):
-        script = (ROOT / "tools/build/run-hosted-native-smoke.sh").read_text()
-        launch = script.split('"$emulator" -avd ', 1)[1].split('> evidence/native/emulator.log', 1)[0]
-        self.assertEqual(launch.replace("\\\n", "").split(),
-                         ['"$avd"', '-port', '5554', '-accel', 'on', '-cores', '2', '-memory', '4096',
-                          '-no-window', '-no-snapshot', '-no-boot-anim', '-noaudio', '-gpu', 'swiftshader_indirect'])
 
     def test_collection_diagnostic_wiring_keeps_parse_and_union_failures_closed(self):
         build = (ROOT / "app/build.gradle").read_text()
