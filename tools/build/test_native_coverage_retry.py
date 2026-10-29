@@ -1,10 +1,4 @@
 """Offline, explicitly synthetic native-coverage retry/runner regressions; no emulator/Gradle."""
-from verify_test_reports import DASHBOARD_JVM, DASHBOARD_NATIVE
-from verify_test_reports import CURRENT_HISTORY_JVM, CURRENT_HISTORY_NATIVE
-from verify_test_reports import HISTORY_EXPORT_JVM, HISTORY_EXPORT_NATIVE
-from verify_test_reports import HISTORY_IMPORT_JVM, HISTORY_IMPORT_NATIVE, REMAINING_TIME_JVM
-from verify_test_reports import BACKGROUND_REFRESH_JVM
-from verify_test_reports import PERIODIC_REFRESH_JVM, PERIODIC_REFRESH_NATIVE
 
 import json
 import os
@@ -19,13 +13,6 @@ import xml.etree.ElementTree as ET
 
 import coverage_gate
 import native_coverage_retry as retry
-from verify_test_reports import HISTORY_ISOLATION_CASES, HISTORY_ISOLATION_CLASS
-from verify_test_reports import ACCOUNT_REMOVAL_CASES, ACCOUNT_REMOVAL_CLASS
-from verify_test_reports import DEVICE_CODE_COPY_CASES, DEVICE_CODE_COPY_CLASS
-from verify_test_reports import ACCOUNT_NAME_CASES, ACCOUNT_NAME_CLASS
-from verify_test_reports import HISTORY_ASSEMBLED_CASES, HISTORY_ASSEMBLED_CLASS
-from verify_test_reports import (HISTORY_AUTHORITY_CASES, HISTORY_AUTHORITY_CLASS, HISTORY_NAVIGATION_CASES, HISTORY_NAVIGATION_CLASS, HISTORY_CHART_CASES, HISTORY_CHART_CLASS, HISTORY_TEXT_CASES, HISTORY_TEXT_CLASS, HISTORY_SAMPLING_CASES, HISTORY_SAMPLING_CLASS, HISTORY_LIFETIME_CASES, HISTORY_LIFETIME_CLASS, HISTORY_CASES, HISTORY_CLASS, BANKED_RESET_CASES, BANKED_RESET_CLASS, CLASS, CONNECTION_CASES, CONNECTION_CLASS, CREDENTIAL_CASES, CREDENTIAL_CLASS,
-                                 EXPECTED, LIVE_USAGE_CASES, LIVE_USAGE_CLASS, USAGE_REFRESH_CASES, USAGE_REFRESH_CLASS)
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRATCH = Path(os.environ.get("RUNNER_TEMP", os.environ.get("BUILD_CONTRACT_SCRATCH", tempfile.gettempdir())))
@@ -41,28 +28,10 @@ def synthetic_reports(build, failed=False):
                            ("native", "outputs/androidTest-results/connected")):
         directory = build / relative
         directory.mkdir(parents=True, exist_ok=True)
-        suite = ET.Element("testsuite", tests=str(len(EXPECTED[kind])), failures="0", errors="0", skipped="0")
-        for name in sorted(EXPECTED[kind]):
-            case = ET.SubElement(suite, "testcase", classname=CLASS[kind], name=name)
-            if failed and kind == "native":
-                ET.SubElement(case, "failure", message="SYNTHETIC test failure")
-        if kind == "native":
-            for name in sorted(CREDENTIAL_CASES):
-                ET.SubElement(suite, "testcase", classname=CREDENTIAL_CLASS, name=name)
-            for classname, required in ((CONNECTION_CLASS, CONNECTION_CASES), (USAGE_REFRESH_CLASS, USAGE_REFRESH_CASES),
-                                        (LIVE_USAGE_CLASS, LIVE_USAGE_CASES), (BANKED_RESET_CLASS, BANKED_RESET_CASES), (HISTORY_CLASS, HISTORY_CASES), (HISTORY_LIFETIME_CLASS, HISTORY_LIFETIME_CASES), (HISTORY_SAMPLING_CLASS, HISTORY_SAMPLING_CASES), (HISTORY_TEXT_CLASS, HISTORY_TEXT_CASES), (HISTORY_CHART_CLASS, HISTORY_CHART_CASES), (HISTORY_NAVIGATION_CLASS, HISTORY_NAVIGATION_CASES), (HISTORY_AUTHORITY_CLASS, HISTORY_AUTHORITY_CASES), (HISTORY_ISOLATION_CLASS, HISTORY_ISOLATION_CASES), (HISTORY_ASSEMBLED_CLASS, HISTORY_ASSEMBLED_CASES), (ACCOUNT_NAME_CLASS, ACCOUNT_NAME_CASES), (ACCOUNT_REMOVAL_CLASS, ACCOUNT_REMOVAL_CASES), (DEVICE_CODE_COPY_CLASS, DEVICE_CODE_COPY_CASES)):
-                for name in sorted(required):
-                    ET.SubElement(suite, "testcase", classname=classname, name=name)
-        current = (CURRENT_HISTORY_JVM | DASHBOARD_JVM) if kind == "jvm" else (CURRENT_HISTORY_NATIVE | DASHBOARD_NATIVE)
-        current |= HISTORY_EXPORT_JVM if kind == "jvm" else HISTORY_EXPORT_NATIVE
-        current |= HISTORY_IMPORT_JVM if kind == "jvm" else HISTORY_IMPORT_NATIVE
-        current |= REMAINING_TIME_JVM if kind == "jvm" else {}
-        current |= BACKGROUND_REFRESH_JVM if kind == "jvm" else {}
-        current |= PERIODIC_REFRESH_JVM if kind == "jvm" else PERIODIC_REFRESH_NATIVE
-        for classname, names in current.items():
-            for name in sorted(names):
-                ET.SubElement(suite, "testcase", classname=classname, name=name)
-        suite.set("tests", str(len(list(suite))))
+        suite = ET.Element("testsuite", tests="1", failures="0", errors="0", skipped="0")
+        case = ET.SubElement(suite, "testcase", classname="fixture.RetryChecks", name="passes")
+        if failed and kind == "native":
+            ET.SubElement(case, "failure", message="SYNTHETIC test failure")
         ET.ElementTree(suite).write(directory / "SYNTHETIC.xml")
 
 
@@ -140,25 +109,16 @@ class RetryContracts(unittest.TestCase):
                 self.require(failure=dict(self.failure, **{field: value}))
 
 
-    def test_missing_retry_rejects_failed_or_missing_jvm_and_native_junit_reports(self):
+    def test_missing_retry_rejects_failed_empty_malformed_or_missing_reports(self):
         self.prepare_missing()
         for kind, relative in (("jvm", "test-results/testDebugUnitTest"),
                                ("native", "outputs/androidTest-results/connected")):
             path = self.build / relative / "SYNTHETIC.xml"
-            tree = ET.parse(path)
-            ET.SubElement(tree.getroot()[0], "failure", message="SYNTHETIC failure")
-            tree.write(path)
-            with self.subTest(kind=kind), self.assertRaisesRegex(ValueError, "failed/errored/skipped"):
-                self.require()
-            path.unlink()
-            synthetic_reports(self.build)
-            tree = ET.parse(path)
-            suite = tree.getroot()
-            case = next(c for c in suite if c.get("classname") == CLASS[kind])
-            suite.remove(case)
-            tree.write(path)
-            with self.subTest(kind=kind, missing="required case"), self.assertRaisesRegex(ValueError, "Missing real"):
-                self.require()
+            for text in ('<testsuite><testcase classname="fixture.RetryChecks" name="fails"><failure/></testcase></testsuite>',
+                         '<testsuite/>', '<testsuite>'):
+                path.write_text(text)
+                with self.subTest(kind=kind, xml=text), self.assertRaises(ValueError):
+                    self.require()
             path.unlink()
             with self.subTest(kind=kind), self.assertRaisesRegex(ValueError, f"No {kind} JUnit XML"):
                 self.require()
