@@ -411,8 +411,8 @@ inference, sample timer, controller, baseline math or graph UI.
 explicitly synthetic journal failure contracts. `HistoryPersistenceTest` covers actual
 SQLite files/transactions, fresh-adapter reopen, capability isolation, retirement, held
 commits/deletion, retention/count/physical budgets, interrupted maintenance, synthetic
-SQLite-full errors, corruption/version handling and explicit recovery. Its mandatory
-cases are checked by the unchanged fail-closed native report gate. Native execution and
+SQLite-full errors, corruption/version handling and explicit recovery. Gradle discovers
+these tests; the generic JUnit gate rejects empty or failed reports. Native execution and
 whole-app >=90% compatible JVM/native INSTRUCTION coverage remain hosted acceptance,
 not a source-compilation claim; neither is exempted or excluded.
 
@@ -461,8 +461,8 @@ coroutine topology with held storage. `HistoryLifetimeTest` uses actual Keystore
 Activity recreation/finish, last-observer retirement, clean fresh-holder restore, rotation,
 relogin, key loss/corruption/uncertain rotation, actual failed credential-file removal,
 held/failed combined deletion and explicit binding crash cuts. Fresh-holder/close/reopen fixtures are not literal process-death proof.
-The native report validator requires every new case, with omission/class-spoof/failure/
-skip contracts; all existing A10 and history-store mandatory cases stay required. All new
+The native report validator requires nonempty passing reports, not a named testcase
+registry. Application behavior remains in the A10 and history-store suites. All new
 handwritten code remains in the unchanged >=90% compatible JVM/native INSTRUCTION union;
 compilation alone does not establish runtime or coverage acceptance.
 
@@ -736,8 +736,8 @@ uses the production-default owner factory, real Keystore and framework SQLite in
 application/no-backup context. It covers observation -> persistence -> fresh-runtime dormant
 restore -> isolated read, relogin/late callbacks, partial endpoints, held pre/post-admission
 writes, categorical native read failure, and Compose-v2 lifecycle/recreation/finish retirement.
-Fresh-runtime restoration is not literal process death. The mandatory native validator adds
-these cases without removing the preceding 72. Native execution, exact-head independent
+Fresh-runtime restoration is not literal process death. Gradle discovers the native
+suites without a separate Python testcase census. Native execution, exact-head independent
 review and >=90% compatible JVM/native INSTRUCTION coverage remain hosted gates; source or
 cached-toolchain compilation alone cannot establish those outcomes. #8 owns graph/UI/
 accessibility; #9 owns assembled release/live acceptance, with #69 separate.
@@ -792,9 +792,9 @@ restoration, Retry-After, no hidden ticks/polls, replacement, terminal auth and 
 rotation settlement. Twelve added mandatory `UsageHistoryIntegrationTest` methods use
 actual isolated Keystore/SQLite and the production-default owner lane, real pre/post-write
 admission gates, Activity STOP, cold-holder restoration and late replies. The fail-closed
-report/retry contracts retain all inherited identities and require these additions,
-including duplicate rejection; captures, permissions, dependencies and the >=90% whole-
-handwritten compatible INSTRUCTION coverage policy are unchanged. These are authored test
+report/retry checks require nonempty passing suites, without named-identity or per-family
+count checks; captures, permissions, dependencies and the >=90% whole-handwritten
+compatible INSTRUCTION coverage policy are unchanged. These are authored test
 contracts, not a claim of local JVM/native execution. Exact-head hosted compilation,
 lint, JVM/native/coverage and independent review remain acceptance gates. Fresh-holder
 restoration is not process-death/reboot proof; OS scheduling, force-stop limits and physical
@@ -836,8 +836,8 @@ the latter disables only that ID's Greedy delayed tracker, ages its test enqueue
 timestamp and forces its registered ordinary JobScheduler job, then checks the held
 owner ingress, RUNNING state, actual SQLite settlement and fresh-holder local reread.
 It does not call `doWork()` to claim OS dispatch, shorten the delivered interval or
-prove natural 15-minute timing. All registry/count/retry fail-closed controls retain
-the inherited cases. Local source/tooling checks are not hosted native/lint/coverage
+prove natural 15-minute timing. Generic report/retry checks reject missing, empty,
+malformed or failed reports. Local source/tooling checks are not hosted native/lint/coverage
 acceptance. Parent 193 still requires physical-phone timing/battery observation.
 
 The exact dependency, manifest/Startup/security surface, backup boundaries and honest
@@ -1098,8 +1098,8 @@ fresh inventory through the real history entry. These diagnostics do not become 
 or current measurements. Current/retired null-context loss remains covered by the
 unchanged held-collection host-reexecution cases from M4b-3a.
 
-The fail-closed JUnit registry and coverage-transport retry fixtures retain all 101
-inherited identities and require six additional identities. The twelve existing
+The generic JUnit gate and coverage-transport retry require nonempty passing reports;
+Gradle owns testcase discovery without a separate identity registry. The twelve existing
 captures (ten reusable component, two injected production-entry) remain unchanged;
 no new visual acceptance class or mandatory screenshot is introduced. Compilation
 and static parser controls are not native runtime proof. Independent exact-head

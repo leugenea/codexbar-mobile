@@ -69,12 +69,14 @@ check final artifacts where appropriate. Do not add Python checks for Kotlin cal
 spelling, function placement, Compose expressions or test-driver implementation.
 Parsed resource copy, security policy and fail-closed artifact/report checks remain
 useful tooling contracts; none substitutes for hosted runtime or visual evidence.
-Synthetic report fixtures reuse the mandatory method registries. Compact representative
-omission/class/duplicate and failure/error/skip/container controls check the report
-parser, not Kotlin source membership or producer authenticity. Do not repeat those
-controls for every registered method or assert fixture-family counts as runtime proof.
-Keep separate expectation lists only when they supply a distinct oracle, not another
-copy of the same registry.
+The JUnit gate requires reports with executed testcases and rejects malformed XML,
+failures, errors and skips, including suite/container failures. Its small synthetic
+fixtures use independent generic cases, not application class/method registries.
+Gradle owns application test discovery; the report gate intentionally does not detect
+omitted or renamed individual tests, enforce per-feature counts or attest producer
+authenticity. Fresh task-execution receipts and compatible union coverage remain
+separate required gates. Saved-PNG/gallery validator regressions remain in the common
+tooling suite; they are not native execution or visual approval.
 
 CI-first is the default. Under the current owner host policy, local work is limited
 to quick static/pure tooling checks and compilation/assembly when separately useful;
