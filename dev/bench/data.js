@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793300532523,
+  "lastUpdate": 1793300535934,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -6145,6 +6145,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/7f06bfa09e309727da9ab02db155e6e831cdfc13"
         },
         "date": 1793295271103,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1b54e542e9871beee2b8f914519111760cc5a7b2",
+          "message": "refactor: retire duplicate CI contracts and test registries (#216)",
+          "timestamp": "2026-10-29T22:01:45+03:00",
+          "tree_id": "3b8c23092b285f6400c3035121862bdabf226e12",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/1b54e542e9871beee2b8f914519111760cc5a7b2"
+        },
+        "date": 1793300535673,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
