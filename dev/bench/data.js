@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793281141582,
+  "lastUpdate": 1793286426276,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2981,6 +2981,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/c95789b83d4cdbaa352919f10145b10878dc86e1"
         },
         "date": 1793281138674,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3931e23ea785b17d61fae0501facae1a260de574",
+          "message": "test: simplify CI report and retry checks (#212)",
+          "timestamp": "2026-10-29T18:06:39+03:00",
+          "tree_id": "c33d0ae62f2708a3a26fd48471819cbc1713a22d",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/3931e23ea785b17d61fae0501facae1a260de574"
+        },
+        "date": 1793286425325,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
