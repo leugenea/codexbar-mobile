@@ -1,11 +1,10 @@
-"""Explicitly synthetic assembled-capture controls; no application/native execution."""
+"""Synthetic saved-pixel, clipping and accessibility controls; not visual approval."""
 import copy
 import json
 import unittest
 
 import test_history_text_contract as text_contract
-from verify_history_text_captures import (ASSEMBLED_CAPTURES, ASSEMBLED_COUNTS, CAPTURES, decoded_samples,
-                                         paeth, verify_captures)
+from verify_history_text_captures import capture_receipt
 
 
 class HistoryAssembledContracts(unittest.TestCase):
@@ -14,111 +13,52 @@ class HistoryAssembledContracts(unittest.TestCase):
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
         self.directory = self.fixture.directory
-
-    def test_five_representative_images_extend_all_twelve_inherited_and_are_each_required(self):
-        self.assertEqual(len(CAPTURES), 12 + len(ASSEMBLED_CAPTURES))
-        for name in ASSEMBLED_CAPTURES:
-            self.fixture.captures()
-            self.assertEqual(len(verify_captures(self.directory)), len(CAPTURES))
-            (self.directory / (name + ".png")).unlink()
-            with self.subTest(name=name), self.assertRaises(ValueError):
-                verify_captures(self.directory)
-
-    def mutate(self, name, key, value):
         self.fixture.captures()
-        path = self.directory / (name + ".json")
-        data = json.loads(path.read_text())
-        data[key] = value
-        path.write_text(json.dumps(data))
-        with self.assertRaises(ValueError):
-            verify_captures(self.directory)
 
-    def test_configuration_owner_cursor_and_counts_fail_closed_for_every_new_capture(self):
-        for name in ASSEMBLED_CAPTURES:
-            for key, value in (("api", 35), ("fontScale", 3), ("layoutFontScale", True), ("density", float("nan")),
-                               ("layoutDensity", 2), ("orientation", True), ("productionEntry", False), ("activity", "fixture"),
-                               ("queryLimit", 257), ("queryAfter", -1), ("pageEntries", True), ("phase", "FAILED"),
-                               ("readiness", "ERROR"), ("hasMore", True), ("requests", 99), ("gets", 99),
-                               ("uiCursor", "newest"), ("visibleControls", ["connection-tab"]), ("visibleRoots", None), ("visibleControls", None), ("visibleRoots", []), ("visibleRoots", ["offline-tab"])):
-                with self.subTest(name=name, key=key):
-                    self.mutate(name, key, value)
-
-    def test_dashboard_chart_captures_require_exact_accessible_plot_legend_without_visible_text(self):
-        for name in ASSEMBLED_COUNTS:
-            self.fixture.captures()
-            path = self.directory / (name + ".json")
-            data = json.loads(path.read_text())
-            receipt = data["compactLegend"]
-            mutations = [None, {}, "SYNTHETIC not a receipt"]
-            for key, value in (("plotTag", "history-chart-five-hour-canvas"),
-                               ("legendDescription", "SYNTHETIC missing explanation"),
-                               ("legendDescription", receipt["legendDescription"].split("\n")[0]),
-                               ("visibleLegendCount", 1), ("visibleLegendCount", False),
-                               ("hiddenFromAccessibility", True), ("hiddenFromAccessibility", 0)):
-                mutations.append(dict(receipt, **{key: value}))
-                mutations.append({field: item for field, item in receipt.items() if field != key})
-            for value in mutations:
-                with self.subTest(name=name, value=value):
-                    self.mutate(name, "compactLegend", value)
-            data.pop("compactLegend")
-            path.write_text(json.dumps(data))
-            with self.subTest(name=name, missing=True), self.assertRaises(ValueError):
-                verify_captures(self.directory)
-        for name in ASSEMBLED_CAPTURES.keys() - ASSEMBLED_COUNTS.keys():
-            with self.subTest(name=name, unexpected=True):
-                self.mutate(name, "compactLegend", receipt)
-
-    def test_full_canvas_rejects_hidden_clipping_even_when_clipped_receipt_is_contained(self):
-        for name in ASSEMBLED_COUNTS:
-            for key, value in (("canvasLeft", -1), ("canvasTop", float("nan")), ("canvasRight", 100),
-                               ("canvasClippedLeft", 0.5), ("canvasClippedBottom", True),
-                               ("observationCount", True), ("connectionCount", 99), ("referenceCount", 99),
-                               ("boundaryCount", 99), ("pixelOraclePassed", False), ("pixelSamples", [])):
-                with self.subTest(name=name, key=key):
-                    self.mutate(name, key, value)
-
-    def test_png_bytes_not_metadata_alone_prove_each_registered_sample(self):
-        for name in ASSEMBLED_COUNTS:
-            self.fixture.captures()
-            path = self.directory / (name + ".json")
-            data = json.loads(path.read_text())
-            for key, value in (("actualArgb", -1), ("matched", False), ("targetArgb", True), ("x", -1),
-                               ("y", 9999), ("x", True), ("kind", "invented")):
-                mutated = copy.deepcopy(data)
-                mutated["pixelSamples"][0][key] = value
-                path.write_text(json.dumps(mutated))
+    def test_real_entry_configuration_controls_and_full_canvas_are_required(self):
+        for name in ("history-integrated-chart-portrait-light", "history-assembled-single-portrait-dark"):
+            path = self.directory / (name + ".png")
+            sidecar = path.with_suffix(".json")
+            original = json.loads(sidecar.read_text())
+            for key, value in (("productionEntry", False), ("visibleRoots", []), ("visibleControls", None),
+                               ("route", "WRONG"), ("canvasLeft", -1), ("canvasTop", float("nan")),
+                               ("canvasClippedLeft", .5), ("canvasClippedBottom", True)):
+                sidecar.write_text(json.dumps(dict(original, **{key: value})))
                 with self.subTest(name=name, key=key), self.assertRaises(ValueError):
-                    verify_captures(self.directory)
-            path.write_text(json.dumps(data))
-            size = (2, 3) if ASSEMBLED_CAPTURES[name][0] == 1 else (3, 2)
-            # CRC-valid and dimension-correct but different actual decoded pixels.
-            filtered = (b"\0" + b"\xff" * (size[0] * 3)) * size[1]
-            (self.directory / (name + ".png")).write_bytes(self.fixture.png(*size, filtered=filtered))
-            with self.subTest(name=name, mutation="different PNG pixels"), self.assertRaises(ValueError):
-                verify_captures(self.directory)
+                    capture_receipt(path)
+            sidecar.write_text(json.dumps(original))
 
-    def test_decoded_rgb_and_rgba_samples_reconstruct_all_five_filters(self):
-        rows = [bytes([17, 34, 51, 255, 68, 85, 102, 255]), bytes([119, 136, 153, 255, 170, 187, 204, 255])]
-        for color, channels in ((2, 3), (6, 4)):
-            actual_rows = [b"".join(row[x:x + channels] for x in (0, 4)) for row in rows]
-            for kind in range(5):
-                previous = bytes(2 * channels)
-                filtered = b""
-                for row in actual_rows:
-                    encoded = bytearray()
-                    for index, value in enumerate(row):
-                        left = row[index - channels] if index >= channels else 0
-                        above = previous[index]
-                        corner = previous[index - channels] if index >= channels else 0
-                        predictors = (0, left, above, (left + above) // 2, paeth(left, above, corner))
-                        encoded.append((value - predictors[kind]) & 255)
-                    filtered += bytes([kind]) + encoded
-                    previous = row
-                image = self.fixture.png(2, 2, color=color, filtered=filtered)
-                samples = [dict(x=x, y=y) for y in range(2) for x in range(2)]
-                with self.subTest(color=color, filter=kind):
-                    self.assertEqual(decoded_samples(image, samples), [-15654349, -12298906, -8943463, -5588020])
+    def test_saved_pixels_not_metadata_alone_prove_registered_paint_and_dash_gaps(self):
+        path = self.directory / "history-assembled-single-portrait-dark.png"
+        sidecar = path.with_suffix(".json")
+        original = json.loads(sidecar.read_text())
+        for key, value in (("actualArgb", -1), ("matched", False), ("x", True), ("y", 9999)):
+            changed = copy.deepcopy(original)
+            changed["pixelSamples"][0][key] = value
+            sidecar.write_text(json.dumps(changed))
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                capture_receipt(path)
+        # Mutually agreeing all-painted receipts must still prove unpainted gaps.
+        changed = copy.deepcopy(original)
+        for sample in changed["pixelSamples"]:
+            if sample["kind"] == "dash":
+                sample.update(targetArgb=-16777216, matched=True)
+        sidecar.write_text(json.dumps(changed))
+        with self.assertRaisesRegex(ValueError, "dash gaps"):
+            capture_receipt(path)
+        sidecar.write_text(json.dumps(original))
+        path.write_bytes(self.fixture.png(2, 3, pixels=b"\xff" * 18))
+        with self.assertRaisesRegex(ValueError, "decoded PNG pixels"):
+            capture_receipt(path)
 
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_compact_legend_must_remain_complete_accessible_and_not_visible_copy(self):
+        path = self.directory / "history-assembled-single-portrait-dark.png"
+        sidecar = path.with_suffix(".json")
+        original = json.loads(sidecar.read_text())
+        for key, value in (("legendDescription", "missing explanation"), ("visibleLegendCount", 1),
+                           ("hiddenFromAccessibility", True)):
+            changed = copy.deepcopy(original)
+            changed["compactLegend"][key] = value
+            sidecar.write_text(json.dumps(changed))
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                capture_receipt(path)

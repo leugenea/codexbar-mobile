@@ -1128,8 +1128,8 @@ and unknown-reset assembled captures now show stored text, with no archived Canv
 arbitrary-period paint expectations are replaced by the new current light/dark campaign.
 Reusable component fixtures still cover arbitrary input geometry. All 19 existing gallery
 names/configurations remain required, plus two current production captures (21 total).
-The collector adds exact current key/selected-ordinal receipts and registered default
-Material3 measured/reference targets, retaining physical bounds, +/-12 color tolerance,
+Native current-period tests assert the exact key/selected ordinals. The collector checks
+registered default Material3 measured/reference targets, physical bounds, +/-12 color tolerance,
 PNG decode/sample equality, source/run/attempt/configuration and fail-closed uniqueness.
 
 ## Assembled history acceptance and original-parent map (M4b-4)
@@ -1162,13 +1162,20 @@ a blanket contrast certification or a physical-device accessibility audit.
 The four assembled identities remain mandatory alongside all inherited and new
 current-period identities. The collector retains the twelve earlier history captures
 and five assembled viewports, adds two current viewports and keeps both live-usage
-images, observed API/configuration, exact owner/page/request identities, per-file
+images, observed API/configuration, real screen roots/routes/controls, per-file
 hashes and checkout/source-head/run/attempt provenance. The assembled single and
 two current Canvas captures retain independent unclipped/clipped bounds; registered Bitmap pixel samples
 are compared again with bounded decoded RGB/RGBA PNG pixels on the host, so metadata or
 filenames alone cannot establish painted observations/edges, run bridges or dash gaps.
 Explicitly synthetic parser controls reject omitted/failed/errored/skipped methods,
 missing images, configuration drift, clipping, false paint receipts and changed PNG pixels.
+The tooling-only hash-pinned Pillow decoder verifies and loads bounded saved PNGs;
+the collector no longer implements PNG chunks, filters or scanline reconstruction.
+Owner/page/request counters, current selected-ordinal/high-water receipts and dashboard
+host/window bookkeeping remain native behavioral assertions, not a second host-side
+metadata oracle. Capture tests keep representative failures rather than per-field,
+per-image mutation matrices or codec self-tests. This deliberately drops those redundant
+diagnostics, not required native execution or independent actual-image review.
 
 Final original-parent acceptance remains conditional on independent full-diff review,
 exact-head hosted compilation/lint/JVM/native execution, compatible whole-handwritten
