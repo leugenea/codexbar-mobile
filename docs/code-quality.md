@@ -88,7 +88,7 @@ not part of the function signature. Identical scopes/signatures receive
 source-order `#2`, `#3`, ... suffixes. Moving lines or reordering distinct
 named siblings preserves IDs; identical scopes and positional arguments
 remain order-dependent. `owner` displays only named class/object nesting.
-The script docstring and fixture tests specify the full ID grammar.
+The script docstring specifies the full ID grammar.
 
 Invalid UTF-8, unreadable files, or syntax `ERROR`/`MISSING` terminate analysis
 with file/line diagnostics. The sole grammar exception is the invisible
