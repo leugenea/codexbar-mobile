@@ -69,10 +69,12 @@ check final artifacts where appropriate. Do not add Python checks for Kotlin cal
 spelling, function placement, Compose expressions or test-driver implementation.
 Parsed resource copy, security policy and fail-closed artifact/report checks remain
 useful tooling contracts; none substitutes for hosted runtime or visual evidence.
-Synthetic report fixtures reuse the mandatory method registries; independent family
-counts and omission/class/failure/error/skip/duplicate controls check the report parser,
-not Kotlin source membership or producer authenticity. Keep separate expectation lists
-only when they supply a distinct oracle, not another copy of the same registry.
+Synthetic report fixtures reuse the mandatory method registries. Compact representative
+omission/class/duplicate and failure/error/skip/container controls check the report
+parser, not Kotlin source membership or producer authenticity. Do not repeat those
+controls for every registered method or assert fixture-family counts as runtime proof.
+Keep separate expectation lists only when they supply a distinct oracle, not another
+copy of the same registry.
 
 CI-first is the default. Under the current owner host policy, local work is limited
 to quick static/pure tooling checks and compilation/assembly when separately useful;
