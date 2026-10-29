@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793254448137,
+  "lastUpdate": 1793254450799,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -5805,6 +5805,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/69344ccf595e9f20989ff34146b42784b3d36c19"
         },
         "date": 1793223154417,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "850b91bc817fcc3f1abbaace47755b9686d0d127",
+          "message": "ci: retire standalone research gate and low-value documentation checks (#209)",
+          "timestamp": "2026-10-29T09:13:40+03:00",
+          "tree_id": "745aa27faf40911dadfff37ebdf48bb20bb07a38",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/850b91bc817fcc3f1abbaace47755b9686d0d127"
+        },
+        "date": 1793254450544,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
