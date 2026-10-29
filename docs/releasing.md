@@ -45,8 +45,9 @@ and deleted/distributed history require owner reconciliation.
 
 1. Create an immutable tag at the intended green `main` commit:
    `v<VERSION>-rc.<positive N>` for RC or `v<VERSION>` for stable. The source must be
-   in main history with successful exact-source main-push Android, repository-policy,
-   research-contract and CodeQL runs. Its workflow subtree must match current main.
+   in main history with successful exact-source main-push Android, repository-policy
+   and CodeQL runs. Research fixture/schema validation runs within repository-policy,
+   not as a separate admission prerequisite. Its workflow subtree must match current main.
 2. Dispatch Guarded release on **main** with `operation=prepare`, `channel=rc|stable`
    and `tag`; leave `prepare_run_id` empty. No dummy dispatch or JSON update is needed.
 3. Check the admission job's **Owner confirmation** summary/log: channel, tag, peeled

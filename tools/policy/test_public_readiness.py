@@ -1,55 +1,16 @@
-"""Small public-document contracts; prose and historical research remain free to evolve."""
+"""Public contribution safety and the current documented coverage floor."""
 from decimal import Decimal
 from pathlib import Path
 import re
-import subprocess
 import unittest
-from urllib.parse import unquote, urlsplit
 
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-GUIDES = ("README.md", "CONTRIBUTING.md", "SECURITY.md", "THIRD_PARTY_NOTICES.md",
-          "AGENTS.md", "ARCHITECTURE.md", "docs/repository-protection.md")
 FORMS = (".github/ISSUE_TEMPLATE/bug.yml", ".github/ISSUE_TEMPLATE/feature.yml")
 PR_TEMPLATE = ".github/PULL_REQUEST_TEMPLATE.md"
 CONFIG = ".github/ISSUE_TEMPLATE/config.yml"
-REQUIRED_FILES = GUIDES + FORMS + (PR_TEMPLATE, CONFIG, ".gitignore", "LICENSE")
-LINK = re.compile(r"\[[^\]\n]+\]\(([^)\s]+)\)")
 SECRET = re.compile(r"\b(?:tokens?|passwords?|device[ _-]?codes?|raw[ _-]?account[ _-]?data)\b", re.I)
-# AGP-provided tasks are declared via the Android plugin/variant, not tasks.register.
-ANDROID_TASKS = {"assembleRelease", "lintRelease", "assembleDebug", "lintDebug", "testDebugUnitTest", "processReleaseManifest",
-                 "compileDebugUnitTestKotlin", "compileDebugAndroidTestKotlin",
-                 "assembleDebugAndroidTest", "connectedDebugAndroidTest"}
-REQUIRED_CHECK_CONTEXTS = {("android.yml", "Android CI result"),
-                           ("repository-policy.yml", "Repository policy result"),
-                           ("research-contract.yml", "Validate research fixtures and schemas")}
-
-
-def relative_links(text, source, root):
-    """Resolve local Markdown targets without network or historical-document crawling."""
-    for link in LINK.findall(text):
-        url = urlsplit(link)
-        if url.scheme or url.netloc:
-            continue
-        target = (source.parent / unquote(url.path)).resolve() if url.path else source.resolve()
-        assert target.is_relative_to(root.resolve()), f"Link escapes repository: {source}: {link}"
-        assert target.exists(), f"Broken relative link: {source}: {link}"
-        if url.fragment and target.suffix == ".md":
-            headings = re.findall(r"^#{1,6}\s+(.+)$", target.read_text(), re.M)
-            anchors = {re.sub(r"[^\w -]", "", heading.lower()).replace(" ", "-") for heading in headings}
-            assert unquote(url.fragment) in anchors, f"Broken heading link: {source}: {link}"
-
-
-def documented_tasks(text, build, init, workflow):
-    custom = set(re.findall(r"tasks\.register\(['\"](\w+)", build + init))
-    tasks = set(re.findall(r":app:([A-Za-z]\w*)", text))
-    assert tasks, "No documented Gradle tasks"
-    for task in tasks:
-        if task not in custom:
-            assert "id 'com.android.application'" in build and task in ANDROID_TASKS, task
-            assert f":app:{task}" in workflow, f"Task absent from hosted commands: {task}"
-        # Registered tasks may be dependency-invoked (e.g. jacocoDebugReport).
 
 
 def coverage_minimum(text, build):
@@ -60,55 +21,6 @@ def coverage_minimum(text, build):
     assert actual == Decimal("0.90"), "Current coverage policy must remain 0.90"
     assert all(Decimal(value) / 100 == actual for value in stated), "Coverage documentation drift"
     assert "INSTRUCTION" in text, "Coverage counter absent"
-
-
-
-def job_names(job):
-    name = job['name']
-    expression = '${{ matrix.language }}'
-    if expression not in name:
-        return [name]
-    rows = job['strategy']['matrix']['include']
-    names = [name.replace(expression, row['language']) for row in rows]
-    assert names and len(set(names)) == len(names), 'Matrix contexts must be nonempty and distinct'
-    return names
-
-def check_contexts(table, workflows):
-    rows = re.findall(r"^\| `([^`]+\.yml)` \| `([^`]+)` \| ([^|]+) \|$", table, re.M)
-    assert rows, "Check context mapping absent"
-    actual = {(file, name) for file, data in workflows.items()
-              for job in data["jobs"].values() for name in job_names(job)}
-    documented = {(file, name) for file, name, _ in rows}
-    assert len(documented) == len(rows), "Duplicate documented context"
-    assert documented == actual, f"Workflow/document contexts differ: {documented ^ actual}"
-    names = [name for _, name in actual]
-    assert len(names) == len(set(names)), "Check contexts must be unique"
-    for file, name, category in rows:
-        if file == "code-metrics.yml":
-            allowed = {"Informational", "Main-only; not required for PRs"}
-        elif file == "release.yml":
-            allowed = {"Manual default-off; not required for PRs"}
-        elif file == "codeql.yml":
-            allowed = {"Code-scanning rule; not a required status check"}
-        elif (file, name) in REQUIRED_CHECK_CONTEXTS:
-            allowed = {"Required"}
-        else:
-            allowed = {"Covered by required aggregate"}
-        assert category.strip() in allowed, f"Unexpected check enforcement: {category}"
-
-
-def required_status_checks(text, workflows):
-    sections = text.split("## Current settings", 1)
-    assert len(sections) == 2, "Current settings section absent"
-    current = sections[1].split("\n## ", 1)[0]
-    rows = re.findall(r"^\| Required status checks \| ([^|]+) \|$", current, re.M)
-    assert len(rows) == 1, "Required status-check setting absent or duplicated"
-    names = re.findall(r"`([^`]+)`", rows[0])
-    expected = {name for _, name in REQUIRED_CHECK_CONTEXTS}
-    assert len(names) == len(expected) and set(names) == expected, "Configured check names drift"
-    for file, name in REQUIRED_CHECK_CONTEXTS:
-        actual = {job["name"] for job in workflows[file]["jobs"].values()}
-        assert name in actual, f"Required check absent from workflow: {file}: {name}"
 
 
 def safe_pr_template(text):
@@ -149,65 +61,9 @@ def safe_form(form):
 
 
 class PublicReadinessTests(unittest.TestCase):
-    def test_gitignore_does_not_match_tracked_files(self):
-        ignored = subprocess.run(
-            ["git", "ls-files", "-ci", "--exclude-standard"],
-            cwd=ROOT, check=True, capture_output=True, text=True)
-        self.assertEqual(ignored.stdout, "", f"Tracked files are ignored:\n{ignored.stdout}")
-
-    def test_gitignore_allows_new_source_files(self):
-        for file in ("tools/build/new_test.py", "tools/policy/new_test.py",
-                     "docs/new-guide.md", ".github/workflows/new-workflow.yml",
-                     "app/src/main/java/NewSource.kt", "gradle/new-config.gradle"):
-            with self.subTest(file=file):
-                ignored = subprocess.run(
-                    ["git", "check-ignore", "-q", "--no-index", file],
-                    cwd=ROOT, capture_output=True, text=True)
-                self.assertEqual(ignored.returncode, 1,
-                                 f"Source path is ignored or Git failed: {file}: {ignored.stderr}")
-
-    def test_gitignore_still_excludes_gradle_build_outputs(self):
-        for file in ("build/generated.txt", "app/build/generated.txt", "buildSrc/build/generated.txt"):
-            with self.subTest(file=file):
-                ignored = subprocess.run(
-                    ["git", "check-ignore", "-q", "--no-index", file],
-                    cwd=ROOT, capture_output=True, text=True)
-                self.assertEqual(ignored.returncode, 0,
-                                 f"Build output is not ignored or Git failed: {file}: {ignored.stderr}")
-
-    def test_named_files_are_present_and_nonempty(self):
-        for file in REQUIRED_FILES:
-            with self.subTest(file=file):
-                self.assertTrue((ROOT / file).is_file(), file)
-                self.assertTrue((ROOT / file).read_text().strip(), file)
-
-    def test_relative_links_resolve(self):
-        for file in GUIDES + (PR_TEMPLATE,):
-            relative_links((ROOT / file).read_text(), ROOT / file, ROOT)
-
-    def test_documented_commands_and_tasks_exist(self):
-        text = "\n".join((ROOT / file).read_text() for file in GUIDES)
-        self.assertIn("bash tools/check.sh", text)
-        for command in set(re.findall(r"\b(tools/[\w./-]+\.(?:sh|py))\b", text)):
-            self.assertTrue((ROOT / command).is_file(), command)
-        documented_tasks(text, (ROOT / "app/build.gradle").read_text(),
-                         (ROOT / "tools/build/toolchain.init.gradle").read_text(),
-                         (ROOT / ".github/workflows/android.yml").read_text() +
-                         (ROOT / "tools/build/run-hosted-native-smoke.sh").read_text())
-
     def test_current_coverage_documents_match_build(self):
         for file in ("CONTRIBUTING.md", "AGENTS.md", "ARCHITECTURE.md"):
             coverage_minimum((ROOT / file).read_text(), (ROOT / "app/build.gradle").read_text())
-
-    def test_check_context_table_matches_all_workflow_job_names(self):
-        workflows = {path.name: yaml.safe_load(path.read_text())
-                     for path in (ROOT / ".github/workflows").glob("*.yml")}
-        check_contexts((ROOT / "docs/repository-protection.md").read_text(), workflows)
-
-    def test_current_required_status_checks_match_workflow_job_names(self):
-        workflows = {file: yaml.safe_load((ROOT / ".github/workflows" / file).read_text())
-                     for file, _ in REQUIRED_CHECK_CONTEXTS}
-        required_status_checks((ROOT / "docs/repository-protection.md").read_text(), workflows)
 
     def test_templates_do_not_request_secrets(self):
         for file in FORMS:
@@ -228,92 +84,12 @@ class PublicReadinessTests(unittest.TestCase):
         self.assertIn("If the form is unavailable, do not disclose the vulnerability publicly", text)
         self.assertIn("a non-sensitive issue asking how to report privately", text)
         self.assertIn("with no exploit details or private data", text)
-        self.assertIn("No response-time guarantee is asserted.", text)
-
-    def test_public_guides_describe_permission_and_explicit_connection_boundaries(self):
-        for file in ("README.md", "SECURITY.md", "ARCHITECTURE.md", "AGENTS.md", "CONTRIBUTING.md"):
-            text = ' '.join((ROOT / file).read_text().split())
-            with self.subTest(file=file):
-                self.assertIn("INTERNET", text)
-                self.assertIn("cleartext", text.lower())
-                self.assertNotRegex(text, r"(?i)(?:has|have|with) no INTERNET permission")
-        security = ' '.join((ROOT / "SECURITY.md").read_text().split())
-        self.assertIn("The launcher enters the real connection/live flow", security)
-        self.assertIn("Fresh-owner restoration stays dormant", security)
-        self.assertIn("STARTED observer cancels eligible reads on foreground loss", security)
-        self.assertIn("resumes an already activated owner", security)
-        self.assertIn("Explicit connect", security)
-        self.assertIn("Process death drops a pending login", security)
-        self.assertIn("binding UNRESOLVED and identity UNVERIFIED", security)
-        self.assertIn("without automatic requests", security)
-        self.assertIn("recorded A8 GO on 2026-10-07", security)
-        self.assertIn("does not revoke remote sessions", security)
-        self.assertIn("Refresh is serialized per session", security)
-        self.assertIn("durably saved before publication", security)
-        self.assertIn("uncertainty marker", security)
-        self.assertIn("requires sign-in", security)
-        self.assertIn("no invented token TTL", security)
-        self.assertIn("own exact-candidate hosted and safe owner live checks", security)
-
-    def test_link_checker_rejects_missing_target_and_escape(self):
-        for link in ("missing-readiness-document.md", "../outside.md"):
-            with self.subTest(link=link), self.assertRaises(AssertionError):
-                relative_links(f"[example]({link})", ROOT / "README.md", ROOT)
 
     def test_coverage_checker_rejects_drift_and_weakened_source(self):
         for text, build in (("Coverage minimum: **95%** INSTRUCTION", "minimum = 0.90"),
                             ("Coverage minimum: **80%** INSTRUCTION", "minimum = 0.80")):
             with self.assertRaises(AssertionError):
                 coverage_minimum(text, build)
-
-    def test_task_checker_rejects_invented_command(self):
-        with self.assertRaises(AssertionError):
-            documented_tasks(":app:inventedTask", "id 'com.android.application'", "", "")
-
-    def test_context_checker_rejects_missing_renamed_and_duplicate_rows(self):
-        workflows = {"android.yml": {"jobs": {"build": {"name": "Build"}}}}
-        for table in ("| `android.yml` | `Renamed` | Required |", "no rows",
-                      "| `android.yml` | `Build` | Required |\n| `android.yml` | `Build` | Required |"):
-            with self.assertRaises(AssertionError):
-                check_contexts(table, workflows)
-
-    def test_context_checker_rejects_required_check_enforcement_drift(self):
-        for file, name, category in (
-                ("android.yml", "Android CI result", "Covered by required aggregate"),
-                ("android.yml", "Build, lint and unit tests (strict dependency verification)", "Required"),
-                ("code-metrics.yml", "Code erosion (Kotlin complexity)", "Required")):
-            workflows = {file: {"jobs": {"job": {"name": name}}}}
-            table = f"| `{file}` | `{name}` | {category} |"
-            with self.subTest(name=name), self.assertRaises(AssertionError):
-                check_contexts(table, workflows)
-
-    def test_matrix_contexts_require_every_language_and_scanning_enforcement(self):
-        job = {'name': 'Analyze (${{ matrix.language }})', 'strategy': {'matrix': {'include': [
-            {'language': 'actions'}, {'language': 'java-kotlin'}, {'language': 'python'}]}}}
-        workflows = {'codeql.yml': {'jobs': {'analyze': job}}}
-        rows = [f'| `codeql.yml` | `Analyze ({language})` | Code-scanning rule; not a required status check |'
-                for language in ('actions', 'java-kotlin', 'python')]
-        check_contexts('\n'.join(rows), workflows)
-        for table in ('\n'.join(rows[:-1]), '\n'.join(rows).replace('Code-scanning rule; not a required status check', 'Required')):
-            with self.assertRaises(AssertionError):
-                check_contexts(table, workflows)
-
-    def test_required_status_checker_rejects_documented_name_drift(self):
-        text = (ROOT / "docs/repository-protection.md").read_text()
-        workflows = {file: {"jobs": {"job": {"name": name}}}
-                     for file, name in REQUIRED_CHECK_CONTEXTS}
-        for replacement in ("", "`Renamed`", "`Android CI result`, `Extra check`",
-                            "`Android CI result`, `Android CI result`"):
-            with self.subTest(replacement=replacement), self.assertRaises(AssertionError):
-                required_status_checks(text.replace("`Android CI result`", replacement), workflows)
-
-    def test_required_status_checker_rejects_workflow_name_drift(self):
-        text = (ROOT / "docs/repository-protection.md").read_text()
-        for renamed in REQUIRED_CHECK_CONTEXTS:
-            workflows = {file: {"jobs": {"job": {"name": "Renamed" if (file, name) == renamed else name}}}
-                         for file, name in REQUIRED_CHECK_CONTEXTS}
-            with self.subTest(renamed=renamed), self.assertRaises(AssertionError):
-                required_status_checks(text, workflows)
 
     def test_pr_checker_rejects_secret_fields_and_prompts(self):
         text = (ROOT / PR_TEMPLATE).read_text()

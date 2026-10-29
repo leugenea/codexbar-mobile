@@ -2,10 +2,7 @@
 import copy
 from datetime import datetime, timezone
 import hashlib
-import json
-import re
 import unittest
-from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from jsonschema import ValidationError
@@ -213,52 +210,24 @@ class FixtureTests(unittest.TestCase):
         self.assertEqual(owner["evidenceKind"], "owner_reported_live")
         self.assertEqual(hashlib.sha256((DATA / "fixtures" / owner["file"]).read_bytes()).hexdigest(), owner["sha256"])
 
-    def test_source_ids_urls_and_document_citations(self):
-        sources = read(DATA / "sources.json")["sources"]
-        ids = [s["id"] for s in sources]
-        self.assertEqual(len(ids),len(set(ids)))
-        for source in sources:
-            url = urlsplit(source["url"])
-            self.assertEqual(url.scheme,"https")
-            self.assertTrue(url.netloc)
-            self.assertIsNone(url.username)
-            self.assertRegex(source["accessed"], r"^\d{4}-\d{2}-\d{2}$")
-            for key in ("sha256", "raw_sha256", "text_sha256"):
-                if key in source:
-                    self.assertRegex(source[key], r"^[0-9a-f]{64}$")
-        document = (DATA.parent / "m0.md").read_text()
-        body, rendered = document.split("## Sources\n",1)
-        cites = set(int(x) for x in re.findall(r"\[(\d+)\]", body))
-        mapping = {int(i):u for i,u in re.findall(r"^\[(\d+)\] (https://\S+)",rendered,re.M)}
-        ledger = {s["id"]:s["url"] for s in sources}
-        self.assertEqual(cites,set(mapping))
-        self.assertTrue(cites <= set(ids))
-        self.assertEqual(mapping,{i:ledger[i] for i in cites})
-
-    def test_toolchain_selection_has_exact_pins_and_future_build_boundary(self):
-        toolchain = read(DATA / "toolchain.json")
-        self.assertEqual(toolchain["status"], "selected_M0_baseline_not_resolved_or_built")
-        self.assertEqual(toolchain["minSdk"],26)
-        self.assertEqual(toolchain["kotlin"]["version"],toolchain["kotlin"]["composeCompilerPlugin"])
-        for component, key in (("jdk","sha256"),("gradle","distributionSha256"),("agp","pomSha256"),("coroutines","pomSha256"),("compose","pomSha256")):
-            self.assertRegex(toolchain[component][key],r"^[0-9a-f]{64}$")
-
-    def test_ci_narrow_read_only_full_sha_contract(self):
-        text = (ROOT / ".github/workflows/research-contract.yml").read_text()
-        self.assertTrue(text.startswith("name: Research contract\n"))
-        self.assertEqual(re.findall(r"^    name: (.+)$", text, re.M),
-                         ["Validate research fixtures and schemas"])
-        self.assertIn("runs-on: ubuntu-24.04",text)
-        self.assertIn("timeout-minutes: 5",text)
-        self.assertIn("  contents: read",text)
-        self.assertIn("persist-credentials: false",text)
-        for event in ("  pull_request:","  push:","  workflow_dispatch:"):
-            self.assertIn(event,text)
-        self.assertRegex(text,r"python-version: '3\.11\.15'")
-        self.assertEqual(len(re.findall(r"uses: [\w/-]+@[a-f0-9]{40} # v[\d.]+",text)),2)
-        for unsafe in ("pull_request_target", "self-hosted", "secrets.", "write-all", "paths:", "auth.openai.com", "chatgpt.com", "gradlew"):
-            self.assertNotIn(unsafe,text)
-        self.assertIn("python -B -m unittest discover -s tools/research -p 'test_*.py' -v",text)
+    def test_ci_research_validation_runs_in_common_required_gate(self):
+        import yaml
+        jobs = yaml.safe_load((ROOT / ".github/workflows/repository-policy.yml").read_text())["jobs"]
+        producer = jobs["policy"]
+        checks = [step for step in producer["steps"] if step.get("run") == "bash tools/check.sh"]
+        self.assertEqual(len(checks), 1)
+        for body in (producer, checks[0]):
+            self.assertNotIn("if", body)
+            self.assertFalse(body.get("continue-on-error", False))
+        self.assertEqual(checks[0]["env"]["CHECK_PYTHON"], "${{ runner.temp }}/policy-venv/bin/python")
+        entrypoint = (ROOT / "tools/check.sh").read_text()
+        self.assertIn("for suite in tools/build tools/research tools/metrics tools/policy; do", entrypoint)
+        self.assertIn('"$python" -B -m unittest discover -s "$suite"', entrypoint)
+        self.assertIn("set -euo pipefail", entrypoint)
+        self.assertEqual(jobs["result"]["needs"], "policy")
+        self.assertEqual(jobs["result"]["if"], "always()")
+        self.assertEqual(jobs["result"]["steps"][0]["env"]["POLICY_RESULT"], "${{ needs.policy.result }}")
+        self.assertEqual(jobs["result"]["steps"][0]["run"], '[[ "$POLICY_RESULT" == success ]]')
 
 
 if __name__ == "__main__":

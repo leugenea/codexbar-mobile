@@ -1,12 +1,21 @@
 # Repository protections and recommendations
 
-## Current settings
+## Required settings
 
-As of October 10, 2026, the active repository ruleset
+The active repository ruleset
 [`protect-main`](https://github.com/leugenea/codexbar-mobile/rules/24633110)
 targets the default branch (`main`), with no excluded refs or bypass actors.
 
-| Setting | Configured state |
+The configuration below includes the owner-approved October 29, 2026 retirement of
+the separate research check. Coordinate its removal from `protect-main` with the
+workflow/source-admission change and read back the exact ruleset before delivery;
+otherwise the missing check will block merging. Remove only
+`Validate research fixtures and schemas` (GitHub Actions integration `15368`) from
+the required status-check array. Preserve all other rules and parameters unchanged.
+Research fixture/schema/privacy/provenance validation continues in the common
+repository-policy gate.
+
+| Setting | Required configuration |
 | --- | --- |
 | Destructive changes | Branch deletion and non-fast-forward updates blocked |
 | History | Linear history required |
@@ -15,7 +24,7 @@ targets the default branch (`main`), with no excluded refs or bypass actors.
 | Unattributed Copilot pull requests | Additional-approval flag enabled; no effect while the ruleset requires zero approvals |
 | Additional review requirements | Stale approvals are not dismissed; code-owner review and approval of the latest push are not required; no required reviewers configured |
 | Allowed merge methods | `merge`, `squash`, `rebase` in the PR rule; the separate linear-history rule still prevents merge commits on `main` |
-| Required status checks | `Android CI result`, `Repository policy result` and `Validate research fixtures and schemas`, bound to the GitHub Actions integration; strict/up-to-date policy enabled |
+| Required status checks | `Android CI result` and `Repository policy result`, bound to the GitHub Actions integration; strict/up-to-date policy enabled |
 | Code scanning | `code_scanning` rule: CodeQL; alerts threshold `errors`, security alerts threshold `high_or_higher`; configured October 10, 2026 |
 | New branch creation | The status-check rule is not exempted on creation |
 
@@ -23,23 +32,22 @@ The strict status-check policy requires PR branches to be up to date with `main`
 before merge. The delivery procedure in [CONTRIBUTING](../CONTRIBUTING.md) also
 requires all applicable exact-head hosted gates to pass before independent read-only
 full-diff review; independent approval remains procedural, not a configured approval
-requirement. This document does not authorize a settings change; the owner must
-approve any configuration update.
+requirement. The owner authorized only the research-context removal above; any
+other configuration update needs separate approval.
 
 ## Check contexts and enforcement
 
 Names below are job display names, not workflow titles. All declared PR gates run
 even for documentation-only changes; metrics are informational. The aggregate
 results reject failed or skipped required producer jobs. The **Required** entries
-below are configured required status checks in `protect-main`; CodeQL is enforced
-separately by its `code_scanning` rule.
+below are the required status checks in the coordinated `protect-main` configuration;
+CodeQL is enforced separately by its `code_scanning` rule.
 
 | Workflow | Exact check context | Enforcement |
 | --- | --- | --- |
 | `android.yml` | `Build, lint and unit tests (strict dependency verification)` | Covered by required aggregate |
 | `android.yml` | `Instrumented tests and coverage (API 36 emulator)` | Covered by required aggregate |
 | `android.yml` | `Android CI result` | Required |
-| `research-contract.yml` | `Validate research fixtures and schemas` | Required |
 | `repository-policy.yml` | `Check repository scripts and supply-chain policy` | Covered by required aggregate |
 | `repository-policy.yml` | `Repository policy result` | Required |
 | `codeql.yml` | `Analyze (actions)` | Code-scanning rule; not a required status check |
@@ -56,7 +64,6 @@ separately by its `code_scanning` rule.
 | `release.yml` | `Publish accepted release candidate` | Manual default-off; not required for PRs |
 
 Sources: [Android](../.github/workflows/android.yml),
-[research](../.github/workflows/research-contract.yml),
 [repository policy](../.github/workflows/repository-policy.yml) and
 [metrics](../.github/workflows/code-metrics.yml).
 
@@ -81,7 +88,8 @@ checks green, independent read-only complete-source review, squash merge and
 exact-merge main workflow/artifact verification. All three CodeQL analyses must pass
 with the other applicable checks before review. Avoid indefinite competing Java
 analyses. Retain the separate CodeQL `errors` / `high_or_higher` rule and every
-required status context. This approval does not authorize other repository changes.
+status context apart from the separately authorized research retirement above.
+The CodeQL approval does not authorize other repository changes.
 The historical default-setup [first run on October 10, 2026](https://github.com/leugenea/codexbar-mobile/actions/runs/38085283380)
 scanned 69 of 150 Kotlin files without test extraction; it does not establish coverage
 for the replacement workflow.
