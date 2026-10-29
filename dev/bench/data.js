@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793257616198,
+  "lastUpdate": 1793281139265,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -2947,6 +2947,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/7399eb71024000a4e38c29c2cf4158637fd291d9"
         },
         "date": 1793257611823,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c95789b83d4cdbaa352919f10145b10878dc86e1",
+          "message": "test: replace bespoke capture decoding with Pillow (#211)",
+          "timestamp": "2026-10-29T16:38:31+03:00",
+          "tree_id": "0c73747bb1d7fb50fe50cd015126021e9556594b",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/c95789b83d4cdbaa352919f10145b10878dc86e1"
+        },
+        "date": 1793281138674,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
