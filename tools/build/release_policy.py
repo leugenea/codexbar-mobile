@@ -13,7 +13,7 @@ from version_identity import MAX_CODE, official_inputs, parse_tag, target_versio
 
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = '.github/workflows/release.yml'
-SOURCE_GATES = ('android.yml', 'repository-policy.yml', 'research-contract.yml', 'codeql.yml')
+SOURCE_GATES = ('android.yml', 'repository-policy.yml', 'codeql.yml')
 
 
 def configuration(text, channel):

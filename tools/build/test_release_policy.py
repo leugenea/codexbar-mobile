@@ -181,6 +181,19 @@ class ConfigurationTests(unittest.TestCase):
                 policy.admit(wrapper(model), configuration(True), ctx)
             self.assertEqual(model.calls, [])
 
+    def test_source_admission_requires_active_gates_without_retired_research_run(self):
+        expected = ('android.yml', 'repository-policy.yml', 'codeql.yml')
+        self.assertEqual(policy.SOURCE_GATES, expected)
+        for operation in ('prepare', 'publish'):
+            ctx = context(operation=operation)
+            model = PolicyAPI(ctx)
+            retired = '/actions/workflows/research-contract.yml/runs?head_sha=' + 'a' * 40 + '&event=push'
+            model.overrides[retired] = AssertionError('Retired workflow must not be queried')
+            policy.admit(wrapper(model), configuration(), ctx)
+            self.assertEqual({path for path in model.calls if '&event=push' in path}, {
+                '/actions/workflows/' + name + '/runs?head_sha=' + 'a' * 40 + '&event=push'
+                for name in expected})
+
     def test_event_controller_source_green_ci_and_environment_drift_deny(self):
         for key, value in [('event', 'pull_request'), ('ref', 'refs/heads/feature'), ('repository', 'fork/repo'),
                            ('repositoryId', 9), ('runNumber', 11), ('sha', 'e' * 40), ('workflowSha', 'f' * 40),

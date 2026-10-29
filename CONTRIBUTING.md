@@ -48,10 +48,19 @@ git diff --check
 ```
 
 [tools/check.sh](tools/check.sh) runs build/research/metrics/policy Python contracts,
-public readiness/link checks, pinned Dependabot schema validation, shell parsing,
+public contribution-safety checks, pinned Dependabot schema validation, shell parsing,
 ShellCheck and actionlint. It does not build Android or install an SDK/emulator.
 It fetches the pinned schema unless `DEPENDABOT_SCHEMA` supplies a checksum-valid
 offline copy. Hash locks cover the supported wheel platform, not every platform.
+
+Documentation links, command/catalogue lists, prose and the check-context table are
+reviewed as documentation, not enforced by a parallel Python inventory. Public
+secret-reporting guidance and the documented 90% instruction coverage floor remain
+checked. M0 citation/toolchain catalogues are archival; fixture/schema validation
+continues in the common tooling run under `Repository policy result`, not a separate
+research workflow or release source-admission prerequisite. Existing source/toolchain
+checks still consume selected M0 baseline fields; keep that data and the hash-pinned
+research dependencies used by fixture validation and release schema validation.
 
 Keep application behavior assertions in the existing JVM/Compose/native suites and
 check final artifacts where appropriate. Do not add Python checks for Kotlin callback

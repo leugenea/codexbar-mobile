@@ -194,40 +194,34 @@ class WorkflowContracts(unittest.TestCase):
             with self.subTest(mutation=old), self.assertRaises(AssertionError):
                 self.assert_repository_gate_tools(*texts)
 
-    def assert_descriptive_workflow_names(self, android, research):
+    def assert_descriptive_android_workflow(self, text):
         expected = {
-            "Android": {
-                "build": "Build, lint and unit tests (strict dependency verification)",
-                "instrumented": "Instrumented tests and coverage (API 36 emulator)",
-                "result": "Android CI result",
-            },
-            "Research contract": {"contract": "Validate research fixtures and schemas"},
+            "build": "Build, lint and unit tests (strict dependency verification)",
+            "instrumented": "Instrumented tests and coverage (API 36 emulator)",
+            "result": "Android CI result",
         }
-        for workflow, text in (("Android", android), ("Research contract", research)):
-            self.assertTrue(text.startswith("name: " + workflow + "\n"))
-            jobs = dict(re.findall(r"(?m)^  (\w+):\n    name: (.+)$", text))
-            self.assertEqual(jobs, expected[workflow])
-            steps = re.findall(r"(?m)^      - (.+)$", text)
-            self.assertTrue(steps)
-            self.assertTrue(all(step.startswith("name: ") for step in steps),
-                            "Every CI step must have a descriptive display name")
-            self.assertNotRegex(text, r"\b[Mm][0-5]\b|[Mm][0-5][_-]|[Mm][0-5][A-Z]")
+        self.assertTrue(text.startswith("name: Android\n"))
+        jobs = dict(re.findall(r"(?m)^  (\w+):\n    name: (.+)$", text))
+        self.assertEqual(jobs, expected)
+        steps = re.findall(r"(?m)^      - (.+)$", text)
+        self.assertTrue(steps)
+        self.assertTrue(all(step.startswith("name: ") for step in steps),
+                        "Every CI step must have a descriptive display name")
+        self.assertNotRegex(text, r"\b[Mm][0-5]\b|[Mm][0-5][_-]|[Mm][0-5][A-Z]")
 
     def test_stable_check_names_and_descriptive_workflows_and_steps(self):
-        self.assert_descriptive_workflow_names(
+        self.assert_descriptive_android_workflow(
             (ROOT / ".github/workflows/android.yml").read_text(),
-            (ROOT / ".github/workflows/research-contract.yml").read_text(),
         )
 
     def test_name_contract_rejects_ambiguous_checks_and_unnamed_steps(self):
         android = (ROOT / ".github/workflows/android.yml").read_text()
-        research = (ROOT / ".github/workflows/research-contract.yml").read_text()
         for old, new in (("name: Android\n", "name: Pipeline\n"),
                          ("name: Android CI result", "name: Result"),
                          ("  build:\n", "  checkpoint:\n"),
                          ("      - name: Check out repository\n        uses:", "      - uses:")):
             with self.subTest(mutation=old), self.assertRaises(AssertionError):
-                self.assert_descriptive_workflow_names(android.replace(old, new, 1), research)
+                self.assert_descriptive_android_workflow(android.replace(old, new, 1))
 
     def assert_code_metrics_contract(self, text):
         self.assertTrue(text.startswith("name: Code metrics\n"))
@@ -440,7 +434,7 @@ class WorkflowContracts(unittest.TestCase):
                     with self.subTest(workflow=path.name, action=action):
                         self.assertEqual((sha, version), pins[action])
                     counts[action] += 1
-        self.assertEqual(counts, {'actions/checkout': 15, 'actions/upload-artifact': 6})
+        self.assertEqual(counts, {'actions/checkout': 14, 'actions/upload-artifact': 6})
 
     def assert_hosted_build_memory_scope(self, workflow, properties, codeql, native):
         steps = self.android_build_steps(workflow)
