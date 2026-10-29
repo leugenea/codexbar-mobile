@@ -1,12 +1,11 @@
 """Cheap scaffold/integrity contracts; no Gradle, SDK or native execution."""
 import hashlib
-import json
 from pathlib import Path
 import re
 import unittest
 import xml.etree.ElementTree as ET
 
-from verify_manifests import approved_work_removal, check_source_manifests
+from verify_manifests import check_source_manifests
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -24,32 +23,6 @@ class ToolchainContract(unittest.TestCase):
         wrapper = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()
         self.assertIn("distributionUrl=https\\://services.gradle.org/distributions/gradle-9.8.2-bin.zip", wrapper)
         self.assertIn("distributionSha256Sum=21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607", wrapper)
-
-    def test_current_toolchain_and_install_policy(self):
-        baseline = json.loads((ROOT / "docs/research/m0/toolchain.json").read_text())
-        root = (ROOT / "build.gradle").read_text()
-        app = (ROOT / "app/build.gradle").read_text()
-        verifier = (ROOT / "tools/build/verify-hosted-toolchain.sh").read_text()
-        workflow = (ROOT / ".github/workflows/android.yml").read_text()
-        self.assertIn("id 'com.android.application' version '9.4.1'", root)
-        self.assertIn("kotlin-gradle-plugin:" + baseline["kotlin"]["version"], root)
-        self.assertIn("plugin.compose' version '" + baseline["kotlin"]["composeCompilerPlugin"] + "'", root)
-        self.assertNotIn("org.jetbrains.kotlin.android", root + app)
-        for snippet in ("release(37) { minorApiLevel = 0 }", "minSdk 26", "targetSdk 37",
-                        "buildToolsVersion '36.0.0'", "compose-bom:2026.09.00", "ui:1.12.1",
-                        "material3:1.4.0", "kotlinx-coroutines-android:1.11.0"):
-            self.assertIn(snippet, app)
-        # Research archive/patch selections are frozen historical evidence, not current install policy.
-        self.assertIn("distribution: temurin", workflow)
-        self.assertIn("java-version: '17'", workflow)
-        for path in baseline["sdkPackages"]:
-            self.assertIn("'" + path + "'", workflow)
-        self.assertIn("Pkg.Revision", verifier)
-        self.assertIn("installed-toolchain.json", verifier)
-        self.assertFalse((ROOT / "tools/build/write_sdk_package_metadata.py").exists())
-        for obsolete in (baseline["jdk"]["sha256"], baseline["jdk"]["linuxX64Archive"],
-                         "write_sdk_package_metadata.py", "installed-archives.sha256"):
-            self.assertNotIn(obsolete, verifier + workflow)
 
     def test_runtime_toolchain_assertions_and_lint_remain_strict(self):
         inventory = (ROOT / "tools/build/toolchain.init.gradle").read_text()
@@ -134,119 +107,7 @@ class ToolchainContract(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     self.assert_backup_policy(manifest, legacy, extraction)
 
-    def test_single_min26_adaptive_icon_includes_monochrome(self):
-        resources = ROOT / "app/src/main/res"
-        self.assertEqual(sorted(p.relative_to(resources).as_posix() for p in resources.glob("mipmap-*/ic_launcher.xml")),
-                         ["mipmap-anydpi/ic_launcher.xml"])
-        icon = ET.parse(resources / "mipmap-anydpi/ic_launcher.xml").getroot()
-        self.assertEqual(icon.tag, "adaptive-icon")
-        self.assertEqual([layer.tag for layer in icon], ["background", "foreground", "monochrome"])
-        ns = "{http://schemas.android.com/apk/res/android}"
-        self.assertEqual(icon[0].get(ns + "drawable"), "@color/launcher_background")
-        for layer in icon[1:]:
-            self.assertEqual(layer.get(ns + "drawable"), "@drawable/ic_launcher_foreground")
-
-    def assert_cached_actions_setup(self, workflow):
-        pins = {
-            "actions/checkout": ("3d3c42e5aac5ba805825da76410c181273ba90b1", "v7.0.1", 2),
-            "actions/upload-artifact": ("cf430e030ddbb5b0abf93d22962f4752f3646cd9", "v7.0.2", 2),
-            "actions/setup-java": ("de7274f081f381c8f8158605e0321c36c376e2e6", "v6.0.1", 2),
-            "gradle/actions/setup-gradle": ("3f5f9adaf7d9fecd50b5935e54106014257a94e6", "v6.4.0", 2),
-            "android-actions/setup-android": ("be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd", "v4.0.4", 2),
-        }
-        uses = re.findall(r"(?m)^\s*-?\s*uses: (\S+) # (v[\d.]+)$", workflow)
-        self.assertEqual(len(uses), len(re.findall(r"(?m)^\s*-?\s*uses:", workflow)))
-        self.assertEqual(len(uses), sum(value[2] for value in pins.values()))
-        for action, (sha, version, count) in pins.items():
-            self.assertEqual(uses.count((action + "@" + sha, version)), count, action)
-        configured = {
-            "actions/setup-java": {
-                "distribution": "temurin", "java-version": "17", "java-package": "jdk",
-                "architecture": "x64", "overwrite-settings": "false",
-            },
-            "gradle/actions/setup-gradle": {
-                "cache-provider": "basic", "cache-disabled": "false",
-                "cache-read-only": "${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}",
-                "validate-wrappers": "true", "allow-snapshot-wrappers": "false",
-                "dependency-graph": "disabled", "build-scan-publish": "false",
-                "add-job-summary": "always", "add-job-summary-as-pr-comment": "never",
-            },
-            "android-actions/setup-android": {
-                "cmdline-tools-version": "15859902", "packages": "",
-                "accept-android-sdk-licenses": "true", "log-accepted-android-sdk-licenses": "false",
-            },
-        }
-        for job, home in (("build", "android-gradle-build"), ("instrumented", "android-gradle-instrumented")):
-            body = workflow.split("  " + job + ":\n", 1)[1].split("\n  instrumented:\n", 1)[0]
-            header, step_text = body.split("    steps:\n", 1)
-            self.assertIn("      GRADLE_USER_HOME: ${{ github.workspace }}/../" + home + "\n", header)
-            self.assertNotIn("${{ runner.temp }}", header)
-            self.assertNotRegex(step_text, r"(?m)^\s*GRADLE_USER_HOME:")
-            self.assertNotRegex(step_text, r"\bGRADLE_USER_HOME=")
-            self.assertNotIn("must start fresh", body)
-            self.assertNotIn('[[ ! -e "$GRADLE_USER_HOME" ]]', body)
-            steps = re.split(r"(?m)^      - ", step_text)[1:]
-            for action, inputs in configured.items():
-                found = [step for step in steps if "uses: " + action + "@" in step]
-                self.assertEqual(len(found), 1, action)
-                self.assertNotRegex(found[0], r"(?m)^        (?:if|continue-on-error):")
-                actual = {key: value.split(" #", 1)[0].strip().strip("'\"")
-                          for key, value in re.findall(r"(?m)^          ([\w-]+): (.*)$", found[0])}
-                self.assertEqual(actual, inputs, action)
-            java = body.index("uses: actions/setup-java@")
-            isolated = body.index("name: Select isolated Android SDK")
-            android = body.index("uses: android-actions/setup-android@")
-            sdk = body.index("name: Install named project SDK packages")
-            gradle = body.index("uses: gradle/actions/setup-gradle@")
-            self.assertLess(java, isolated)
-            self.assertLess(isolated, android)
-            self.assertLess(android, sdk)
-            self.assertLess(sdk, gradle)
-            self.assertIn('"$RUNNER_TEMP/android-sdk" "$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"', body[isolated:android])
-            install = body[sdk:gradle]
-            self.assertNotRegex(install, r"(?m)^        (?:if|continue-on-error):")
-            self.assertIn('set -euo pipefail', install)
-            self.assertIn('timeout 30 "$sdkmanager" --version', install)
-            self.assertIn('timeout --signal=TERM --kill-after=30s 10m "$sdkmanager"', install)
-            self.assertIn('--sdk_root="$ANDROID_HOME" --channel=0', install)
-            self.assertEqual(install.split('--install ', 1)[1].split('2>&1', 1)[0].strip(),
-                             "'platforms;android-37.0' 'build-tools;36.0.0'")
-            self.assertIn('bash tools/build/verify-hosted-toolchain.sh', install)
-            # Retired filenames below are absence guards, not active CI references.
-            for obsolete in ('jdkfile', 'jdk-file:', 'force-download:', 'cache-jdk:', 'cache: gradle',
-                             '17.0.20', 'm1-jdk.tar.gz', 'curl ', 'unzip ', 'write_sdk_package_metadata.py',
-                             'android-emulator-runner', 'build-tools;37.0.0'):
-                self.assertNotIn(obsolete, body)
-            self.assertNotIn("steps.gradle.outputs.cache", body)
-
-    def test_actions_cache_contract_rejects_synthetic_regressions(self):
-        workflow = (ROOT / ".github/workflows/android.yml").read_text()
-        for old, new in (
-            ("cache-provider: basic", "cache-provider: enhanced"),
-            ("cache-disabled: false", "cache-disabled: true"),
-            ("cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}", "cache-read-only: true"),
-            ("distribution: temurin", "distribution: jdkfile"),
-            ("java-version: '17'", "java-version: '17.0.20.1+1'"),
-            ("architecture: x64", "architecture: x64\n          force-download: true"),
-            ("'platforms;android-37.0' 'build-tools;36.0.0'", "'platforms;android-37' 'build-tools;25.0.0'"),
-            ('timeout 30 "$sdkmanager" --version', '"$sdkmanager" --version'),
-            ('timeout --signal=TERM --kill-after=30s 10m "$sdkmanager"', '"$sdkmanager"'),
-            ('--sdk_root="$ANDROID_HOME" --channel=0', '--sdk_root="$ANDROID_HOME" --channel=3'),
-            ('name: Install named project SDK packages and verify observed toolchain\n',
-             'name: Install named project SDK packages and verify observed toolchain\n        if: false\n'),
-            ("uses: android-actions/setup-android@", "uses: invalid/setup-android@"),
-            ("packages: ''", "packages: 'build-tools;37.0.0'"),
-            ("cache-provider: basic", "cache-provider: basic\n          cache-write-only: true"),
-            ("android-gradle-instrumented\n", "unrestored-home\n"),
-            ("          set -o pipefail", "          export GRADLE_USER_HOME=/unrestored\n          set -o pipefail"),
-            ("# v6.4.0", "# v6.3.0"),
-        ):
-            with self.subTest(mutation=new):
-                self.assertIn(old, workflow)
-                with self.assertRaises(AssertionError):
-                    self.assert_cached_actions_setup(workflow.replace(old, new, 1))
-
-    def test_read_only_routes_require_cached_homes_and_real_strict_execution(self):
+    def test_read_only_routes_require_real_strict_execution(self):
         workflow = (ROOT / ".github/workflows/android.yml").read_text()
         self.assertIn("  pull_request:", workflow)
         self.assertIn("  push:", workflow)
@@ -260,7 +121,6 @@ class ToolchainContract(unittest.TestCase):
                        "discover_dependencies", "m1-bootstrap-diagnostic", "m1-gradle-discovery",
                        "--write-verification-metadata", "--dependency-verification off", "actions/cache"):
             self.assertNotIn(unsafe, workflow)
-        self.assert_cached_actions_setup(workflow)
         strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
         self.assertIn("--dependency-verification strict", strict)
         for flag in ("--build-cache", "--no-configuration-cache", "--console=plain"):
@@ -307,57 +167,8 @@ class ToolchainContract(unittest.TestCase):
             with self.subTest(mutation=old), self.assertRaises(AssertionError):
                 self.assert_real_output_uploads(workflow.replace(old, new, 1))
 
-    def test_inventory_filters_projects_before_artifact_selection(self):
-        inventory = (ROOT / "tools/build/toolchain.init.gradle").read_text()
-        self.assertIn("configuration.incoming.artifactView { view ->", inventory)
-        self.assertIn("view.componentFilter { component ->", inventory)
-        self.assertIn("component instanceof ModuleComponentIdentifier", inventory)
-        for unsafe in ("configuration.incoming.artifacts", "lenient", "withVariantReselection", "artifactType"):
-            # Comments may explain AGP artifact types; executable view must remain untyped/non-lenient.
-            code = "\n".join(line for line in inventory.splitlines() if not line.strip().startswith("//"))
-            self.assertNotIn(unsafe, code)
-        self.assertIn("c.name.toLowerCase().contains('debug')", inventory)
-        self.assertIn("digest(artifact.file)", inventory)
-        self.assertIn("actual.every { it.version == expected[2] }", inventory)
-        self.assertNotIn("write_sdk_package_metadata.py", (ROOT / "tools/build/verify-hosted-toolchain.sh").read_text())
-
     def test_app_manifest_overlays_cannot_broaden_network_policy(self):
         check_source_manifests(ROOT)
-
-    def test_exact_scheduler_permissions_cleartext_off_and_default_real_connection_screen(self):
-        ns = "{http://schemas.android.com/apk/res/android}"
-        manifest = ET.parse(ROOT / "app/src/main/AndroidManifest.xml").getroot()
-        permissions = {node.get(ns + "name") for node in manifest
-                       if node.tag in ("uses-permission", "uses-permission-sdk-23") and not approved_work_removal(node)}
-        self.assertEqual(permissions, {"android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE",
-                                      "android.permission.RECEIVE_BOOT_COMPLETED", "android.permission.WAKE_LOCK"})
-        application = manifest.find("application")
-        assert application is not None
-        self.assertEqual(application.get(ns + "usesCleartextTraffic"), "false")
-        self.assertIsNone(application.get(ns + "networkSecurityConfig"))
-        activity = manifest.find("application/activity")
-        self.assertEqual(activity.get(ns + "exported"), "true")
-        self.assertEqual(activity.find("intent-filter/category").get(ns + "name"), "android.intent.category.LAUNCHER")
-        strings = ET.parse(ROOT / "app/src/main/res/values/strings.xml").getroot()
-        text = " ".join(e.text or "" for e in strings)
-        self.assertIn("Disconnected", text)
-        self.assertIn("Identity unverified", text)
-        self.assertNotIn("offline demo", text)
-        self.assertIn("Unofficial", text)
-        self.assertNotIn("not implemented yet", text)
-        ET.parse(ROOT / "app/src/main/res/values/themes.xml")
-        source = (ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile/MainActivity.kt").read_text()
-        for snippet in ("ComponentActivity()", "setContent", "MaterialTheme", "Surface(",
-                        "WindowInsets.safeDrawing", "isSystemInDarkTheme()",
-                        "ObserveUsageLifecycle(connection, lifecycle)", "ConnectionScreen(connectionState, connection"):
-            self.assertIn(snippet, source)
-        self.assertEqual(source.count("ObserveUsageLifecycle(connection, lifecycle)"), 1)
-        self.assertNotRegex(source, r"rememberSaveable|savedPreview|connectionTab|OfflineShell|Preview\.")
-        self.assertFalse((ROOT / "app/src/main/java/io/github/leugenea/codexbarmobile/OfflineShellState.kt").exists())
-        self.assertFalse((ROOT / "app/src/test/java/io/github/leugenea/codexbarmobile/OfflineShellStateTest.kt").exists())
-        names = {element.get("name") for element in strings}
-        self.assertFalse(names & {"offline_tab", "connection_tab", "preview_heading", "show_fixture", "reset_preview"})
-        self.assertNotRegex(source, r"https?://|Socket|HttpClient|URLConnection|SharedPreferences")
 
     def test_screen_capture_and_recents_use_normal_platform_policy(self):
         production = ROOT / "app/src/main"

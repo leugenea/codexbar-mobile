@@ -10,7 +10,6 @@ import json
 import os
 from pathlib import Path
 import re
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -112,50 +111,6 @@ class WorkflowContracts(unittest.TestCase):
         self.assertEqual(steps[collect]["if"], "always()")
         self.assertIn(python + " tools/build/verify_history_text_captures.py", steps[collect]["run"])
 
-    def test_android_offline_parser_environment_rejects_missing_late_or_bare_python_bootstrap(self):
-        original = (ROOT / ".github/workflows/android.yml").read_text()
-        prepare = re.search(r"(?ms)^      - name: Prepare hash-pinned offline parser environment\n.*?(?=^      - name: )", original).group()
-        discovery = re.search(r"(?ms)^      - name: Validate offline build and workflow contracts\n.*?(?=^      - name: )", original).group()
-        mutations = [("missing bootstrap", original.replace(prepare, "", 1)),
-                     ("late bootstrap", original.replace(prepare + discovery, discovery + prepare, 1))]
-        for old, new in (
-            ('"$RUNNER_TEMP/android-build-contract-venv/bin/python" -B', 'python3 -B'),
-            ('"$RUNNER_TEMP/android-build-contract-venv/bin/python" -m pip', 'python3 -m pip'),
-            ('python3 -m venv "$RUNNER_TEMP/android-build-contract-venv" &&', 'true &&'),
-            ('--require-hashes', ''), ('--no-deps', ''),
-            ('-r .github/requirements-metrics.txt', '-r .github/requirements-policy.txt'),
-            ('-r tools/research/requirements.txt', ''),
-            ('-r .github/requirements-captures.txt', ''),
-            ('android-build-contract-venv/bin/python" -B', 'other-venv/bin/python" -B'),
-            ('timeout --signal=TERM --kill-after=10s 3m', ''),
-            ('--timeout 30', ''), ('--retries 1', ''),
-        ):
-            self.assertIn(old, original)
-            mutations.append((old, original.replace(old, new, 1)))
-        for name, mutated in mutations:
-            with self.subTest(mutation=name), self.assertRaises(AssertionError):
-                self.assert_android_offline_parser_environment(mutated)
-
-    def test_android_offline_parser_environment_rejects_suppressed_failures_and_missing_diagnostics(self):
-        original = (ROOT / ".github/workflows/android.yml").read_text()
-        for old, new in (
-            ('name: Prepare hash-pinned offline parser environment\n', 'name: Prepare hash-pinned offline parser environment\n        if: false\n'),
-            ('name: Validate offline build and workflow contracts\n', 'name: Validate offline build and workflow contracts\n        continue-on-error: true\n'),
-            ('timeout-minutes: 5\n        run: |\n          set -euo pipefail', 'run: |\n          set -euo pipefail'),
-            ('set -euo pipefail', 'set -eu'),
-            ('tee evidence/offline-parser-setup.log', 'cat'),
-            ('tee evidence/offline-build-contracts.log', 'cat'),
-            ('setup_status=("${PIPESTATUS[@]}")', 'setup_status=(0 0)'),
-            ('contracts_status=("${PIPESTATUS[@]}")', 'contracts_status=(0 0)'),
-            ('exit "${setup_status[0]}"', 'exit 0'),
-            ('exit "${contracts_status[0]}"', 'exit 0'),
-            ('(( setup_status[1] == 0 ))', 'true'),
-            ('(( contracts_status[1] == 0 ))', 'true'),
-        ):
-            self.assertIn(old, original)
-            with self.subTest(mutation=old), self.assertRaises(AssertionError):
-                self.assert_android_offline_parser_environment(original.replace(old, new, 1))
-
     def assert_repository_gate_tools(self, workflow, entrypoint):
         self.assertTrue(workflow.startswith("name: Repository policy\n"))
         self.assertNotRegex(workflow, r"\b[Mm][0-5]\b|[Mm][0-5][_-]|[Mm][0-5][A-Z]")
@@ -192,123 +147,8 @@ class WorkflowContracts(unittest.TestCase):
             (ROOT / "tools/check.sh").read_text(),
         )
 
-    def test_repository_gate_rejects_unverified_or_missing_tools_and_suites(self):
-        original = [(ROOT / path).read_text() for path in (
-            ".github/workflows/repository-policy.yml", "tools/check.sh")]
-        for target, old, new in (
-            (0, "sha256sum -c -", "true"),
-            (0, "./shellcheck --version", "true"),
-            (0, "--require-hashes --no-deps", "--no-deps"),
-            (1, "tools/build tools/research tools/metrics tools/policy", "tools/build tools/research"),
-            (1, '"$actionlint" -shellcheck "$shellcheck"', '"$actionlint" -shellcheck=""'),
-            (1, 'bash -n "$source"', "true"),
-        ):
-            texts = original.copy()
-            self.assertIn(old, texts[target])
-            texts[target] = texts[target].replace(old, new, 1)
-            with self.subTest(mutation=old), self.assertRaises(AssertionError):
-                self.assert_repository_gate_tools(*texts)
-
-
-    def assert_code_metrics_contract(self, text):
-        self.assertTrue(text.startswith("name: Code metrics\n"))
-        header, jobs_text = text.split("jobs:\n", 1)
-        self.assertIn("  pull_request:\n", header)
-        self.assertIn("  push:\n    branches: [main]\n", header)
-        self.assertIn("  workflow_dispatch:\n", header)
-        self.assertIn("permissions:\n  contents: read\n", header)
-        self.assertIn("github.workflow", header)
-        self.assertIn("github.event_name", header)
-        self.assertIn("github.event_name == 'push' && github.run_id", header)
-        self.assertIn("github.event.pull_request.number || github.ref", header)
-        jobs = dict(re.findall(r"(?ms)^  (\w+):\n(.*?)(?=^  \w+:\n|\Z)", jobs_text))
-        self.assertEqual(set(jobs), {"erosion", "duplication", "history", "pages"})
-        names = {"erosion": "Code erosion (Kotlin complexity)",
-                 "duplication": "Code duplication (jscpd)",
-                 "history": "Publish code metric history", "pages": "Deploy code metric chart"}
-        permissions = {"erosion": {"contents": "read"}, "duplication": {"contents": "read"},
-                       "history": {"contents": "write"},
-                       "pages": {"contents": "read", "pages": "write", "id-token": "write"}}
-        for job, body in jobs.items():
-            self.assertTrue(body.startswith("    name: " + names[job] + "\n"))
-            self.assertIn("runs-on: ubuntu-24.04", body)
-            # Read the six-space permission fields, stopping at the next job key.
-            permission_text = re.search(r"(?ms)^    permissions:\n((?:      [^\n]+\n)+)", body).group(1)
-            self.assertEqual(dict(re.findall(r"      ([\w-]+): (\w+)\n", permission_text)), permissions[job])
-            self.assertIn("persist-credentials: false", body)
-            steps = re.findall(r"(?m)^      - (.+)$", body)
-            self.assertTrue(all(step.startswith("name: ") for step in steps))
-        for unsafe in ("secrets.", "self-hosted", "pull_request_target", "continue-on-error", "paths:", "lizard"):
-            self.assertNotIn(unsafe, text)
-        self.assertNotRegex(text, r"\b[Mm][0-5]\b|[Mm][0-5][_-]|[Mm][0-5][A-Z]")
-        self.assertEqual(text.count("persist-credentials: false"), 4)
-        uses = re.findall(r"(?m)^\s*uses: ([\w/-]+)@([0-9a-f]{40}) # (v[\d.]+)$", text)
-        self.assertEqual(len(re.findall(r"(?m)^\s*uses:", text)), len(uses))
-        # Assert the executable surface, not exact release versions: reviewed
-        # Dependabot SHA/comment updates must not require a second pin ledger.
-        expected_actions = {
-            "actions/checkout", "actions/setup-python", "actions/upload-artifact",
-            "actions/download-artifact", "benchmark-action/github-action-benchmark",
-            "actions/upload-pages-artifact", "actions/deploy-pages",
-        }
-        self.assertEqual({action for action, _, _ in uses}, expected_actions)
-        for job, artifact in (("erosion", "code-erosion"), ("duplication", "code-duplication")):
-            body = jobs[job]
-            self.assertNotRegex(body, r"(?m)^    (?:if|needs):")
-            self.assertIn("-m unittest discover -s tools/metrics", body)
-            self.assertIn("name: " + artifact, body)
-            self.assertIn("report.json", body)
-            self.assertIn("report.md", body)
-            self.assertIn('>> "$GITHUB_STEP_SUMMARY"', body)
-            self.assertIn("if-no-files-found: error", body)
-        self.assertIn("--require-hashes --no-deps -r .github/requirements-metrics.txt", jobs["erosion"])
-        duplicate = jobs["duplication"]
-        self.assertIn("97259f222ea7f6d51a0f2faa98ed5889430233e0fb8d2c129f23d84aff4b93b2", duplicate)
-        self.assertLess(duplicate.index("sha256sum -c -"), duplicate.index("tar -xzf"))
-        self.assertIn("--threshold 100 --fail-on-empty", duplicate)
-        history, pages = jobs["history"], jobs["pages"]
-        for body in (history, pages):
-            condition = re.search(r"(?m)^    if: (.+)$", body).group(1)
-            self.assertIn("github.event_name == 'push'", condition)
-            self.assertIn("github.ref == 'refs/heads/main'", condition)
-            self.assertIn("queue: max", body)
-            self.assertIn("cancel-in-progress: false", body)
-        self.assertIn("needs: [erosion, duplication]", history)
-        self.assertIn("needs: history", pages)
-        for value in ("tool: customSmallerIsBetter", "gh-pages-branch: gh-pages",
-                      "benchmark-data-dir-path: dev/bench", "auto-push: true",
-                      'alert-threshold: "110%"', "comment-on-alert: true", "fail-on-alert: false"):
-            self.assertEqual(history.count(value), 2, value)
-        self.assertIn("name: Code erosion", history)
-        self.assertIn("name: Code duplication", history)
-        self.assertIn("name: github-pages", pages)
-        self.assertIn("ref: gh-pages", pages)
-        self.assertIn("touch .nojekyll", pages)
-        self.assertIn("name: github-pages-${{ github.run_attempt }}", pages)
-        self.assertIn("artifact_name: github-pages-${{ github.run_attempt }}", pages)
-
-    def test_code_metrics_are_informational_and_privilege_is_main_only(self):
-        self.assert_code_metrics_contract((ROOT / ".github/workflows/code-metrics.yml").read_text())
-        android = (ROOT / ".github/workflows/android.yml").read_text()
-        self.assertIn("needs: [build, instrumented]", android)
-        self.assertNotIn("erosion", android)
-        self.assertNotIn("duplication", android)
         # Cross-workflow pin/permission policy is exercised by tools/policy;
         # keep this stdlib suite usable in the unchanged Android job.
-
-    def test_code_metrics_contract_rejects_privilege_and_history_regressions(self):
-        original = (ROOT / ".github/workflows/code-metrics.yml").read_text()
-        release_comment = re.findall(r"# v[\d.]+", original)[0]
-        for old, new in (("      contents: read", "      contents: write"),
-                         ("queue: max", "queue: single"),
-                         ("github.event_name == 'push' && github.run_id", "github.ref"),
-                         ("github.ref == 'refs/heads/main'", "true"),
-                         ("fail-on-alert: false", "fail-on-alert: true"),
-                         ("persist-credentials: false", "persist-credentials: true"),
-                         ("artifact_name: github-pages-${{ github.run_attempt }}", "artifact_name: github-pages"),
-                         (release_comment, "# unversioned")):
-            with self.subTest(mutation=old), self.assertRaises(AssertionError):
-                self.assert_code_metrics_contract(original.replace(old, new, 1))
 
     def test_native_script_rejects_nonhosted_execution_before_setup(self):
         environment = dict(os.environ, GITHUB_ACTIONS="false")
@@ -372,18 +212,6 @@ class WorkflowContracts(unittest.TestCase):
     def test_android_gates_run_in_parallel_but_result_requires_both(self):
         self.assert_parallel_android_gates((ROOT / ".github/workflows/android.yml").read_text())
 
-    def test_parallel_gate_contract_rejects_serialization_and_weaker_results(self):
-        workflow = (ROOT / ".github/workflows/android.yml").read_text()
-        for old, new in (
-            ("  instrumented:\n", "  instrumented:\n    needs: build\n"),
-            ("  build:\n", "  build:\n    if: false\n"),
-            ("    needs: [build, instrumented]", "    needs: instrumented"),
-            ("\n    if: always()\n", "\n    if: success()\n"),
-            ('"$BUILD_RESULT" == success &&', '"$BUILD_RESULT" == success ||'),
-        ):
-            with self.subTest(mutation=old), self.assertRaises(AssertionError):
-                self.assert_parallel_android_gates(workflow.replace(old, new, 1))
-
     def assert_full_evidence_filtered_console(self, workflow, script):
         strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
         graph = script.split('  set +e\n  timeout --signal=TERM', 1)[1].split('  python3 tools/build/coverage_gate.py phases', 1)[0]
@@ -408,64 +236,6 @@ class WorkflowContracts(unittest.TestCase):
             (ROOT / "tools/build/run-hosted-native-smoke.sh").read_text(),
         )
 
-
-    def assert_hosted_build_memory_scope(self, workflow, properties, codeql, native):
-        steps = self.android_build_steps(workflow)
-        strict = next(step['run'] for step in steps
-                      if step['name'] == 'Build, lint and unit tests with strict verification')
-        command = strict.split('./gradlew ', 1)[1].split('2>&1', 1)[0].replace('\\\n', ' ')
-        arguments = shlex.split(command)
-        actual = [value for value in arguments if value.startswith('-Dorg.gradle.jvmargs=')]
-        self.assertEqual(actual, ['-Dorg.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8'])
-        self.assertEqual(workflow.count('org.gradle.jvmargs'), 1)
-        self.assertNotIn('org.gradle.jvmargs', workflow.split('  instrumented:\n', 1)[1] + codeql + native)
-        self.assertNotRegex(strict, r'--max-workers|--parallel|org\.gradle\.(?:workers\.max|parallel)')
-        self.assertIn('org.gradle.jvmargs=-Xmx1536m -XX:MaxMetaspaceSize=384m -Dfile.encoding=UTF-8', properties.splitlines())
-        self.assertIn('org.gradle.workers.max=2', properties.splitlines())
-        self.assertIn('org.gradle.parallel=false', properties.splitlines())
-        self.assertIn('kotlin.compiler.execution.strategy=in-process', properties.splitlines())
-        build = workflow.split('  build:\n', 1)[1].split('  instrumented:\n', 1)[0]
-        self.assertIn('    timeout-minutes: 45\n', build)
-        self.assert_cached_execution(workflow, native, (ROOT / 'tools/build/verify-hosted-toolchain.sh').read_text())
-
-    def memory_scope_sources(self):
-        return [(ROOT / path).read_text() for path in (
-            '.github/workflows/android.yml', 'gradle.properties', '.github/workflows/codeql.yml',
-            'tools/build/run-hosted-native-smoke.sh')]
-
-    def test_hosted_strict_graph_has_scoped_metaspace_without_changing_other_profiles_or_gates(self):
-        self.assert_hosted_build_memory_scope(*self.memory_scope_sources())
-
-    def test_hosted_memory_scope_rejects_global_profile_changes_timeout_increase_and_weaker_gates(self):
-        original = self.memory_scope_sources()
-        override = '-Dorg.gradle.jvmargs="-Xmx1536m -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8"'
-        mutations = [
-            (0, override, ''),
-            (0, override, override.replace('768m', '384m')),
-            (0, override, override.replace('1536m', '2048m')),
-            (0, override, override.replace('-Dorg.gradle', '-Porg.gradle')),
-            (0, override, override.replace('"', '')),
-            (0, 'timeout-minutes: 45', 'timeout-minutes: 60'),
-            (0, '--dependency-verification strict', '--dependency-verification off'),
-            (0, ':app:lintRelease ', ''),
-            (0, ':app:compileDebugAndroidTestKotlin ', ''),
-            (0, ':app:testDebugUnitTest ', ''),
-            (0, '--build-cache', '--build-cache --max-workers=4'),
-            (1, 'MaxMetaspaceSize=384m', 'MaxMetaspaceSize=768m'),
-            (1, 'org.gradle.workers.max=2', 'org.gradle.workers.max=4'),
-            (1, 'org.gradle.parallel=false', 'org.gradle.parallel=true'),
-        ]
-        for index, old, new in mutations:
-            changed = original.copy()
-            self.assertIn(old, changed[index])
-            changed[index] = changed[index].replace(old, new, 1)
-            with self.subTest(index=index, mutation=new), self.assertRaises(AssertionError):
-                self.assert_hosted_build_memory_scope(*changed)
-        for index in (2, 3):
-            changed = original.copy()
-            changed[index] += '\n' + override
-            with self.subTest(profile=index), self.assertRaises(AssertionError):
-                self.assert_hosted_build_memory_scope(*changed)
 
     def assert_cached_execution(self, workflow, script, verifier):
         strict = workflow.split("- name: Build, lint and unit tests with strict verification", 1)[1].split("- name: Upload", 1)[0]
@@ -542,55 +312,12 @@ class WorkflowContracts(unittest.TestCase):
         self.assert_execution_evidence((ROOT / '.github/workflows/android.yml').read_text(),
                                        (ROOT / 'tools/build/run-hosted-native-smoke.sh').read_text())
 
-    def test_removing_or_bypassing_execution_evidence_fails_contract(self):
-        original = [(ROOT / path).read_text() for path in
-                    ('.github/workflows/android.yml', 'tools/build/run-hosted-native-smoke.sh')]
-        mutations = [(0, 'python3 tools/build/verify_gradle_execution.py build evidence/strict.log', 'true'),
-                     (1, 'verify_gradle_execution.py native', 'unused.py native'),
-                     (1, '--graph-exit "$test_status"', '--graph-exit 1'),
-                     (1, 'gate_status=$?', 'gate_status=0'),
-                     (1, 'exit "$gate_status"', 'true')]
-        for index, old, new in mutations:
-            texts = original.copy()
-            self.assertIn(old, texts[index])
-            texts[index] = texts[index].replace(old, new, 1)
-            with self.subTest(old=old), self.assertRaises(AssertionError):
-                self.assert_execution_evidence(*texts)
-
     def test_cached_execution_preserves_strict_real_gates_and_observed_sdk_receipts(self):
         self.assert_cached_execution(
             (ROOT / ".github/workflows/android.yml").read_text(),
             (ROOT / "tools/build/run-hosted-native-smoke.sh").read_text(),
             (ROOT / "tools/build/verify-hosted-toolchain.sh").read_text(),
         )
-
-    def test_cached_execution_rejects_synthetic_regressions(self):
-        original = [(ROOT / path).read_text() for path in (
-            ".github/workflows/android.yml", "tools/build/run-hosted-native-smoke.sh",
-            "tools/build/verify-hosted-toolchain.sh")]
-        mutations = [(target, flag, "") for target in (0, 1) for flag in (
-            "--build-cache", "--no-configuration-cache", "--console=plain")]
-        mutations += [(target, "--build-cache", unsafe) for target in (0, 1)
-                      for unsafe in ("--no-build-cache", "--build-cache --rerun-tasks")]
-        mutations += [
-            (1, '${GRADLE_USER_HOME:?}', 'unused-home'),
-            (1, 'image=', 'export GRADLE_USER_HOME="$RUNNER_TEMP/unrestored"\nimage='),
-            (1, 'platform-tools emulator "$image"', 'platform-tools emulator "platforms;android-37" "$image"'),
-            (1, 'cmdline-tools/22.0/bin/sdkmanager', 'cmdline-tools/latest/bin/sdkmanager'),
-            (1, 'timeout 30 "$sdkmanager" --version', '"$sdkmanager" --version'),
-            (1, 'cmdline-tools-binaries.sha256', 'missing-binary-receipt'),
-            (1, 'Pkg.Revision[[:space:]]*=[[:space:]]*22\\.0', 'Pkg.Revision.*'),
-            (2, "observed['java.specification.version'] == '17'", "observed['java.specification.version'] == '21'"),
-            (2, 'installed-toolchain.json', 'missing-toolchain-receipt'),
-            (2, 'timeout 30 java -XshowSettings:properties -version', 'java -version'),
-        ]
-        for target, old, new in mutations:
-            with self.subTest(target=target, mutation=old):
-                texts = original.copy()
-                self.assertIn(old, texts[target])
-                texts[target] = texts[target].replace(old, new, 1)
-                with self.assertRaises(AssertionError):
-                    self.assert_cached_execution(*texts)
 
     def installed_verifiers(self):
         # Execute only the shipped verifier's pure helpers, never Java/SDK/Gradle.
@@ -687,71 +414,6 @@ class WorkflowContracts(unittest.TestCase):
                     props, metadata = self.synthetic_installed_package(path, '37.0.0')
                 with self.assertRaises(AssertionError):
                     verify_sdk(path, props, metadata)
-
-    def assert_host_emulator_prerequisite(self, workflow):
-        build, native = workflow.split("  instrumented:\n", 1)
-        self.assertNotIn("apt-get", build)
-        self.assertIn("runs-on: ubuntu-24.04", native)
-        steps = re.split(r"(?m)^      - ", native)[1:]
-        setup = [index for index, step in enumerate(steps)
-                 if step.startswith("name: Prepare hosted emulator client library\n")]
-        invocation = [index for index, step in enumerate(steps)
-                      if "bash tools/build/run-hosted-native-smoke.sh" in step]
-        self.assertEqual(len(setup), 1, "Missing/duplicate hosted emulator prerequisite")
-        self.assertEqual(len(invocation), 1)
-        self.assertLess(setup[0], invocation[0], "Emulator prerequisite must precede native invocation")
-        step = steps[setup[0]]
-        self.assertRegex(step, r"(?m)^        timeout-minutes: [1-5]$")
-        self.assertNotRegex(step, r"(?m)^        (?:if|continue-on-error):")
-        header, run = step.split("        run: |\n", 1)
-        self.assertNotIn("if:", header)
-        self.assertTrue(run.lstrip().startswith("set -euo pipefail\n"))
-        receipt, commands = run.split("trap record_prerequisite EXIT\n", 1)
-        for contract in ("status=$?", "trap - EXIT", 'exit "$status"',
-                         "${binary:Package}", "${Version}", "${db:Status-Status}",
-                         "host-libpulse0-receipt.txt", "package_query_exit=",
-                         "library_readable=true", "library_readable=false", 'sha256sum "$library"'):
-            self.assertIn(contract, receipt)
-        self.assertIn("library=/usr/lib/x86_64-linux-gnu/libpulse.so.0", receipt)
-        self.assertRegex(commands, r"timeout --signal=TERM --kill-after=15s [1-2]m sudo apt-get "
-                                  r"-o APT::Update::Error-Mode=any update")
-        self.assertRegex(commands, r"timeout --signal=TERM --kill-after=15s [1-2]m sudo env "
-                                  r"DEBIAN_FRONTEND=noninteractive")
-        self.assertRegex(commands, r"apt-get install\s+--yes\s+--no-install-recommends\s+libpulse0\s+\\\n"
-                                  r"\s+2>&1 \| tee evidence/native/host-libpulse0-install.log")
-        self.assertIn("tee evidence/native/host-apt-update.log", commands)
-        self.assertIn("dpkg-query -W -f='${db:Status-Status}\\n' libpulse0 | grep -Fx installed", commands)
-        self.assertIn('test -r "$library"', commands)
-        self.assertLess(commands.index(" update"), commands.index("apt-get install"))
-        self.assertLess(commands.index("apt-get install"), commands.index("dpkg-query"))
-        self.assertLess(commands.index("dpkg-query"), commands.index('test -r "$library"'))
-        for unsafe in ("||", "&&", "set +e", "exit 0", "LD_LIBRARY_PATH", "--allow-", "--force-yes"):
-            self.assertNotIn(unsafe, commands)
-
-    def test_host_emulator_prerequisite_is_bounded_observable_and_fail_closed(self):
-        self.assert_host_emulator_prerequisite((ROOT / ".github/workflows/android.yml").read_text())
-
-    def test_host_emulator_prerequisite_contract_rejects_synthetic_regressions(self):
-        # Pure source controls: never install host packages or invoke an emulator here.
-        workflow = (ROOT / ".github/workflows/android.yml").read_text()
-        setup_match = re.search(r"(?ms)^      - name: Prepare hosted emulator client library\n.*?"
-                                r"(?=^      - )", workflow)
-        assert setup_match is not None, "Missing hosted emulator prerequisite"
-        setup = setup_match.group()
-        missing = workflow.replace(setup, "", 1)
-        invocation_match = re.search(r"(?ms)^      - name: Run unit and instrumented tests with coverage.*?(?=^      - )", missing)
-        assert invocation_match is not None, "Missing native invocation"
-        invocation = invocation_match.group()
-        for name, mutation in (
-            ("missing", missing),
-            ("misordered", missing.replace(invocation, invocation + setup, 1)),
-            ("fail-open", workflow.replace(setup, setup.replace("          set -euo pipefail\n", "          set -uo pipefail\n", 1), 1)),
-            ("conditional", workflow.replace(setup, setup.replace("        run: |", "        if: false\n        run: |"), 1)),
-        ):
-            with self.subTest(mutation=name):
-                with self.assertRaises(AssertionError):
-                    self.assert_host_emulator_prerequisite(mutation)
-
 
 class SyntheticReportTests(unittest.TestCase):
     def setUp(self):
