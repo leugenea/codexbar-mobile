@@ -140,9 +140,14 @@ before claiming a warm-run gain.
 
 `org.gradle.caching=true` enables local output reuse too, including clean builds,
 branches and worktrees sharing the same Gradle user home. CI explicitly passes
-`--build-cache`. Tasks use ordinary Gradle cache, up-to-date and skip semantics;
-there is no custom execution-state gate or per-task freshness receipt. Explicit
-build, full lint, test, coverage and observation tasks remain in the hosted commands.
+`--build-cache`. Tasks use ordinary Gradle cache, up-to-date and skip semantics,
+except `testDebugUnitTest`: debug JVM coverage is enabled, and preparation runs
+before it in both hosted jobs, so this producer must generate a current-graph
+JaCoCo session rather than reuse cached outputs. Its false `outputs.upToDateWhen`
+predicate prevents both up-to-date reuse and cache loads; compilation and other
+outputs remain reusable. There is no custom execution-state gate or per-task
+freshness receipt. Explicit build, full lint, test, coverage and observation tasks
+remain in the hosted commands.
 Configuration cache remains disabled (`--no-configuration-cache`) for the existing
 coverage-phase diagnostics and init-script observation.
 

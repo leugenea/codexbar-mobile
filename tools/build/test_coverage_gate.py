@@ -110,6 +110,17 @@ class CoverageContracts(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.validate(inventory=inventory)
 
+    def test_restored_jvm_session_rejects_even_with_current_file_time_and_fresh_native_data(self):
+        # Synthetic cache restore: new filesystem time does not renew the embedded session.
+        restored = copy.deepcopy(self.inventory)
+        jvm = restored["datasets"][0]
+        jvm["sessions"] = [{"startMillis": 1000, "dumpMillis": 2000}]
+        with self.assertRaisesRegex(ValueError, "Stale JaCoCo session: synthetic.exec"):
+            self.validate(inventory=restored)
+        # Only a newly produced JVM session repairs this otherwise compatible union.
+        jvm["sessions"] = [{"startMillis": 5500, "dumpMillis": 6000}]
+        self.assertEqual(set(self.validate(inventory=restored)), {"synthetic/Activity"})
+
     def test_stale_wrong_sha_run_attempt_and_future_context_reject(self):
         for key in (*coverage_gate.IDENTITY_KEYS, "startedMillis"):
             context = dict(self.context)
@@ -250,6 +261,15 @@ class CoverageContracts(unittest.TestCase):
                 result = json.loads((evidence / 'task-phase-outcomes.json').read_text())
                 self.assertEqual(result['scriptExit'], 0)
                 self.assertEqual(result['identity'], self.identity)
+
+    def test_only_jvm_coverage_producer_has_the_freshness_override(self):
+        # Source wiring only: actual Gradle execution/cache behavior is hosted-only.
+        build = (ROOT / "app/build.gradle").read_text()
+        wiring = build.split("tasks.configureEach { task ->", 1)[1].split("def coverageInputs =", 1)[0]
+        self.assertIn("task.dependsOn prepareCoverage", wiring)
+        self.assertRegex(wiring, r"if \(task\.name == 'testDebugUnitTest'\) \{[^{}]*"
+                         r"task\.outputs\.upToDateWhen \{ false \}\s*\}")
+        self.assertEqual(build.count("outputs.upToDateWhen"), 1)
 
     def test_scoped_full_production_wiring_and_always_running_result(self):
         build = (ROOT / "app/build.gradle").read_text()
