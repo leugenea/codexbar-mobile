@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793341307567,
+  "lastUpdate": 1793358189221,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -3117,6 +3117,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/90be9c5709a0c407465d48779040613a0d338f15"
         },
         "date": 1793341305202,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9c91474358bd2b2a4802f6b897286dca35688be5",
+          "message": "Remove host screenshot validation and Pillow tooling (#221)\n\n* refactor: remove host screenshot audit and Pillow tooling\n\n* fix: execute JVM coverage producer with fresh session",
+          "timestamp": "2026-10-30T14:02:45+03:00",
+          "tree_id": "f70ed50f9e3aa8b10781bf5e3b03496ebfea2a74",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/9c91474358bd2b2a4802f6b897286dca35688be5"
+        },
+        "date": 1793358188525,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
