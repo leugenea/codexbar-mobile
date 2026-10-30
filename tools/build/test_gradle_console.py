@@ -73,7 +73,7 @@ class GradleConsoleTests(unittest.TestCase):
                 self.assertEqual(result.stdout, text)
 
     def test_kept_line_is_readable_before_producer_closes_stdin(self):
-        line = b'GATE_TASK_OUTCOME :app:lintDebug SUCCESS\r\n'
+        line = b'> Task :app:lintDebug UP-TO-DATE\r\n'
         with subprocess.Popen(['bash', str(FILTER)], stdin=subprocess.PIPE,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0) as process:
             assert process.stdin is not None
@@ -162,7 +162,7 @@ class GradleConsoleTests(unittest.TestCase):
             for source in (FILTER, ROOT / 'tools/build/filter_gradle_console.py'):
                 shutil.copyfile(source, tools / source.name)
             # Parser doubles isolate log-pipeline exits; real gate semantics are tested separately.
-            for filename in ("verify_manifests.py", "verify_test_reports.py", "verify_gradle_execution.py"):
+            for filename in ("verify_manifests.py", "verify_test_reports.py"):
                 (tools / filename).write_text("from pathlib import Path\nPath('parsers-ran').touch()\n")
             (base / "evidence/native/attempt-1").mkdir(parents=True)
             (base / "gradlew").write_text(

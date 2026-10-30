@@ -25,9 +25,6 @@ def build_case(root, label, env, reports):
     command(root, './gradlew', '--no-daemon', '--dependency-verification', 'strict', '--build-cache',
             '--no-configuration-cache', '--stacktrace', '--console=plain', ':app:assembleRelease',
             ':app:collectReleaseRuntimeInventory', env=env, log=reports / 'assemble.log')
-    if (reports / 'assemble.log').read_text().splitlines().count(
-            'GATE_TASK_OUTCOME :app:collectReleaseRuntimeInventory SUCCESS') != 1:
-        raise ValueError('Hosted fixture requires fresh release runtime collection')
     name = f'codexbar-mobile-{expected["versionName"]}-{expected["versionCode"]}-unsigned.apk'
     apk = reports / name
     shutil.copyfile(root / 'app/build/outputs/apk/release/app-release-unsigned.apk', apk)

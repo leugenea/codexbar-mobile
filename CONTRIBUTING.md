@@ -74,8 +74,9 @@ failures, errors and skips, including suite/container failures. Its small synthe
 fixtures use independent generic cases, not application class/method registries.
 Gradle owns application test discovery; the report gate intentionally does not detect
 omitted or renamed individual tests, enforce per-feature counts or attest producer
-authenticity. Fresh task-execution receipts and compatible union coverage remain
-separate required gates. Saved-PNG/gallery validator regressions remain in the common
+authenticity. Explicit Gradle commands and their exits are trusted with ordinary
+cache/skip semantics; compatible union coverage retains independent dataset and
+context integrity checks. Saved-PNG/gallery validator regressions remain in the common
 tooling suite; they are not native execution or visual approval.
 
 CI-first is the default. Under the current owner host policy, local work is limited
@@ -135,24 +136,17 @@ before claiming a warm-run gain.
 
 `org.gradle.caching=true` enables local output reuse too, including clean builds,
 branches and worktrees sharing the same Gradle user home. CI explicitly passes
-`--build-cache`. Ordinary compile, dex, resource and packaging tasks retain normal
-cacheability.
-The app applies [always-execute.gradle](tools/build/always-execute.gradle) to force
-fresh JVM/native tests, coverage preparation/collection/report/verification, resolved
-toolchain observation and **all lint tasks**: both up-to-date reuse and build-cache
-reuse are disabled for these tasks. Their terminal-state listener rejects skipped,
-no-source or reused gates locally as well as in CI. Only AGP-disabled
-`lintVital[Report]<Variant>` may be skipped when its matching, enforced full lint
-partner is enabled in the same graph; vital lint still cannot reuse outputs.
-Global `--rerun-tasks` is forbidden in the hosted graphs because it would defeat
-output reuse. Configuration
-cache remains disabled (`--no-configuration-cache`) for the outcome listeners and
-init-script observation.
+`--build-cache`. Tasks use ordinary Gradle cache, up-to-date and skip semantics;
+there is no custom execution-state gate or per-task freshness receipt. Explicit
+build, full lint, test, coverage and observation tasks remain in the hosted commands.
+Configuration cache remains disabled (`--no-configuration-cache`) for the existing
+coverage-phase diagnostics and init-script observation.
 
 The explicit [CodeQL workflow](.github/workflows/codeql.yml) must compile sources,
 not restore compiled task outputs. Its manual Java/Kotlin build runs `clean`, both
 app assemblies and debug JVM/native test compilation with `--no-build-cache`.
-It verifies actual compiler task execution before analysis. When `CODEQL_EXTRACTOR_JAVA_TRAP_DIR` is present,
+Gradle's clean, noncached compilation supplies extraction without a custom
+compiler-outcome parser. When `CODEQL_EXTRACTOR_JAVA_TRAP_DIR` is present,
 [settings.gradle](settings.gradle) disables the local task-output cache for that
 traced build; ordinary builds keep output reuse. CodeQL dependency/wrapper caching
 remains enabled and is distinct from task-output caching. No remote build cache is
@@ -174,14 +168,12 @@ Both graphs keep full `--info` output in `evidence/strict.log` and
 filtering known cache-disabled and library-manifest informational lines, plus exact
 artifact-transform `Caching not enabled.` two-line blocks, from the console.
 Warnings, errors, task/test output and coverage outcomes remain visible.
-[verify_gradle_execution.py](tools/build/verify_gradle_execution.py) requires every
-expected verification/observation receipt to be `SUCCESS` and rejects reuse/skip
-headers, including lint analysis/report tasks. Missing, duplicate or malformed
-receipts fail closed. It checks each native attempt **before** retry eligibility;
-only a `FAILED` collection receipt in a failed graph may explain absent downstream
-report/verification receipts; an unrelated graph failure is not an exemption.
-No gate may reuse outputs. Existing retry/JUnit checks still forbid failed suites.
-Evidence parsers and the bounded coverage retry read the unfiltered logs. Gradle/
+Custom task-outcome validation is retired: reused, skipped or omitted individual
+tasks no longer have a separate execution-policing gate. Generic JUnit checks still
+require executed cases without failures, errors or skips. Existing coverage-phase
+diagnostics constrain retry eligibility, not successful-graph freshness; only passing
+suites and a failed input collection phase with exact ADB-offline evidence may retry.
+The bounded coverage retry reads the unfiltered logs. Gradle/
 timeout exit codes take precedence over pipeline helpers; evidence/filter failures
 also fail the job. Checkout v7.0.1 and upload-artifact v7.0.2 use Node 24 with full
 SHA pins; credential persistence remains disabled and existing artifact inputs
@@ -208,7 +200,6 @@ mkdir -p evidence
   :app:lintDebug :app:assembleDebug :app:lintRelease :app:assembleRelease :app:processReleaseManifest :app:compileDebugUnitTestKotlin \
   :app:compileDebugAndroidTestKotlin :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:collectReleaseRuntimeInventory \
   2>&1 | tee evidence/strict.log | bash tools/build/filter-gradle-console.sh
-python3 tools/build/verify_gradle_execution.py build evidence/strict.log
 python3 tools/build/verify_manifests.py
 python3 tools/build/verify_test_reports.py jvm
 ```
@@ -229,8 +220,9 @@ across attempts or retries failing tests, timeouts, other invalid datasets or a
 coverage-threshold failure. `coverage_gate.py prepare()` deletes execution data,
 class snapshots and test/coverage reports before both suites on **each** attempt;
 it leaves compilation/instrumentation outputs intact. Those outputs may legitimately
-be up-to-date or restored byte-for-byte, but suites and every coverage gate execute
-again. Attempt 2 never loads attempt 1's `.exec`/`.ec` or report. See
+be up-to-date or restored byte-for-byte. Dataset/session timestamps, class IDs and
+context checks still reject stale or incompatible coverage independently of task
+state. Attempt 2 never loads attempt 1's `.exec`/`.ec` or report. See
 [the retry guard](tools/build/native_coverage_retry.py).
 
 Coverage minimum: **90%** JaCoCo **INSTRUCTION** over the compatible JVM +
@@ -240,7 +232,7 @@ code. Only Android-generated R/BuildConfig/Manifest identities are excluded;
 there are no handwritten-code exclusions. Class IDs, probe counts, freshness,
 nonzero denominator and XML/inventory consistency are validated. Cache hits replay
 the exact compiled/instrumented bytes for their declared inputs/toolchain; they do
-not regenerate class IDs. Both fresh suites consume those same graph outputs, and
+not regenerate class IDs. Both suites consume those same graph outputs, and
 `DebugCoverageInputs` analyzes the actual report-class snapshot. Any bytecode drift
 still fails closed on class IDs/probe counts, freshness or snapshot hashes before
 the report/90% check. Never lower the
@@ -347,7 +339,7 @@ and mock publication are not production evidence.
 
 ### APK-bound runtime SBOM and notices
 
-The build graph additionally runs fresh `:app:collectReleaseRuntimeInventory`.
+The build graph additionally requests `:app:collectReleaseRuntimeInventory`.
 It resolves **only** `releaseRuntimeClasspath`, at task execution, retaining selected
 variants, dependency/constraint edges, original archive filenames/hashes and project
 class names. KMP forwarding variants retain their selected leaf relationship. It

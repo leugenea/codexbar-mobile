@@ -1,10 +1,8 @@
-"""Source/YAML and synthetic compiler evidence contracts; no real tool execution."""
+"""Release build wiring and runtime inventory contracts; no real tool execution."""
 from pathlib import Path
 import subprocess
 import sys
 import unittest
-
-from verify_gradle_execution import validate, REQUIRED
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -13,7 +11,7 @@ class ReleasePipelineTests(unittest.TestCase):
     def test_new_android_consumers_import_without_policy_site_packages(self):
         # Schema validation is explicit; SDK/runtime consumers remain stdlib-only at import.
         consumers = ('test_release_pipeline', 'test_release_artifact', 'test_version_identity',
-                     'release_artifact', 'version_identity', 'hosted_release_fixtures', 'verify_gradle_execution',
+                     'release_artifact', 'version_identity', 'hosted_release_fixtures',
                      'release_runtime', 'release_bundle', 'test_release_runtime', 'test_release_bundle')
         script = 'import importlib, sys; sys.path.insert(0, sys.argv[1]); ' \
                  '[importlib.import_module(name) for name in sys.argv[2:]]'
@@ -22,18 +20,7 @@ class ReleasePipelineTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_release_lint_preserves_only_agp_redundant_vital_suppression(self):
-        log = '\n'.join('GATE_TASK_OUTCOME :app:' + name + ' SUCCESS' for name in REQUIRED['build'])
-        for name in ('lintVitalRelease', 'lintVitalReportRelease'):
-            valid = log + f'\nGATE_TASK_OUTCOME :app:{name} SKIPPED\n> Task :app:{name} SKIPPED'
-            validate(valid, 'build')
-            partner = name.replace('Vital', '')
-            with self.assertRaises(ValueError):
-                validate(valid.replace(partner + ' SUCCESS', partner + ' SKIPPED'), 'build')
-            with self.assertRaises(ValueError):
-                validate(valid.replace(f'{name} SKIPPED', f'{name} FROM_CACHE'), 'build')
-
-    def test_runtime_observation_is_release_only_and_fresh_without_application_changes(self):
+    def test_runtime_observation_is_release_only_without_application_changes(self):
         app = (ROOT / 'app/build.gradle').read_text()
         collector = app.split('abstract class ReleaseRuntimeInputs', 1)[1].split('// One resolver', 1)[0]
         for text in ('runtimeConfiguration.incoming.resolutionResult.allComponents',
@@ -47,8 +34,6 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn('SingleArtifact.APK.INSTANCE', registration)
         self.assertIn('ScopedArtifacts.Scope.PROJECT', registration)
         self.assertIn("destination.set(layout.buildDirectory.dir('runtime-release'))", registration)
-        self.assertIn('collectReleaseRuntimeInventory', REQUIRED['build'])
-        self.assertNotIn('collectReleaseRuntimeInventory', REQUIRED['native'])
 
     def test_selected_archive_identity_is_shared_with_fail_closed_consumer(self):
         collector = (ROOT / 'app/build.gradle').read_text().split(

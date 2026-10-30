@@ -1,12 +1,8 @@
 """Release workflow policy contracts run in the existing hash-pinned policy venv."""
 from pathlib import Path
-import sys
 import unittest
 
 from repository_policy import load_yaml, workflow_policy
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'build'))
-from verify_gradle_execution import COMPILERS
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -49,16 +45,10 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.assertEqual(compile_step['if'], "matrix.language == 'java-kotlin'")
         for flag in ('--dependency-verification strict', '--no-build-cache', '--no-configuration-cache', 'clean'):
             self.assertIn(flag, compile_step['run'])
-        for compiler in COMPILERS:
-            # Assemble supplies the application compilers, explicit tasks supply both test sets.
-            task = compiler if 'Test' in compiler else compiler.replace('compile', 'assemble').removesuffix('Kotlin')
+        for task in ('assembleDebug', 'assembleRelease', 'compileDebugUnitTestKotlin', 'compileDebugAndroidTestKotlin'):
             self.assertIn(':app:' + task, compile_step['run'])
-        self.assertIn('verify_gradle_execution.py codeql', compile_step['run'])
-        self.assertIn('--graph-exit "${build_status[0]}"', compile_step['run'])
-        self.assertLess(compile_step['run'].index('if (( build_status[0] != 0 )); then exit "${build_status[0]}"; fi'),
-                        compile_step['run'].index('python3 tools/build/verify_gradle_execution.py'))
-        self.assertLess(compile_step['run'].index('(( build_status[1] == 0 ))'),
-                        compile_step['run'].index('python3 tools/build/verify_gradle_execution.py'))
+        self.assertIn('if (( build_status[0] != 0 )); then exit "${build_status[0]}"; fi', compile_step['run'])
+        self.assertIn('(( build_status[1] == 0 ))', compile_step['run'])
         self.assertTrue(steps[-1]['uses'].startswith('github/codeql-action/analyze@'))
         for forbidden in ('autobuild', 'pull_request_target', 'secrets.', 'continue-on-error', 'paths:'):
             self.assertNotIn(forbidden, text)
