@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793341305583,
+  "lastUpdate": 1793341307567,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -6213,6 +6213,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/1b54e542e9871beee2b8f914519111760cc5a7b2"
         },
         "date": 1793300535673,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "90be9c5709a0c407465d48779040613a0d338f15",
+          "message": "refactor: remove custom Gradle execution policing (#218)",
+          "timestamp": "2026-10-30T09:21:22+03:00",
+          "tree_id": "16d8e1721a3d71908754e45ff81c6f57dd293e70",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/90be9c5709a0c407465d48779040613a0d338f15"
+        },
+        "date": 1793341307349,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
