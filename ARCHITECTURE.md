@@ -1478,15 +1478,13 @@ basic provider [hashes Gradle build files](https://github.com/gradle/actions/blo
 and intentionally has [no restore keys](https://github.com/gradle/actions/blob/3f5f9adaf7d9fecd50b5935e54106014257a94e6/sources/src/cache-service-basic.ts#L25-L39),
 so the first run after dependency/build-script changes starts with a cold home.
 
-The app-applied `always-execute.gradle` disables up-to-date and cache reuse for
-JVM/native suites, coverage preparation/collection/report/verification, all lint
-analysis/report tasks and toolchain observation, while compile/dex/resource/package
-outputs remain reusable. Local terminal-state checks and hosted full-log evidence
-checks reject reused/skipped/no-source gates; the native check precedes each retry.
-Only AGP-disabled redundant vital lint report/text tasks may be skipped with their
-same-variant enforced full lint partner enabled in the graph, never reused.
-Configuration cache remains off because these listeners and the init observation
-are not configuration-cache compatible. Cached compile/instrumentation outputs
+Explicit build/lint/test/coverage commands use ordinary Gradle cache, up-to-date and
+skip semantics. Custom execution-policing observers and log validators are retired;
+individual task execution/freshness is not independently attested. Generic JUnit
+validation still rejects empty reports, failures, errors and skips. Existing coverage
+phases remain diagnostic and constrain the narrow infrastructure-only retry, not
+successful-graph task freshness. Configuration cache remains off for those phase
+diagnostics and the init observation. Cached compile/instrumentation outputs
 replay identical bytes, so caching itself cannot change JaCoCo class IDs; actual
 class-ID/probe/freshness/snapshot checks still fail closed on any drift. Preparation
 deletes all coverage/test data and snapshots each attempt, not compiled outputs;

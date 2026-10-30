@@ -70,9 +70,10 @@ Sources: [Android](../.github/workflows/android.yml),
 The checked-in [advanced CodeQL workflow](../.github/workflows/codeql.yml) preserves
 `actions`, `java-kotlin` and `python`, default queries and the remote threat model,
 with PR/main/manual/weekly events. Its Java/Kotlin manual build compiles debug and
-release application sources plus debug JVM/native test sources; it rejects skipped
-or reused compiler tasks. Successful analysis and extracted-file coverage require
-actual hosted evidence, not a source claim. Fork PRs use credential-free checkout,
+release application sources plus debug JVM/native test sources using `clean` and
+`--no-build-cache`, without custom compiler-outcome validation. Successful analysis
+and extracted-file coverage require actual hosted evidence, not a source claim.
+Fork PRs use credential-free checkout,
 no secrets and GitHub's unprivileged pull-request code-scanning upload behavior.
 Only analysis jobs request `security-events: write`; all checkouts use contents read.
 

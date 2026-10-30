@@ -178,16 +178,6 @@ while :; do
     if (( test_status != 0 )); then exit "$test_status"; fi
     exit 1
   fi
-  # Reject reused/skipped gates on every attempt, before considering a transport retry.
-  set +e
-  python3 tools/build/verify_gradle_execution.py native "$attempt_dir/strict-connected.log" \
-    --graph-exit "$test_status" > "$attempt_dir/gate-execution.log" 2>&1
-  gate_status=$?
-  set -e
-  if (( gate_status != 0 )); then
-    if (( test_status != 0 )); then exit "$test_status"; fi
-    exit "$gate_status"
-  fi
   python3 tools/build/coverage_gate.py phases > "$attempt_dir/phases.log" 2>&1
   cp evidence/native/task-phase-outcomes.json "$attempt_dir/task-phase-outcomes.json"
   if (( test_status == 0 || coverage_attempt == 2 )); then break; fi

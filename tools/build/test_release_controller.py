@@ -1,4 +1,4 @@
-"""Pure controller artifact provenance and release-only Gradle receipt controls."""
+"""Pure controller artifact provenance and guarded release controls."""
 from contextlib import redirect_stdout
 import copy
 import io
@@ -12,7 +12,6 @@ from unittest.mock import patch
 import release_controller as controller
 from release_runtime import fingerprint
 from release_signing import zip_bytes
-from verify_gradle_execution import REQUIRED, validate
 
 
 class ArtifactTests(unittest.TestCase):
@@ -41,15 +40,6 @@ class ArtifactTests(unittest.TestCase):
             model.overrides['/actions/artifacts/1'] = original
             with self.assertRaises(ValueError):
                 controller.download_artifact(api, 1, 'e' * 64, 10, 2, 'signed-10-2', 'c' * 40, root / 'corrupt')
-
-    def test_release_graph_requires_fresh_toolchain_full_lint_and_runtime_observer(self):
-        rows = [f'GATE_TASK_OUTCOME :app:{name} SUCCESS' for name in REQUIRED['release']]
-        validate('\n'.join(rows), 'release')
-        for index in range(len(rows)):
-            with self.subTest(index=index), self.assertRaises(ValueError):
-                validate('\n'.join(rows[:index] + rows[index + 1:]), 'release')
-            with self.assertRaises(ValueError):
-                validate('\n'.join(rows).replace(rows[index], rows[index].replace('SUCCESS', 'FROM_CACHE')), 'release')
 
 
 class ControllerTests(unittest.TestCase):

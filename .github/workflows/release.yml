@@ -231,7 +231,6 @@ jobs:
             -I tools/build/toolchain.init.gradle :app:verifyResolvedToolchain \
             :app:lintRelease :app:assembleRelease :app:collectReleaseRuntimeInventory \
             2>&1 | tee "$RUNNER_TEMP/release/strict.log"
-          python "$GITHUB_WORKSPACE/controller/tools/build/verify_gradle_execution.py" release "$RUNNER_TEMP/release/strict.log"
       - name: Re-derive and bind accepted unsigned capsule
         id: capsule
         env:

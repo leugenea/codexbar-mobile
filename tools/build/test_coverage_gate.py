@@ -1,5 +1,6 @@
 """Quick offline coverage contracts. Every runtime-like value here is explicitly synthetic."""
 import copy
+from contextlib import chdir
 import itertools
 import json
 import os
@@ -233,6 +234,22 @@ class CoverageContracts(unittest.TestCase):
                           {"build": {"result": "success"}, "instrumented": {}, "extra": {"result": "success"}}):
             with self.assertRaises(ValueError):
                 coverage_gate.result_truth_table(malformed)
+
+    def test_successful_graph_phase_diagnostics_do_not_police_task_freshness(self):
+        with tempfile.TemporaryDirectory(dir=SCRATCH) as temporary, chdir(temporary):
+            evidence = Path('evidence/native')
+            evidence.mkdir(parents=True)
+            (evidence / 'boot-success.txt').touch()
+            # Missing/reused/skipped task receipts are not a second success gate.
+            for log in ('', 'COVERAGE_TASK_OUTCOME :app:testDebugUnitTest UP_TO_DATE\n'
+                            'COVERAGE_TASK_OUTCOME :app:jacocoDebugReport SKIPPED\n'):
+                (evidence / 'strict-connected.log').write_text(log)
+                with patch('sys.argv', ['coverage_gate.py', 'phases', '--exit', '0']), patch.object(
+                        coverage_gate, 'current_identity', return_value=self.identity):
+                    coverage_gate.main()
+                result = json.loads((evidence / 'task-phase-outcomes.json').read_text())
+                self.assertEqual(result['scriptExit'], 0)
+                self.assertEqual(result['identity'], self.identity)
 
     def test_scoped_full_production_wiring_and_always_running_result(self):
         build = (ROOT / "app/build.gradle").read_text()
