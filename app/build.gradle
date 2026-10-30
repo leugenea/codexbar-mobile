@@ -359,6 +359,11 @@ tasks.configureEach { task ->
     if (task.name in ['testDebugUnitTest', 'connectedDebugAndroidTest']) {
         task.dependsOn prepareCoverage
     }
+    if (task.name == 'testDebugUnitTest') {
+        // This coverage-enabled producer needs a new JaCoCo session after preparation.
+        // A false predicate also prevents cache loads; compilation remains reusable.
+        task.outputs.upToDateWhen { false }
+    }
 }
 
 def coverageInputs = tasks.register('collectDebugCoverageInputs', DebugCoverageInputs) {

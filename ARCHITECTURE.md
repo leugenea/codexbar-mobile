@@ -915,8 +915,8 @@ production navigation are separate layers described below.
 `HistoryTextComponentTest` cases add native labels, semantics, controls and text
 layout plus synthetic portrait/light, landscape/dark and large-font captures.
 The native artifact upload includes AGP additional-test-output PNGs and observed
-configuration metadata; its fail-closed collector requires all declared captures.
-Capture collection is not visual approval: independent actual-image inspection and
+configuration metadata without a separate host capture validator.
+Capture production is not visual approval: independent actual-image inspection and
 exact-head hosted native/coverage evidence remain required. All preceding 77 native
 cases, dependencies, permissions and the coverage denominator/threshold are retained.
 
@@ -946,9 +946,9 @@ preservation. Eight mandatory `HistoryChartComponentTest` cases exercise product
 Canvas pixels, dashed gaps, singleton-tick/straight-edge visibility, continuous run bridges,
 labels/semantics/layout and reachable details across phone portrait/landscape,
 light/dark and doubled font scale. Six synthetic chart PNGs extend the existing
-collector without removing its four textual PNGs or 85 inherited native identities.
-The collector validates decoded pixels/configuration and observed root-contained
-Canvas metadata, not visual approval. Hosted execution, compatible whole-app >=90%
+native artifact gallery without removing its four textual PNGs or 85 inherited native
+identities. Pixel/configuration and root-contained Canvas assertions remain native;
+there is no independent host PNG/metadata audit. Hosted execution, compatible whole-app >=90%
 INSTRUCTION coverage and independent exact-candidate actual-image inspection remain
 acceptance gates; compilation alone proves none of them. Owner/navigation integration
 and the conditional assembled acceptance contract are described below.
@@ -1128,9 +1128,10 @@ and unknown-reset assembled captures now show stored text, with no archived Canv
 arbitrary-period paint expectations are replaced by the new current light/dark campaign.
 Reusable component fixtures still cover arbitrary input geometry. All 19 existing gallery
 names/configurations remain required, plus two current production captures (21 total).
-Native current-period tests assert the exact key/selected ordinals. The collector checks
-registered default Material3 measured/reference targets, physical bounds, +/-12 color tolerance,
-PNG decode/sample equality, source/run/attempt/configuration and fail-closed uniqueness.
+Native current-period tests assert the exact key/selected ordinals, registered default
+Material3 measured/reference targets, physical bounds and +/-12 color tolerance.
+Saved PNGs and sidecars remain available for review; the host no longer independently
+checks decoded sample equality, provenance/configuration or gallery uniqueness.
 
 ## Assembled history acceptance and original-parent map (M4b-4)
 
@@ -1159,23 +1160,21 @@ driver checks complete labels/details after reaching them rather than claiming a
 history page fits in one image. The campaign is not a full configuration Cartesian product,
 a blanket contrast certification or a physical-device accessibility audit.
 
-The four assembled identities remain mandatory alongside all inherited and new
-current-period identities. The collector retains the twelve earlier history captures
-and five assembled viewports, adds two current viewports and keeps both live-usage
-images, observed API/configuration, real screen roots/routes/controls, per-file
-hashes and checkout/source-head/run/attempt provenance. The assembled single and
-two current Canvas captures retain independent unclipped/clipped bounds; registered Bitmap pixel samples
-are compared again with bounded decoded RGB/RGBA PNG pixels on the host, so metadata or
-filenames alone cannot establish painted observations/edges, run bridges or dash gaps.
-Explicitly synthetic parser controls reject omitted/failed/errored/skipped methods,
-missing images, configuration drift, clipping, false paint receipts and changed PNG pixels.
-The tooling-only hash-pinned Pillow decoder verifies and loads bounded saved PNGs;
-the collector no longer implements PNG chunks, filters or scanline reconstruction.
-Owner/page/request counters, current selected-ordinal/high-water receipts and dashboard
-host/window bookkeeping remain native behavioral assertions, not a second host-side
-metadata oracle. Capture tests keep representative failures rather than per-field,
-per-image mutation matrices or codec self-tests. This deliberately drops those redundant
-diagnostics, not required native execution or independent actual-image review.
+The assembled and current-period native tests retain their screenshot producers,
+observed configuration, roots/routes/controls, unclipped/clipped bounds and Bitmap
+pixel assertions. The complete gallery contains 19 history, two live-usage and seven
+dashboard images (28 total), with their native JSON sidecars. AGP transfers the
+additional test outputs, and the unchanged all-outcome native artifact upload retains
+them for independent actual-image review.
+
+There is no independent host PNG decoder or gallery/metadata/clipping/accessibility
+validator, synthetic validator suite or aggregate capture receipt. Missing, duplicate,
+corrupt or substituted saved PNGs, sidecar drift, decoded-pixel/sample disagreement,
+gallery-wide density and source/run/attempt provenance no longer fail a separate
+Python gate. Native layout, accessibility, paint, owner/page/request counters,
+selected-ordinal/high-water and dashboard host/window assertions remain in the
+instrumented suites. This intentionally drops the host's independent diagnostics,
+not native UI coverage or the requirement to inspect actual images.
 
 Final original-parent acceptance remains conditional on independent full-diff review,
 exact-head hosted compilation/lint/JVM/native execution, compatible whole-handwritten
@@ -1201,13 +1200,14 @@ extents and reachable refresh/history controls. Existing landscape, malformed,
 unavailable, stale/error, exhausted, banked and lifecycle cases remain
 mandatory; this adds no duplicate lifecycle campaign.
 
-The existing collector keeps all 17 history images and additionally requires
-`live-usage-portrait-light` and `live-usage-portrait-dark`. Live metadata identifies
+The native gallery includes `live-usage-portrait-light` and
+`live-usage-portrait-dark`. Live metadata identifies
 the actual screen, production Activity, observed US resource locale, density/font
 scale and visible facts. Registered samples refer to the exact saved root bitmap
-and native owner bounds; the host compares decoded PNG bytes with each receipt.
-API 36 and gallery-wide density constraints remain in force, with separate live
-screen/locale identities. Native execution, lint, compatible whole-handwritten
+and native owner bounds; there is no second comparison against saved PNG bytes on
+the host. Native tests retain API 36, effective configuration and separate live
+screen/locale assertions without a host gallery-wide density gate. Native execution,
+lint, compatible whole-handwritten
 >=90% INSTRUCTION union, independent exact-source review and individual actual-PNG
 inspection remain hosted/delivery gates; source/compile/parser checks do not prove
 runtime paint or visual acceptance. The actual reported phone reset cause remains unknown.

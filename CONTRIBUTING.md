@@ -42,7 +42,7 @@ ShellCheck 0.11.0 on PATH (or select binaries with `ACTIONLINT`/`SHELLCHECK`):
 uv venv -p /usr/bin/python3.13 ../codexbar-check-venv
 uv pip install --python ../codexbar-check-venv/bin/python --require-hashes --no-deps \
   -r .github/requirements-policy.txt -r tools/research/requirements.txt \
-  -r .github/requirements-metrics.txt -r .github/requirements-captures.txt
+  -r .github/requirements-metrics.txt
 CHECK_PYTHON=../codexbar-check-venv/bin/python bash tools/check.sh
 git diff --check
 ```
@@ -52,8 +52,6 @@ public contribution-safety checks, pinned Dependabot schema validation, shell pa
 ShellCheck and actionlint. It does not build Android or install an SDK/emulator.
 It fetches the pinned schema unless `DEPENDABOT_SCHEMA` supplies a checksum-valid
 offline copy. Hash locks cover the supported wheel platform, not every platform.
-Pillow is a tooling-only dependency for bounded saved-PNG decoding/sample checks;
-the capture lock also supports the Android runner's Python 3.12 and local 3.14.
 
 Documentation links, command/catalogue lists, prose and the check-context table are
 reviewed as documentation, not enforced by a parallel Python inventory. Public
@@ -76,8 +74,14 @@ Gradle owns application test discovery; the report gate intentionally does not d
 omitted or renamed individual tests, enforce per-feature counts or attest producer
 authenticity. Explicit Gradle commands and their exits are trusted with ordinary
 cache/skip semantics; compatible union coverage retains independent dataset and
-context integrity checks. Saved-PNG/gallery validator regressions remain in the common
-tooling suite; they are not native execution or visual approval.
+context integrity checks. Native screenshot producers, pixel/layout/accessibility
+assertions and PNG/JSON sidecars remain in the existing instrumented suites. The
+all-outcome native artifact upload retains the complete 28-image history/live/dashboard
+gallery through AGP's additional-test-output directory for independent actual-image
+review. There is no separate host PNG decoder, gallery/metadata/clipping/accessibility
+audit or aggregate capture receipt; missing, duplicate, corrupt or mismatched saved
+images no longer fail an independent Python gate. Native tests and visual review
+remain distinct requirements.
 
 CI-first is the default. Under the current owner host policy, local work is limited
 to quick static/pure tooling checks and compilation/assembly when separately useful;
@@ -136,9 +140,14 @@ before claiming a warm-run gain.
 
 `org.gradle.caching=true` enables local output reuse too, including clean builds,
 branches and worktrees sharing the same Gradle user home. CI explicitly passes
-`--build-cache`. Tasks use ordinary Gradle cache, up-to-date and skip semantics;
-there is no custom execution-state gate or per-task freshness receipt. Explicit
-build, full lint, test, coverage and observation tasks remain in the hosted commands.
+`--build-cache`. Tasks use ordinary Gradle cache, up-to-date and skip semantics,
+except `testDebugUnitTest`: debug JVM coverage is enabled, and preparation runs
+before it in both hosted jobs, so this producer must generate a current-graph
+JaCoCo session rather than reuse cached outputs. Its false `outputs.upToDateWhen`
+predicate prevents both up-to-date reuse and cache loads; compilation and other
+outputs remain reusable. There is no custom execution-state gate or per-task
+freshness receipt. Explicit build, full lint, test, coverage and observation tasks
+remain in the hosted commands.
 Configuration cache remains disabled (`--no-configuration-cache`) for the existing
 coverage-phase diagnostics and init-script observation.
 

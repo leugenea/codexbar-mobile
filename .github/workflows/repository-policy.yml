@@ -27,14 +27,13 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.13'
-      - name: Install hash-pinned policy, research, metrics and capture dependencies
+      - name: Install hash-pinned policy, research and metrics dependencies
         run: |
           python -m venv "$RUNNER_TEMP/policy-venv"
           "$RUNNER_TEMP/policy-venv/bin/python" -m pip install --require-hashes --no-deps \
             -r .github/requirements-policy.txt \
             -r tools/research/requirements.txt \
-            -r .github/requirements-metrics.txt \
-            -r .github/requirements-captures.txt
+            -r .github/requirements-metrics.txt
       - name: Install checksum-verified actionlint 1.7.12 and ShellCheck 0.11.0
         run: |
           set -euo pipefail
