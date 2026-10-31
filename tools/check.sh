@@ -24,7 +24,7 @@ done
 "$actionlint" --version
 "$shellcheck" --version
 # tools/policy discovery includes public contribution and private-reporting safety.
-for suite in tools/build tools/research tools/metrics tools/policy; do
+for suite in tools/build tools/metrics tools/policy; do
   "$python" -B -m unittest discover -s "$suite" -p 'test_*.py' -v
 done
 schema_args=()

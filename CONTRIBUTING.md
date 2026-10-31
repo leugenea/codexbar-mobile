@@ -47,7 +47,7 @@ CHECK_PYTHON=../codexbar-check-venv/bin/python bash tools/check.sh
 git diff --check
 ```
 
-[tools/check.sh](tools/check.sh) runs build/research/metrics/policy Python contracts,
+[tools/check.sh](tools/check.sh) runs build/metrics/policy Python contracts,
 public contribution-safety checks, pinned Dependabot schema validation, shell parsing,
 ShellCheck and actionlint. It does not build Android or install an SDK/emulator.
 It fetches the pinned schema unless `DEPENDABOT_SCHEMA` supplies a checksum-valid
@@ -56,11 +56,13 @@ offline copy. Hash locks cover the supported wheel platform, not every platform.
 Documentation links, command/catalogue lists, prose and the check-context table are
 reviewed as documentation, not enforced by a parallel Python inventory. Public
 secret-reporting guidance and the documented 90% instruction coverage floor remain
-checked. M0 citation/toolchain catalogues are archival; fixture/schema validation
-continues in the common tooling run under `Repository policy result`, not a separate
-research workflow or release source-admission prerequisite. Existing source/toolchain
-checks still consume selected M0 baseline fields; keep that data and the hash-pinned
-research dependencies used by fixture validation and release schema validation.
+checked. M0 citation/toolchain catalogues are archival. The executable Python research
+model and separate research schema/hash/privacy checks are retired; Kotlin tests do
+not replace every deleted diagnostic. Fixtures, provenance, schemas and attribution
+remain as research inputs, including fixtures consumed by Kotlin tests. Existing
+source/toolchain checks still consume selected M0 baseline fields. Keep that data and
+the unchanged hash-pinned `tools/research/requirements.txt` lock and its installation
+consumers: independent release schema validation still needs jsonschema/referencing.
 
 Keep application behavior assertions in the existing JVM/Compose/native suites and
 check final artifacts where appropriate. Do not add Python checks for Kotlin callback

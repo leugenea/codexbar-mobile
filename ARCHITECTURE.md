@@ -1432,7 +1432,9 @@ These are authored contracts, not local Android runtime, lint or visual approval
   legacy-selection rejection, recreation, foreground coalescing and landscape UI checks.
 - `tools/build`: scaffold/workflow/toolchain/strict dependency contracts, manifests,
   JUnit and compatible class-ID/freshness/denominator coverage validation.
-- `tools/research`: offline fixture/schema contracts; not a production provider parser.
+- `tools/research/requirements.txt`: retained release-schema dependencies. The Python
+  research model and its separate schema/hash/privacy checks are retired; retained
+  M0 fixtures still feed Kotlin parser tests, without replacing every deleted diagnostic.
 - `tools/metrics`: informational production Kotlin complexity/duplication reporting.
 - `tools/policy`: script/supply-chain policy and public-readiness contracts.
 - `UsageResponseParserTest` / `BankedResetResponseParserTest`: unchanged attributed
