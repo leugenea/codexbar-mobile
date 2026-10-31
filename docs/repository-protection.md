@@ -12,8 +12,8 @@ workflow/source-admission change and read back the exact ruleset before delivery
 otherwise the missing check will block merging. Remove only
 `Validate research fixtures and schemas` (GitHub Actions integration `15368`) from
 the required status-check array. Preserve all other rules and parameters unchanged.
-Research fixture/schema/privacy/provenance validation continues in the common
-repository-policy gate.
+The later executable research model/schema/hash/privacy checks are also retired;
+fixtures/provenance/schemas remain, and this adds no required-setting change.
 
 | Setting | Required configuration |
 | --- | --- |

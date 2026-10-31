@@ -10,7 +10,7 @@ class ReadPolicyTest {
 
     @Test fun allSevenM0ReadPolicyVectorsRetainTheirMeanings() {
         // Semantic adaptation, not captured wire data: docs/research/m0/fixtures/policy-vectors.json.
-        // The independent original M0 oracle is tools/research/contract.py read_outcome.
+        // The original independent Python M0 model is retired; these literal expectations remain.
         val cases = listOf(
             Vector("read-401", 401, false, ReadAction.SERIALIZED_REFRESH_AND_RETRY, null),
             Vector("terminal-401", 401, true, ReadAction.FINISH, ReadError.REAUTHORIZE),

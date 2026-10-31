@@ -28,7 +28,7 @@ fun interface ReadBackoff {
 
 /**
  * Adapted semantics: docs/research/m0/fixtures/policy-vectors.json (seven synthetic
- * vectors) and tools/research/contract.py read_outcome. No refresh/retry execution here:
+ * vectors); the original Python research model is retired. No refresh/retry execution here:
  * A10 must serialize refresh per session and persist rotation; B2 owns later cadence.
  * Errors preserve credentials/last success except explicit REAUTHORIZE. No quota inferred.
  */
