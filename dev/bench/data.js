@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793433063801,
+  "lastUpdate": 1793433066073,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -6349,6 +6349,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/9c91474358bd2b2a4802f6b897286dca35688be5"
         },
         "date": 1793358191546,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a5377242e13111f6f5ab5a02705e145d290da432",
+          "message": "refactor: retire executable Python research model (#223)",
+          "timestamp": "2026-10-31T10:50:38+03:00",
+          "tree_id": "a0db9cde943233633a523f10d00f1e3ec034e7fe",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/a5377242e13111f6f5ab5a02705e145d290da432"
+        },
+        "date": 1793433065830,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
