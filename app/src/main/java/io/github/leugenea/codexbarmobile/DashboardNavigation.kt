@@ -30,24 +30,34 @@ internal enum class DashboardRoute(val title: Int) {
     ACCOUNT_SETTINGS(R.string.account_settings_title),
 }
 
+/** Build-type policy, independent of version channels; also fences stale/internal selections. */
+internal fun allowedDashboardRoute(requested: DashboardRoute, diagnosticsEnabled: Boolean): DashboardRoute =
+    when (requested) {
+        DashboardRoute.LOCAL_HISTORY_DETAILS, DashboardRoute.CONNECTION_DETAILS ->
+            if (diagnosticsEnabled) requested else DashboardRoute.DASHBOARD
+        DashboardRoute.DASHBOARD, DashboardRoute.ACCOUNT_SETTINGS -> requested
+    }
+
 /** Only ephemeral presentation choices; no saved account, payload, cursor or capability. */
 @Composable
 internal fun ConnectionScreen(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit,
     observer: HistoryUiObserver? = null) {
-    var route by remember(controller) { mutableStateOf(DashboardRoute.DASHBOARD) }
+    var selectedRoute by remember(controller) { mutableStateOf(DashboardRoute.DASHBOARD) }
+    // Normalize before Back, history interest, header and content; never render a denied route.
+    val route = allowedDashboardRoute(selectedRoute, BuildConfig.DEBUG)
     val drawer = remember(controller) { DrawerState(DrawerValue.Closed) }
     val scope = rememberCoroutineScope()
     val exporter = historyExporter(controller)
     val importer = historyImporter(controller)
     BackHandler(drawer.isOpen || route != DashboardRoute.DASHBOARD) {
-        if (drawer.isOpen) scope.launch { drawer.close() } else route = DashboardRoute.DASHBOARD
+        if (drawer.isOpen) scope.launch { drawer.close() } else selectedRoute = DashboardRoute.DASHBOARD
     }
     ModalNavigationDrawer(drawerState = drawer, drawerContent = {
-        DetailDrawer(route) { route = it; scope.launch { drawer.close() } }
+        DetailDrawer(route) { selectedRoute = it; scope.launch { drawer.close() } }
     }) {
         ConnectionRoute(state, controller, route, openBrowser, observer, exporter, importer,
-            { scope.launch { drawer.open() } }, { route = DashboardRoute.DASHBOARD },
-            { route = DashboardRoute.ACCOUNT_SETTINGS })
+            { scope.launch { drawer.open() } }, { selectedRoute = DashboardRoute.DASHBOARD },
+            { selectedRoute = DashboardRoute.ACCOUNT_SETTINGS })
     }
 }
 
@@ -56,7 +66,8 @@ private fun DetailDrawer(route: DashboardRoute, select: (DashboardRoute) -> Unit
     ModalDrawerSheet(Modifier.testTag("details-drawer")) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Spacer(Modifier.height(24.dp))
-            listOf(DashboardRoute.LOCAL_HISTORY_DETAILS, DashboardRoute.CONNECTION_DETAILS).forEach { destination ->
+            listOf(DashboardRoute.LOCAL_HISTORY_DETAILS, DashboardRoute.CONNECTION_DETAILS)
+                .filter { allowedDashboardRoute(it, BuildConfig.DEBUG) == it }.forEach { destination ->
                 NavigationDrawerItem(label = { Text(stringResource(destination.title)) },
                     selected = route == destination, onClick = { select(destination) },
                     modifier = Modifier.padding(horizontal = 12.dp).heightIn(min = 48.dp).testTag("drawer-${destination.name}"))

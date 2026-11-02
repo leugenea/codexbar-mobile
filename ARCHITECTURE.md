@@ -9,7 +9,7 @@ honest projections of the one process owner; no sample model or preview route is
 
 ```text
 MainActivity / StateFlow observer + identity-tagged STARTED lifecycle observer
-    -> ConnectionScreen / dashboard, two drawer detail routes and Account settings
+    -> ConnectionScreen / dashboard, debug-only detail routes and Account settings
     -> NativeConnection.get(applicationContext) / one lazy process owner
 ```
 
@@ -963,9 +963,17 @@ and the conditional assembled acceptance contract are described below.
 
 ## Production bounded history navigation (M4b-3a)
 
-The Connection screen defaults to the compact dashboard; the modal drawer contains
+The Connection screen defaults to the compact dashboard. Debug's modal drawer contains
 **Full local history details**, **Full live connection details**, and **Account settings**
-anchored at its bottom. Account settings alone hosts local naming, device sign-in
+anchored at its bottom. The release build type omits both diagnostic entries, independently
+of development/RC/stable version channels. Generated `BuildConfig.DEBUG` is the sole policy,
+with no runtime toggle or extra flavor. The root normalizes any disallowed remembered/internal
+selection to dashboard before Back handling, history requests, headers or screen rendering;
+there is currently no saved route. Both builds retain Account settings and the unchanged
+root-owned SAF callbacks. Shared diagnostic code need not be removed from release bytes.
+Exact build commands and hosted evidence boundaries are in
+[CONTRIBUTING](CONTRIBUTING.md#development-and-user-facing-ui).
+Account settings alone hosts local naming, device sign-in
 (including reauthorization, cancellation, code copy and browser launch), and confirmed
 local removal. The dashboard and connection details instead point disconnected users
 to Account settings with an open action; usage/session refresh controls stay in place.
@@ -1624,8 +1632,14 @@ independent public DER pin, actual SDK verification, existing final binder and a
 localhost mock of the same publisher protocol. Its exact downloaded signed APK is
 installed/pulled/inspected/launched after debug observations on the same existing
 emulator, outside all coverage retries; production-package cleanup preserves graph
-failure precedence. No app source, dependency, UI/test identity, coverage denominator,
-threshold or native retry/resource budget changes are made. Actual SDK/native timing
+failure precedence. It also drives platform UI dumps/ADB on those unchanged signed release
+bytes: dashboard, restricted drawer, disconnected Account history tools and Back.
+XML/PNG hashes and observed process IDs join the existing certificate/APK/build identity.
+The observer checks enabled export and disabled import without logging in; it does not
+claim an authenticated release SAF flow or credential-restoration proof. Existing debug
+native tests retain the full menu and shared authenticated export/import callback/lifetime
+coverage. No dependency, coverage exclusion/threshold, flavor matrix or native retry/resource
+budget is added. Actual SDK/native timing
 and evidence are hosted acceptance, not established by pure tooling tests. The
 [owner runbook](docs/releasing.md) defines static configuration, owner confirmation,
 byte allowlist/readback and partial-state recovery; production custody/configuration,

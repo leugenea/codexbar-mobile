@@ -248,6 +248,8 @@ class DashboardUiTest {
     }
 
     @Test fun drawerHasExactTwoLabelsBackPrecedenceAndDetailsReturnToDashboard() {
+        assertTrue("Development UI is bound to the actual debug build type", BuildConfig.DEBUG)
+        assertEquals("io.github.leugenea.codexbarmobile.dev", BuildConfig.APPLICATION_ID)
         settings.apply(true, 1f)
         launch(dark = true).use { scenario ->
             login()

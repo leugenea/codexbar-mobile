@@ -97,4 +97,10 @@ archival. Signing still independently verifies the unsigned capsule, certificate
 APK security and unchanged payload through the final binder; secrets stay confined
 to signing and private files are removed before upload. The unchanged hosted-only
 disposable-key fixture exercises real SDK signing, mock publication/download and
-same-emulator install/pull/launch. Pure local tests do not prove those hosted results.
+same-emulator install/pull/launch. That observer also checks the unchanged nondebuggable
+release's restricted drawer and reachable disconnected Account history tools using platform
+UI XML/PNG evidence bound to the exact APK/certificate/build identity. This is not an
+authenticated release SAF flow: the shared callbacks are exercised by the existing debug
+native suites, while owner/device acceptance remains separate. Build-type UI policy is
+independent of `RELEASE_CHANNEL`; see [exact build commands and evidence limits](../CONTRIBUTING.md#development-and-user-facing-ui).
+Pure local tests do not prove those hosted results.
