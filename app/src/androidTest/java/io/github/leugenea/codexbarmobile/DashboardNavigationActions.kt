@@ -13,7 +13,8 @@ internal fun openDetailRoute(compose: ComposeTestRule, owner: ConnectionControll
         else -> "connection-details"
     }
     if (compose.onAllNodesWithTag(root).fetchSemanticsNodes().isEmpty()) {
-        compose.onNodeWithTag("open-drawer").performScrollTo().performClick()
+        compose.onNodeWithTag("connection-screen").performScrollToNode(hasTestTag("route-header"))
+        compose.onNodeWithTag("open-drawer").performClick()
         val label = when (route) {
             DashboardRoute.LOCAL_HISTORY_DETAILS -> "Full local history details"
             DashboardRoute.ACCOUNT_SETTINGS -> "Account settings"
@@ -29,7 +30,8 @@ internal fun openDetailRoute(compose: ComposeTestRule, owner: ConnectionControll
 
 internal fun returnDashboard(compose: ComposeTestRule, owner: ConnectionController) {
     if (compose.onAllNodesWithTag("dashboard").fetchSemanticsNodes().isEmpty()) {
-        compose.onNodeWithTag("details-back").performScrollTo().performClick()
+        compose.onNodeWithTag("connection-screen").performScrollToNode(hasTestTag("details-back"))
+        compose.onNodeWithTag("details-back").performClick()
         try { compose.waitUntil(8_000) { compose.onAllNodesWithTag("dashboard").fetchSemanticsNodes().size == 1 } }
         catch (error: ComposeTimeoutException) { throw AssertionError("Dashboard return: last=${owner.state.value}", error) }
         compose.waitForIdle()

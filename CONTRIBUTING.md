@@ -78,7 +78,7 @@ authenticity. Explicit Gradle commands and their exits are trusted with ordinary
 cache/skip semantics; compatible union coverage retains independent dataset and
 context integrity checks. Native screenshot producers, pixel/layout/accessibility
 assertions and PNG/JSON sidecars remain in the existing instrumented suites. The
-all-outcome native artifact upload retains the complete 28-image history/live/dashboard
+all-outcome native artifact upload retains the complete 31-image history/live/dashboard
 gallery through AGP's additional-test-output directory for independent actual-image
 review. There is no separate host PNG decoder, gallery/metadata/clipping/accessibility
 audit or aggregate capture receipt; missing, duplicate, corrupt or mismatched saved

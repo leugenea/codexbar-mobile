@@ -13,6 +13,17 @@ import org.junit.Assert.*
 internal class HistoryAcceptanceSettings {
     private var originalNight: String? = null
     private var originalFont: String? = null
+    private var originalSize: String? = null
+
+    fun narrowPhone() {
+        val sizes = shell("wm size")
+        check(originalSize == null) { "Narrow size already installed" }
+        originalSize = Regex("""Override size: (\d+x\d+)""").find(sizes)?.groupValues?.get(1) ?: "reset"
+        val effective = Regex("""(?:Physical|Override) size: (\d+)x(\d+)""").findAll(sizes).last()
+        val density = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        val width = kotlin.math.round(320 * density).toInt()
+        shell("wm size ${width}x${effective.groupValues[2]}")
+    }
 
     fun apply(dark: Boolean, font: Float) {
         if (originalNight == null) {
@@ -32,8 +43,14 @@ internal class HistoryAcceptanceSettings {
         originalFont = null
         try { if (night != null) shell("cmd uimode night $night") }
         finally {
-            if (font == "null") shell("settings delete system font_scale")
-            else if (font != null) shell("settings put system font_scale $font")
+            try {
+                if (font == "null") shell("settings delete system font_scale")
+                else if (font != null) shell("settings put system font_scale $font")
+            } finally {
+                val size = originalSize
+                originalSize = null
+                if (size != null) shell("wm size $size")
+            }
         }
     }
 

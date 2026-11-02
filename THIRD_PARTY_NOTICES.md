@@ -42,6 +42,25 @@ Unicode-3.0 terms. The exact fork release source is
 Unsigned capsules remain non-distributable signing inputs; final-signed binding is
 not an owner publication or activation GO.
 
+## Codex provider mark
+
+The decorative in-app provider mark in `app/src/main/res/drawable/ic_codex.xml`
+retains the three paths and proportions of the OpenAI-authored
+[`public/logos/codex.svg`](https://github.com/agentsmd/agents.md/blob/6ae22720966e9cca6b2c2dd0780fb7265a87a46c/public/logos/codex.svg)
+from “Update Codex logo” (August 25, 2026), originally supplied by OpenAI to the
+AGENTS.md project. Original SVG SHA-256:
+`0b490f33f9c5b62c7db578f5101497efb87b774720f91b9e878243e761952c52`.
+Only the SVG-to-Android-vector representation and inherited monochrome foreground
+change; the geometry is not redrawn. Copyright (c) 2025 OpenAI; the upstream
+[full MIT notice](docs/legal/codex-mark-MIT.txt) is preserved.
+
+Codex and its mark belong to OpenAI. MIT copyright terms do not grant trademark
+rights. The mark identifies the usage provider only: it is not an action, launcher
+icon, application identity or claim of endorsement. This independent unofficial
+app is not affiliated with OpenAI. Follow [OpenAI's brand terms](https://openai.com/brand/)
+for any distribution; no blanket trademark clearance or distribution approval is
+claimed. The source notice is not an APK-bound attribution audit.
+
 ## Build, test and repository tooling (not a release-runtime list)
 
 | Component | Use / license findings |

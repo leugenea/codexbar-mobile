@@ -1258,7 +1258,7 @@ gate, alongside runtime/lint/coverage and independent full-candidate review.
 ## Dashboard presentation and joint observation (issue 142)
 
 The dashboard renders both exact current five-hour and weekly sections without a
-kind selector. Known percentages and B1 minute-precision `Next reset in` labels precede
+kind selector. Known percentages and B1 minute-precision `Resets in` labels precede
 the compact charts; there is no separate absolute-reset line in these cards. Missing
 current identity or actual renderable retained history has one concise no-information
 line per window, no empty Canvas or analytical-only substitute. A single observation
@@ -1382,8 +1382,10 @@ acceptance gates, not claims established by quick static tooling.
 
 ## Simplified usage window cards (issue 173)
 
-The dashboard's last-reported-usage status owns one localized second-precision
-measurement-observed-at label, projected from the retained accepted usage source.
+The dashboard owns one secondary `Updated` label, projected from the retained
+accepted usage source at minute precision (seconds/nanoseconds floor, never round).
+There is no redundant current/last-reported-usage heading; actionable status and
+stale/error states remain explicit.
 It is not repeated inside either window card, cannot switch to a failed attempt's
 clock, and is hidden with retired/disconnected facts. The compact cards omit the
 recorded-observation count/no-trend copy, repeated exact measured percentage,
@@ -1410,7 +1412,10 @@ start at physical left, end at physical right. Android's locale-aware `MMMdHHmm`
 skeleton supplies the yearless date/time pattern; B1 retains containing-hour display,
 phone-zone conversion and repeated-hour numeric offsets. Original instants remain
 exact. Unknown/unrepresentable dates remain unknown. The existing minute-flooring
-and plural formatter supplies `Next reset in <remaining>` without a second suffix.
+projection supplies `Resets in <remaining>` without
+a second suffix. Dashboard-only units are compact (`4h 59m`, `2d 3h 4m`, `<1m`);
+the accessible description retains the shared expanded units, and connection/
+banked details retain their existing plural wording and all reset states.
 
 Mandatory JVM additions cover pace direction/rounding/locale and yearless
 label/timezone/offset/unknown boundaries, plus latest-observation provenance beyond
@@ -1423,6 +1428,27 @@ unknown pace through actual accepted reads. Existing large-font/landscape label
 checks and capture label receipts now target the readable pace line; no image or
 pixel oracle is removed. Exact report registries and synthetic totals are updated.
 These are authored contracts, not local Android runtime, lint or visual approval.
+
+## Usage header hierarchy (issue 225)
+
+The Usage app-bar row vertically centers its title, 48dp menu target and
+noninteractive 48dp branding slot. Both icon drawings are 24dp. The provider-only
+Codex vector retains the OpenAI-authored upstream paths; attribution and trademark
+limits are in THIRD_PARTY_NOTICES. It is hidden from accessibility, has no action,
+and does not replace the unofficial application's launcher identity.
+
+Dashboard-only app-bar/content spacing is 4dp; the secondary observation line and
+first card are separated by 12dp. Internal card padding, prominent headlineMedium
+percentage and chart geometry remain unchanged. A wrapping title/pace row places
+one bodySmall/onSurfaceVariant pace label beside its title when space permits,
+and below it on narrow/large-font layouts; no duplicate follows the graph.
+Comparison provenance, unknown reasons and rounding remain unchanged.
+
+The existing native capture campaign retains its chart/pixel images and adds a
+normal light header plus 320dp/2x-font light and dark headers. Native layout and
+semantics assertions cover centered controls, compact spacing, unchanged percent
+size, complete line/ellipsis/height bounds, wrapping and decorative branding;
+actual hosted execution and individual saved-image review remain acceptance gates.
 
 ## Verification boundaries
 

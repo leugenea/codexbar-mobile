@@ -60,9 +60,11 @@ class DashboardCopyAndTimeTest {
             await("initial usage settled") { owner.state.value.refresh.usage.success != null && !owner.state.value.refresh.refreshing }
             assertEquals(java.time.Instant.parse("2027-01-15T08:37:59Z"), owner.state.value.refresh.usage.success!!.usage!!.observedAt)
             compose.onNodeWithTag("dashboard-observed-at").assertTextEquals("Updated Jan 15, 08:37")
-            val cases = listOf(59L to "less than a minute", 60L to "1 minute", 7500L to "2 hours 5 minutes",
-                86700L to "1 day 5 minutes", 259200L to "3 days")
-            for ((seconds, duration) in cases) {
+            val cases = listOf(Triple(59L, "less than a minute", "<1m"), Triple(60L, "1 minute", "1m"),
+                Triple(7500L, "2 hours 5 minutes", "2h 5m"), Triple(17999L, "4 hours 59 minutes", "4h 59m"),
+                Triple(86700L, "1 day 5 minutes", "1d 5m"), Triple(259200L, "3 days", "3d"),
+                Triple(183840L, "2 days 3 hours 4 minutes", "2d 3h 4m"))
+            for ((seconds, duration, compact) in cases) {
                 val target = fixture.transport.clock.now().wall!!.plusSeconds(seconds)
                 fixture.transport.usageBody = NavigationTransport.USAGE.replace("1800003600", target.epochSecond.toString())
                 fixture.transport.inventoryBody = """{"available_count":1,"credits":[{"id":"synthetic-minute-expiry",
@@ -72,7 +74,7 @@ class DashboardCopyAndTimeTest {
                 await("minute-precision usage and inventory settled") {
                     owner.state.value.refresh.inventory.attempt !== previous && !owner.state.value.refresh.refreshing
                 }
-                compose.onNodeWithTag("live-five-hour-reset-relative").performScrollTo().assertTextEquals("Next reset in $duration")
+                compose.onNodeWithTag("live-five-hour-reset-relative").performScrollTo().assertTextEquals("Resets in $compact").assertContentDescriptionEquals("Resets in $duration")
                 compose.onNodeWithTag("banked-disclosure-title").performScrollTo().assertHasNoClickAction()
                 compose.onNodeWithTag("banked-disclosure-remaining-0", useUnmergedTree = true).performScrollTo()
                     .assertTextEquals(duration)
@@ -118,7 +120,8 @@ class DashboardCopyAndTimeTest {
             returnDashboard(compose, owner)
             await("initial current measurements settled") { recordedHistory(owner).points.size == 1 && !owner.state.value.refresh.refreshing }
             val measured = "Updated Jan 15, 08:00"
-            compose.onNodeWithTag("dashboard-status").assertTextEquals("Last reported usage")
+            compose.onNodeWithTag("dashboard-status").assertDoesNotExist()
+            compose.onAllNodesWithText("Last reported usage", useUnmergedTree = true).assertCountEquals(0)
             compose.onAllNodesWithText(measured, useUnmergedTree = true).assertCountEquals(1)
             compose.onNodeWithTag("dashboard-observed-at").performScrollTo().assertTextEquals(measured)
             assertCompactChartCopy("history-chart-five-hour", "Jan 15, 04:00")
@@ -129,7 +132,7 @@ class DashboardCopyAndTimeTest {
                 compose.onAllNodes(hasText(removed, substring = true), useUnmergedTree = true).assertCountEquals(0)
             }
             compose.onNodeWithTag("live-five-hour-reset-absolute").assertDoesNotExist()
-            compose.onNodeWithTag("live-five-hour-reset-relative").assertTextEquals("Next reset in 1 hour")
+            compose.onNodeWithTag("live-five-hour-reset-relative").assertTextEquals("Resets in 1h")
             val first = compose.onNodeWithTag("history-chart-five-hour-first").performScrollTo()
                 .assertTextEquals("Jan 15, 04:00").fetchSemanticsNode().boundsInRoot
             val last = compose.onNodeWithTag("history-chart-five-hour-last")
@@ -140,6 +143,10 @@ class DashboardCopyAndTimeTest {
                 .fetchSemanticsNode().boundsInRoot.bottom <= first.top)
             val pace = compose.onNodeWithTag("history-chart-five-hour-pace")
             pace.performScrollTo().assertTextEquals("67.6% in reserve")
+                .assert(hasAnyAncestor(hasTestTag("history-chart-five-hour-heading")))
+            compose.onAllNodes(hasTestTag("history-chart-five-hour-pace") and
+                hasAnyAncestor(hasTestTag("history-chart-five-hour")), useUnmergedTree = true).assertCountEquals(0)
+            compose.onAllNodesWithTag("history-chart-five-hour-pace", useUnmergedTree = true).assertCountEquals(1)
             for ((percent, label) in listOf("80.0056" to "On pace", "90" to "Over pace by 10.0%", "1" to "Baseline and delta unavailable: uncertain correction")) {
                 val previous = owner.state.value.refresh.usage.attempt
                 fixture.transport.advance(1000)
@@ -151,6 +158,55 @@ class DashboardCopyAndTimeTest {
                 }
                 pace.performScrollTo().assertTextEquals(label)
             }
+            val accepted = owner.state.value.refresh.usage.success
+            val previous = owner.state.value.refresh.usage.attempt
+            fixture.transport.usageStatus = 503
+            fixture.transport.advance(60_000)
+            owner.readUsage()
+            await("failed attempt retains accepted observation clock") {
+                owner.state.value.refresh.usage.attempt !== previous && !owner.state.value.refresh.refreshing
+            }
+            assertSame(accepted, owner.state.value.refresh.usage.success)
+            compose.onNodeWithTag("dashboard-observed-at").performScrollTo().assertTextEquals(measured)
+            compose.onNodeWithTag("dashboard-status").assertTextEquals("Unable to update usage")
+        }
+    }
+
+    @Test fun compactResetRetainsPassedStateAndDoesNotInventUnavailableCountdowns() {
+        fixture.transport.advance(1000)
+        ActivityScenario.launch(MainActivity::class.java).use {
+            awaitConnectionScreen(compose, owner)
+            openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
+            compose.onNodeWithTag("connect").performScrollTo().performClick()
+            returnDashboard(compose, owner)
+            await("known initial reset accepted") { owner.state.value.refresh.usage.success != null && !owner.state.value.refresh.refreshing }
+            val now = fixture.transport.clock.now().wall.epochSecond
+            val cases = listOf(
+                "\"reset_at\":$now" to "Reset passed · awaiting refresh",
+                "\"reset_at\":${now - 60}" to "Reset passed · awaiting refresh",
+                "" to null, "\"reset_at\":null" to null, "\"reset_at\":false" to null,
+                "\"reset_at\":\"unsupported\"" to null,
+                "\"reset_at\":1800003600,\"reset_after_seconds\":4000" to null,
+            )
+            for ((reset, expected) in cases) {
+                val suffix = if (reset.isEmpty()) "" else ",$reset"
+                fixture.transport.usageBody = """{"rate_limit":{"primary_window":{"limit_window_seconds":18000,"used_percent":7.25$suffix}}}"""
+                val previous = owner.state.value.refresh.usage.attempt
+                owner.readUsage()
+                await("reset case $reset settled") { owner.state.value.refresh.usage.attempt !== previous && !owner.state.value.refresh.refreshing }
+                compose.onNodeWithTag("live-five-hour-percent").assertTextEquals("7.25% used")
+                compose.onNodeWithTag("live-five-hour-reset-absolute").assertDoesNotExist()
+                val relative = compose.onNodeWithTag("live-five-hour-reset-relative")
+                if (expected == null) relative.assertDoesNotExist() else relative.assertTextEquals(expected)
+            }
+            // A local backwards clock must not turn the original reset into a longer countdown.
+            fixture.transport.usageBody = NavigationTransport.USAGE
+            val previous = owner.state.value.refresh.usage.attempt
+            owner.readUsage()
+            await("restored known reset accepted") { owner.state.value.refresh.usage.attempt !== previous && !owner.state.value.refresh.refreshing }
+            fixture.transport.advance(-1000)
+            await("backwards clock reaches local evaluation") { owner.state.value.refresh.evaluatedAt == fixture.transport.clock.now().wall }
+            compose.onNodeWithTag("live-five-hour-reset-relative").assertDoesNotExist()
         }
     }
 
