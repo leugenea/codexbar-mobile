@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793649428512,
+  "lastUpdate": 1793649431295,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -6553,6 +6553,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/3832dd068f960aea5774396667903aa8ffe581de"
         },
         "date": 1793640757975,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3ee3938672a99a875734c3d874b0bdfd50289313",
+          "message": "Keep diagnostic navigation in development builds only (#230)\n\n* Restrict diagnostic navigation to development builds\n\n* Match observed release drawer accessibility semantics",
+          "timestamp": "2026-11-02T22:56:13+03:00",
+          "tree_id": "4e33766d8251dd4c846279470c722b4cae31468b",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/3ee3938672a99a875734c3d874b0bdfd50289313"
+        },
+        "date": 1793649430892,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
