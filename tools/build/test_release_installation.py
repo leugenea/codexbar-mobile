@@ -36,7 +36,9 @@ class InstallationTests(unittest.TestCase):
                     f'enabled="{str(enabled).lower()}" bounds="[10,{y}][500,{y + 48}]" '
                     f'{"content-desc" if description else "text"}="{label}"/>')
         if self.ui_scene == 'drawer':
-            nodes = action('Account settings', 700) + action('Close drawer', 100, description=True)
+            nodes = (action('Account settings', 700)
+                     + f'<node package="{PACKAGE}" class="android.view.View" clickable="true" enabled="true" '
+                     'content-desc="Close navigation menu" bounds="[945,63][1080,1857]"/>')
         elif self.ui_scene == 'account':
             nodes = (f'<node package="{PACKAGE}" text="Local usage history"/>' + action('Export history', 300)
                      + action('Import history', 400, False)) if not self.ui_scroll_needed or self.ui_scrolled else action('Add account', 200)
@@ -175,11 +177,43 @@ class InstallationTests(unittest.TestCase):
             self.assertEqual(self.calls[-1], ['uninstall', PACKAGE])
 
 
+    def test_captured_platform_drawer_reaches_account_tools(self):
+        drawer = (Path(__file__).with_name('fixtures') / 'release-drawer.xml').read_text()
+        self.ui_mutation = lambda text: drawer if self.ui_scene == 'drawer' else text
+        self.observe()
+        self.assertIn(['shell', 'input', 'tap', '472', '1751'], self.calls)
+        receipt = json.loads((self.root / 'reports/identity.json').read_text())
+        self.assertEqual(receipt['ui']['scenes'][1]['xml']['sha256'], observer.fingerprint(drawer.encode())['sha256'])
+
+    def test_captured_drawer_requires_enabled_production_close_affordance(self):
+        drawer = (Path(__file__).with_name('fixtures') / 'release-drawer.xml').read_text()
+        for attribute, value in (('content-desc', ''), ('enabled', 'false'), ('package', PACKAGE + '.dev')):
+            with self.subTest(attribute=attribute):
+                tree = observer.ET.fromstring(drawer)
+                close = next(n for n in tree.iter('node') if n.get('content-desc') == 'Close navigation menu')
+                close.set(attribute, value)
+                invalid = observer.ET.tostring(tree, encoding='unicode')
+                self.ui_scene = 'dashboard'
+                self.ui_mutation = lambda text: invalid if self.ui_scene == 'drawer' else text
+                with self.assertRaisesRegex(ValueError, 'readiness deadline: release-drawer$'):
+                    self.observe()
+                self.assertEqual(self.calls[-1], ['uninstall', PACKAGE])
+                self.assertFalse((self.root / 'reports/identity.json').exists())
+
+    def test_dashboard_requires_platform_drawer_to_be_closed(self):
+        close = observer.ET.parse(Path(__file__).with_name('fixtures') / 'release-drawer.xml').getroot()[0]
+        self.ui_mutation = lambda text: text.replace('</hierarchy>', observer.ET.tostring(close, encoding='unicode') + '</hierarchy>')
+        with self.assertRaisesRegex(ValueError, 'readiness deadline: release-dashboard$'):
+            self.observe()
+        self.assertEqual(self.calls[-1], ['uninstall', PACKAGE])
+        self.assertFalse((self.root / 'reports/identity.json').exists())
+
     def test_release_ui_rejects_either_diagnostic_label_and_still_cleans_up(self):
+        drawer = (Path(__file__).with_name('fixtures') / 'release-drawer.xml').read_text()
         for label in sorted(observer.DIAGNOSTIC_LABELS):
             for attribute in ('text', 'content-desc'):
                 self.ui_scene = 'dashboard'
-                self.ui_mutation = lambda text: text.replace('</hierarchy>',
+                self.ui_mutation = lambda text: drawer.replace('</hierarchy>',
                     f'<node package="{PACKAGE}" {attribute}="{label}"/></hierarchy>') if self.ui_scene == 'drawer' else text
                 with self.subTest(label=label, attribute=attribute), self.assertRaisesRegex(ValueError, 'diagnostic'):
                     self.observe()

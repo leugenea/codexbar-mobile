@@ -129,11 +129,11 @@ def observe_ui(run, reports, clock, wait):
         run('tap-' + label.lower().replace(' ', '-'), 'shell', 'input', 'tap', (left + right) // 2, (top + bottom) // 2)
 
     def dashboard(tree):
-        return enabled(tree, 'Open details menu') and enabled(tree, 'Account settings') and ui_action(tree, 'Close drawer') is None
+        return enabled(tree, 'Open details menu') and enabled(tree, 'Account settings') and ui_action(tree, 'Close navigation menu') is None
 
     tree = snapshot('release-dashboard', dashboard)
     tap(tree, 'Open details menu')
-    tree = snapshot('release-drawer', lambda t: enabled(t, 'Account settings') and enabled(t, 'Close drawer'))
+    tree = snapshot('release-drawer', lambda t: enabled(t, 'Account settings') and enabled(t, 'Close navigation menu'))
     tap(tree, 'Account settings')
     snapshot('release-account-history-tools', lambda t: enabled(t, 'Export history') and enabled(t, 'Import history', False)
              and any(n.get('text') == 'Local usage history' for n in t.iter('node')), scroll=True)
