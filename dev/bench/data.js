@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793629849208,
+  "lastUpdate": 1793629852724,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -6417,6 +6417,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/a5377242e13111f6f5ab5a02705e145d290da432"
         },
         "date": 1793433065830,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d9f15e1431148816925871730fe8656b3b197e0f",
+          "message": "Polish Usage header and compact window hierarchy (#226)\n\n* Polish Usage header and compact window hierarchy\n\n* Use ChatGPT mark and include branding notices in release capsules",
+          "timestamp": "2026-11-02T17:30:10+03:00",
+          "tree_id": "899e76196985765ca1b5c314b846e378de430584",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/d9f15e1431148816925871730fe8656b3b197e0f"
+        },
+        "date": 1793629852065,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
