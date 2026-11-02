@@ -90,7 +90,7 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
         val titleBounds = title.fetchSemanticsNode().boundsInRoot
         val menu = compose.onNodeWithTag("open-drawer").assertHasClickAction().assertContentDescriptionEquals("Open details menu")
             .fetchSemanticsNode()
-        val brand = compose.onNodeWithTag("codex-brand", useUnmergedTree = true).assertHasNoClickAction()
+        val brand = compose.onNodeWithTag("chatgpt-brand", useUnmergedTree = true).assertHasNoClickAction()
             .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility)).fetchSemanticsNode()
         assertFalse(brand.config.contains(SemanticsProperties.ContentDescription))
         assertFalse(brand.config.contains(SemanticsProperties.Role))

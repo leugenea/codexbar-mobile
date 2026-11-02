@@ -53,6 +53,7 @@ class RuntimeFixture(unittest.TestCase):
                     'artifacts': [{'component': COMPONENT, 'path': str(self.outer), **runtime.file_record(self.outer)}]}
         legal = self.root / bundle.LEGAL
         legal.mkdir(parents=True)
+        shutil.copytree(runtime.ROOT / bundle.LEGAL / 'branding', legal / 'branding')
         (legal / 'license.txt').write_text('SYNTHETIC license, not a legal assertion\n')
         self.evidence = {'path': 'license.txt', **runtime.fingerprint((legal / 'license.txt').read_bytes()),
                          'source': 'https://example.invalid/version1/LICENSE', 'scope': 'Synthetic only', 'role': 'license'}
@@ -270,6 +271,22 @@ class RuntimeTests(RuntimeFixture):
 
 
 class BundleTests(RuntimeFixture):
+    def test_copied_provider_mark_full_notice_and_source_reach_unsigned_capsule(self):
+        files = self.files()
+        manifest = {r['path']: r for r in json.loads(files['bundle-manifest.json'])['files']}
+        for name in ('chatgpt-mark-MIT.txt', 'chatgpt-mark-SOURCE.txt'):
+            key = 'legal/branding/' + name
+            original = (runtime.ROOT / bundle.LEGAL / 'branding' / name).read_bytes()
+            self.assertEqual(files[key], original)
+            self.assertIn(original.rstrip(), files['THIRD_PARTY_NOTICES.txt'])
+            self.assertEqual({k: manifest[key][k] for k in ('size', 'sha256')}, runtime.fingerprint(original))
+        self.assertEqual(runtime.fingerprint(files['legal/branding/chatgpt-mark-MIT.txt'])['sha256'],
+                         '13df7812ca53ecaae1cb4a868844bb598373047ae1d580e4debfbef1dd5b6915')
+        self.assertIn(b'Copyright (c) 2025 OpenAI', files['THIRD_PARTY_NOTICES.txt'])
+        (self.root / bundle.LEGAL / 'branding/chatgpt-mark-MIT.txt').unlink()
+        with self.assertRaises(FileNotFoundError):
+            self.files()
+
     def test_deterministic_cyclonedx_notices_and_exact_member_bindings(self):
         files = self.files()
         self.assertEqual(files, self.files())

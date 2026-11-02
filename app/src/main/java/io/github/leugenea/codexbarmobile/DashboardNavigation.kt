@@ -1,6 +1,7 @@
 package io.github.leugenea.codexbarmobile
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -8,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
@@ -107,9 +109,10 @@ private fun RouteHeader(route: DashboardRoute, openDrawer: () -> Unit, back: () 
         }
         Text(stringResource(route.title), style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.weight(1f).testTag("route-title").semantics { heading() })
-        if (route == DashboardRoute.DASHBOARD) Box(Modifier.size(48.dp).testTag("codex-brand")
+        if (route == DashboardRoute.DASHBOARD) Box(Modifier.size(48.dp).testTag("chatgpt-brand")
             .clearAndSetSemantics { hideFromAccessibility() }, contentAlignment = Alignment.Center) {
-            Icon(painterResource(R.drawable.ic_codex), contentDescription = null, modifier = Modifier.size(24.dp))
+            Icon(painterResource(R.drawable.ic_chatgpt), contentDescription = null, modifier = Modifier.size(24.dp),
+                tint = if (isSystemInDarkTheme()) Color.White else Color.Black)
         }
     }
     if (route != DashboardRoute.DASHBOARD) TextButton(onClick = back,

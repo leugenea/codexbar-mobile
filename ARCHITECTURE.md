@@ -1433,9 +1433,12 @@ These are authored contracts, not local Android runtime, lint or visual approval
 
 The Usage app-bar row vertically centers its title, 48dp menu target and
 noninteractive 48dp branding slot. Both icon drawings are 24dp. The provider-only
-Codex vector retains the OpenAI-authored upstream paths; attribution and trademark
-limits are in THIRD_PARTY_NOTICES. It is hidden from accessibility, has no action,
-and does not replace the unofficial application's launcher identity.
+ChatGPT/OpenAI knot vector retains the official OpenAI Cookbook path and viewport,
+rendered black in light mode and white in dark mode. Attribution and trademark
+limits are in THIRD_PARTY_NOTICES; the full upstream MIT notice and source directions
+also accompany every release capsule and its combined notices. It is hidden from
+accessibility, has no action, and does not replace the unofficial application's
+launcher identity.
 
 Dashboard-only app-bar/content spacing is 4dp; the secondary observation line and
 first card are separated by 12dp. Internal card padding, prominent headlineMedium
