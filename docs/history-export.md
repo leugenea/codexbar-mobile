@@ -1,6 +1,6 @@
 # Local history export, JSON v1
 
-Open the drawer → **Full local history details** → **Export history**. Android's
+Open the drawer → **Account settings** → **Local usage history** → **Export history**. Android's
 Storage Access Framework (`ACTION_CREATE_DOCUMENT`, `application/json`) saves
 `codexbar-history-v1.json` without a storage permission. Cancellation is silent;
 success is reported only after the UTF-8 writer closes. A failed document provider
@@ -107,7 +107,7 @@ an explicit destination partition.
 
 ## Import
 
-In the same details view, **Import history** opens JSON-only `ACTION_OPEN_DOCUMENT`
+In the same Account settings group, **Import history** opens JSON-only `ACTION_OPEN_DOCUMENT`
 while a signed-in history partition exists. Choosing a file shows **Replace history**:
 Cancel/dismiss changes nothing; there is no merge. Picker/confirmation state stays
 in process memory across Activity recreation, not process death. The captured

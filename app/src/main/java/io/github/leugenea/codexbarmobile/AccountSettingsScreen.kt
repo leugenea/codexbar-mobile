@@ -6,12 +6,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.leugenea.codexbarmobile.auth.AuthState
 
 /** Account commands stay on the existing process owner; this route owns only presentation. */
 @Composable
-internal fun AccountSettingsScreen(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit) {
+internal fun AccountSettingsScreen(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit,
+    exporter: HistoryExporter, importer: HistoryImporter, historyAvailable: Boolean) {
     val name by controller.accountName.collectAsState()
     Column(Modifier.fillMaxWidth().testTag("account-settings"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         AccountNameHeader(name, controller::renameAccount)
@@ -19,6 +22,12 @@ internal fun AccountSettingsScreen(state: ConnectionState, controller: Connectio
         Text(stringResource(R.string.gate_state, state.phase.name, state.problem?.name ?: "—"), Modifier.testTag("account-settings-state"))
         AccountSignIn(state, controller, openBrowser)
         AccountRemovalAction(state.phase, controller)
+        Column(Modifier.fillMaxWidth().testTag("account-history-tools"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(R.string.account_history_tools), style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.testTag("account-history-tools-title").semantics { heading() })
+            HistoryExportAction(exporter)
+            HistoryImportAction(importer, historyAvailable)
+        }
     }
 }
 
