@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reduced credential-free hosted UIAutomator dump; inert wrappers/attributes omitted. -->
+<hierarchy rotation="0">
+  <node class="android.view.View" package="io.github.leugenea.codexbarmobile" content-desc="Close navigation menu" clickable="true" enabled="true" bounds="[945,63][1080,1857]" />
+  <node class="android.view.View" package="io.github.leugenea.codexbarmobile" clickable="true" enabled="true" bounds="[32,1678][913,1825]">
+    <node class="android.widget.TextView" package="io.github.leugenea.codexbarmobile" text="Account settings" clickable="false" enabled="true" bounds="[74,1720][411,1783]" />
+  </node>
+</hierarchy>

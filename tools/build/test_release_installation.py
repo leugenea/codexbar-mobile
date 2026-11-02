@@ -25,6 +25,27 @@ class InstallationTests(unittest.TestCase):
         self.calls = []
         self.failure = None
         self.now = 0
+        self.ui_scene = 'dashboard'
+        self.ui_mutation = lambda text: text
+        self.ui_scroll_needed = False
+        self.ui_scrolled = False
+
+    def ui_xml(self):
+        def action(label, y, enabled=True, description=False):
+            return (f'<node package="{PACKAGE}" class="android.widget.Button" clickable="{str(enabled).lower()}" '
+                    f'enabled="{str(enabled).lower()}" bounds="[10,{y}][500,{y + 48}]" '
+                    f'{"content-desc" if description else "text"}="{label}"/>')
+        if self.ui_scene == 'drawer':
+            nodes = (action('Account settings', 700)
+                     + f'<node package="{PACKAGE}" class="android.view.View" clickable="true" enabled="true" '
+                     'content-desc="Close navigation menu" bounds="[945,63][1080,1857]"/>')
+        elif self.ui_scene == 'account':
+            nodes = (f'<node package="{PACKAGE}" text="Local usage history"/>' + action('Export history', 300)
+                     + action('Import history', 400, False)) if not self.ui_scroll_needed or self.ui_scrolled else action('Add account', 200)
+            nodes = f'<node package="{PACKAGE}" scrollable="true" bounds="[0,100][1080,1800]">{nodes}</node>'
+        else:
+            nodes = action('Open details menu', 10, description=True) + action('Account settings', 200)
+        return self.ui_mutation('<hierarchy>' + nodes + '</hierarchy>')
 
     def clock(self):
         self.now += 3
@@ -44,8 +65,24 @@ class InstallationTests(unittest.TestCase):
         elif args[:3] == ['shell', 'dumpsys', 'package']:
             text = f'  Package [{PACKAGE}] (synthetic):\n    versionCode=2 minSdk=26 targetSdk=37\n    versionName=0.1.0-rc.1\n    requested permissions:\n' + ''.join('      ' + p + '\n' for p in sorted(permissions_for(PACKAGE))) + '    install permissions:\n'
         elif args[0] == 'pull':
-            Path(args[2]).write_bytes(self.apk.read_bytes())
+            if args[1] == observer.UI_XML:
+                Path(args[2]).write_text(self.ui_xml())
+            elif args[1] == observer.UI_PNG:
+                Path(args[2]).write_bytes(b'\x89PNG\r\n\x1a\nSYNTHETIC screenshot transport fixture, not native pixels')
+            else:
+                Path(args[2]).write_bytes(self.apk.read_bytes())
             text = '1 file pulled\n'
+        elif args[:3] == ['shell', 'uiautomator', 'dump'] or args[:2] in (['shell', 'screencap'], ['shell', 'rm']):
+            text = ''
+        elif args[:3] == ['shell', 'input', 'tap']:
+            self.ui_scene = 'drawer' if self.ui_scene == 'dashboard' else 'account'
+            text = ''
+        elif args[:3] == ['shell', 'input', 'keyevent']:
+            self.ui_scene = 'dashboard'
+            text = ''
+        elif args[:3] == ['shell', 'input', 'swipe']:
+            self.ui_scrolled = True
+            text = ''
         elif args[:3] == ['shell', 'am', 'start']:
             text = f'Status: ok\nActivity: {PACKAGE}/{MAIN_ACTIVITY}\n'
         elif args[:3] == ['shell', 'dumpsys', 'activity']:
@@ -72,6 +109,19 @@ class InstallationTests(unittest.TestCase):
         receipt = json.loads((self.root / 'reports/identity.json').read_text())
         self.assertEqual(receipt['downloadedSha256'], receipt['installedSha256'])
         self.assertTrue(receipt['foregroundObserved'])
+        ui = receipt['ui']
+        self.assertEqual([scene['scene'] for scene in ui['scenes']], ['release-dashboard', 'release-drawer',
+                         'release-account-history-tools', 'release-back-dashboard'])
+        self.assertTrue(ui['diagnosticEntriesAbsent'])
+        self.assertTrue(ui['accountHistoryToolsReachable'])
+        self.assertTrue(ui['disconnectedExportEnabled'])
+        self.assertTrue(ui['disconnectedImportDisabled'])
+        self.assertFalse(ui['authenticatedSafFlowObserved'])
+        for scene in ui['scenes']:
+            for kind in ('xml', 'screenshot'):
+                item = scene[kind]
+                self.assertEqual(item['sha256'], observer.fingerprint((self.root / 'reports' / item['filename']).read_bytes())['sha256'])
+        self.assertIn(['shell', 'rm', '-f', observer.UI_XML, observer.UI_PNG], self.calls)
         self.assertFalse(any('.dev' in str(arg) for call in self.calls for arg in call))
 
     def test_single_base_path_and_exact_resumed_default_process_fail_closed(self):
@@ -125,6 +175,138 @@ class InstallationTests(unittest.TestCase):
             with self.subTest(phase=phase), self.assertRaises(ValueError):
                 self.observe()
             self.assertEqual(self.calls[-1], ['uninstall', PACKAGE])
+
+
+    def test_captured_platform_drawer_reaches_account_tools(self):
+        drawer = (Path(__file__).with_name('fixtures') / 'release-drawer.xml').read_text()
+        self.ui_mutation = lambda text: drawer if self.ui_scene == 'drawer' else text
+        self.observe()
+        self.assertIn(['shell', 'input', 'tap', '472', '1751'], self.calls)
+        receipt = json.loads((self.root / 'reports/identity.json').read_text())
+        self.assertEqual(receipt['ui']['scenes'][1]['xml']['sha256'], observer.fingerprint(drawer.encode())['sha256'])
+
+    def test_captured_drawer_requires_enabled_production_close_affordance(self):
+        drawer = (Path(__file__).with_name('fixtures') / 'release-drawer.xml').read_text()
+        for attribute, value in (('content-desc', ''), ('enabled', 'false'), ('package', PACKAGE + '.dev')):
+            with self.subTest(attribute=attribute):
+                tree = observer.ET.fromstring(drawer)
+                close = next(n for n in tree.iter('node') if n.get('content-desc') == 'Close navigation menu')
+                close.set(attribute, value)
+                invalid = observer.ET.tostring(tree, encoding='unicode')
+                self.ui_scene = 'dashboard'
+                self.ui_mutation = lambda text: invalid if self.ui_scene == 'drawer' else text
+                with self.assertRaisesRegex(ValueError, 'readiness deadline: release-drawer$'):
+                    self.observe()
+                self.assertEqual(self.calls[-1], ['uninstall', PACKAGE])
+                self.assertFalse((self.root / 'reports/identity.json').exists())
+
+    def test_dashboard_requires_platform_drawer_to_be_closed(self):
+        close = observer.ET.parse(Path(__file__).with_name('fixtures') / 'release-drawer.xml').getroot()[0]
+        self.ui_mutation = lambda text: text.replace('</hierarchy>', observer.ET.tostring(close, encoding='unicode') + '</hierarchy>')
+        with self.assertRaisesRegex(ValueError, 'readiness deadline: release-dashboard$'):
+            self.observe()
+        self.assertEqual(self.calls[-1], ['uninstall', PACKAGE])
+        self.assertFalse((self.root / 'reports/identity.json').exists())
+
+    def test_release_ui_rejects_either_diagnostic_label_and_still_cleans_up(self):
+        drawer = (Path(__file__).with_name('fixtures') / 'release-drawer.xml').read_text()
+        for label in sorted(observer.DIAGNOSTIC_LABELS):
+            for attribute in ('text', 'content-desc'):
+                self.ui_scene = 'dashboard'
+                self.ui_mutation = lambda text: drawer.replace('</hierarchy>',
+                    f'<node package="{PACKAGE}" {attribute}="{label}"/></hierarchy>') if self.ui_scene == 'drawer' else text
+                with self.subTest(label=label, attribute=attribute), self.assertRaisesRegex(ValueError, 'diagnostic'):
+                    self.observe()
+                self.assertEqual(self.calls[-1], ['uninstall', PACKAGE])
+                self.assertFalse((self.root / 'reports/identity.json').exists())
+
+    def test_release_ui_requires_real_package_controls_disabled_import_and_valid_xml(self):
+        mutations = [lambda text: text.replace(PACKAGE, PACKAGE + '.dev'),
+                     lambda text: text.replace('Export history', 'Missing export'),
+                     lambda text: text.replace('Import history', 'Missing import'),
+                     lambda text: text.replace('enabled="false"', 'enabled="true"'),
+                     lambda text: text.replace('Local usage history', 'Missing group'),
+                     lambda text: '<not-xml']
+        for mutation in mutations:
+            self.ui_scene = 'dashboard'
+            self.ui_mutation = mutation
+            with self.subTest(mutation=mutation), self.assertRaises((ValueError, observer.ET.ParseError)):
+                self.observe()
+            self.assertEqual(self.calls[-1], ['uninstall', PACKAGE])
+
+    def test_ui_bounds_and_ambiguous_actions_fail_closed(self):
+        tree = observer.ui_tree(self.ui_xml())
+        node = observer.ui_action(tree, 'Account settings')
+        assert node is not None
+        self.assertEqual(observer.ui_bounds(node), (10, 200, 500, 248))
+        for bounds in ('', '[0,0][0,1]', '[-1,0][2,3]', '[0,2][1,1]'):
+            node.set('bounds', bounds)
+            with self.subTest(bounds=bounds), self.assertRaises(ValueError):
+                observer.ui_bounds(node)
+        tree.append(observer.ET.fromstring(f'<node package="{PACKAGE}" clickable="true" text="Account settings"/>'))
+        with self.assertRaisesRegex(ValueError, 'Ambiguous'):
+            observer.ui_action(tree, 'Account settings')
+        with self.assertRaisesRegex(ValueError, 'hierarchy'):
+            observer.ui_tree('<hierarchy/>')
+
+    def test_account_tools_scroll_in_own_container_and_resolve_child_button_labels(self):
+        self.ui_scroll_needed = True
+        def nested(text):
+            tree = observer.ET.fromstring(text)
+            for node in list(tree.iter('node')):
+                if node.get('class') == 'android.widget.Button' and node.get('text'):
+                    label = node.attrib.pop('text')
+                    observer.ET.SubElement(node, 'node', {'package': PACKAGE, 'text': label})
+            return observer.ET.tostring(tree, encoding='unicode')
+        self.ui_mutation = nested
+        self.observe()
+        self.assertEqual([call for call in self.calls if call[:3] == ['shell', 'input', 'swipe']],
+                         [['shell', 'input', 'swipe', '540', '1460', '540', '440', '300']])
+        self.assertTrue((self.root / 'reports/release-account-history-tools-2.xml').is_file())
+
+    def test_missing_fresh_dump_or_lost_ui_foreground_never_reuses_prior_evidence(self):
+        reports = self.root / 'reports'
+        reports.mkdir()
+        stale = reports / 'release-dashboard-1.xml'
+        stale.write_text(self.ui_xml())
+        def missing(args):
+            if args[0] == 'pull' and args[1] == observer.UI_XML:
+                return subprocess.CompletedProcess([], 0, 'synthetic silent no-op')
+        self.failure = missing
+        with self.assertRaises(FileNotFoundError):
+            self.observe()
+        self.assertFalse(stale.exists())
+        self.assertEqual(self.calls[-1], ['uninstall', PACKAGE])
+        def lost(args):
+            if self.ui_scene == 'account' and args[:3] == ['shell', 'dumpsys', 'activity']:
+                return subprocess.CompletedProcess([], 0, 'mLastPausedActivity: stale')
+        self.failure = lost
+        with self.assertRaisesRegex(ValueError, 'left the verified foreground'):
+            self.observe()
+        self.assertEqual(self.calls[-1], ['uninstall', PACKAGE])
+
+    def test_ui_timeout_bad_screenshot_or_cleanup_failure_never_pass(self):
+        def fail(args):
+            if args[:3] == ['shell', 'uiautomator', 'dump']:
+                raise subprocess.TimeoutExpired([], 10)
+        self.failure = fail
+        with self.assertRaisesRegex(ValueError, 'release-dashboard-dump'):
+            self.observe()
+        self.assertEqual(self.calls[-1], ['uninstall', PACKAGE])
+        def corrupt(args):
+            if args[0] == 'pull' and args[1] == observer.UI_PNG:
+                Path(args[2]).write_bytes(b'not a PNG')
+                return subprocess.CompletedProcess([], 0, 'pulled')
+        self.failure = corrupt
+        with self.assertRaisesRegex(ValueError, 'not PNG'):
+            self.observe()
+        def cleanup(args):
+            if args[:2] == ['shell', 'rm'] and (self.root / 'reports/identity.json').exists():
+                return subprocess.CompletedProcess([], 1, 'cleanup failed')
+        self.failure = cleanup
+        with self.assertRaisesRegex(ValueError, 'ui-cleanup'):
+            self.observe()
+        self.assertEqual(self.calls[-1], ['uninstall', PACKAGE])
 
 
 class HostedWiringTests(unittest.TestCase):
