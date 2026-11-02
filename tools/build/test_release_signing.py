@@ -220,6 +220,11 @@ class AssetTests(RuntimeFixture):
         zipped = runtime.members(self.assets[signing.asset_names(self.expected)[1]])
         self.assertEqual(zipped, {p.relative_to(self.final).as_posix(): p.read_bytes() for p in self.final.rglob('*') if p.is_file()})
         self.assertIn('legal/license.txt', zipped)
+        for name in ('chatgpt-mark-MIT.txt', 'chatgpt-mark-SOURCE.txt'):
+            key = 'legal/branding/' + name
+            original = (runtime.ROOT / bundle.LEGAL / 'branding' / name).read_bytes()
+            self.assertEqual(zipped[key], original)
+            self.assertIn(original.rstrip(), self.assets['THIRD_PARTY_NOTICES.txt'])
         bom = json.loads(self.assets['runtime.cdx.json'])
         self.assertEqual(bom['metadata']['component']['hashes'][0]['content'], runtime.fingerprint(apk.read_bytes())['sha256'])
         self.assertEqual(len(self.assets), 6)

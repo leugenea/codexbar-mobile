@@ -83,11 +83,11 @@ internal object DashboardPresentation {
         return PresentedPace(if (rounded.signum() > 0) R.string.dashboard_over_pace else R.string.dashboard_reserve, amount)
     }
 
-    fun status(status: UsageScreenStatus): Int = when (status) {
+    fun status(status: UsageScreenStatus): Int? = when (status) {
         UsageScreenStatus.DISCONNECTED -> R.string.dashboard_disconnected
         UsageScreenStatus.LOADING -> R.string.dashboard_loading
         UsageScreenStatus.UNAVAILABLE -> R.string.dashboard_unavailable
-        UsageScreenStatus.CURRENT -> R.string.dashboard_current
+        UsageScreenStatus.CURRENT -> null
         UsageScreenStatus.STALE -> R.string.dashboard_stale
         UsageScreenStatus.ERROR -> R.string.dashboard_error
         UsageScreenStatus.REAUTHORIZE -> R.string.dashboard_reauthorize

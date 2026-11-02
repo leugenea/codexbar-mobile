@@ -52,6 +52,14 @@ class FinalBundleTests(RuntimeFixture):
         self.assertEqual(bom['metadata']['component']['hashes'][0]['content'], manifest['apk']['sha256'])
         self.assertEqual(files['runtime-inventory.json'], (self.unsigned / 'runtime-inventory.json').read_bytes())
         self.assertEqual(files['THIRD_PARTY_NOTICES.txt'], (self.unsigned / 'THIRD_PARTY_NOTICES.txt').read_bytes())
+        manifest_files = {r['path']: r for r in manifest['files']}
+        for name in ('chatgpt-mark-MIT.txt', 'chatgpt-mark-SOURCE.txt'):
+            key = 'legal/branding/' + name
+            original = (runtime.ROOT / bundle.LEGAL / 'branding' / name).read_bytes()
+            self.assertEqual((self.unsigned / key).read_bytes(), original)
+            self.assertEqual(files[key], original)
+            self.assertIn(original.rstrip(), files['THIRD_PARTY_NOTICES.txt'])
+            self.assertEqual({k: manifest_files[key][k] for k in ('size', 'sha256')}, runtime.fingerprint(original))
         output = self.root / 'final-bundle'
         bundle.write_bundle(output, files, [self.apk, self.final, self.unsigned])
         bundle.verify_files(output, self.final_files())

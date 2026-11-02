@@ -1,14 +1,20 @@
 package io.github.leugenea.codexbarmobile
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -78,7 +84,7 @@ private fun ConnectionRoute(state: ConnectionState, controller: ConnectionContro
     val scroll = key(route) { rememberScrollState() }
     DashboardRefresh(route == DashboardRoute.DASHBOARD, state, { controller.readUsage() }) {
         Column(Modifier.fillMaxSize().testTag("connection-screen").verticalScroll(scroll).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            verticalArrangement = Arrangement.spacedBy(if (route == DashboardRoute.DASHBOARD) 4.dp else 20.dp)) {
             RouteHeader(route, openDrawer, back)
             RouteContent(route, state, controller, openBrowser, openAccountSettings, source, authority, current, navigation, observer, exporter, importer,
                 { kind = it.kind }, { after = it })
@@ -95,13 +101,19 @@ private fun routeRequest(route: DashboardRoute, current: HistoryPresentationRequ
 
 @Composable
 private fun RouteHeader(route: DashboardRoute, openDrawer: () -> Unit, back: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(Modifier.fillMaxWidth().testTag("route-header"), horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically) {
         val menu = stringResource(R.string.dashboard_menu)
         IconButton(onClick = openDrawer, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).testTag("open-drawer").semantics { contentDescription = menu }) {
-            Text("☰")
+            Icon(painterResource(R.drawable.ic_menu), contentDescription = null, modifier = Modifier.size(24.dp))
         }
         Text(stringResource(route.title), style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.weight(1f).padding(top = 8.dp).semantics { heading() })
+            modifier = Modifier.weight(1f).testTag("route-title").semantics { heading() })
+        if (route == DashboardRoute.DASHBOARD) Box(Modifier.size(48.dp).testTag("chatgpt-brand")
+            .clearAndSetSemantics { hideFromAccessibility() }, contentAlignment = Alignment.Center) {
+            Icon(painterResource(R.drawable.ic_chatgpt), contentDescription = null, modifier = Modifier.size(24.dp),
+                tint = if (isSystemInDarkTheme()) Color.White else Color.Black)
+        }
     }
     if (route != DashboardRoute.DASHBOARD) TextButton(onClick = back,
         modifier = Modifier.heightIn(min = 48.dp).testTag("details-back")) { Text(stringResource(R.string.dashboard_back)) }

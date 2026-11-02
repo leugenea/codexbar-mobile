@@ -83,6 +83,9 @@ def attribution(root, inventory):
             files['legal/' + evidence['path']] = data
     # First-party permission/copyright text accompanies every capsule.
     files['legal/application-MIT.txt'] = (root / 'LICENSE').read_bytes()
+    # The copied provider drawable is an application resource, not a Maven dependency.
+    for name in ('chatgpt-mark-MIT.txt', 'chatgpt-mark-SOURCE.txt'):
+        files['legal/branding/' + name] = (root / LEGAL / 'branding' / name).read_bytes()
     return sorted(selected, key=lambda r: r['id']), files
 
 

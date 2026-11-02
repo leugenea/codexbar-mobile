@@ -29,7 +29,7 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
     fun restore() { observer.release(); MainActivity.historyUiObserver = previousObserver }
 
     fun capture(name: String, scenario: ActivityScenario<MainActivity>, fixture: HistoryNavigationFixture,
-        label: String, kind: WindowKind? = null) {
+        label: String, kind: WindowKind? = null, header: Boolean = false) {
         // Let the selected route finish its real delivery before installing a hold;
         // no predecessor is captured until after the hold's host acknowledgement.
         awaitRenderedSource(fixture.owner)
@@ -39,8 +39,10 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
         try {
             awaitRenderedSource(fixture.owner)
             val compactCopy = if (kind != null) compactCopy(kind) else JSONObject.NULL
+            if (header) compose.onNodeWithTag("connection-screen").performScrollToNode(hasTestTag("route-header"))
             val observed = compose.onNodeWithTag(label)
-            val layouts = HistoryAcceptanceCapture(compose).layout(if (name == "dashboard-drawer-portrait-dark") observed else observed.performScrollTo())
+            val layouts = HistoryAcceptanceCapture(compose).layout(if (header || name == "dashboard-drawer-portrait-dark") observed else observed.performScrollTo())
+            val hierarchy = if (header) headerHierarchy() else JSONObject.NULL
             val observedLabel = observed.fetchSemanticsNode().config[SemanticsProperties.TestTag]
             val tag = if (kind == WindowKind.WEEKLY) "history-chart-weekly-canvas" else "history-chart-five-hour-canvas"
             if (kind != null) compose.onNodeWithTag(tag, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
@@ -58,7 +60,7 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
                     .put("requests", fixture.transport.requests.get()).put("gets", fixture.transport.gets.get())
                     .put("layoutLabel", observedLabel).put("layoutFontScale", layouts.layoutInput.density.fontScale)
                     .put("layoutDensity", layouts.layoutInput.density.density)
-                    .put("sourceKind", kind?.name ?: "NONE").put("compactCopy", compactCopy)
+                    .put("sourceKind", kind?.name ?: "NONE").put("compactCopy", compactCopy).put("headerHierarchy", hierarchy)
                 val config = frame.configuration
                 data.put("orientation", config.orientation).put("fontScale", config.fontScale)
                     .put("density", frame.density).put("renderedLocale", config.locales[0].toLanguageTag())
@@ -77,6 +79,57 @@ internal class DashboardCapture(private val compose: ComposeTestRule) {
                 save(name, bitmap, data)
             } finally { bitmap.recycle() }
         } finally { observer.release() }
+    }
+
+    private fun headerHierarchy(): JSONObject {
+        val native = HistoryAcceptanceCapture(compose)
+        val title = compose.onNodeWithTag("route-title").assertTextEquals("Usage").assertHasNoClickAction()
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        val titleLayout = native.layout(title)
+        val density = titleLayout.layoutInput.density.density
+        val titleBounds = title.fetchSemanticsNode().boundsInRoot
+        val menu = compose.onNodeWithTag("open-drawer").assertHasClickAction().assertContentDescriptionEquals("Open details menu")
+            .fetchSemanticsNode()
+        val brand = compose.onNodeWithTag("chatgpt-brand", useUnmergedTree = true).assertHasNoClickAction()
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility)).fetchSemanticsNode()
+        assertFalse(brand.config.contains(SemanticsProperties.ContentDescription))
+        assertFalse(brand.config.contains(SemanticsProperties.Role))
+        assertTrue(menu.size.width >= 48 * density && menu.size.height >= 48 * density)
+        assertEquals(menu.boundsInRoot.center.y, titleBounds.center.y, 1f)
+        assertEquals(menu.boundsInRoot.center.y, brand.boundsInRoot.center.y, 1f)
+        assertEquals(menu.boundsInRoot.width, brand.boundsInRoot.width, 1f)
+        assertTrue(menu.boundsInRoot.right <= titleBounds.left && titleBounds.right <= brand.boundsInRoot.left)
+        val updated = compose.onNodeWithTag("dashboard-observed-at")
+        val updatedLayout = native.layout(updated)
+        val updatedBounds = updated.fetchSemanticsNode().boundsInRoot
+        val headerBounds = compose.onNodeWithTag("route-header").fetchSemanticsNode().boundsInRoot
+        val card = compose.onNodeWithTag("dashboard-FIVE_HOUR").fetchSemanticsNode().boundsInRoot
+        assertTrue(updatedBounds.top >= headerBounds.bottom && updatedBounds.top - headerBounds.bottom <= 5 * density)
+        assertTrue(card.top >= updatedBounds.bottom && card.top - updatedBounds.bottom <= 13 * density)
+        val percent = native.layout(compose.onNodeWithTag("live-five-hour-percent"))
+        assertEquals("The main percentage keeps headlineMedium", 28f, percent.layoutInput.style.fontSize.value, 0f)
+        assertTrue(updatedLayout.layoutInput.style.fontSize.value < percent.layoutInput.style.fontSize.value)
+        compose.onNodeWithTag("dashboard-status").assertDoesNotExist()
+        compose.onAllNodesWithText("Last reported usage", useUnmergedTree = true).assertCountEquals(0)
+        val heading = native.layout(compose.onNodeWithTag("history-chart-five-hour-title"))
+        val pace = compose.onNodeWithTag("history-chart-five-hour-pace")
+            .assert(hasAnyAncestor(hasTestTag("history-chart-five-hour-heading")))
+        val paceLayout = native.layout(pace)
+        native.layout(compose.onNodeWithTag("live-five-hour-reset-relative"))
+        assertTrue(paceLayout.layoutInput.style.fontSize.value < heading.layoutInput.style.fontSize.value)
+        val windowTitle = compose.onNodeWithTag("history-chart-five-hour-title").fetchSemanticsNode().boundsInRoot
+        val paceBounds = pace.fetchSemanticsNode().boundsInRoot
+        assertTrue("Title and pace must not overlap", windowTitle.right <= paceBounds.left || windowTitle.bottom <= paceBounds.top)
+        if (titleLayout.layoutInput.density.fontScale == 1f)
+            assertEquals("Normal-font pace sits alongside its title", windowTitle.center.y, paceBounds.center.y, 1f)
+        compose.onAllNodesWithTag("history-chart-five-hour-pace", useUnmergedTree = true).assertCountEquals(1)
+        compose.onAllNodes(hasTestTag("history-chart-five-hour-pace") and
+            hasAnyAncestor(hasTestTag("history-chart-five-hour")), useUnmergedTree = true).assertCountEquals(0)
+        return JSONObject().put("updated", text("dashboard-observed-at")).put("pace", text("history-chart-five-hour-pace"))
+            .put("reset", text("live-five-hour-reset-relative")).put("rootWidthDp", compose.onRoot().fetchSemanticsNode().boundsInRoot.width / density)
+            .put("menuSizeDp", menu.boundsInRoot.width / density).put("firstCardTopDp", card.top / density)
+            .put("titleLineCount", heading.lineCount).put("paceLineCount", paceLayout.lineCount)
+            .put("paceWrappedBelowTitle", paceBounds.top >= windowTitle.bottom)
     }
 
     private fun mountedRoots(): List<String> {

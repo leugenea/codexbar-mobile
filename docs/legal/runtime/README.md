@@ -5,7 +5,11 @@ catalog**, not a claim that every catalog entry ships. The release-only Gradle
 observation selects the actual graph; APK observation selects observed and merged
 contributors. Only their material is copied into the generated bundle's `legal/`
 directory. Build/test dependencies and constraint-only BOMs are not runtime SBOM
-components. Full original text and spelling are retained.
+components. Full original text and spelling are retained. The copied provider mark
+is an application resource, not a dependency-graph component: `release_bundle.py`
+explicitly includes `branding/chatgpt-mark-MIT.txt` and `branding/chatgpt-mark-SOURCE.txt`
+in every unsigned/final capsule before rendering the combined notices. Existing
+byte manifests and complete legal ZIP packaging carry these files unchanged.
 
 Generated `attribution/` compilations and extracted `candidate-*` notice/header
 texts use LF line endings and one final newline; their catalog hashes bind those
@@ -51,6 +55,9 @@ other whitespace checks and corpus paths retain the normal gate.
 - `psl/`: full MPL-2.0, original NOTICE, exact corresponding source and versioned
   generator for `assets/PublicSuffixDatabase.list`. `SOURCE.txt` provides recipient
   directions. A pure test reproduces the cataloged binary hash from this source.
+- `branding/`: byte-identical OpenAI Cookbook MIT license for the copied
+  ChatGPT/OpenAI knot drawable, plus pinned source/hash and trademark directions.
+  Copyright permission does not grant trademark rights or imply endorsement.
 
 The owner-approved bounded policy requires exact selected artifact versions/hashes,
 known embedded identities and preserved source-backed texts, not exhaustive upstream

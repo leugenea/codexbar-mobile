@@ -44,7 +44,7 @@ class HistoryAssembledAcceptanceTest {
             compose.onNodeWithTag("live-five-hour-percent").assertDoesNotExist()
             compose.onNodeWithTag("live-weekly-percent").assertDoesNotExist()
             capture.label("dashboard-no-info-FIVE_HOUR")
-            compose.onNodeWithTag("open-drawer").performScrollTo()
+            compose.onNodeWithTag("connection-screen").performScrollToNode(hasTestTag("route-header"))
             capture.capture("history-assembled-fresh-portrait-light", scenario, fixture, listOf("open-drawer", "open-account-settings"))
             assertEquals(0L, fixture.transport.requests.get())
         }

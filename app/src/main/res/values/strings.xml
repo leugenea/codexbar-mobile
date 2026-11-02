@@ -345,7 +345,6 @@
     <string name="dashboard_disconnected">Sign in to see your usage</string>
     <string name="dashboard_loading">Connecting…</string>
     <string name="dashboard_unavailable">Usage information unavailable</string>
-    <string name="dashboard_current">Last reported usage</string>
     <string name="dashboard_stale">Usage may be out of date</string>
     <string name="dashboard_error">Unable to update usage</string>
     <string name="dashboard_reauthorize">Sign in again to continue</string>
@@ -364,7 +363,11 @@
     <string name="dashboard_window_malformed">Some latest usage fields are malformed.</string>
     <string name="dashboard_window_unsupported">Latest usage percentage unsupported.</string>
     <string name="dashboard_updated">Updated %1$s</string>
-    <string name="dashboard_next_reset">Next reset in %1$s</string>
+    <string name="dashboard_next_reset">Resets in %1$s</string>
+    <string name="dashboard_days_short">%1$dd</string>
+    <string name="dashboard_hours_short">%1$dh</string>
+    <string name="dashboard_minutes_short">%1$dm</string>
+    <string name="dashboard_less_than_minute">&lt;1m</string>
     <string name="dashboard_over_pace">Over pace by %1$s%%</string>
     <string name="dashboard_reserve">%1$s%% in reserve</string>
     <string name="dashboard_on_pace">On pace</string>

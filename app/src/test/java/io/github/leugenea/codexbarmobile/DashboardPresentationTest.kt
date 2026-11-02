@@ -12,6 +12,15 @@ import java.util.Locale
 
 /** Existing normalized/plot facts are the oracle; these adapters never infer quota/count/time. */
 class DashboardPresentationTest {
+    @Test fun currentStatusHasNoRedundantHeadingWhileActionableStatesRemainExplicit() {
+        assertNull(DashboardPresentation.status(UsageScreenStatus.CURRENT))
+        val expected = mapOf(UsageScreenStatus.DISCONNECTED to R.string.dashboard_disconnected,
+            UsageScreenStatus.LOADING to R.string.dashboard_loading, UsageScreenStatus.UNAVAILABLE to R.string.dashboard_unavailable,
+            UsageScreenStatus.STALE to R.string.dashboard_stale, UsageScreenStatus.ERROR to R.string.dashboard_error,
+            UsageScreenStatus.REAUTHORIZE to R.string.dashboard_reauthorize)
+        expected.forEach { (status, resource) -> assertEquals(resource, DashboardPresentation.status(status)!!) }
+    }
+
     @Test fun reportedInventoryCountNeverFallsBackToSummaryRowsOrZero() {
         val unknowns = listOf<Field<Long>?>(null, Field(Knowledge.UNAVAILABLE), Field(Knowledge.MALFORMED), Field(Knowledge.UNSUPPORTED))
         unknowns.forEach { count ->

@@ -42,6 +42,32 @@ Unicode-3.0 terms. The exact fork release source is
 Unsigned capsules remain non-distributable signing inputs; final-signed binding is
 not an owner publication or activation GO.
 
+## ChatGPT / OpenAI provider mark
+
+The decorative in-app provider mark in `app/src/main/res/drawable/ic_chatgpt.xml`
+retains the single knot path and `0 0 320 320` viewport from the official OpenAI
+Cookbook's
+[`openai-logomark.svg`](https://github.com/openai/openai-cookbook/blob/f5819076643583e2c2a77268e7fe522e927499d0/examples/agents_sdk/deployment_manager/frontend/src/openai-logomark.svg).
+Original SVG SHA-256:
+`a41e8e53b14ef686319ed1529066d6a3391aca77d7f6eaaa9f0783acc717375f`.
+Only the SVG-to-Android-vector representation changes; the geometry is not redrawn.
+The original `currentColor` fill is displayed black in light mode and white in dark
+mode. The upstream repository's MIT license, Copyright (c) 2025 OpenAI, is retained
+[byte-for-byte](docs/legal/runtime/branding/chatgpt-mark-MIT.txt), with
+[pinned source and transformation directions](docs/legal/runtime/branding/chatgpt-mark-SOURCE.txt).
+`release_bundle.py` explicitly includes both files in every unsigned/final capsule's
+`legal/branding/` directory before rendering `THIRD_PARTY_NOTICES.txt`; existing
+byte manifests and release legal ZIP packaging preserve them. The application
+resource is not listed as a Maven dependency.
+
+ChatGPT, OpenAI and their marks belong to OpenAI. MIT copyright terms do not grant
+trademark rights. The mark identifies the usage provider only: it is not an action,
+launcher icon, application identity or claim of endorsement. This independent
+unofficial app is not affiliated with or endorsed by OpenAI. Follow
+[OpenAI's brand terms](https://openai.com/brand/), including their revocable permission
+and unaltered service-related use requirements; no blanket trademark clearance or
+distribution approval is claimed. Exact hosted capsule verification remains required.
+
 ## Build, test and repository tooling (not a release-runtime list)
 
 | Component | Use / license findings |

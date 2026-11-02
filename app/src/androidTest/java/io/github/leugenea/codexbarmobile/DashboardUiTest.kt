@@ -34,6 +34,7 @@ class DashboardUiTest {
             compose.onNodeWithTag("history-select-FIVE_HOUR").assertDoesNotExist()
             compose.onNodeWithTag("history-page-cursor").assertDoesNotExist()
             val before = fixture.transport.counts()
+            capture.capture("dashboard-header-portrait-light", scenario, fixture, "route-title", header = true)
             capture.capture("dashboard-main-portrait-light", scenario, fixture, "history-chart-five-hour-pace", WindowKind.FIVE_HOUR)
             capture.capture("dashboard-weekly-portrait-light", scenario, fixture, "history-chart-weekly-pace", WindowKind.WEEKLY)
             val weekly = compose.onNodeWithTag("history-chart-weekly-canvas", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -165,7 +166,7 @@ class DashboardUiTest {
             assertEquals(source.point.segment.window, owner.currentHistoryDisplayContext()!!.periods.fiveHour.window)
             assertCurrentDrawing(current, 1, 0, 1)
             compose.onNodeWithTag("live-five-hour-reset-absolute").assertDoesNotExist()
-            compose.onNodeWithTag("live-five-hour-reset-relative").assertTextEquals("Next reset in 59 minutes")
+            compose.onNodeWithTag("live-five-hour-reset-relative").assertTextEquals("Resets in 59m")
             compose.onNodeWithTag("dashboard-no-info-FIVE_HOUR").assertDoesNotExist()
             compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertExists()
             compose.onNodeWithTag("history-chart-five-hour-pace").assertTextEquals("67.6% in reserve")
@@ -200,7 +201,7 @@ class DashboardUiTest {
             assertEquals(java.time.Instant.parse("2027-01-15T09:00:00Z"), owner.currentHistoryDisplayContext()!!.periods.fiveHour.window!!.resetAt)
             compose.onNodeWithTag("live-five-hour-percent").assertTextEquals("7.25% used")
             compose.onNodeWithTag("live-five-hour-reset-absolute").assertDoesNotExist()
-            compose.onNodeWithTag("live-five-hour-reset-relative").assertTextEquals("Next reset in 59 minutes")
+            compose.onNodeWithTag("live-five-hour-reset-relative").assertTextEquals("Resets in 59m")
             compose.onNodeWithTag("dashboard-window-warning-FIVE_HOUR").assertTextEquals("Some latest usage fields are malformed.")
             compose.onNodeWithTag("dashboard-no-info-FIVE_HOUR").assertDoesNotExist()
             compose.onNodeWithTag("history-chart-five-hour-canvas", useUnmergedTree = true).assertExists()
@@ -292,7 +293,8 @@ class DashboardUiTest {
                 "history-chart-five-hour-first", "history-chart-five-hour-last", "history-chart-five-hour-pace").forEach {
                 HistoryAcceptanceCapture(compose).label(it)
             }
-            val menu = compose.onNodeWithTag("open-drawer").performScrollTo().assertHasClickAction().fetchSemanticsNode()
+            compose.onNodeWithTag("connection-screen").performScrollToNode(hasTestTag("route-header"))
+            val menu = compose.onNodeWithTag("open-drawer").assertHasClickAction().fetchSemanticsNode()
             assertTrue(menu.size.height >= 48 * scenarioDensity(scenario))
             assertDashboardRefreshAction(compose, enabled = true)
             assertBankedTableReadable()
@@ -313,6 +315,40 @@ class DashboardUiTest {
             openDetailRoute(compose, owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
             await("large-font stored page") { recordedHistory(owner).storage != null }
             capture.capture("dashboard-local-history-details-large-font", scenario, fixture, "history-page-cursor")
+        }
+    }
+
+    @Test fun narrowLargeFontHeaderAndWindowPaceWrapWithoutClippingInBothThemes() {
+        fixture.transport.advance(2_279_000)
+        settings.narrowPhone()
+        for (dark in listOf(false, true)) {
+            launch(dark = dark, font = 2f).use { scenario ->
+                if (!dark) login()
+                await("narrow ${if (dark) "dark" else "light"} accepted current pair") {
+                    !owner.state.value.refresh.refreshing && recordedHistory(owner).points.isNotEmpty()
+                }
+                val width = compose.onRoot().fetchSemanticsNode().boundsInRoot.width / scenarioDensity(scenario)
+                assertTrue("Actual narrow native root is 320dp: $width", width in 319f..321f)
+                capture.capture("dashboard-header-narrow-${if (dark) "dark" else "light"}-large-font",
+                    scenario, fixture, "route-title", header = true)
+                for (kind in listOf("five-hour", "weekly")) {
+                    val tag = "history-chart-$kind"
+                    val native = HistoryAcceptanceCapture(compose)
+                    native.label("$tag-title")
+                    native.label("$tag-pace")
+                    val title = compose.onNodeWithTag("$tag-title").fetchSemanticsNode().boundsInRoot
+                    val pace = compose.onNodeWithTag("$tag-pace").fetchSemanticsNode().boundsInRoot
+                    assertTrue("Narrow large-font pace wraps below $kind title", title.bottom <= pace.top)
+                    compose.onAllNodesWithTag("$tag-pace", useUnmergedTree = true).assertCountEquals(1)
+                    compose.onNodeWithTag("$tag-pace").assert(hasAnyAncestor(hasTestTag("$tag-heading")))
+                }
+                val before = fixture.transport.counts()
+                compose.onNodeWithTag("connection-screen").performScrollToNode(hasTestTag("route-header"))
+                compose.onNodeWithTag("open-drawer").performClick()
+                compose.onNodeWithTag("drawer-LOCAL_HISTORY_DETAILS").assertIsDisplayed().performClick()
+                returnDashboard(compose, owner)
+                assertEquals(before, fixture.transport.counts())
+            }
         }
     }
 
@@ -361,7 +397,11 @@ class DashboardUiTest {
     }
     private fun click(tag: String) {
         if (tag == "connect") openDetailRoute(compose, owner, DashboardRoute.ACCOUNT_SETTINGS)
-        compose.onNodeWithTag(tag).performScrollTo().performClick(); compose.waitForIdle()
+        if (tag == "open-drawer" || tag == "details-back") {
+            compose.onNodeWithTag("connection-screen").performScrollToNode(hasTestTag(if (tag == "open-drawer") "route-header" else tag))
+            compose.onNodeWithTag(tag).performClick()
+        } else compose.onNodeWithTag(tag).performScrollTo().performClick()
+        compose.waitForIdle()
         if (tag == "connect") returnDashboard(compose, owner)
     }
     private fun pressActivityBack(scenario: ActivityScenario<MainActivity>, step: String) {
