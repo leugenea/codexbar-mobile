@@ -102,7 +102,9 @@ internal class HistoryAcceptanceCapture(private val compose: ComposeTestRule) {
                 .put("dark", config.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES)
         }
         val stored = compose.onAllNodesWithTag("connection-history").fetchSemanticsNodes().isNotEmpty()
-        val tag = if (stored) "history-page-cursor" else if (name == "history-assembled-fresh-portrait-light") "dashboard-no-info-FIVE_HOUR" else "history-chart-five-hour-pace"
+        val account = compose.onAllNodesWithTag("account-settings").fetchSemanticsNodes().isNotEmpty()
+        val tag = if (account) "account-history-tools-title" else if (stored) "history-page-cursor"
+            else if (name == "history-assembled-fresh-portrait-light") "dashboard-no-info-FIVE_HOUR" else "history-chart-five-hour-pace"
         val observed = compose.onNodeWithTag(tag)
         val layouts = mutableListOf<TextLayoutResult>()
         observed.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
@@ -110,7 +112,7 @@ internal class HistoryAcceptanceCapture(private val compose: ComposeTestRule) {
         assertEquals(data.getDouble("fontScale").toFloat(), effective.fontScale)
         assertEquals(data.getDouble("density").toFloat(), effective.density)
         data.put("layoutFontScale", effective.fontScale).put("layoutDensity", effective.density)
-            .put("route", if (stored) "LOCAL_HISTORY_DETAILS" else "DASHBOARD").put("layoutLabel", tag)
+            .put("route", if (account) "ACCOUNT_SETTINGS" else if (stored) "LOCAL_HISTORY_DETAILS" else "DASHBOARD").put("layoutLabel", tag)
         if (stored) data.put("uiCursor", observed.fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text })
         return data
     }

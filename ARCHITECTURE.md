@@ -252,7 +252,15 @@ A8 sign-in alone does not close parent #4.
 
 ## History JSON export and import
 
-The local-history detail route exports all retained entries plus coherent continuation
+Account settings groups **Export history** and **Import history** under **Local usage history**,
+separate from sign-in credentials. The history detail route has no duplicate controls.
+The existing exporters/importers remain registered unconditionally at the navigation root;
+their pending state stays in process-owner memory across navigation and Activity recreation,
+never in a saved Bundle. Account settings retains Idle history-page interest: rendering
+these controls neither queries a history page nor activates dormant provider reads.
+Import availability still requires the current foreground history generation and partition,
+not a displayed page; export retains its existing busy-only UI gate and checked preparation.
+Export includes all retained entries plus coherent continuation
 state through SAF, off Main, without credentials/account metadata or the local
 partition UUID. The versioned production encoder/decoder, privacy boundary and
 forward-compatibility contract are documented in [history export v1](docs/history-export.md).

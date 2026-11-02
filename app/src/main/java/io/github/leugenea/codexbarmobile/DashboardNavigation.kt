@@ -129,10 +129,9 @@ private fun RouteContent(route: DashboardRoute, state: ConnectionState, controll
             val display = historyForDisplay(source, navigation.query, authority)
             SideEffect { observer?.projected(source, display, state.refresh.evaluatedAt) }
             StoredHistoryContent(navigation, display, state.refresh.evaluatedAt, kind, page)
-            HistoryExportAction(exporter)
-            HistoryImportAction(importer, authority?.generation != null && source.partition != null)
         }
         DashboardRoute.CONNECTION_DETAILS -> Column(Modifier.testTag("connection-details")) { ConnectionContent(state, controller, openAccountSettings) }
-        DashboardRoute.ACCOUNT_SETTINGS -> AccountSettingsScreen(state, controller, browser)
+        DashboardRoute.ACCOUNT_SETTINGS -> AccountSettingsScreen(state, controller, browser, exporter, importer,
+            authority?.generation != null && source.partition != null)
     }
 }
