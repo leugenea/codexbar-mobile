@@ -289,6 +289,7 @@ class CandidateTests(unittest.TestCase):
             self.assertEqual(self.read(), self.assets)
             self.assertEqual(verify.call_args.kwargs, {'expected_certificate': 'd' * 64,
                 'expected_binding': {key: self.expected[key] for key in ('tag', 'source')}, 'apk_contract': None,
+                'rendering_contract': None,
                 'expected_authority': {'repository': self.api.repository, 'workflowId': 8,
                                       'controllerSha': 'c' * 40, 'runId': 90, 'runAttempt': 2}})
         for key, value in [('tag', 'v0.1.0-rc.2'), ('channel', 'stable'), ('source', {'sha': 'e' * 40, 'tree': 'b' * 40}),

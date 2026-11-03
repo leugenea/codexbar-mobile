@@ -11,10 +11,11 @@ from unittest.mock import patch
 import historical_apk_contract as contracts
 from historical_apk_fixtures import SOURCE_MANIFEST, PERMISSIONS, TREE
 import release_artifact as artifact
+import release_bundle as bundle
 import release_policy as policy
 import release_signing as signing
 from release_publication import marker
-from release_runtime import canonical, fingerprint
+from release_runtime import canonical, file_record, fingerprint, members
 import test_release_artifact as current
 import test_release_policy as fixtures
 import test_release_signing as asset_tests
@@ -25,6 +26,9 @@ LEGACY = contracts.ApkContract.PRE_WORKMANAGER
 FIRST_SOURCE = {'sha': '296e030c68e79235397d7e4d082aaf463ce95f7e',
                 'tree': '30353f7174afd47b5e62d676e434bcffa1aafefb'}
 FIRST_TAG = 'v0.1.0-rc.1'
+PRE_BRANDING = contracts.RenderingContract.PRE_BRANDING
+THIRD_SOURCE = {'sha': '5cfb6f9e3f1e06ea6cea415acdad34a210984568',
+                'tree': '830f21a42e920fd8abd3694b8301885a694bb053'}
 
 
 def without_node(tree, kind, name):
@@ -202,6 +206,8 @@ class HistoricalBindingTests(unittest.TestCase):
         self.assertEqual(kwargs['expected_authority'], self.authority)
         self.assertEqual(kwargs['expected_certificate'], 'd' * 64)
         self.assertIs(kwargs['apk_contract'], LEGACY)
+        self.assertIs(kwargs['rendering_contract'], contracts.rendering_for(
+            self.identity['tag'], self.identity['source'], self.authority['controllerSha']))
         self.assertIn('/git/ref/tags/' + self.identity['tag'], self.model.calls)
         self.assertIn('/git/commits/' + self.identity['source']['sha'], self.model.calls)
         self.assertIn('/contents/app/src/main/AndroidManifest.xml?ref=' + self.identity['source']['sha'], self.model.calls)
@@ -223,6 +229,46 @@ class HistoricalBindingTests(unittest.TestCase):
                                          'v0.2.0-rc.2', 'v0.2.0-rc.3', 'v0.2.0'})
         self.assertEqual(len(contracts.LEGACY_SOURCES), 5)
         self.assertEqual(fingerprint(SOURCE_MANIFEST)['sha256'], contracts.LEGACY_MANIFEST_SHA256)
+
+    def test_nine_rendering_identities_require_authenticated_source_and_producer(self):
+        observed = set()
+        for sha, (tree, tags, controller) in contracts.PRE_BRANDING_SOURCES.items():
+            for tag in tags:
+                self.identity = legacy_identity(tag, {'sha': sha, 'tree': tree})
+                self.manifest['buildInputs'] = self.identity
+                self.authority['controllerSha'] = controller
+                self.model = legacy_model(self.identity)
+                path = '/actions/runs/90/attempts/2'
+                origin = {**self.model.get(path), 'head_sha': controller}
+                self.model.overrides[path] = origin
+                self.api = fixtures.wrapper(self.model)
+                with patch.object(policy, 'verify_assets', return_value=(self.manifest, None)) as verify:
+                    self.read()
+                    self.assertIs(verify.call_args.kwargs['rendering_contract'], PRE_BRANDING)
+                    self.assertIs(verify.call_args.kwargs['apk_contract'], contracts.contract_for(tag, self.identity['source']))
+                    self.assertIn('/git/ref/tags/' + tag, self.model.calls)
+                    self.assertIn('/git/commits/' + sha, self.model.calls)
+                    observed.add(tag)
+                    # Even an authenticated but different producer cannot gain old rendering.
+                    self.authority['controllerSha'] = 'e' * 40
+                    self.model.overrides[path] = {**origin, 'head_sha': 'e' * 40}
+                    self.read()
+                    self.assertIsNone(verify.call_args.kwargs['rendering_contract'])
+        self.assertEqual(observed, {'v0.1.0-rc.1', 'v0.1.0-rc.2', 'v0.1.0', 'v0.2.0-rc.1',
+                                    'v0.2.0-rc.2', 'v0.2.0-rc.3', 'v0.2.0', 'v0.3.0-rc.1', 'v0.3.0'})
+        for tag in ('v0.3.0-rc.1', 'v0.3.0'):
+            source = next({'sha': sha, 'tree': row[0]} for sha, row in contracts.PRE_BRANDING_SOURCES.items() if tag in row[1])
+            self.assertIsNone(contracts.contract_for(tag, source))
+
+    def test_unknown_or_mismatched_rendering_identities_never_select_compatibility(self):
+        for tag, source, controller in [
+            ('v0.3.0-rc.2', THIRD_SOURCE, THIRD_SOURCE['sha']),
+            ('v0.3.0', {**THIRD_SOURCE, 'sha': 'e' * 40}, THIRD_SOURCE['sha']),
+            ('v0.3.0', {**THIRD_SOURCE, 'tree': 'e' * 40}, THIRD_SOURCE['sha']),
+            ('v0.3.0', THIRD_SOURCE, 'e' * 40),
+        ]:
+            with self.subTest(tag=tag, source=source, controller=controller):
+                self.assertIsNone(contracts.rendering_for(tag, source, controller))
 
     def test_tag_source_tree_and_manifest_drift_fail_before_apk_observation(self):
         paths = [('/git/ref/tags/' + FIRST_TAG, {'object': {'type': 'commit', 'sha': 'e' * 40}}),
@@ -253,12 +299,14 @@ class HistoricalBindingTests(unittest.TestCase):
             for tag in sorted(tags):
                 release_id = len(assets_by_id) + 1
                 identity = legacy_identity(tag, {'sha': sha, 'tree': tree}, release_id)
-                authority = {**self.authority, 'runId': 1000 + release_id}
+                authority = {**self.authority, 'runId': 1000 + release_id,
+                             'controllerSha': contracts.PRE_BRANDING_SOURCES[sha][2]}
                 manifest = {'buildInputs': identity, 'authority': authority}
                 assets = {'release-manifest.json': canonical(manifest)}
                 assets_by_id[release_id] = assets
                 self.model.overrides.update(legacy_model(identity).overrides)
-                run = {**self.model.get('/actions/runs/90'), 'id': authority['runId'], 'run_number': release_id}
+                run = {**self.model.get('/actions/runs/90'), 'id': authority['runId'], 'run_number': release_id,
+                       'head_sha': authority['controllerSha']}
                 self.model.overrides[f'/actions/runs/{authority["runId"]}/attempts/2'] = run
                 self.model.records.append({'id': release_id, 'tag_name': tag, 'target_commitish': sha,
                                            'name': tag[1:], 'body': marker(assets), 'draft': False,
@@ -309,21 +357,26 @@ class HistoricalBindingTests(unittest.TestCase):
             select.assert_not_called()
 
     def test_retained_legacy_candidate_authenticates_then_reserves_tag(self):
+        self.authority['controllerSha'] = 'e20afff53f44075e1e461b0fefa937d96f77c48c'
+        self.model.overrides['/actions/runs/90/attempts/2'] = {
+            **self.model.get('/actions/runs/90/attempts/2'), 'head_sha': self.authority['controllerSha']}
         raw = signing.zip_bytes({'release-manifest.json': canonical(self.manifest)})
         self.model.archive = raw
-        run = {**self.model.get('/actions/runs/90'), 'repository': {'id': 7}}
+        run = {**self.model.get('/actions/runs/90/attempts/2'), 'repository': {'id': 7}}
         artifact_record = {'id': 80, 'name': 'signed-90-2', 'expired': False,
                            'digest': 'sha256:' + fingerprint(raw)['sha256'],
-                           'workflow_run': {'id': 90, 'head_sha': 'c' * 40}}
+                           'workflow_run': {'id': 90, 'head_sha': self.authority['controllerSha']}}
         self.model.overrides['/actions/workflows/8/runs?event=workflow_dispatch'] = [run]
         self.model.overrides['/actions/runs/90/artifacts'] = [artifact_record]
         self.model.overrides['/actions/artifacts/80'] = artifact_record
-        with patch.object(policy, 'verify_assets', side_effect=self.observe):
+        with patch.object(policy, 'verify_assets', side_effect=self.observe) as verify:
             policy.prepared_tags(self.api, self.record, {**self.identity, 'tag': 'v0.3.0-rc.1'}, set(), self.reports, self.reports)
+            self.assertIs(verify.call_args.kwargs['rendering_contract'], PRE_BRANDING)
             with self.assertRaisesRegex(ValueError, 'Tag already admitted'):
                 policy.prepared_tags(self.api, self.record, self.identity, set(), self.reports, self.reports)
             self.assertEqual(policy.candidate_assets(self.api, self.record, self.identity, run, self.reports, self.reports),
                              {'release-manifest.json': canonical(self.manifest)})
+            self.assertIs(verify.call_args.kwargs['rendering_contract'], PRE_BRANDING)
         artifact_record['expired'] = True
         with patch.object(policy, 'verify_assets') as observe, self.assertRaisesRegex(ValueError, 'Expired unresolved'):
             policy.prepared_tags(self.api, self.record, self.identity, set(), self.reports, self.reports)
@@ -412,4 +465,129 @@ class LegacyAssetTests(asset_tests.AssetTests):
             assets['release-manifest.json'] = canonical(record)
             assets['SHA256SUMS'] = signing.checksums(assets)
             with self.subTest(key=key), self.assertRaises(ValueError):
+                self.verify(assets)
+
+
+class PreBrandingRenderingTests(asset_tests.RuntimeFixture):
+    """Small deterministic pre-branding capsule; APK/SDK observations are synthetic."""
+    def setUp(self):
+        with patch('test_release_runtime.archive', side_effect=lambda rows: signing.zip_bytes(dict(rows))):
+            super().setUp()
+        self.expected = legacy_identity('v0.3.0', THIRD_SOURCE, 19)
+        self.inventory['buildInputs'] = self.receipt['buildInputs'] = self.expected
+        self.receipt['source'] = THIRD_SOURCE
+        self.binding = {key: self.expected[key] for key in ('tag', 'source')}
+        self.authority = {'repository': 'leugenea/codexbar-mobile', 'workflowId': 388385730,
+                          'controllerSha': THIRD_SOURCE['sha'], 'runId': 40378036550, 'runAttempt': 1}
+        self.rendering: dict = {'rendering_contract': PRE_BRANDING, 'expected_binding': self.binding,
+                          'controller_sha': THIRD_SOURCE['sha']}
+        # Construct old bytes independently of the compatibility branch. Pin the
+        # resulting unsigned digest below, not an expected value from render().
+        self.old = self.files()
+        legal = {name: data for name, data in self.old.items()
+                 if name.startswith('legal/') and not name.startswith('legal/branding/')}
+        self.old = {name: data for name, data in self.old.items() if not name.startswith('legal/branding/')}
+        self.old['THIRD_PARTY_NOTICES.txt'] = bundle.notices(json.loads(self.old['runtime-inventory.json'])['attribution'], legal)
+        manifest = json.loads(self.old.pop('bundle-manifest.json'))
+        manifest['files'] = [{'path': name, **fingerprint(data)} for name, data in sorted(self.old.items())]
+        self.old['bundle-manifest.json'] = canonical(manifest)
+        self.accepted = {'apk': self.inventory['apk'],
+                         'bundleManifestSha256': fingerprint(self.old['bundle-manifest.json'])['sha256']}
+        self.signed = self.root / signing.asset_names(self.expected)[0]
+        self.signed.write_bytes(signing.zip_bytes({**members(self.apk.read_bytes()), 'META-INF/CERT.SF': b'SYNTHETIC'}))
+        self.inspection = {'unsigned': False, 'signerCertificateSha256': asset_tests.CERT}
+        # Rebind the independently constructed old unsigned files to signed bytes.
+        final = dict(self.old)
+        final['runtime.cdx.json'] = canonical(bundle.sbom(self.inventory, json.loads(final['runtime-inventory.json'])['attribution'],
+                                                         file_record(self.signed)))
+        manifest.update(stage='final-signed', apk=file_record(self.signed), signedInspection=self.inspection,
+                        acceptedUnsigned=self.accepted)
+        manifest['files'] = [{'path': name, **fingerprint(data)} for name, data in sorted(final.items())
+                             if name != 'bundle-manifest.json']
+        final['bundle-manifest.json'] = canonical(manifest)
+        self.final = self.root / 'old-final'
+        bundle.write_bundle(self.final, final, [self.apk, self.signed])
+        self.assets = signing.package_assets(self.signed, self.final, self.authority)
+
+    def verify(self, assets=None, **overrides):
+        kwargs = {'expected_binding': self.binding, 'expected_authority': self.authority, 'rendering_contract': PRE_BRANDING}
+        kwargs.update(overrides)
+        with patch.object(artifact, 'inspect_apk', return_value=self.inspection) as inspect, \
+                patch.object(bundle, 'observe_classes', return_value=sorted(self.classes)):
+            result = signing.verify_assets(self.root, self.assets if assets is None else assets, self.root,
+                                           self.root / 'reports', expected_certificate=asset_tests.CERT, **kwargs)
+        self.assertEqual(inspect.call_args.kwargs, {'expected_signer': asset_tests.CERT, 'apk_contract': None})
+        return result
+
+    def test_historical_unsigned_and_complete_final_roundtrip_preserve_current_apk_policy(self):
+        self.assertEqual(self.accepted['bundleManifestSha256'],
+                         '3cd9112ab6fec8f4ca720b0dc5c7710b4389ea9b503408b6622271022fdcc003')
+        self.assertEqual(bundle.render(self.root, self.inventory, self.receipt, **self.rendering), self.old)
+        self.assertEqual(self.verify()[0]['buildInputs'], self.expected)
+        with self.assertRaisesRegex(ValueError, 'accepted unsigned capsule binding'):
+            self.verify(rendering_contract=None)
+
+    def test_unbound_unknown_and_mismatched_rendering_contracts_fail_before_inspection(self):
+        for overrides in ({'expected_binding': None}, {'expected_authority': None},
+                          {'expected_binding': {**self.binding, 'source': {**THIRD_SOURCE, 'tree': 'e' * 40}}},
+                          {'expected_binding': {**self.binding, 'tag': 'v0.3.0-rc.2'}},
+                          {'expected_authority': {**self.authority, 'controllerSha': 'e' * 40}},
+                          {'rendering_contract': True}, {'rendering_contract': 'pre-branding'}):
+            kwargs = {'expected_binding': self.binding, 'expected_authority': self.authority, 'rendering_contract': PRE_BRANDING}
+            kwargs.update(overrides)
+            with self.subTest(overrides=overrides), patch.object(artifact, 'inspect_apk') as inspect, self.assertRaises(ValueError):
+                signing.verify_assets(self.root, self.assets, self.root, self.root / 'reports', **kwargs)
+            inspect.assert_not_called()
+        for rendering in ({'rendering_contract': PRE_BRANDING}, {**self.rendering, 'controller_sha': None},
+                          {**self.rendering, 'rendering_contract': True}):
+            with self.assertRaises(ValueError):
+                bundle.render(self.root, self.inventory, self.receipt, **rendering)
+
+    def test_default_requires_branding_and_current_source_cannot_use_old_rendering(self):
+        current_files = self.files()
+        self.assertEqual(set(current_files) - set(self.old),
+                         {'legal/branding/chatgpt-mark-MIT.txt', 'legal/branding/chatgpt-mark-SOURCE.txt'})
+        self.inventory['buildInputs'] = self.receipt['buildInputs'] = current.EXPECTED
+        self.receipt['source'] = current.EXPECTED['source']
+        with self.assertRaises(ValueError):
+            bundle.render(self.root, self.inventory, self.receipt, **self.rendering)
+        (self.root / bundle.LEGAL / 'branding/chatgpt-mark-MIT.txt').unlink()
+        with self.assertRaises(FileNotFoundError):
+            self.files()
+
+    def test_historical_complete_bytes_accepted_digest_and_legal_evidence_remain_mandatory(self):
+        for name in ('THIRD_PARTY_NOTICES.txt', 'runtime.cdx.json', 'legal/license.txt', 'bundle-manifest.json'):
+            path = self.final / name
+            original = path.read_bytes()
+            if name == 'bundle-manifest.json':
+                manifest = json.loads(original)
+                manifest['acceptedUnsigned']['bundleManifestSha256'] = 'e' * 64
+                path.write_bytes(canonical(manifest))
+            else:
+                path.write_bytes(original + b'changed')
+            bad = signing.package_assets(self.signed, self.final, self.authority)
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'legal/SBOM|unsigned capsule binding'):
+                self.verify(bad)
+            path.write_bytes(original)
+        (self.root / bundle.LEGAL / 'license.txt').write_bytes(b'changed source legal evidence')
+        with self.assertRaisesRegex(ValueError, 'License/NOTICE/source bytes changed'):
+            self.verify()
+
+    def test_historical_rendering_keeps_payload_classes_and_certificate_checks(self):
+        self.classes.append('unapproved.ExtraClass')
+        with self.assertRaisesRegex(ValueError, 'defined classes'):
+            self.verify()
+        self.classes.pop()
+        for mutation, message in (('certificate', 'certificate pin'), ('payload', 'signed payload')):
+            assets = dict(self.assets)
+            record = json.loads(assets['release-manifest.json'])
+            if mutation == 'certificate':
+                record['certificateSha256'] = 'e' * 64
+            else:
+                name = self.signed.name
+                assets[name] = signing.zip_bytes({**members(assets[name]), 'unexpected.bin': b'changed'})
+                record['assets'][name] = fingerprint(assets[name])
+            assets['release-manifest.json'] = canonical(record)
+            assets['SHA256SUMS'] = signing.checksums(assets)
+            with self.subTest(mutation=mutation), self.assertRaisesRegex(ValueError, message):
                 self.verify(assets)

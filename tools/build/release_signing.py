@@ -12,7 +12,7 @@ import zipfile
 
 import release_artifact as artifact
 import release_bundle as bundle
-from historical_apk_contract import check_binding
+from historical_apk_contract import check_binding, check_rendering
 from release_runtime import canonical, file_record, fingerprint, load, members, payload, safe_name
 
 from version_identity import official_inputs
@@ -130,7 +130,7 @@ def checksums(assets):
 
 
 def verify_assets(root, assets, sdk, reports, *, expected_certificate=None, expected_authority=None,
-                  expected_binding=None, apk_contract=None):
+                  expected_binding=None, apk_contract=None, rendering_contract=None):
     """Re-derive delivered legal/SBOM bytes and inspect the downloaded signed APK; no rebuild."""
     record = json.loads(assets['release-manifest.json'], object_pairs_hook=_unique)
     if (set(record) != {'schema', 'kind', 'buildInputs', 'authority', 'certificateSha256',
@@ -139,6 +139,9 @@ def verify_assets(root, assets, sdk, reports, *, expected_certificate=None, expe
         raise ValueError('Unknown release manifest')
     expected = record['buildInputs']
     check_binding(expected, expected_binding, apk_contract)
+    rendering = {'rendering_contract': rendering_contract, 'expected_binding': expected_binding,
+                 'controller_sha': None if expected_authority is None else expected_authority['controllerSha']}
+    check_rendering(expected, expected_binding, rendering['controller_sha'], rendering_contract)
     if expected['channel'] not in ('rc', 'stable') or expected['versionName'] != expected['tag'][1:]:
         raise ValueError('Distributable assets require official RC/stable identity')
     official_inputs(expected['target'], expected['channel'], {'RELEASE_TAG': expected['tag'],
@@ -178,12 +181,12 @@ def verify_assets(root, assets, sdk, reports, *, expected_certificate=None, expe
         raise ValueError('Downloaded signed payload differs from accepted inventory')
     if bundle.observe_classes(apk, sdk, reports) != sorted(r['name'] for r in inventory['classes']):
         raise ValueError('Downloaded defined classes differ')
-    unsigned = bundle.render(root, inventory, receipt)
+    unsigned = bundle.render(root, inventory, receipt, **rendering)
     accepted = {'apk': inventory['apk'], 'bundleManifestSha256': fingerprint(unsigned['bundle-manifest.json'])['sha256']}
     if manifest['acceptedUnsigned'] != accepted:
         raise ValueError('Delivered accepted unsigned capsule binding differs')
     rendered = bundle.render(root, inventory, receipt, stage='final-signed', apk_record=file_record(apk),
-                             signed=inspection, accepted=accepted)
+                             signed=inspection, accepted=accepted, **rendering)
     if files != rendered or any(assets[n] != files[n] for n in ('runtime.cdx.json', 'THIRD_PARTY_NOTICES.txt')):
         raise ValueError('Delivered complete legal/SBOM capsule differs')
     return record, apk

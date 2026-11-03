@@ -6,6 +6,7 @@ import subprocess
 import zipfile
 
 import release_artifact as artifact
+from historical_apk_contract import check_rendering
 from release_runtime import (ROOT, canonical, confined, file_record, fingerprint, load,
                              members, observe_classes, payload, reconcile, safe_name, unique)
 from version_identity import git, resolve
@@ -195,7 +196,9 @@ def validate_schemas(root, inventory, manifest, bom, catalog=None):
         Draft7Validator(load(schema_dir / 'runtime-catalog.schema.json'), registry=registry).validate(catalog)
 
 
-def render(root, inventory, artifact_manifest, *, stage='unsigned', apk_record=None, signed=None, accepted=None):
+def render(root, inventory, artifact_manifest, *, stage='unsigned', apk_record=None, signed=None, accepted=None,
+           rendering_contract=None, expected_binding=None, controller_sha=None):
+    check_rendering(inventory['buildInputs'], expected_binding, controller_sha, rendering_contract)
     if (canonical(artifact_manifest['buildInputs']) != canonical(inventory['buildInputs'])
             or artifact_manifest['source'] != inventory['buildInputs']['source']
             or {k: artifact_manifest[k] for k in ('filename', 'size', 'sha256')} != inventory['apk']
@@ -204,6 +207,9 @@ def render(root, inventory, artifact_manifest, *, stage='unsigned', apk_record=N
     if inventory['unresolved']:
         raise ValueError('Unresolved shipped inventory: ' + '; '.join(inventory['unresolved'][:10]))
     entries, files = attribution(root, inventory)
+    if rendering_contract is not None:
+        for name in ('chatgpt-mark-MIT.txt', 'chatgpt-mark-SOURCE.txt'):
+            del files['legal/branding/' + name]
     inventory = {**inventory, 'attribution': entries}
     apk_record = inventory['apk'] if apk_record is None else apk_record
     bom = sbom(inventory, entries, apk_record)

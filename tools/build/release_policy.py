@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import urllib.parse
 
-from historical_apk_contract import LEGACY_MANIFEST_SHA256, contract_for
+from historical_apk_contract import LEGACY_MANIFEST_SHA256, contract_for, rendering_for
 from release_publication import history_body, identifier, notes_text, read_assets, release_binding, release_body, require
 from release_runtime import fingerprint, load, members
 from release_signing import _unique, verify_assets
@@ -191,8 +191,10 @@ def verify_remote_assets(api, record, assets, sdk, reports, *, tag=None, expecte
                           number=identity['versionCode'], attempt=authority['runAttempt'])
     require(origin['status'] == 'completed' and origin['conclusion'] == 'success', 'History origin attempt not accepted')
     binding, contract = bound_contract(api, identity, identity['tag'] if tag is None else tag)
+    rendering = rendering_for(binding['tag'], binding['source'], origin['head_sha'])
     manifest, _ = verify_assets(ROOT, assets, sdk, reports, expected_certificate=record['certificateSha256'],
-                                expected_authority=authority, expected_binding=binding, apk_contract=contract)
+                                expected_authority=authority, expected_binding=binding, apk_contract=contract,
+                                rendering_contract=rendering)
     require(manifest['buildInputs'] == identity and manifest['authority'] == authority, 'Verified release identity differs')
     return manifest
 
