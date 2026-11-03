@@ -6,9 +6,9 @@ import re
 import urllib.parse
 
 from historical_apk_contract import LEGACY_MANIFEST_SHA256, contract_for
-from release_publication import history_body, identifier, notes_text, read_assets, release_binding, release_body, require
+from release_publication import history_body, identifier, notes_text, release_binding, release_body, require
 from release_runtime import fingerprint, load, members
-from release_signing import _unique, verify_assets, verify_historical_assets
+from release_signing import _unique, verify_assets
 from version_identity import MAX_CODE, official_inputs, parse_tag, target_version
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -153,70 +153,8 @@ def admit(api, config, context):
     return record, expected, origin
 
 
-def artifact_assets(api, artifact):
-    require(artifact['expired'] is False, 'Expired unresolved signed candidate; reconcile before another allocation')
-    digest = artifact['digest']
-    require(isinstance(digest, str) and re.fullmatch('sha256:[0-9a-f]{64}', digest), 'Candidate archive digest missing')
-    raw = api.request('GET', api.prefix + '/actions/artifacts/' + identifier(artifact['id']) + '/zip', binary=True)
-    require('sha256:' + fingerprint(raw)['sha256'] == digest, 'Candidate archive differs')
-    return members(raw)
-
-
-def bound_contract(api, identity, tag):
-    """Resolve independently before policy selection; asset identity is only a claim."""
-    source = tag_source(api, tag)
-    tree = api.get('/git/commits/' + source)['tree']['sha']
-    require(identity['tag'] == tag and identity['source']['sha'] == source, 'History tag/source drift')
-    require(identity['source'] == {'sha': source, 'tree': tree}, 'History tree differs')
-    contract = contract_for(tag, identity['source'])
-    if contract is not None:
-        content = api.get('/contents/app/src/main/AndroidManifest.xml?ref=' + source)
-        require(content['encoding'] == 'base64', 'Unsupported historical manifest encoding')
-        raw = base64.b64decode(''.join(content['content'].split()), validate=True)
-        require(fingerprint(raw)['sha256'] == LEGACY_MANIFEST_SHA256, 'Historical source manifest differs')
-    return {'tag': tag, 'source': {'sha': source, 'tree': tree}}, contract
-
-
-def authenticated_asset_inputs(api, record, assets, *, tag=None, expected_authority=None, expected_inputs=None):
-    """Authenticate historical/retained source and origin before inspecting any APK."""
-    claimed = json.loads(assets['release-manifest.json'], object_pairs_hook=_unique)
-    identity, authority = claimed['buildInputs'], claimed['authority']
-    if expected_inputs is not None:
-        require(identity == expected_inputs, 'Prepare tag/source/channel/counter differs')
-    if expected_authority is not None:
-        require(authority == expected_authority, 'Release origin differs')
-    require(authority['repository'] == record['repository'] and authority['workflowId'] == record['workflowId'],
-            'History workflow reset')
-    origin = run_identity(api, authority['runId'], record['workflowId'], sha=authority['controllerSha'],
-                          number=identity['versionCode'], attempt=authority['runAttempt'])
-    require(origin['status'] == 'completed' and origin['conclusion'] == 'success', 'History origin attempt not accepted')
-    binding, contract = bound_contract(api, identity, identity['tag'] if tag is None else tag)
-    return identity, {'expected_certificate': record['certificateSha256'], 'expected_authority': authority,
-                      'expected_binding': binding, 'apk_contract': contract}
-
-
-def verify_remote_assets(api, record, assets, sdk, reports, *, expected_authority, expected_inputs):
-    """Selected retained prepare: always use full candidate legal/SBOM verification."""
-    _, inputs = authenticated_asset_inputs(api, record, assets, expected_authority=expected_authority,
-                                           expected_inputs=expected_inputs)
-    manifest, _ = verify_assets(ROOT, assets, sdk, reports, **inputs)
-    require(manifest['buildInputs'] == expected_inputs and manifest['authority'] == expected_authority,
-            'Verified release identity differs')
-    return manifest
-
-
-def verify_remote_history(api, record, assets, sdk, reports, *, tag=None, expected_authority=None):
-    """Published history and non-selected reservations verify issued bytes, not today's render."""
-    identity, inputs = authenticated_asset_inputs(api, record, assets, tag=tag, expected_authority=expected_authority)
-    manifest, _ = verify_historical_assets(ROOT, assets, sdk, reports, **inputs)
-    require(manifest['authority'] == inputs['expected_authority']
-            and manifest['buildInputs'] == identity,
-            'Verified release identity differs')
-    return manifest
-
-
 def candidate_assets(api, record, expected, origin, sdk, reports):
-    """Resolve the retained prepare artifact, then reverify its bytes and signed identity."""
+    """Fully verify the retained candidate from admit()'s independently pinned inputs/origin."""
     name = f'signed-{origin["id"]}-{origin["run_attempt"]}'
     artifacts = api.pages('/actions/runs/' + identifier(origin['id']) + '/artifacts', 'artifacts')
     matches = [a for a in artifacts if a['name'] == name]
@@ -225,21 +163,35 @@ def candidate_assets(api, record, expected, origin, sdk, reports):
     require(artifact['id'] == matches[0]['id'] and artifact['name'] == name and artifact['expired'] is False
             and artifact['workflow_run']['id'] == origin['id']
             and artifact['workflow_run']['head_sha'] == origin['head_sha'], 'Prepare artifact provenance differs/expired')
-    assets = artifact_assets(api, artifact)
+    digest = artifact['digest']
+    require(isinstance(digest, str) and re.fullmatch('sha256:[0-9a-f]{64}', digest), 'Candidate archive digest missing')
+    raw = api.request('GET', api.prefix + '/actions/artifacts/' + identifier(artifact['id']) + '/zip', binary=True)
+    require('sha256:' + fingerprint(raw)['sha256'] == digest, 'Candidate archive differs')
+    assets = members(raw)
     expected_authority = {'repository': api.repository, 'workflowId': record['workflowId'],
                           'controllerSha': origin['head_sha'], 'runId': origin['id'], 'runAttempt': origin['run_attempt']}
-    manifest = verify_remote_assets(api, record, assets, sdk, reports, expected_authority=expected_authority,
-                                    expected_inputs=expected)
+    # expected is independently tag/source/tree-bound by admit(), never by archive claims.
+    binding = {key: expected[key] for key in ('tag', 'source')}
+    contract = contract_for(expected['tag'], expected['source'])
+    if contract is not None:
+        content = api.get('/contents/app/src/main/AndroidManifest.xml?ref=' + expected['source']['sha'])
+        require(content['encoding'] == 'base64', 'Unsupported historical manifest encoding')
+        raw = base64.b64decode(''.join(content['content'].split()), validate=True)
+        require(fingerprint(raw)['sha256'] == LEGACY_MANIFEST_SHA256, 'Historical source manifest differs')
+    manifest, _ = verify_assets(ROOT, assets, sdk, reports, expected_certificate=record['certificateSha256'],
+                                expected_authority=expected_authority, expected_binding=binding, apk_contract=contract)
     require(manifest['buildInputs'] == expected, 'Prepare tag/source/channel/counter differs')
     return assets
 
 
-def prepared_tags(api, record, expected, accepted_runs, sdk, reports):
+def prepared_tags(api, record, expected, accepted_runs, accepted):
     """Retained official candidates reserve their tag; ordinary CI artifacts never allocate."""
     runs = api.pages('/actions/workflows/' + identifier(record['workflowId'])
                      + '/runs?event=workflow_dispatch', 'workflow_runs')
     own_run = record.get('prepareRunId') or record['runId']
     for run in runs:
+        require(run['status'] in ('queued', 'in_progress', 'waiting', 'pending', 'requested', 'completed'),
+                'Unknown official run state')
         if run['id'] in accepted_runs or run['id'] == own_run or run['status'] != 'completed':
             continue
         # Foreign-ref dispatches cannot enter the official main-only job boundary.
@@ -247,23 +199,32 @@ def prepared_tags(api, record, expected, accepted_runs, sdk, reports):
             continue
         require(run['path'] == WORKFLOW and run['event'] == 'workflow_dispatch'
                 and run['repository']['id'] == record['repositoryId'], 'Unknown official candidate run')
+        tag = None
         for artifact in api.pages('/actions/runs/' + identifier(run['id']) + '/artifacts', 'artifacts'):
-            if not re.fullmatch(r'signed-' + str(run['id']) + r'-[1-9][0-9]*', artifact['name']):
+            if not artifact['name'].startswith('signed-'):
                 continue
-            expected_authority = {'repository': record['repository'], 'workflowId': record['workflowId'],
-                                  'controllerSha': run['head_sha'], 'runId': run['id'],
-                                  'runAttempt': int(artifact['name'].rsplit('-', 1)[1])}
-            candidate = verify_remote_history(api, record, artifact_assets(api, artifact), sdk,
-                                              reports / identifier(artifact['id']), expected_authority=expected_authority)
-            origin = candidate['authority']
-            require(origin['runId'] == run['id'] and origin['workflowId'] == record['workflowId']
-                    and origin['repository'] == record['repository'] and origin['controllerSha'] == run['head_sha']
-                    and artifact['name'] == f'signed-{run["id"]}-{origin["runAttempt"]}'
-                    and candidate['buildInputs']['versionCode'] == run['run_number'], 'Retained candidate origin differs')
-            require(candidate['buildInputs']['tag'] != expected['tag'], 'Tag already admitted by a different prepare run')
+            require(re.fullmatch(r'signed-' + identifier(run['id']) + r'-[1-9][0-9]*', artifact['name']),
+                    'Malformed retained candidate name')
+            require(artifact['expired'] is False, 'Expired unresolved signed candidate; reconcile before another allocation')
+            origin = run_identity(api, run['id'], record['workflowId'], sha=run['head_sha'],
+                                  number=run['run_number'], attempt=int(artifact['name'].rsplit('-', 1)[1]))
+            operation, channel, tag = origin['display_title'].split(' ')
+            require(origin['status'] == 'completed' and origin['conclusion'] == 'success'
+                    and artifact['workflow_run']['id'] == origin['id']
+                    and artifact['workflow_run']['head_sha'] == origin['head_sha']
+                    and operation == 'prepare' and channel in ('rc', 'stable'),
+                    'Unknown retained candidate allocation')
+            official_inputs(tag[1:].split('-rc.', 1)[0], channel, {'RELEASE_TAG': tag,
+                            'RELEASE_VERSION_CODE': str(origin['run_number']), 'RELEASE_PREVIOUS_VERSION_CODE': '0'})
+            require(tag != expected['tag'] and tag not in accepted and origin['run_number'] not in accepted.values(),
+                    'Tag/counter already admitted by a different prepare run')
+        if tag is not None:
+            accepted[tag] = run['run_number']
+        require(tag is not None or run['conclusion'] != 'success' or not run['display_title'].startswith('prepare '),
+                'Missing retained successful prepare artifact; reconcile expired/partial state')
 
 
-def history(api, record, expected, sdk, reports):
+def history(api, record, expected):
     """Draft-capable GET token required by caller. A failed/partial read is never empty history."""
     accepted, same = {}, False
     accepted_runs = set()
@@ -276,11 +237,27 @@ def history(api, record, expected, sdk, reports):
         if release['draft']:
             require(record['operation'] == 'publish' and tag == expected['tag'], 'Unresolved draft blocks official allocation')
             continue  # Exact draft candidate ownership/assets are checked by publisher before any mutation.
-        assets = read_assets(api, release['id'])
-        manifest = verify_remote_history(api, record, assets, sdk, reports / identifier(release['id']), tag=tag)
+        manifests = [a for a in api.assets(release['id']) if a['name'] == 'release-manifest.json']
+        require(len(manifests) == 1 and type(manifests[0]['size']) is int and 0 < manifests[0]['size'] <= 65536,
+                'Missing/ambiguous/oversized history manifest')
+        assets = {'release-manifest.json': api.download(manifests[0])}
+        manifest = json.loads(assets['release-manifest.json'], object_pairs_hook=_unique)
+        require(type(manifest['schema']) is int and manifest['schema'] == 1
+                and manifest['kind'] == 'guarded-android-release', 'Unknown history manifest')
         identity, authority = manifest['buildInputs'], manifest['authority']
+        source = tag_source(api, tag)
+        require(type(identity['versionCode']) is int and identity['channel'] in ('rc', 'stable')
+                and identity['versionName'] == tag[1:]
+                and identity['source'] == {'sha': source, 'tree': api.get('/git/commits/' + source)['tree']['sha']},
+                'History identity differs')
+        origin = run_identity(api, authority['runId'], record['workflowId'], sha=authority['controllerSha'],
+                              number=identity['versionCode'], attempt=authority['runAttempt'])
+        require(origin['status'] == 'completed' and origin['conclusion'] == 'success'
+                and origin['display_title'] == f'prepare {identity["channel"]} {tag}'
+                and authority['repository'] == record['repository'] and authority['workflowId'] == record['workflowId'],
+                'History origin attempt not accepted')
         accepted_runs.add(authority['runId'])
-        official_inputs(identity['target'], identity['channel'], {'RELEASE_TAG': tag,
+        official_inputs(target_version(identity['target']), identity['channel'], {'RELEASE_TAG': tag,
                         'RELEASE_VERSION_CODE': str(identity['versionCode']), 'RELEASE_PREVIOUS_VERSION_CODE': '0'})
         body = history_body(release['body'], assets)
         if record['operation'] == 'publish' and tag == expected['tag']:
@@ -293,11 +270,10 @@ def history(api, record, expected, sdk, reports):
             # a later prepare no-op rerun does not replace the published candidate.
             same = True
         accepted[tag] = identity['versionCode']
-    codes = list(accepted.values())
-    require(len(set(codes)) == len(codes), 'Reused official versionCode')
+    require(len(set(accepted.values())) == len(accepted), 'Reused official versionCode')
     floor = max((code for tag, code in accepted.items() if tag != expected['tag']), default=0)
     require(expected['versionCode'] > floor, 'Counter reset/non-increasing candidate')
-    prepared_tags(api, record, expected, accepted_runs, sdk, reports / 'prepared')
+    prepared_tags(api, record, expected, accepted_runs, accepted)
     return floor, same
 
 

@@ -69,32 +69,30 @@ and deleted/distributed history require owner reconciliation.
 
 Prepare's versionCode is this dedicated workflow's API-verified `run_number`
 (1..2100000000); reruns keep it and gaps are legal. Before signing/publication the
-controller reads complete draft-aware history and actually downloads/reverifies
-accepted RC/stable releases. A new code must exceed every accepted code; empty
-history is derived from the complete listing. Retained signed candidates reserve
-their tag. Unknown, conflicting, expired unresolved or partial state stops progress.
-An exact already-published allocation is a read-only no-op even after Actions
-artifact expiry; a different prepare run cannot replace it.
+controller reads complete authenticated draft-aware Release history. A new code
+must exceed every accepted code; empty history is derived from the complete listing.
+Unknown, conflicting, expired unresolved or partial allocation state stops progress.
+An exact already-published allocation is a read-only metadata no-op even after
+Actions artifact expiry; a different prepare run cannot replace it.
 
-Published history and **non-selected** retained tag reservations are checked as
-issued: exact assets/checksums and release integrity marker, complete bundle member
-hashes, consistent manifest/APK/legal evidence and matching external notices/SBOM.
-The controller independently authenticates the immutable tag/source/tree and
-successful producer-workflow attempt, and actually verifies the APK's pinned signer,
-package/version, payload/classes and existing source-bound historical APK security
-contract. Checksums alone do not establish provenance. It does **not** regenerate
-old unsigned/final legal or SBOM bytes from today's catalogs, templates or branding;
-there are no per-release renderer modes or archived-script execution.
+History is an allocation ledger, not an archive audit. For each published release,
+only the small `release-manifest.json` is downloaded: its tag/source/tree, official
+version identity, successful dedicated producer run/attempt and Release integrity
+marker are checked against authenticated API metadata. No old APK, bundle ZIP,
+SBOM, notices or checksum files are downloaded or inspected. Non-selected retained
+signed artifacts reserve tags through their authenticated artifact metadata and
+exact successful attempt's existing `prepare <channel> <tag>` run title; malformed,
+unknown or expired reservations require reconciliation, not archive downloads.
+This supersedes previous full-history binary/legal revalidation requirements:
+preparing a new release no longer detects unrelated old binary corruption or
+historical legal inconsistency. Metadata/provenance does not prove old byte integrity.
 
-The candidate being signed or published is different. Signing retains full
-accepted-unsigned and final legal/SBOM generation and comparison, actual signature,
-source/security and unchanged payload checks. The **selected retained prepare**
-artifact also passes full accepted-unsigned binding and both legal/SBOM renders
-before publication; it cannot use the history-only path. A changed renderer may
-therefore block an old selected candidate even when its issued history is intact.
-Reconcile that candidate explicitly rather than bypassing verification or changing
-published bytes. Counter, reservation, draft/no-op/resume and approval rules above
-remain unchanged.
+The candidate actually being signed or published still receives full existing
+accepted-unsigned and final legal/SBOM generation/comparison, signatures, APK
+security, payload/classes, source/counter/certificate, hashes and provenance checks.
+This includes the selected retained prepare artifact; it cannot use the history
+ledger instead. A changed renderer can still block that selected candidate.
+Publication downloads and reads back this candidate's exact assets as below.
 
 Publication creates a draft, uploads only missing matching assets, downloads each
 for readback, then publishes and reads back the final state. Only an owned matching

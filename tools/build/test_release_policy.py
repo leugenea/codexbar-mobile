@@ -299,7 +299,7 @@ class CandidateTests(unittest.TestCase):
         with patch.object(policy, 'verify_assets', side_effect=ValueError('wrong certificate')), self.assertRaises(ValueError):
             self.read()
 
-    def test_selected_prepare_uses_full_renderer_even_when_issued_history_passes(self):
+    def test_selected_prepare_still_runs_full_legal_renders_and_rejects_drift(self):
         import release_artifact as artifact
         import release_bundle as bundle
         import release_signing as signing
@@ -320,12 +320,9 @@ class CandidateTests(unittest.TestCase):
             self.assertEqual(self.read(), self.assets)
             self.assertEqual(render.call_count, 2)
             (fixture.root / 'LICENSE').write_text('SYNTHETIC changed current notice\n')
-            render.reset_mock()
-            policy.verify_remote_history(self.api, self.record, self.assets, self.path, self.path)
-            render.assert_not_called()
             with self.assertRaisesRegex(ValueError, 'accepted unsigned capsule binding'):
                 self.read()
-            self.assertEqual(render.call_count, 1)
+            self.assertEqual(render.call_count, 3)
 
     def test_missing_ambiguous_expired_foreign_attempt_digest_and_bytes_deny_before_verification(self):
         for rows in ([], [self.artifact, {**self.artifact, 'id': 81}], [{**self.artifact, 'name': 'signed-90-1'}]):
@@ -348,176 +345,154 @@ class CandidateTests(unittest.TestCase):
 
 class HistoryTests(unittest.TestCase):
     def setUp(self):
-        self.api = PolicyAPI()
+        self.model = PolicyAPI()
+        self.api = wrapper(self.model)
         self.record, self.expected, _ = policy.admit(self.api, configuration(), context())
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.reports = Path(self.temp.name)
 
     def read(self):
-        return policy.history(self.api, self.record, self.expected, self.reports, self.reports)
+        return policy.history(self.api, self.record, self.expected)
 
-    def test_complete_empty_inventory_is_derived_but_unknown_read_is_not_zero(self):
-        self.assertEqual(self.read(), (0, False))
-        with patch.object(self.api, 'releases', side_effect=OSError('offline')), self.assertRaises(OSError):
-            self.read()
-
-    def published(self, code=9, tag='v0.1.0-rc.2', run_id=90):
-        expected = {**self.expected, 'versionCode': code, 'tag': tag, 'versionName': tag[1:]}
-        manifest = {'buildInputs': expected, 'bundleManifestSha256': 'f' * 64,
-                    'authority': {'repository': self.api.repository, 'workflowId': 8, 'controllerSha': 'c' * 40,
-                                  'runId': run_id, 'runAttempt': 2}}
-        assets = {'release-manifest.json': canonical(manifest)}  # Synthetic, no signature.
-        from release_publication import marker
-        self.api.records = [{'id': 5, 'tag_name': tag, 'target_commitish': 'a' * 40, 'name': tag[1:],
-                             'body': marker(assets), 'draft': False, 'prerelease': True}]
-        return assets, manifest
-
-    def published_api(self, assets, manifest, notes=''):
-        assets['release-manifest.json'] = canonical(manifest)
+    def published(self, code=9, tag='v0.1.0-rc.2', run_id=90, notes=''):
         from release_mock import ReleaseAPI
         from release_publication import publish
+        identity = {**self.expected, 'versionCode': code, 'tag': tag, 'versionName': tag[1:],
+                    'channel': 'rc' if '-rc.' in tag else 'stable'}
+        self.manifest = {'schema': 1, 'kind': 'guarded-android-release', 'buildInputs': identity,
+                         'authority': {'repository': self.api.repository, 'workflowId': 8,
+                                       'controllerSha': 'c' * 40, 'runId': run_id, 'runAttempt': 2}}
+        assets = {'release-manifest.json': canonical(self.manifest),
+                  'unrelated.apk': b'NOT an APK; history must not download it',
+                  'old-bundle.zip': b'NOT a ZIP; history must not inspect it',
+                  'SHA256SUMS': b'Not audited by allocation history'}
         remote = ReleaseAPI()
-        api = GitHub(self.api.repository, 'synthetic-token', remote.transport)
-        publish(api, manifest['buildInputs'], assets, lambda: None, notes=notes)
-        policy_transport = wrapper(self.api).transport
+        publish(GitHub(self.model.repository, 'synthetic-token', remote.transport), identity, assets, lambda: None, notes=notes)
+        policy_transport = wrapper(self.model).transport
         def transport(method, url, headers, data):
             if '/releases' in urlsplit(url).path:
                 return remote.transport(method, url, headers, data)
             return policy_transport(method, url, headers, data)
-        return GitHub(self.api.repository, 'synthetic-token', transport, read_only=True), remote
-
-    def test_real_wrapper_history_accepts_both_body_shapes_and_rejects_marker_tampering(self):
-        for channel, tag in [('rc', 'v0.1.0-rc.2'), ('stable', 'v0.1.0')]:
-            assets, manifest = self.published(tag=tag)
-            manifest['buildInputs']['channel'] = channel
-            for notes in ('', '## Changes\n- Fix usage display'):
-                api, remote = self.published_api(assets, manifest, notes)
-                body = remote.records[0]['body']
-                wrong_digest = body[:-1] + ('0' if body[-1] != '0' else '1')
-                remote.calls.clear()
-                with self.subTest(channel=channel, notes=notes), \
-                        patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
-                    self.assertEqual(policy.history(api, self.record, self.expected, self.reports, self.reports), (9, False))
-                    for bad in ('No marker', wrong_digest, body + '\n', body + '\nNot last',
-                                body.replace('\n\n', '\n') if notes else 'Notes\n' + body, None):
-                        remote.records[0]['body'] = bad
-                        with self.subTest(body=bad), self.assertRaisesRegex(ValueError, 'marker'):
-                            policy.history(api, self.record, self.expected, self.reports, self.reports)
-                self.assertTrue(all(call[0] == 'GET' for call in remote.calls))
-
-    def test_real_wrapper_accepted_publish_requires_same_notes_without_retained_artifact(self):
-        ctx = {**context(operation='publish'), 'notes': '## Changes\n- Fix usage display'}
-        self.record, self.expected, _ = policy.admit(wrapper(self.api), configuration(), ctx)
-        assets, manifest = self.published(9, self.expected['tag'], 90)
-        api, remote = self.published_api(assets, manifest, ctx['notes'])
+        self.api = GitHub(self.model.repository, 'synthetic-token', transport, read_only=True)
+        self.model.overrides[f'/actions/runs/{run_id}/attempts/2'] = {
+            **self.model.get('/actions/runs/' + str(run_id)), 'run_number': code,
+            'display_title': f'prepare {identity["channel"]} {tag}'}
         remote.calls.clear()
-        with patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
-            self.assertEqual(policy.history(api, self.record, self.expected, self.reports, self.reports), (0, True))
-            for notes in ('', 'Different notes'):
-                self.record['notes'] = notes
-                with self.subTest(notes=notes), self.assertRaisesRegex(ValueError, 'Release binding'):
-                    policy.history(api, self.record, self.expected, self.reports, self.reports)
-        self.assertTrue(all(call[0] == 'GET' for call in remote.calls))
-        self.assertFalse(any('/artifacts' in path for path in self.api.calls))
+        return remote
 
-    def test_history_floor_gaps_reset_same_run_noop_and_new_run_same_tag_conflict(self):
-        assets, manifest = self.published()
-        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
-            self.assertEqual(self.read(), (9, False))
-            self.expected['versionCode'] = 9
-            with self.assertRaises(ValueError):
-                self.read()
-            self.expected['versionCode'] = 100
-            self.assertEqual(self.read(), (9, False))
-        self.expected['versionCode'] = 10
-        assets, manifest = self.published(10, self.expected['tag'], 100)
-        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
-            self.assertEqual(self.read(), (0, True))
-            manifest['authority']['runId'] = 90
-            with self.assertRaises(ValueError):
-                self.read()
-
-    def test_publish_history_requires_verified_exact_origin_attempt_for_readonly_noop(self):
-        self.record, self.expected, _ = policy.admit(self.api, configuration(), context(operation='publish'))
-        assets, manifest = self.published(9, self.expected['tag'], 90)
-        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
-            self.assertEqual(self.read(), (0, True))
-            manifest['authority']['runAttempt'] = 1
-            with self.assertRaises(ValueError):
-                self.read()
-
-    def test_real_wrapper_published_noop_survives_successful_prepare_rerun(self):
-        model = self.api
-        api = wrapper(model)
-        prepare_ctx = {**context(), 'runId': 90, 'runNumber': 9}
-        record, expected, _ = policy.admit(api, configuration(), prepare_ctx)
-        self.assertEqual(policy.history(api, record, expected, self.reports, self.reports), (0, False))
-        publish_ctx = context(operation='publish')
-        record, expected, _ = policy.admit(api, configuration(), publish_ctx)
-        assets, manifest = self.published(9, expected['tag'], 90)
-        published = copy.deepcopy(model.records)
-        # Synthetic accepted-release/signature observations; GitHub reads use the real wrapper.
-        with patch.object(policy, 'read_assets', return_value=assets), \
-                patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
-            self.assertEqual(policy.history(api, record, expected, self.reports, self.reports), (0, True))
-            original = model.get('/actions/runs/90')
-            model.overrides['/actions/runs/90/attempts/2'] = copy.deepcopy(original)
-            model.overrides['/actions/runs/90'] = {**original, 'run_attempt': 3}
-            record, prepare_expected, _ = policy.admit(api, configuration(), prepare_ctx)
-            self.assertEqual(prepare_expected, expected)
-            self.assertEqual(policy.history(api, record, expected, self.reports, self.reports), (0, True))
-            record, publish_expected, _ = policy.admit(api, configuration(), publish_ctx)
-            self.assertEqual(publish_expected, expected)
-            self.assertEqual(record['prepareAttempt'], 3)
-            self.assertEqual(manifest['authority']['runAttempt'], 2)
-            self.assertEqual(policy.history(api, record, expected, self.reports, self.reports), (0, True))
-            self.assertEqual(model.records, published)
-            self.assertIn('/actions/runs/90/attempts/2', model.calls)
-            self.assertFalse(any('/artifacts' in path for path in model.calls))
-            model.overrides['/actions/runs/90/attempts/2'] = {**original, 'conclusion': 'failure'}
-            with self.assertRaisesRegex(ValueError, 'History origin attempt not accepted'):
-                policy.history(api, record, expected, self.reports, self.reports)
-
-    def test_retained_official_candidate_reserves_tag_and_expired_unknown_blocks(self):
-        path = '/actions/workflows/8/runs?event=workflow_dispatch'
-        run = {'id': 90, 'status': 'completed', 'conclusion': 'success', 'path': policy.WORKFLOW,
-               'event': 'workflow_dispatch', 'head_branch': 'main', 'repository': {'id': 7},
-               'head_sha': 'c' * 40, 'run_number': 9}
-        self.api.overrides[path] = [run]
-        manifest = {'buildInputs': {**self.expected, 'versionCode': 9},
-                    'authority': {'runId': 90, 'workflowId': 8, 'repository': self.api.repository,
-                                  'controllerSha': 'c' * 40, 'runAttempt': 2}}
-        raw = zip_bytes({'release-manifest.json': canonical(manifest)})
-        artifact = {'id': 80, 'name': 'signed-90-2', 'expired': False, 'digest': 'sha256:' + fingerprint(raw)['sha256']}
-        self.api.overrides['/actions/runs/90/artifacts'] = [artifact]
-        with patch.object(self.api, 'request', return_value=raw, create=True) as download, \
-                patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
-            with self.assertRaisesRegex(ValueError, 'Tag already admitted'):
-                self.read()
-            manifest['buildInputs']['tag'] = 'v0.1.0-rc.2'
-            raw = zip_bytes({'release-manifest.json': canonical(manifest)})
-            artifact['digest'] = 'sha256:' + fingerprint(raw)['sha256']
-            download.return_value = raw
-            self.assertEqual(self.read(), (0, False))
-            artifact['expired'] = True
-            with self.assertRaisesRegex(ValueError, 'Expired unresolved'):
-                self.read()
-        self.api.overrides[path] = [dict(run, status='queued')]
+    def test_complete_empty_inventory_but_unknown_or_partial_reads_fail_closed(self):
         self.assertEqual(self.read(), (0, False))
-
-    def test_partial_unknown_drafts_duplicates_and_sdk_history_failures_deny(self):
-        self.api.records = [{'id': 1, 'tag_name': self.expected['tag'], 'draft': True}]
-        with self.assertRaises(ValueError):
+        with patch.object(self.api, 'releases', side_effect=OSError('offline')), self.assertRaises(OSError):
             self.read()
-        self.api.records *= 2
-        with self.assertRaises(ValueError):
-            self.read()
-        assets, _ = self.published()
-        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_historical_assets', side_effect=ValueError('bad signature')):
-            with self.assertRaises(ValueError):
+        remote = self.published()
+        row = next(row for row, data in remote.files.values() if row['name'] == 'release-manifest.json')
+        for rows in ([], [row, dict(row, id=999)], [dict(row, size=65537)]):
+            with patch.object(self.api, 'assets', return_value=rows), self.assertRaises(ValueError):
                 self.read()
+        with patch.object(self.api, 'assets', side_effect=OSError('partial inventory')), self.assertRaises(OSError):
+            self.read()
 
+    def test_real_wrapper_history_reads_only_manifest_and_derives_floor(self):
+        import release_bundle as bundle
+        import release_artifact as artifact
+        for tag, notes in [('v0.1.0-rc.2', ''), ('v0.1.0', '## Changes')]:
+            remote = self.published(tag=tag, notes=notes)
+            with patch.object(policy, 'verify_assets', side_effect=AssertionError('No candidate inspection')) as verify, \
+                    patch.object(bundle, 'render', side_effect=AssertionError('No historical render')) as render, \
+                    patch.object(artifact, 'run_tool', side_effect=AssertionError('No SDK')) as sdk:
+                self.assertEqual(self.read(), (9, False))
+            verify.assert_not_called()
+            render.assert_not_called()
+            sdk.assert_not_called()
+            manifest_id = next(row['id'] for row, data in remote.files.values() if row['name'] == 'release-manifest.json')
+            downloads = [path for method, path, data in remote.calls if '/releases/assets/' in path]
+            self.assertEqual(downloads, [self.api.prefix + '/releases/assets/' + str(manifest_id)])
+            self.expected['versionCode'] = 9
+            with self.assertRaisesRegex(ValueError, 'non-increasing'):
+                self.read()
+            self.expected['versionCode'] = 100  # Gaps are allowed.
+            self.assertEqual(self.read(), (9, False))
+
+    def test_history_rejects_allocation_identity_source_producer_and_marker_drift(self):
+        for section, key, value in [('buildInputs', 'source', {'sha': 'a' * 40, 'tree': 'e' * 40}),
+                                    ('buildInputs', 'tag', 'v0.1.0-rc.9'), ('buildInputs', 'versionCode', True),
+                                    ('authority', 'workflowId', 99), ('authority', 'runAttempt', 1)]:
+            self.published()
+            self.manifest[section][key] = value
+            with patch.object(self.api, 'download', return_value=canonical(self.manifest)), \
+                    self.subTest(key=key), self.assertRaises(ValueError):
+                self.read()
+        remote = self.published()
+        path = '/actions/runs/90/attempts/2'
+        self.model.overrides[path]['conclusion'] = 'failure'
+        with self.assertRaisesRegex(ValueError, 'origin attempt'):
+            self.read()
+        self.model.overrides[path]['conclusion'] = 'success'
+        remote.records[0]['body'] += '\n'
+        with self.assertRaisesRegex(ValueError, 'marker'):
+            self.read()
+        remote = self.published()
+        remote.records.append({**remote.records[0], 'id': 99})
+        with self.assertRaisesRegex(ValueError, 'Duplicate release tags'):
+            self.read()
+
+    def test_published_noop_keeps_original_attempt_and_notes_but_never_reallocates_tag(self):
+        self.record, self.expected, _ = policy.admit(self.api, configuration(), context(operation='publish'))
+        remote = self.published(tag=self.expected['tag'], notes='Changes')
+        self.record['notes'] = 'Changes'
+        self.model.overrides['/actions/runs/90'] = {**self.model.get('/actions/runs/90'), 'run_attempt': 3}
+        self.assertEqual(self.read(), (0, True))
+        self.assertFalse(any('/artifacts' in path for path in self.model.calls))
+        self.record['notes'] = 'Different notes'
+        with self.assertRaisesRegex(ValueError, 'Release binding'):
+            self.read()
+        self.record['notes'] = 'Changes'
+        self.record['prepareRunId'] = 91
+        with self.assertRaisesRegex(ValueError, 'different allocation'):
+            self.read()
+        remote.records[0]['draft'] = True
+        self.assertEqual(self.read(), (0, False))  # Exact draft resume belongs to the publisher.
+        self.record['operation'] = 'prepare'
+        with self.assertRaisesRegex(ValueError, 'Unresolved draft'):
+            self.read()
+
+    def test_duplicate_published_counter_from_another_origin_fails_closed(self):
+        from release_publication import publish
+        remote = self.published()
+        second = copy.deepcopy(self.manifest)
+        second['buildInputs'].update(tag='v0.1.0-rc.3', versionName='0.1.0-rc.3')
+        second['authority']['runId'] = 91
+        publish(GitHub(self.model.repository, 'synthetic-token', remote.transport), second['buildInputs'],
+                {'release-manifest.json': canonical(second)}, lambda: None)
+        self.model.overrides['/actions/runs/91/attempts/2'] = {
+            **self.model.get('/actions/runs/91'), 'display_title': 'prepare rc v0.1.0-rc.3'}
+        with self.assertRaisesRegex(ValueError, 'Reused official versionCode'):
+            self.read()
+
+    def test_retained_reservations_use_metadata_and_reject_unknown_expired_or_conflicting_state(self):
+        run = {**self.model.get('/actions/runs/90'), 'repository': {'id': 7},
+               'display_title': 'prepare rc v0.1.0-rc.2'}
+        artifact = {'id': 80, 'name': 'signed-90-2', 'expired': False,
+                    'workflow_run': {'id': 90, 'head_sha': 'c' * 40}}
+        self.model.overrides['/actions/workflows/8/runs?event=workflow_dispatch'] = [run]
+        self.model.overrides['/actions/runs/90/artifacts'] = [artifact]
+        path = '/actions/runs/90/attempts/2'
+        self.model.overrides[path] = {**run, 'repository': {'full_name': self.api.repository}}
+        self.assertEqual(self.read(), (0, False))  # Any archive request would fail in the wrapper.
+        original = copy.deepcopy(self.model.overrides[path])
+        for change in ({'display_title': 'prepare rc ' + self.expected['tag']},
+                       {'display_title': 'Unknown title'}, {'display_title': 'prepare stable v0.1.0-rc.2'},
+                       {'conclusion': 'failure'}, {'run_number': 8}, {'head_sha': 'e' * 40}):
+            self.model.overrides[path] = {**original, **change}
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.read()
+        self.model.overrides[path] = original
+        for change in ({'expired': True}, {'name': 'signed-90-malformed'},
+                       {'workflow_run': {'id': 91, 'head_sha': 'c' * 40}}):
+            self.model.overrides['/actions/runs/90/artifacts'] = [{**artifact, **change}]
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.read()
+        self.model.overrides['/actions/runs/90/artifacts'] = []
+        with self.assertRaisesRegex(ValueError, 'Missing retained'):
+            self.read()
 
 if __name__ == '__main__':
     unittest.main()
