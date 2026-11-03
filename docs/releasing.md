@@ -76,6 +76,26 @@ their tag. Unknown, conflicting, expired unresolved or partial state stops progr
 An exact already-published allocation is a read-only no-op even after Actions
 artifact expiry; a different prepare run cannot replace it.
 
+Published history and **non-selected** retained tag reservations are checked as
+issued: exact assets/checksums and release integrity marker, complete bundle member
+hashes, consistent manifest/APK/legal evidence and matching external notices/SBOM.
+The controller independently authenticates the immutable tag/source/tree and
+successful producer-workflow attempt, and actually verifies the APK's pinned signer,
+package/version, payload/classes and existing source-bound historical APK security
+contract. Checksums alone do not establish provenance. It does **not** regenerate
+old unsigned/final legal or SBOM bytes from today's catalogs, templates or branding;
+there are no per-release renderer modes or archived-script execution.
+
+The candidate being signed or published is different. Signing retains full
+accepted-unsigned and final legal/SBOM generation and comparison, actual signature,
+source/security and unchanged payload checks. The **selected retained prepare**
+artifact also passes full accepted-unsigned binding and both legal/SBOM renders
+before publication; it cannot use the history-only path. A changed renderer may
+therefore block an old selected candidate even when its issued history is intact.
+Reconcile that candidate explicitly rather than bypassing verification or changing
+published bytes. Counter, reservation, draft/no-op/resume and approval rules above
+remain unchanged.
+
 Publication creates a draft, uploads only missing matching assets, downloads each
 for readback, then publishes and reads back the final state. Only an owned matching
 partial draft can resume. On failure, inspect exact run/attempt/Release/asset IDs

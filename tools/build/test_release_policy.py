@@ -299,6 +299,34 @@ class CandidateTests(unittest.TestCase):
         with patch.object(policy, 'verify_assets', side_effect=ValueError('wrong certificate')), self.assertRaises(ValueError):
             self.read()
 
+    def test_selected_prepare_uses_full_renderer_even_when_issued_history_passes(self):
+        import release_artifact as artifact
+        import release_bundle as bundle
+        import release_signing as signing
+        from test_release_signing import AssetTests
+        fixture = AssetTests()
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        self.expected = fixture.expected
+        self.record['certificateSha256'] = fixture.inspection['signerCertificateSha256']
+        self.assets = signing.package_assets(fixture.signed, fixture.final, self.manifest['authority'])
+        self.model.archive = zip_bytes(self.assets)
+        self.artifact['digest'] = 'sha256:' + fingerprint(self.model.archive)['sha256']
+        self.model.overrides['/actions/runs/90/attempts/2'] = {**self.origin, 'run_number': self.expected['versionCode']}
+        with patch.object(policy, 'ROOT', fixture.root), \
+                patch.object(artifact, 'inspect_apk', return_value=fixture.inspection), \
+                patch.object(bundle, 'observe_classes', return_value=sorted(fixture.classes)), \
+                patch.object(bundle, 'render', wraps=bundle.render) as render:
+            self.assertEqual(self.read(), self.assets)
+            self.assertEqual(render.call_count, 2)
+            (fixture.root / 'LICENSE').write_text('SYNTHETIC changed current notice\n')
+            render.reset_mock()
+            policy.verify_remote_history(self.api, self.record, self.assets, self.path, self.path)
+            render.assert_not_called()
+            with self.assertRaisesRegex(ValueError, 'accepted unsigned capsule binding'):
+                self.read()
+            self.assertEqual(render.call_count, 1)
+
     def test_missing_ambiguous_expired_foreign_attempt_digest_and_bytes_deny_before_verification(self):
         for rows in ([], [self.artifact, {**self.artifact, 'id': 81}], [{**self.artifact, 'name': 'signed-90-1'}]):
             self.model.overrides['/actions/runs/90/artifacts'] = rows
@@ -369,7 +397,7 @@ class HistoryTests(unittest.TestCase):
                 wrong_digest = body[:-1] + ('0' if body[-1] != '0' else '1')
                 remote.calls.clear()
                 with self.subTest(channel=channel, notes=notes), \
-                        patch.object(policy, 'verify_assets', return_value=(manifest, None)):
+                        patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
                     self.assertEqual(policy.history(api, self.record, self.expected, self.reports, self.reports), (9, False))
                     for bad in ('No marker', wrong_digest, body + '\n', body + '\nNot last',
                                 body.replace('\n\n', '\n') if notes else 'Notes\n' + body, None):
@@ -384,7 +412,7 @@ class HistoryTests(unittest.TestCase):
         assets, manifest = self.published(9, self.expected['tag'], 90)
         api, remote = self.published_api(assets, manifest, ctx['notes'])
         remote.calls.clear()
-        with patch.object(policy, 'verify_assets', return_value=(manifest, None)):
+        with patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
             self.assertEqual(policy.history(api, self.record, self.expected, self.reports, self.reports), (0, True))
             for notes in ('', 'Different notes'):
                 self.record['notes'] = notes
@@ -395,7 +423,7 @@ class HistoryTests(unittest.TestCase):
 
     def test_history_floor_gaps_reset_same_run_noop_and_new_run_same_tag_conflict(self):
         assets, manifest = self.published()
-        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_assets', return_value=(manifest, None)):
+        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
             self.assertEqual(self.read(), (9, False))
             self.expected['versionCode'] = 9
             with self.assertRaises(ValueError):
@@ -404,7 +432,7 @@ class HistoryTests(unittest.TestCase):
             self.assertEqual(self.read(), (9, False))
         self.expected['versionCode'] = 10
         assets, manifest = self.published(10, self.expected['tag'], 100)
-        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_assets', return_value=(manifest, None)):
+        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
             self.assertEqual(self.read(), (0, True))
             manifest['authority']['runId'] = 90
             with self.assertRaises(ValueError):
@@ -413,7 +441,7 @@ class HistoryTests(unittest.TestCase):
     def test_publish_history_requires_verified_exact_origin_attempt_for_readonly_noop(self):
         self.record, self.expected, _ = policy.admit(self.api, configuration(), context(operation='publish'))
         assets, manifest = self.published(9, self.expected['tag'], 90)
-        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_assets', return_value=(manifest, None)):
+        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
             self.assertEqual(self.read(), (0, True))
             manifest['authority']['runAttempt'] = 1
             with self.assertRaises(ValueError):
@@ -431,7 +459,7 @@ class HistoryTests(unittest.TestCase):
         published = copy.deepcopy(model.records)
         # Synthetic accepted-release/signature observations; GitHub reads use the real wrapper.
         with patch.object(policy, 'read_assets', return_value=assets), \
-                patch.object(policy, 'verify_assets', return_value=(manifest, None)):
+                patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
             self.assertEqual(policy.history(api, record, expected, self.reports, self.reports), (0, True))
             original = model.get('/actions/runs/90')
             model.overrides['/actions/runs/90/attempts/2'] = copy.deepcopy(original)
@@ -464,7 +492,7 @@ class HistoryTests(unittest.TestCase):
         artifact = {'id': 80, 'name': 'signed-90-2', 'expired': False, 'digest': 'sha256:' + fingerprint(raw)['sha256']}
         self.api.overrides['/actions/runs/90/artifacts'] = [artifact]
         with patch.object(self.api, 'request', return_value=raw, create=True) as download, \
-                patch.object(policy, 'verify_assets', return_value=(manifest, None)):
+                patch.object(policy, 'verify_historical_assets', return_value=(manifest, None)):
             with self.assertRaisesRegex(ValueError, 'Tag already admitted'):
                 self.read()
             manifest['buildInputs']['tag'] = 'v0.1.0-rc.2'
@@ -486,7 +514,7 @@ class HistoryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.read()
         assets, _ = self.published()
-        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_assets', side_effect=ValueError('bad signature')):
+        with patch.object(policy, 'read_assets', return_value=assets), patch.object(policy, 'verify_historical_assets', side_effect=ValueError('bad signature')):
             with self.assertRaises(ValueError):
                 self.read()
 

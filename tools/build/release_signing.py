@@ -13,7 +13,7 @@ import zipfile
 import release_artifact as artifact
 import release_bundle as bundle
 from historical_apk_contract import check_binding
-from release_runtime import canonical, file_record, fingerprint, load, members, payload, safe_name
+from release_runtime import canonical, file_record, fingerprint, load, members, payload, safe_name, unique
 
 from version_identity import official_inputs
 
@@ -129,9 +129,9 @@ def checksums(assets):
                    if name != 'SHA256SUMS').encode()
 
 
-def verify_assets(root, assets, sdk, reports, *, expected_certificate=None, expected_authority=None,
-                  expected_binding=None, apk_contract=None):
-    """Re-derive delivered legal/SBOM bytes and inspect the downloaded signed APK; no rebuild."""
+def _inspect_assets(root, assets, sdk, reports, *, expected_certificate=None, expected_authority=None,
+                    expected_binding=None, apk_contract=None):
+    """Shared issued-byte integrity and actual APK checks; never regenerate attribution."""
     record = json.loads(assets['release-manifest.json'], object_pairs_hook=_unique)
     if (set(record) != {'schema', 'kind', 'buildInputs', 'authority', 'certificateSha256',
                        'bundleManifestSha256', 'assets'} or type(record['schema']) is not int
@@ -170,14 +170,58 @@ def verify_assets(root, assets, sdk, reports, *, expected_certificate=None, expe
                                       expected_signer=record['certificateSha256'], apk_contract=apk_contract)
     inventory = json.loads(files['runtime-inventory.json'], object_pairs_hook=_unique)
     receipt = json.loads(files['artifact-manifest.json'], object_pairs_hook=_unique)
-    if inventory['buildInputs'] != expected or manifest['buildInputs'] != expected:
-        raise ValueError('Delivered capsule source differs')
+    bom = json.loads(files['runtime.cdx.json'], object_pairs_hook=_unique)
+    bundle.validate_schemas(root, inventory, manifest, bom)
+    unique([r['path'] for r in manifest['files']], 'bundle member')
+    if {r['path']: {k: r[k] for k in ('size', 'sha256')} for r in manifest['files']} != {
+            n: fingerprint(data) for n, data in files.items() if n != 'bundle-manifest.json'}:
+        raise ValueError('Delivered legal/SBOM member inventory differs')
+    if (manifest['stage'] != 'final-signed' or manifest['apk'] != file_record(apk)
+            or manifest['signedInspection'] != inspection
+            or inventory['buildInputs'] != expected or manifest['buildInputs'] != expected
+            or receipt['buildInputs'] != expected or receipt['source'] != expected['source']
+            or {k: receipt[k] for k in ('filename', 'size', 'sha256')} != inventory['apk']
+            or receipt['inspection']['unsigned'] is not True
+            or manifest['acceptedUnsigned']['apk'] != inventory['apk']):
+        raise ValueError('Delivered capsule source/APK/inspection differs')
+    if any(assets[n] != files[n] for n in ('runtime.cdx.json', 'THIRD_PARTY_NOTICES.txt')):
+        raise ValueError('Delivered external legal/SBOM sidecars differ')
+    for entry in inventory['attribution']:
+        for evidence in entry['evidence']:
+            if fingerprint(files['legal/' + evidence['path']]) != {k: evidence[k] for k in ('size', 'sha256')}:
+                raise ValueError('Delivered legal evidence digest differs')
     # Independent observation also covers the retained unsigned payload inventory.
+    unique([r['path'] for r in inventory['members']], 'inventory member')
+    unique([r['name'] for r in inventory['classes']], 'inventory defined class')
     actual = payload(apk)
     if actual != {r['path']: {k: r[k] for k in ('size', 'sha256')} for r in inventory['members']}:
         raise ValueError('Downloaded signed payload differs from accepted inventory')
     if bundle.observe_classes(apk, sdk, reports) != sorted(r['name'] for r in inventory['classes']):
         raise ValueError('Downloaded defined classes differ')
+    component = bom['metadata']['component']
+    if (component['version'] != expected['versionName']
+            or component['hashes'] != [{'alg': 'SHA-256', 'content': manifest['apk']['sha256']}]):
+        raise ValueError('Delivered SBOM APK identity differs')
+    return record, apk, files, manifest, inventory, receipt, inspection
+
+
+def verify_historical_assets(root, assets, sdk, reports, *, expected_certificate,
+                             expected_authority, expected_binding, apk_contract=None):
+    """Issued history only: authenticated caller pins origin, signer and tag/source/tree."""
+    if any(value is None for value in (expected_certificate, expected_authority, expected_binding)):
+        raise ValueError('Historical assets require independent signer, origin and source pins')
+    record, apk, *_ = _inspect_assets(root, assets, sdk, reports, expected_certificate=expected_certificate,
+                                      expected_authority=expected_authority,
+                                      expected_binding=expected_binding, apk_contract=apk_contract)
+    return record, apk
+
+
+def verify_assets(root, assets, sdk, reports, *, expected_certificate=None, expected_authority=None,
+                  expected_binding=None, apk_contract=None):
+    """Full candidate verification, including accepted unsigned and final re-rendering."""
+    record, apk, files, manifest, inventory, receipt, inspection = _inspect_assets(
+        root, assets, sdk, reports, expected_certificate=expected_certificate,
+        expected_authority=expected_authority, expected_binding=expected_binding, apk_contract=apk_contract)
     unsigned = bundle.render(root, inventory, receipt)
     accepted = {'apk': inventory['apk'], 'bundleManifestSha256': fingerprint(unsigned['bundle-manifest.json'])['sha256']}
     if manifest['acceptedUnsigned'] != accepted:

@@ -195,7 +195,7 @@ class HistoricalBindingTests(unittest.TestCase):
 
     def read(self, **kwargs):
         assets = {'release-manifest.json': canonical(self.manifest)}
-        return policy.verify_remote_assets(self.api, self.record, assets, self.reports, self.reports, **kwargs)
+        return policy.verify_remote_history(self.api, self.record, assets, self.reports, self.reports, **kwargs)
 
     def observe(self, root, assets, sdk, reports, **kwargs):
         self.assertEqual(kwargs['expected_binding'], {key: self.identity[key] for key in ('tag', 'source')})
@@ -216,7 +216,7 @@ class HistoricalBindingTests(unittest.TestCase):
                 self.manifest['buildInputs'] = self.identity
                 self.model = legacy_model(self.identity)
                 self.api = fixtures.wrapper(self.model)
-                with self.subTest(tag=tag), patch.object(policy, 'verify_assets', side_effect=self.observe):
+                with self.subTest(tag=tag), patch.object(policy, 'verify_historical_assets', side_effect=self.observe):
                     self.assertEqual(self.read(), self.manifest)
                 observed.append(tag)
         self.assertEqual(set(observed), {'v0.1.0-rc.1', 'v0.1.0-rc.2', 'v0.1.0', 'v0.2.0-rc.1',
@@ -232,7 +232,7 @@ class HistoricalBindingTests(unittest.TestCase):
         for path, response in paths:
             original = copy.deepcopy(self.model.overrides)
             self.model.overrides[path] = response
-            with self.subTest(path=path), patch.object(policy, 'verify_assets') as observe, self.assertRaises(ValueError):
+            with self.subTest(path=path), patch.object(policy, 'verify_historical_assets') as observe, self.assertRaises(ValueError):
                 self.read()
             observe.assert_not_called()
             self.model.overrides = original
@@ -240,7 +240,7 @@ class HistoricalBindingTests(unittest.TestCase):
                            ('source', {'sha': FIRST_SOURCE['sha'], 'tree': 'e' * 40}), ('tag', 'v0.1.0-rc.2')]:
             original = copy.deepcopy(self.identity)
             self.identity[key] = value
-            with self.subTest(key=key), patch.object(policy, 'verify_assets') as observe, self.assertRaises(ValueError):
+            with self.subTest(key=key), patch.object(policy, 'verify_historical_assets') as observe, self.assertRaises(ValueError):
                 self.read(tag=FIRST_TAG)
             observe.assert_not_called()
             self.identity.clear()
@@ -271,7 +271,7 @@ class HistoricalBindingTests(unittest.TestCase):
             return self.observe(root, assets, sdk, reports, **kwargs)
         expected = {**legacy_identity(), 'tag': 'v0.3.0-rc.1', 'versionCode': 20}
         with patch.object(policy, 'read_assets', side_effect=lambda api, release_id: assets_by_id[release_id]), \
-                patch.object(policy, 'verify_assets', side_effect=observe):
+                patch.object(policy, 'verify_historical_assets', side_effect=observe):
             self.assertEqual(policy.history(self.api, self.record, expected, self.reports, self.reports), (7, False))
             self.assertEqual(len(observed), 7)
             self.assertEqual(set(observed), {row['tag_name'] for row in self.model.records})
@@ -295,7 +295,7 @@ class HistoricalBindingTests(unittest.TestCase):
         def observe(root, assets, sdk, reports, **kwargs):
             self.assertIsNone(kwargs['apk_contract'])
             check_apk_dump(PERMISSIONS, TREE, PACKAGE, apk_contract=kwargs['apk_contract'])
-        with patch.object(policy, 'verify_assets', side_effect=observe), self.assertRaisesRegex(ValueError, 'Permission allowlist'):
+        with patch.object(policy, 'verify_historical_assets', side_effect=observe), self.assertRaisesRegex(ValueError, 'Permission allowlist'):
             self.read()
 
     def test_foreign_failed_stale_origin_and_reused_counter_fail_before_policy_selection(self):
@@ -318,14 +318,16 @@ class HistoricalBindingTests(unittest.TestCase):
         self.model.overrides['/actions/workflows/8/runs?event=workflow_dispatch'] = [run]
         self.model.overrides['/actions/runs/90/artifacts'] = [artifact_record]
         self.model.overrides['/actions/artifacts/80'] = artifact_record
-        with patch.object(policy, 'verify_assets', side_effect=self.observe):
+        with patch.object(policy, 'verify_historical_assets', side_effect=self.observe), \
+                patch.object(policy, 'verify_assets', side_effect=self.observe) as candidate:
             policy.prepared_tags(self.api, self.record, {**self.identity, 'tag': 'v0.3.0-rc.1'}, set(), self.reports, self.reports)
             with self.assertRaisesRegex(ValueError, 'Tag already admitted'):
                 policy.prepared_tags(self.api, self.record, self.identity, set(), self.reports, self.reports)
             self.assertEqual(policy.candidate_assets(self.api, self.record, self.identity, run, self.reports, self.reports),
                              {'release-manifest.json': canonical(self.manifest)})
+            candidate.assert_called_once()
         artifact_record['expired'] = True
-        with patch.object(policy, 'verify_assets') as observe, self.assertRaisesRegex(ValueError, 'Expired unresolved'):
+        with patch.object(policy, 'verify_historical_assets') as observe, self.assertRaisesRegex(ValueError, 'Expired unresolved'):
             policy.prepared_tags(self.api, self.record, self.identity, set(), self.reports, self.reports)
         observe.assert_not_called()
         artifact_record['expired'] = False
@@ -333,7 +335,7 @@ class HistoricalBindingTests(unittest.TestCase):
         original = self.model.get(attempt_path)
         for change in ({'conclusion': 'failure'}, {'run_number': 8}, {'head_sha': 'e' * 40}):
             self.model.overrides[attempt_path] = {**original, **change}
-            with self.subTest(change=change), patch.object(policy, 'verify_assets') as observe, self.assertRaises(ValueError):
+            with self.subTest(change=change), patch.object(policy, 'verify_historical_assets') as observe, self.assertRaises(ValueError):
                 policy.prepared_tags(self.api, self.record, self.identity, set(), self.reports, self.reports)
             observe.assert_not_called()
 

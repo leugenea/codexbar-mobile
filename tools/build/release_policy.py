@@ -8,7 +8,7 @@ import urllib.parse
 from historical_apk_contract import LEGACY_MANIFEST_SHA256, contract_for
 from release_publication import history_body, identifier, notes_text, read_assets, release_binding, release_body, require
 from release_runtime import fingerprint, load, members
-from release_signing import _unique, verify_assets
+from release_signing import _unique, verify_assets, verify_historical_assets
 from version_identity import MAX_CODE, official_inputs, parse_tag, target_version
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -177,7 +177,7 @@ def bound_contract(api, identity, tag):
     return {'tag': tag, 'source': {'sha': source, 'tree': tree}}, contract
 
 
-def verify_remote_assets(api, record, assets, sdk, reports, *, tag=None, expected_authority=None, expected_inputs=None):
+def authenticated_asset_inputs(api, record, assets, *, tag=None, expected_authority=None, expected_inputs=None):
     """Authenticate historical/retained source and origin before inspecting any APK."""
     claimed = json.loads(assets['release-manifest.json'], object_pairs_hook=_unique)
     identity, authority = claimed['buildInputs'], claimed['authority']
@@ -191,9 +191,27 @@ def verify_remote_assets(api, record, assets, sdk, reports, *, tag=None, expecte
                           number=identity['versionCode'], attempt=authority['runAttempt'])
     require(origin['status'] == 'completed' and origin['conclusion'] == 'success', 'History origin attempt not accepted')
     binding, contract = bound_contract(api, identity, identity['tag'] if tag is None else tag)
-    manifest, _ = verify_assets(ROOT, assets, sdk, reports, expected_certificate=record['certificateSha256'],
-                                expected_authority=authority, expected_binding=binding, apk_contract=contract)
-    require(manifest['buildInputs'] == identity and manifest['authority'] == authority, 'Verified release identity differs')
+    return identity, {'expected_certificate': record['certificateSha256'], 'expected_authority': authority,
+                      'expected_binding': binding, 'apk_contract': contract}
+
+
+def verify_remote_assets(api, record, assets, sdk, reports, *, expected_authority, expected_inputs):
+    """Selected retained prepare: always use full candidate legal/SBOM verification."""
+    _, inputs = authenticated_asset_inputs(api, record, assets, expected_authority=expected_authority,
+                                           expected_inputs=expected_inputs)
+    manifest, _ = verify_assets(ROOT, assets, sdk, reports, **inputs)
+    require(manifest['buildInputs'] == expected_inputs and manifest['authority'] == expected_authority,
+            'Verified release identity differs')
+    return manifest
+
+
+def verify_remote_history(api, record, assets, sdk, reports, *, tag=None, expected_authority=None):
+    """Published history and non-selected reservations verify issued bytes, not today's render."""
+    identity, inputs = authenticated_asset_inputs(api, record, assets, tag=tag, expected_authority=expected_authority)
+    manifest, _ = verify_historical_assets(ROOT, assets, sdk, reports, **inputs)
+    require(manifest['authority'] == inputs['expected_authority']
+            and manifest['buildInputs'] == identity,
+            'Verified release identity differs')
     return manifest
 
 
@@ -235,7 +253,7 @@ def prepared_tags(api, record, expected, accepted_runs, sdk, reports):
             expected_authority = {'repository': record['repository'], 'workflowId': record['workflowId'],
                                   'controllerSha': run['head_sha'], 'runId': run['id'],
                                   'runAttempt': int(artifact['name'].rsplit('-', 1)[1])}
-            candidate = verify_remote_assets(api, record, artifact_assets(api, artifact), sdk,
+            candidate = verify_remote_history(api, record, artifact_assets(api, artifact), sdk,
                                               reports / identifier(artifact['id']), expected_authority=expected_authority)
             origin = candidate['authority']
             require(origin['runId'] == run['id'] and origin['workflowId'] == record['workflowId']
@@ -259,7 +277,7 @@ def history(api, record, expected, sdk, reports):
             require(record['operation'] == 'publish' and tag == expected['tag'], 'Unresolved draft blocks official allocation')
             continue  # Exact draft candidate ownership/assets are checked by publisher before any mutation.
         assets = read_assets(api, release['id'])
-        manifest = verify_remote_assets(api, record, assets, sdk, reports / identifier(release['id']), tag=tag)
+        manifest = verify_remote_history(api, record, assets, sdk, reports / identifier(release['id']), tag=tag)
         identity, authority = manifest['buildInputs'], manifest['authority']
         accepted_runs.add(authority['runId'])
         official_inputs(identity['target'], identity['channel'], {'RELEASE_TAG': tag,
