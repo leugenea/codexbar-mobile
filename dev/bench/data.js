@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793693523870,
+  "lastUpdate": 1793693525985,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -6689,6 +6689,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/9d903022476beabe743b264e4b073cdc4c727965"
         },
         "date": 1793653251626,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5d98d2a4b39ffd7987a2898a13bdee4e3ea363be",
+          "message": "Reduce release history to metadata-only allocation checks (#235)\n\n* Verify historical release integrity without regenerating bundles\n\n* Reduce release history to metadata-only allocation checks\n\n* Reject unknown retained allocation metadata",
+          "timestamp": "2026-11-03T11:11:35+03:00",
+          "tree_id": "1cac2dc325be9822e2333cd97acc7be613c68055",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/5d98d2a4b39ffd7987a2898a13bdee4e3ea363be"
+        },
+        "date": 1793693525753,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
