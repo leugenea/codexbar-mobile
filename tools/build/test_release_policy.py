@@ -467,6 +467,28 @@ class HistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Reused official versionCode'):
             self.read()
 
+    def test_missing_signed_inventory_rejects_unknown_conclusion_or_invalid_generated_title(self):
+        run = {**self.model.get('/actions/runs/90'), 'repository': {'id': 7},
+               'display_title': 'prepare rc v0.1.0-rc.2'}
+        self.model.overrides['/actions/runs/90/artifacts'] = []
+        for change in ({'display_title': 'Unknown title'}, {'conclusion': 'unknown'},
+                       {'display_title': 'publish stable v0.1.0-rc.2'},
+                       {'display_title': 'publish rc v0.1.0-rc.02'}):
+            self.model.overrides['/actions/workflows/8/runs?event=workflow_dispatch'] = [{**run, **change}]
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.read()
+        self.assertNotIn('/actions/runs/90/artifacts', self.model.calls)
+
+    def test_missing_signed_inventory_accepts_valid_publish_and_known_unsuccessful_prepares(self):
+        run = {**self.model.get('/actions/runs/90'), 'repository': {'id': 7}}
+        self.model.overrides['/actions/runs/90/artifacts'] = []
+        for conclusion in ('success', 'failure', 'cancelled', 'timed_out', 'neutral', 'skipped', 'action_required', 'stale'):
+            title = 'publish rc v0.1.0-rc.2' if conclusion == 'success' else 'prepare rc v0.1.0-rc.2'
+            self.model.overrides['/actions/workflows/8/runs?event=workflow_dispatch'] = [
+                {**run, 'conclusion': conclusion, 'display_title': title}]
+            with self.subTest(conclusion=conclusion):
+                self.assertEqual(self.read(), (0, False))
+
     def test_retained_reservations_use_metadata_and_reject_unknown_expired_or_conflicting_state(self):
         run = {**self.model.get('/actions/runs/90'), 'repository': {'id': 7},
                'display_title': 'prepare rc v0.1.0-rc.2'}

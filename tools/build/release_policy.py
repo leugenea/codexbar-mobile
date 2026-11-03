@@ -199,28 +199,30 @@ def prepared_tags(api, record, expected, accepted_runs, accepted):
             continue
         require(run['path'] == WORKFLOW and run['event'] == 'workflow_dispatch'
                 and run['repository']['id'] == record['repositoryId'], 'Unknown official candidate run')
-        tag = None
-        for artifact in api.pages('/actions/runs/' + identifier(run['id']) + '/artifacts', 'artifacts'):
-            if not artifact['name'].startswith('signed-'):
-                continue
+        require(run['conclusion'] in ('success', 'failure', 'cancelled', 'timed_out', 'neutral', 'skipped',
+                                      'action_required', 'stale'), 'Unknown official run conclusion')
+        operation, channel, tag = run['display_title'].split(' ')
+        require(operation in ('prepare', 'publish') and channel in ('rc', 'stable'), 'Unknown official allocation')
+        official_inputs(tag[1:].split('-rc.', 1)[0], channel, {'RELEASE_TAG': tag,
+                        'RELEASE_VERSION_CODE': str(run['run_number']), 'RELEASE_PREVIOUS_VERSION_CODE': '0'})
+        artifacts = [a for a in api.pages('/actions/runs/' + identifier(run['id']) + '/artifacts', 'artifacts')
+                     if a['name'].startswith('signed-')]
+        for artifact in artifacts:
             require(re.fullmatch(r'signed-' + identifier(run['id']) + r'-[1-9][0-9]*', artifact['name']),
                     'Malformed retained candidate name')
             require(artifact['expired'] is False, 'Expired unresolved signed candidate; reconcile before another allocation')
             origin = run_identity(api, run['id'], record['workflowId'], sha=run['head_sha'],
                                   number=run['run_number'], attempt=int(artifact['name'].rsplit('-', 1)[1]))
-            operation, channel, tag = origin['display_title'].split(' ')
             require(origin['status'] == 'completed' and origin['conclusion'] == 'success'
                     and artifact['workflow_run']['id'] == origin['id']
                     and artifact['workflow_run']['head_sha'] == origin['head_sha']
-                    and operation == 'prepare' and channel in ('rc', 'stable'),
+                    and operation == 'prepare' and origin['display_title'] == run['display_title'],
                     'Unknown retained candidate allocation')
-            official_inputs(tag[1:].split('-rc.', 1)[0], channel, {'RELEASE_TAG': tag,
-                            'RELEASE_VERSION_CODE': str(origin['run_number']), 'RELEASE_PREVIOUS_VERSION_CODE': '0'})
             require(tag != expected['tag'] and tag not in accepted and origin['run_number'] not in accepted.values(),
                     'Tag/counter already admitted by a different prepare run')
-        if tag is not None:
+        if artifacts:
             accepted[tag] = run['run_number']
-        require(tag is not None or run['conclusion'] != 'success' or not run['display_title'].startswith('prepare '),
+        require(artifacts or run['conclusion'] != 'success' or operation == 'publish',
                 'Missing retained successful prepare artifact; reconcile expired/partial state')
 
 
