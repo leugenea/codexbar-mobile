@@ -349,7 +349,6 @@
     <string name="dashboard_stale">Usage may be out of date</string>
     <string name="dashboard_error">Unable to update usage</string>
     <string name="dashboard_reauthorize">Sign in again to continue</string>
-    <string name="dashboard_refreshing">Refreshing…</string>
     <string name="dashboard_storage_error">Local storage unavailable</string>
     <string name="dashboard_auth_error">Login failed. Try again.</string>
     <string name="dashboard_browser_error">Unable to open the browser</string>
