@@ -1,6 +1,5 @@
 """Bounded historical-policy regressions; remote/SDK outcomes are synthetic unless labeled captured."""
 import base64
-import copy
 import json
 from pathlib import Path
 import re
@@ -13,7 +12,6 @@ from historical_apk_fixtures import SOURCE_MANIFEST, PERMISSIONS, TREE
 import release_artifact as artifact
 import release_policy as policy
 import release_signing as signing
-from release_publication import marker
 from release_runtime import canonical, fingerprint
 import test_release_artifact as current
 import test_release_policy as fixtures
@@ -182,160 +180,33 @@ class HistoricalInspectionTests(unittest.TestCase):
 
 class HistoricalBindingTests(unittest.TestCase):
     def setUp(self):
-        self.model = legacy_model()
-        self.api = fixtures.wrapper(self.model)
-        self.record = {**fixtures.configuration(), **fixtures.context(), 'workflowId': 8}
         self.identity = legacy_identity()
-        self.authority = {'repository': self.api.repository, 'workflowId': 8, 'controllerSha': 'c' * 40,
-                          'runId': 90, 'runAttempt': 2}
-        self.manifest = {'buildInputs': self.identity, 'authority': self.authority}
+        self.manifest = {'buildInputs': self.identity, 'authority': {}}
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.reports = Path(temporary.name)
 
-    def read(self, **kwargs):
-        assets = {'release-manifest.json': canonical(self.manifest)}
-        return policy.verify_remote_assets(self.api, self.record, assets, self.reports, self.reports, **kwargs)
-
-    def observe(self, root, assets, sdk, reports, **kwargs):
-        self.assertEqual(kwargs['expected_binding'], {key: self.identity[key] for key in ('tag', 'source')})
-        self.assertEqual(kwargs['expected_authority'], self.authority)
-        self.assertEqual(kwargs['expected_certificate'], 'd' * 64)
-        self.assertIs(kwargs['apk_contract'], LEGACY)
-        self.assertIn('/git/ref/tags/' + self.identity['tag'], self.model.calls)
-        self.assertIn('/git/commits/' + self.identity['source']['sha'], self.model.calls)
-        self.assertIn('/contents/app/src/main/AndroidManifest.xml?ref=' + self.identity['source']['sha'], self.model.calls)
-        check_apk_dump(PERMISSIONS, TREE, PACKAGE, apk_contract=kwargs['apk_contract'])
-        return copy.deepcopy(self.manifest), None
-
-    def test_all_seven_reviewed_tags_resolve_before_legacy_observation(self):
-        observed = []
-        for sha, (tree, tags) in contracts.LEGACY_SOURCES.items():
-            for tag in sorted(tags):
-                self.identity = legacy_identity(tag, {'sha': sha, 'tree': tree})
-                self.manifest['buildInputs'] = self.identity
-                self.model = legacy_model(self.identity)
-                self.api = fixtures.wrapper(self.model)
-                with self.subTest(tag=tag), patch.object(policy, 'verify_assets', side_effect=self.observe):
-                    self.assertEqual(self.read(), self.manifest)
-                observed.append(tag)
-        self.assertEqual(set(observed), {'v0.1.0-rc.1', 'v0.1.0-rc.2', 'v0.1.0', 'v0.2.0-rc.1',
-                                         'v0.2.0-rc.2', 'v0.2.0-rc.3', 'v0.2.0'})
-        self.assertEqual(len(contracts.LEGACY_SOURCES), 5)
-        self.assertEqual(fingerprint(SOURCE_MANIFEST)['sha256'], contracts.LEGACY_MANIFEST_SHA256)
-
-    def test_tag_source_tree_and_manifest_drift_fail_before_apk_observation(self):
-        paths = [('/git/ref/tags/' + FIRST_TAG, {'object': {'type': 'commit', 'sha': 'e' * 40}}),
-                 ('/git/commits/' + FIRST_SOURCE['sha'], {'tree': {'sha': 'e' * 40}}),
-                 ('/contents/app/src/main/AndroidManifest.xml?ref=' + FIRST_SOURCE['sha'],
-                  {'encoding': 'base64', 'content': base64.b64encode(b'forged manifest').decode()})]
-        for path, response in paths:
-            original = copy.deepcopy(self.model.overrides)
-            self.model.overrides[path] = response
-            with self.subTest(path=path), patch.object(policy, 'verify_assets') as observe, self.assertRaises(ValueError):
-                self.read()
-            observe.assert_not_called()
-            self.model.overrides = original
-        for key, value in [('source', {'sha': 'e' * 40, 'tree': FIRST_SOURCE['tree']}),
-                           ('source', {'sha': FIRST_SOURCE['sha'], 'tree': 'e' * 40}), ('tag', 'v0.1.0-rc.2')]:
-            original = copy.deepcopy(self.identity)
-            self.identity[key] = value
-            with self.subTest(key=key), patch.object(policy, 'verify_assets') as observe, self.assertRaises(ValueError):
-                self.read(tag=FIRST_TAG)
-            observe.assert_not_called()
-            self.identity.clear()
-            self.identity.update(original)
-
-    def test_complete_seven_release_history_keeps_counter_floor_and_no_skipped_entry(self):
-        assets_by_id, observed = {}, []
-        self.model.records = []
-        for sha, (tree, tags) in contracts.LEGACY_SOURCES.items():
-            for tag in sorted(tags):
-                release_id = len(assets_by_id) + 1
-                identity = legacy_identity(tag, {'sha': sha, 'tree': tree}, release_id)
-                authority = {**self.authority, 'runId': 1000 + release_id}
-                manifest = {'buildInputs': identity, 'authority': authority}
-                assets = {'release-manifest.json': canonical(manifest)}
-                assets_by_id[release_id] = assets
-                self.model.overrides.update(legacy_model(identity).overrides)
-                run = {**self.model.get('/actions/runs/90'), 'id': authority['runId'], 'run_number': release_id}
-                self.model.overrides[f'/actions/runs/{authority["runId"]}/attempts/2'] = run
-                self.model.records.append({'id': release_id, 'tag_name': tag, 'target_commitish': sha,
-                                           'name': tag[1:], 'body': marker(assets), 'draft': False,
-                                           'prerelease': identity['channel'] == 'rc'})
-        def observe(root, assets, sdk, reports, **kwargs):
-            manifest = json.loads(assets['release-manifest.json'])
-            self.identity, self.authority = manifest['buildInputs'], manifest['authority']
-            self.manifest = manifest
-            observed.append(self.identity['tag'])
-            return self.observe(root, assets, sdk, reports, **kwargs)
-        expected = {**legacy_identity(), 'tag': 'v0.3.0-rc.1', 'versionCode': 20}
-        with patch.object(policy, 'read_assets', side_effect=lambda api, release_id: assets_by_id[release_id]), \
-                patch.object(policy, 'verify_assets', side_effect=observe):
-            self.assertEqual(policy.history(self.api, self.record, expected, self.reports, self.reports), (7, False))
-            self.assertEqual(len(observed), 7)
-            self.assertEqual(set(observed), {row['tag_name'] for row in self.model.records})
-            duplicate = json.loads(assets_by_id[2]['release-manifest.json'])
-            duplicate['buildInputs']['versionCode'] = 1
-            assets_by_id[2]['release-manifest.json'] = canonical(duplicate)
-            self.model.records[1]['body'] = marker(assets_by_id[2])
-            self.model.overrides['/actions/runs/1002/attempts/2']['run_number'] = 1
-            with self.assertRaisesRegex(ValueError, 'Reused official versionCode'):
-                policy.history(self.api, self.record, expected, self.reports, self.reports)
-
-    def test_unknown_sources_tags_and_tree_never_select_legacy(self):
-        for tag, source in [('v0.2.0-rc.9', FIRST_SOURCE),
-                            (FIRST_TAG, {'sha': 'e' * 40, 'tree': FIRST_SOURCE['tree']}),
-                            (FIRST_TAG, {**FIRST_SOURCE, 'tree': 'e' * 40})]:
-            with self.subTest(tag=tag, source=source):
-                self.assertIsNone(contracts.contract_for(tag, source))
-        self.identity['source'] = {'sha': 'e' * 40, 'tree': 'f' * 40}
-        self.model = legacy_model(self.identity)
-        self.api = fixtures.wrapper(self.model)
-        def observe(root, assets, sdk, reports, **kwargs):
-            self.assertIsNone(kwargs['apk_contract'])
-            check_apk_dump(PERMISSIONS, TREE, PACKAGE, apk_contract=kwargs['apk_contract'])
-        with patch.object(policy, 'verify_assets', side_effect=observe), self.assertRaisesRegex(ValueError, 'Permission allowlist'):
-            self.read()
-
-    def test_foreign_failed_stale_origin_and_reused_counter_fail_before_policy_selection(self):
-        original = self.model.get('/actions/runs/90/attempts/2')
-        for change in ({'head_sha': 'e' * 40}, {'run_number': 8}, {'run_attempt': 1},
-                       {'status': 'in_progress'}, {'conclusion': 'failure'}, {'head_branch': 'feature'},
-                       {'repository': {'full_name': 'fork/repo'}}, {'workflow_id': 9}):
-            self.model.overrides['/actions/runs/90/attempts/2'] = {**original, **change}
-            with self.subTest(change=change), patch.object(policy, 'bound_contract') as select, self.assertRaises(ValueError):
-                self.read()
-            select.assert_not_called()
-
-    def test_retained_legacy_candidate_authenticates_then_reserves_tag(self):
-        raw = signing.zip_bytes({'release-manifest.json': canonical(self.manifest)})
-        self.model.archive = raw
-        run = {**self.model.get('/actions/runs/90'), 'repository': {'id': 7}}
-        artifact_record = {'id': 80, 'name': 'signed-90-2', 'expired': False,
-                           'digest': 'sha256:' + fingerprint(raw)['sha256'],
-                           'workflow_run': {'id': 90, 'head_sha': 'c' * 40}}
-        self.model.overrides['/actions/workflows/8/runs?event=workflow_dispatch'] = [run]
-        self.model.overrides['/actions/runs/90/artifacts'] = [artifact_record]
-        self.model.overrides['/actions/artifacts/80'] = artifact_record
-        with patch.object(policy, 'verify_assets', side_effect=self.observe):
-            policy.prepared_tags(self.api, self.record, {**self.identity, 'tag': 'v0.3.0-rc.1'}, set(), self.reports, self.reports)
-            with self.assertRaisesRegex(ValueError, 'Tag already admitted'):
-                policy.prepared_tags(self.api, self.record, self.identity, set(), self.reports, self.reports)
-            self.assertEqual(policy.candidate_assets(self.api, self.record, self.identity, run, self.reports, self.reports),
-                             {'release-manifest.json': canonical(self.manifest)})
-        artifact_record['expired'] = True
-        with patch.object(policy, 'verify_assets') as observe, self.assertRaisesRegex(ValueError, 'Expired unresolved'):
-            policy.prepared_tags(self.api, self.record, self.identity, set(), self.reports, self.reports)
-        observe.assert_not_called()
-        artifact_record['expired'] = False
-        attempt_path = '/actions/runs/90/attempts/2'
-        original = self.model.get(attempt_path)
-        for change in ({'conclusion': 'failure'}, {'run_number': 8}, {'head_sha': 'e' * 40}):
-            self.model.overrides[attempt_path] = {**original, **change}
-            with self.subTest(change=change), patch.object(policy, 'verify_assets') as observe, self.assertRaises(ValueError):
-                policy.prepared_tags(self.api, self.record, self.identity, set(), self.reports, self.reports)
-            observe.assert_not_called()
+    def test_selected_legacy_candidate_uses_admitted_source_and_checks_manifest_before_inspection(self):
+        candidate = fixtures.CandidateTests()
+        candidate.setUp()
+        self.addCleanup(candidate.doCleanups)
+        candidate.model.overrides.update(legacy_model().overrides)
+        for filename in policy.SOURCE_GATES:
+            path = '/actions/workflows/' + filename + '/runs?head_sha=' + FIRST_SOURCE['sha'] + '&event=push'
+            candidate.model.overrides[path] = [{**candidate.model.pages(path)[0], 'head_sha': FIRST_SOURCE['sha']}]
+        candidate.record, candidate.expected, candidate.origin = policy.admit(candidate.api, fixtures.configuration(), candidate.ctx)
+        candidate.manifest['buildInputs'] = candidate.expected
+        candidate.assets = {'release-manifest.json': canonical(candidate.manifest)}
+        candidate.model.archive = signing.zip_bytes(candidate.assets)
+        candidate.artifact['digest'] = 'sha256:' + fingerprint(candidate.model.archive)['sha256']
+        with patch.object(policy, 'verify_assets', return_value=(candidate.manifest, None)) as verify:
+            self.assertEqual(candidate.read(), candidate.assets)
+            self.assertIs(verify.call_args.kwargs['apk_contract'], LEGACY)
+            self.assertEqual(verify.call_args.kwargs['expected_binding'], {'tag': FIRST_TAG, 'source': FIRST_SOURCE})
+            candidate.model.overrides['/contents/app/src/main/AndroidManifest.xml?ref=' + FIRST_SOURCE['sha']]['content'] = base64.b64encode(b'changed').decode()
+            with self.assertRaisesRegex(ValueError, 'Historical source manifest'):
+                candidate.read()
+            verify.assert_called_once()
 
     def test_legacy_contract_cannot_be_requested_without_exact_independent_binding(self):
         assets = {'release-manifest.json': canonical({**self.manifest, 'schema': 1, 'kind': 'guarded-android-release',
@@ -348,7 +219,6 @@ class HistoricalBindingTests(unittest.TestCase):
         with patch.object(artifact, 'run_tool') as tool, self.assertRaises(ValueError):
             artifact.inspect_apk(self.reports / 'unused.apk', self.identity, self.reports, self.reports, apk_contract=LEGACY)
         tool.assert_not_called()
-
 
 class LegacyAssetTests(asset_tests.AssetTests):
     """Repeat existing full capsule/integrity controls with the optional legacy contract."""

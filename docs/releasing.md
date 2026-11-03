@@ -69,12 +69,30 @@ and deleted/distributed history require owner reconciliation.
 
 Prepare's versionCode is this dedicated workflow's API-verified `run_number`
 (1..2100000000); reruns keep it and gaps are legal. Before signing/publication the
-controller reads complete draft-aware history and actually downloads/reverifies
-accepted RC/stable releases. A new code must exceed every accepted code; empty
-history is derived from the complete listing. Retained signed candidates reserve
-their tag. Unknown, conflicting, expired unresolved or partial state stops progress.
-An exact already-published allocation is a read-only no-op even after Actions
-artifact expiry; a different prepare run cannot replace it.
+controller reads complete authenticated draft-aware Release history. A new code
+must exceed every accepted code; empty history is derived from the complete listing.
+Unknown, conflicting, expired unresolved or partial allocation state stops progress.
+An exact already-published allocation is a read-only metadata no-op even after
+Actions artifact expiry; a different prepare run cannot replace it.
+
+History is an allocation ledger, not an archive audit. For each published release,
+only the small `release-manifest.json` is downloaded: its tag/source/tree, official
+version identity, successful dedicated producer run/attempt and Release integrity
+marker are checked against authenticated API metadata. No old APK, bundle ZIP,
+SBOM, notices or checksum files are downloaded or inspected. Non-selected retained
+signed artifacts reserve tags through their authenticated artifact metadata and
+exact successful attempt's existing `prepare <channel> <tag>` run title; malformed,
+unknown or expired reservations require reconciliation, not archive downloads.
+This supersedes previous full-history binary/legal revalidation requirements:
+preparing a new release no longer detects unrelated old binary corruption or
+historical legal inconsistency. Metadata/provenance does not prove old byte integrity.
+
+The candidate actually being signed or published still receives full existing
+accepted-unsigned and final legal/SBOM generation/comparison, signatures, APK
+security, payload/classes, source/counter/certificate, hashes and provenance checks.
+This includes the selected retained prepare artifact; it cannot use the history
+ledger instead. A changed renderer can still block that selected candidate.
+Publication downloads and reads back this candidate's exact assets as below.
 
 Publication creates a draft, uploads only missing matching assets, downloads each
 for readback, then publishes and reads back the final state. Only an owned matching

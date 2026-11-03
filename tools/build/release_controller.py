@@ -97,7 +97,7 @@ def main():
         return
     if args.operation == 'remote-state':
         # This GET-only helper has a technically Contents-write job token for draft visibility.
-        floor, same = policy.history(api, record, expected, sdk, args.work / 'history')
+        floor, same = policy.history(api, record, expected)
         if origin is not None and not same:
             policy.candidate_assets(api, record, expected, origin, sdk, args.work / 'candidate-verification')
         output(allow='true', previous=str(floor), noop=str(same).lower())
@@ -119,7 +119,7 @@ def main():
         # The draft-capable remote-state job already admitted this serialized operation.
         # Reverify accepted/public history at key use with the signer's read-only token;
         # do not claim this token independently proves draft absence.
-        current_floor, already_accepted = policy.history(api, record, expected, sdk, args.work / 'sign-history')
+        current_floor, already_accepted = policy.history(api, record, expected)
         require(current_floor == int(previous) and not already_accepted, 'History changed before signing')
         unsigned = args.work / 'download'
         download_artifact(api, int(env['UNSIGNED_ARTIFACT_ID']), env['UNSIGNED_ARTIFACT_DIGEST'], record['runId'], attempt,
@@ -141,7 +141,7 @@ def main():
         for name, data in assets.items():
             (destination / name).write_bytes(data)
         return
-    _, accepted = policy.history(api, record, expected, sdk, args.work / 'publish-history')
+    _, accepted = policy.history(api, record, expected)
     if accepted:
         matches = [r for r in api.releases() if r['tag_name'] == expected['tag'] and r['draft'] is False]
         require(len(matches) == 1, 'Accepted Release changed during no-op readback')
@@ -153,7 +153,7 @@ def main():
     def recheck():
         fresh_api, fresh_record, fresh_expected, _ = admitted(env, reader=False)
         require(fresh_record == record and fresh_expected == expected, 'Authorization drift')
-        policy.history(fresh_api, record, expected, sdk, args.work / 'current-history')
+        policy.history(fresh_api, record, expected)
     release_id = publish(api, expected, assets, recheck, notes=record['notes'])
     print('Exact Release ID verified:', release_id)
 
