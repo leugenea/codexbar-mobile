@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793701994655,
+  "lastUpdate": 1793701996837,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -6757,6 +6757,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/5d98d2a4b39ffd7987a2898a13bdee4e3ea363be"
         },
         "date": 1793693525753,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c43859e990f9c84dcc0ad38bb393d9995cb248c3",
+          "message": "Remove transient dashboard refreshing text (#237)",
+          "timestamp": "2026-11-03T13:32:47+03:00",
+          "tree_id": "c7811a319e65526d1cc1eed43e50f04461e34a46",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/c43859e990f9c84dcc0ad38bb393d9995cb248c3"
+        },
+        "date": 1793701996587,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
