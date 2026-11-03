@@ -211,6 +211,9 @@ class LiveUsageScreenTest {
             returnDashboard(compose, owner)
             assertDashboardRefreshAction(compose, enabled = false)
             assertRefreshIndicator()
+            compose.onNodeWithTag("live-five-hour-percent").assertTextEquals("12.5% used").assertIsDisplayed()
+            assertPlatformScreenshot(compose, "dashboard-held-refresh", "live-five-hour-percent")
+            assertTrue("Screenshot is captured during the held quota GET", owner.state.value.refresh.refreshing)
             repeat(2) { pullDashboardRefresh(compose) }
             settleConnectionCommands(compose, owner, "repeated error-cycle pulls coalesce")
             assertEquals(3, fake.gets.get())
@@ -222,6 +225,8 @@ class LiveUsageScreenTest {
             waitFor("manual error settles") { !owner.state.value.refresh.refreshing && owner.state.value.refresh.usage.attempt?.error == ReadError.FORBIDDEN }
             compose.onNodeWithTag("dashboard-refresh-indicator").assertDoesNotExist()
             assertDashboardRefreshAction(compose, enabled = true)
+            compose.onNodeWithTag("dashboard-status").assertTextEquals("Unable to update usage")
+            compose.onNodeWithTag("live-five-hour-percent").assertTextEquals("12.5% used")
             openDetailRoute(compose, owner, DashboardRoute.CONNECTION_DETAILS)
             text("live-error", "Usage access forbidden · this does not imply session expiry or zero quota")
             compose.onNodeWithTag("live-error").assert(SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite))
@@ -260,18 +265,22 @@ class LiveUsageScreenTest {
             assertEquals(0, fake.posts.get())
             fake.hold = false
             fake.holdInventory = false
+            fake.usage = response(fiveHour("23.75"))
             val previous = owner.state.value.refresh.usage.attempt
             val action = compose.onNodeWithTag("dashboard-refresh").fetchSemanticsNode().config[SemanticsActions.CustomActions].single()
             compose.runOnUiThread { assertTrue(action.action()) }
             waitFor("accessible refresh invokes the same one-cycle owner command") {
                 owner.state.value.refresh.usage.attempt !== previous && !owner.state.value.refresh.refreshing
             }
+            compose.onNodeWithTag("dashboard-refresh-indicator").assertDoesNotExist()
+            compose.onNodeWithTag("live-five-hour-percent").assertTextEquals("23.75% used")
             assertEquals(4, fake.gets.get())
             assertEquals(0, fake.posts.get())
         }
     }
 
     private fun assertRefreshIndicator() {
+        compose.onAllNodes(hasText("Refreshing…"), useUnmergedTree = true).assertCountEquals(0)
         compose.onNodeWithTag("dashboard-refresh-indicator").assertIsDisplayed()
         compose.onNode(hasAnyAncestor(hasTestTag("dashboard-refresh-indicator")) and
             SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo.Indeterminate)).assertIsDisplayed()

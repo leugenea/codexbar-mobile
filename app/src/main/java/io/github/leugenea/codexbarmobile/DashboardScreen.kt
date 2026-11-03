@@ -37,7 +37,6 @@ private fun DashboardStatus(state: ConnectionState, model: PresentedUsage, time:
         model.observation?.observedAt?.let { Text(stringResource(R.string.dashboard_updated, chartTimeLabel(it, time.zone, time.locale, truncateToHour = false)),
             Modifier.testTag("dashboard-observed-at"), style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        if (model.refreshing) Text(stringResource(R.string.dashboard_refreshing))
         model.errorResource?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
         DashboardPresentation.problem(state.problem)?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
     }
