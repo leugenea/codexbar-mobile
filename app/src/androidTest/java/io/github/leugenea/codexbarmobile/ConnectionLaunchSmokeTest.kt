@@ -40,6 +40,13 @@ class ConnectionLaunchSmokeTest {
     @Test fun launcherReachesRealDisconnectedScreenWithInstalledSecurityPolicy() {
         launch().use { scenario ->
             ready(ConnectionPhase.IDLE)
+            val context = InstrumentationRegistry.getInstrumentation().targetContext
+            val packages = context.packageManager
+            assertEquals("CodexBar Mobile", context.getString(R.string.app_name))
+            assertEquals("CodexBar Mobile", packages.getApplicationLabel(context.applicationInfo).toString())
+            val launcher = requireNotNull(packages.getLaunchIntentForPackage(context.packageName))
+            assertEquals("CodexBar Mobile",
+                packages.getActivityInfo(requireNotNull(launcher.component), 0).loadLabel(packages).toString())
             compose.onNodeWithTag("dashboard-status").assertTextEquals("Sign in to see your usage")
             compose.onNodeWithTag("live-refresh").assertDoesNotExist()
             compose.onNodeWithTag("live-five-hour-progress").assertDoesNotExist()
