@@ -7,6 +7,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
 import java.util.UUID
 
 class AccountCatalogTest {
@@ -16,6 +17,26 @@ class AccountCatalogTest {
     private fun open(root: File, fault: () -> Unit = {}) = AccountCatalog.open(root, { slot }, fault)
     private fun named(text: String) = AccountNameRead.Ready(AccountDisplayName.from(text))
     private fun other(name: String?) = CatalogEntry(AccountStorage.fresh(), HistoryPartition(UUID.randomUUID()), name, true)
+
+    @Test fun applicationRootAliasCreatesAndReopensTheSameCatalog() {
+        val root = temporary.newFolder().canonicalFile
+        val alias = File(temporary.root, "root-alias")
+        Files.createSymbolicLink(alias.toPath(), root.toPath())
+        assertNotEquals(alias.absoluteFile, alias.canonicalFile)
+        val catalog = open(alias)
+        val entry = catalog.adopt(partition, named("Synthetic alias"))
+        assertEquals(listOf(entry), open(root).snapshot().entries)
+        assertEquals(catalog.snapshot(), open(alias).snapshot())
+        assertEquals(entry.storage.id, open(root).snapshot().selected)
+    }
+
+    @Test fun applicationRootResolutionDoesNotPermitRedirectingTheCatalogChild() {
+        val root = temporary.newFolder().canonicalFile
+        val redirected = temporary.newFolder().canonicalFile
+        Files.createSymbolicLink(File(root, "account-catalog").toPath(), redirected.toPath())
+        assertThrows(IllegalArgumentException::class.java) { open(root) }
+        assertFalse(File(redirected, "catalog").exists())
+    }
 
     @Test fun migrationIsIdempotentAndLocationsDoNotReuseTheHistoryPartitionOrCredentialSlot() {
         val root = temporary.newFolder()

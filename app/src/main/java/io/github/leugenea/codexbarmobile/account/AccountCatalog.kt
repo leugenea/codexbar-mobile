@@ -103,7 +103,8 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
 
     companion object {
         fun open(root: File, legacySession: () -> UUID, beforeRename: () -> Unit = {}): AccountCatalog {
-            val file = CatalogFile(File(root, "account-catalog"), beforeRename)
+            // Resolve the application root alias, not a redirected catalog child.
+            val file = CatalogFile(File(root.canonicalFile, "account-catalog"), beforeRename)
             val initial = if (file.exists()) file.read() else CatalogSnapshot(legacySession()).also(file::write)
             return AccountCatalog(file, initial)
         }

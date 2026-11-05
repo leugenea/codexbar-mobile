@@ -59,7 +59,7 @@ class AccountCatalogMigrationTest {
         try { withTimeout(5_000) { owner.shutdown() } }
         catch (_: TimeoutCancellationException) { throw AssertionError("catalog owner shutdown: last state=${owner.state.value}") }
     }
-    private fun native() = NativeConnection.create(context, transport, transport.clock, transport::pause).also {
+    private fun native(context: Context = this.context) = NativeConnection.create(context, transport, transport.clock, transport::pause).also {
         owners += it
         try { slots += NativeConnection.session(context) } catch (_: Exception) { /* Unreadable metadata is under test. */ }
     }
@@ -171,6 +171,31 @@ class AccountCatalogMigrationTest {
             assertEquals(ObservationId(1), continued.entries.last().windows.first().point!!.segment.id.first)
         }
         assertEquals(setOf("history.db", "binding", "lane", "account-name"), historyDirectory.list()!!.toSet())
+    }
+
+    @Test fun aliasedApplicationStorageRootMigratesAndRestoresTheSameProtectedLegacyAccount() {
+        seed()
+        val ciphertext = credentialFile.readBytes()
+        val before = export()
+        val aliased = object : ContextWrapper(context) {
+            override fun getApplicationContext(): Context = this
+            override fun getNoBackupFilesDir(): File = File(root, ".")
+        }
+        assertNotEquals(aliased.noBackupFilesDir.absoluteFile, aliased.noBackupFilesDir.canonicalFile)
+        assertEquals(slot, NativeConnection.session(aliased))
+        val first = native(aliased); phase(first, ConnectionPhase.RESTORED)
+        val entry = catalog().legacyEntry()!!
+        assertEquals(slot, entry.storage.credentialSlot)
+        assertEquals(partition, entry.partition)
+        stop(first)
+        val restored = native(); phase(restored, ConnectionPhase.RESTORED)
+        assertEquals(entry, catalog().legacyEntry())
+        stop(restored)
+        assertArrayEquals(ciphertext, credentialFile.readBytes())
+        assertProtectedReadback()
+        assertEquals(before, export())
+        assertSidecar("Synthetic legacy")
+        assertEquals(0L, transport.requests.get())
     }
 
     @Test fun freshInstallStillSignsInAndRestoresDormantThroughTheCatalog() {
