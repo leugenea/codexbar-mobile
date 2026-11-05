@@ -57,6 +57,58 @@ class AccountCatalogTest {
         assertNotEquals(entry.storage.historyDirectory(root), fresh.historyDirectory(root))
     }
 
+    @Test fun unknownPartitionReconcilesDurablyWithoutRebindingIdentityOrKnownKeys() {
+        val root = temporary.newFolder()
+        val catalog = open(root)
+        val unknown = catalog.adopt(null, AccountNameRead.Unavailable)
+        val recovered = catalog.adopt(partition, named("Synthetic recovered"))
+        assertEquals(unknown.storage, recovered.storage)
+        assertEquals(unknown.type, recovered.type)
+        assertEquals(partition, recovered.partition)
+        assertEquals("Synthetic recovered", recovered.name)
+        assertTrue(recovered.nameAvailable)
+        assertEquals(recovered, open(root).legacyEntry())
+        assertEquals(unknown.storage.id, open(root).snapshot().selected)
+        assertEquals(recovered, catalog.adopt(null, AccountNameRead.Unavailable))
+        val before = catalog.snapshot()
+        assertThrows(IllegalStateException::class.java) {
+            catalog.adopt(HistoryPartition(UUID.randomUUID()), named("Synthetic rebound"))
+        }
+        assertEquals(before, open(root).snapshot())
+
+        val known = open(temporary.newFolder())
+        val keyed = known.adopt(null, named("Synthetic reserved"))
+        assertEquals(keyed.copy(partition = partition), known.adopt(partition, named("Synthetic unexpected")))
+    }
+
+    @Test fun unknownPartitionReconciliationRejectsAConflictingKeyWithoutChangingEitherEntry() {
+        val root = temporary.newFolder()
+        val catalog = open(root)
+        catalog.adopt(null, AccountNameRead.Unavailable)
+        assertTrue(catalog.insert(other("Synthetic occupied")))
+        val before = catalog.snapshot()
+        assertThrows(IllegalStateException::class.java) { catalog.adopt(partition, named("Synthetic occupied")) }
+        assertEquals(before, open(root).snapshot())
+        val recovered = catalog.adopt(partition, AccountNameRead.Unavailable)
+        assertNull(recovered.name)
+        assertFalse(recovered.nameAvailable)
+        assertEquals(before.entries.first().storage, recovered.storage)
+        assertEquals(before.selected, open(root).snapshot().selected)
+    }
+
+    @Test fun interruptedUnknownPartitionReconciliationCanRetryTheSameEntry() {
+        val root = temporary.newFolder()
+        val unknown = open(root).adopt(null, AccountNameRead.Unavailable)
+        var fail = true
+        val catalog = open(root) { if (fail) throw IOException("synthetic reconciliation interruption") }
+        assertThrows(IOException::class.java) { catalog.adopt(partition, named("Synthetic recovered")) }
+        assertEquals(unknown, open(root).legacyEntry())
+        fail = false
+        val recovered = catalog.adopt(partition, named("Synthetic recovered"))
+        assertEquals(unknown.storage, recovered.storage)
+        assertEquals(recovered, open(root).legacyEntry())
+    }
+
     @Test fun conflictingNamesRejectWithoutMergingAndRenameKeepsTheOpaqueIdentity() {
         val root = temporary.newFolder()
         val catalog = open(root)

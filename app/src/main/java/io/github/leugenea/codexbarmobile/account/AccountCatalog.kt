@@ -33,14 +33,24 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     @Synchronized fun adopt(partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
         check(state.deleting == null)
         val previous = legacyEntry()
-        if (previous != null) {
-            check(partition == null || previous.partition == partition)
-            return previous
-        }
+        if (previous != null) return reconcile(previous, partition, name)
         val ready = name as? AccountNameRead.Ready
         val entry = CatalogEntry(AccountStorage(UUID.randomUUID(), state.legacySlot, true), partition,
             ready?.name?.text, ready != null)
         check(insert(entry))
+        return entry
+    }
+
+    /** Only a previously unknown partition may gain the continuing history binding. */
+    private fun reconcile(previous: CatalogEntry, partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
+        check(partition == null || previous.partition == null || previous.partition == partition)
+        if (partition == null || previous.partition != null) return previous
+        val ready = name as? AccountNameRead.Ready
+        val entry = previous.copy(partition = partition,
+            name = if (previous.nameAvailable) previous.name else ready?.name?.text,
+            nameAvailable = previous.nameAvailable || ready != null)
+        check(!conflicts(entry.storage.id, entry.type, entry.name))
+        commit(state.copy(entries = state.entries.map { if (it.storage.id == entry.storage.id) entry else it }))
         return entry
     }
 

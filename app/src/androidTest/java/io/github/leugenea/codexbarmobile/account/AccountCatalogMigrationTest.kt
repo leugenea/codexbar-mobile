@@ -198,6 +198,53 @@ class AccountCatalogMigrationTest {
         assertEquals(0L, transport.requests.get())
     }
 
+    @Test fun transientHistoryLockKeepsTheUnknownEntryThenRecoversItsContinuingPartitionAndName() {
+        seed()
+        val ciphertext = credentialFile.readBytes()
+        val before = export()
+        lateinit var unknown: CatalogEntry
+        lateinit var restored: ConnectionController
+        SQLiteHistoryStore(historyDirectory).use { locked ->
+            assertTrue(locked.adopt(partition) is HistoryAccessOutcome.Bound)
+            val first = native(); phase(first, ConnectionPhase.RESTORED)
+            unknown = catalog().legacyEntry()!!
+            assertNull(unknown.partition)
+            assertFalse(unknown.nameAvailable)
+            assertEquals(unknown.storage.id, catalog().snapshot().selected)
+            assertTrue(first.session.snapshot() is SessionResult.Ready)
+            stop(first)
+            restored = native(); phase(restored, ConnectionPhase.RESTORED)
+            assertEquals(unknown, catalog().legacyEntry())
+            assertEquals(HistoryAvailability.STORAGE_FAILURE, restored.historyAvailability)
+        }
+        restored.usageForeground(Any(), true)
+        awaitName(restored, "Synthetic legacy")
+        assertEquals(ConnectionPhase.RESTORED, restored.state.value.phase)
+        assertEquals(HistoryAvailability.AVAILABLE, restored.historyAvailability)
+        val recovered = catalog().legacyEntry()!!
+        assertEquals(unknown.storage, recovered.storage)
+        assertEquals(partition, recovered.partition)
+        assertEquals(unknown.storage.id, catalog().snapshot().selected)
+        assertEquals("Synthetic legacy", recovered.name)
+        stop(restored)
+        assertArrayEquals(ciphertext, credentialFile.readBytes())
+        assertProtectedReadback()
+        assertEquals(before, export())
+        assertSidecar("Synthetic legacy")
+        val next = native(); phase(next, ConnectionPhase.RESTORED)
+        assertEquals(recovered, catalog().legacyEntry())
+        assertEquals(0L, transport.requests.get())
+        stop(next)
+        SQLiteHistoryStore(historyDirectory).use { history ->
+            val access = (history.adopt(partition) as HistoryAccessOutcome.Bound).access
+            assertEquals(HistoryAppendOutcome.AlreadyAdmitted(ObservationId(1)), access.append(admission(partition, 1)))
+            assertTrue(access.append(admission(partition, 4)) is HistoryAppendOutcome.Stored)
+            val page = (access.read(HistoryReadQuery(partition, 10)) as HistoryReadOutcome.Ready).snapshot
+            assertEquals(ObservationId(4), page.lastAdmitted)
+            assertEquals(ObservationId(1), page.entries.last().windows.first().point!!.segment.id.first)
+        }
+    }
+
     @Test fun freshInstallStillSignsInAndRestoresDormantThroughTheCatalog() {
         val first = native(); phase(first, ConnectionPhase.IDLE)
         assertTrue(catalog().snapshot().entries.isEmpty())
@@ -215,6 +262,83 @@ class AccountCatalogMigrationTest {
         assertTrue(catalog().snapshot().entries.isEmpty())
         assertNull(catalog().snapshot().deleting)
         assertNull(catalog().snapshot().selected)
+    }
+
+    @Test fun failedStagingStillCommitsUnknownCatalogSelectionBeforeTheFirstUsablePublication() = stagingFailure(false)
+
+    @Test fun failedStagingCannotPublishWhenCatalogCommitFailsAfterProtectedAuthentication() = stagingFailure(true)
+
+    private fun stagingFailure(failCatalog: Boolean) = runBlocking {
+        File(root, "connection-session").writeText(slot.toString())
+        val failCommit = java.util.concurrent.atomic.AtomicBoolean()
+        val accountCatalog = AccountCatalog.open(root, { slot }) {
+            if (failCommit.get()) throw IOException("synthetic post-auth catalog failure")
+        }
+        val storage = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(historyDirectory))
+        var stageCalls = 0
+        var restoreCalls = 0
+        val interrupted = object : HistoryLifetimeStorage by storage {
+            override fun restore(): HistoryLifetimeOutcome {
+                restoreCalls++
+                return storage.restore()
+            }
+            override fun stage(): HistoryPartitionOutcome {
+                stageCalls++
+                // Fail after the real durable STAGED fence, before returning its capability.
+                assertTrue(storage.stage() is HistoryPartitionOutcome.Staged)
+                failCommit.set(failCatalog)
+                return HistoryPartitionOutcome.Unavailable(HistoryUnavailable.STORAGE_FULL)
+            }
+        }
+        val protected = credentials()
+        val owner = ConnectionController(protected,
+            DeviceCodeAuthenticator(transport, protected, transport.clock, transport::pause),
+            NativeFeasibilityReader(transport, transport.clock, transport::pause),
+            CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            history = HistoryLifetimeCoordinator(CatalogHistoryStorage(interrupted, accountCatalog)), accountCatalog = accountCatalog)
+        owners += owner
+        phase(owner, ConnectionPhase.IDLE)
+        val publication = CompletableDeferred<CatalogSnapshot>()
+        // Unconfined collection reads durable bytes at the first usable session publication.
+        val witness = launch(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+            owner.state.first {
+                if (owner.session.snapshot() !is SessionResult.Ready) false
+                else { publication.complete(catalog().snapshot()); true }
+            }
+        }
+        try {
+            owner.connect()
+            phase(owner, if (failCatalog) ConnectionPhase.FAILED else ConnectionPhase.OBSERVED)
+            assertEquals(1, stageCalls)
+            assertEquals(1, restoreCalls)
+            assertEquals(HistoryAvailability.STORAGE_FAILURE, owner.historyAvailability)
+            if (failCatalog) {
+                assertFalse(publication.isCompleted)
+                assertFalse(owner.session.snapshot() is SessionResult.Ready)
+                assertTrue(catalog().snapshot().entries.isEmpty())
+                assertNull(catalog().snapshot().selected)
+                assertEquals(0L, transport.gets.get())
+            } else {
+                val published = withTimeout(5_000) { publication.await() }
+                assertEquals(1, published.entries.size)
+                assertEquals(published.entries.single().storage.id, published.selected)
+                assertNull(published.entries.single().partition)
+                assertFalse(published.entries.single().nameAvailable)
+                assertEquals(published, catalog().snapshot())
+            }
+        } finally { witness.cancelAndJoin() }
+        stop(owner)
+        val ciphertext = credentialFile.readBytes()
+        val result = credentials().let { it.read(it.openSession()) } as CredentialResult.Success
+        assertArrayEquals("synthetic-navigation-access".toByteArray(), result.value.accessToken.copyBytes())
+        assertArrayEquals("synthetic-navigation-refresh".toByteArray(), result.value.refreshToken!!.copyBytes())
+        failCommit.set(false)
+        val count = transport.requests.get()
+        val restarted = native(); phase(restarted, ConnectionPhase.RESTORED)
+        assertNotNull(catalog().legacyEntry())
+        assertEquals(catalog().legacyEntry()!!.storage.id, catalog().snapshot().selected)
+        assertEquals(count, transport.requests.get())
+        assertArrayEquals(ciphertext, credentialFile.readBytes())
     }
 
     @Test fun restartCompletesRenameIntentOnEitherSideOfTheExistingNameFileCommit() {
@@ -236,6 +360,46 @@ class AccountCatalogMigrationTest {
         stop(second); assertSidecar("Synthetic second")
         assertEquals(entry.storage, catalog().legacyEntry()!!.storage)
         assertNull(catalog().snapshot().rename)
+        assertArrayEquals(ciphertext, credentialFile.readBytes())
+        assertProtectedReadback()
+        assertEquals(0L, transport.requests.get())
+    }
+
+    @Test fun sidecarFailureCanBeRetriedThroughTheCatalogWithTheSameLiveEditor() {
+        seed()
+        val ciphertext = credentialFile.readBytes()
+        val first = native(); phase(first, ConnectionPhase.RESTORED)
+        val original = catalog().legacyEntry()!!
+        val edit = first.accountName.value!!.edit!!
+        var previous = "Synthetic legacy"
+        for ((intended, retry) in listOf("Synthetic first" to "Synthetic first", "Synthetic pending" to "Synthetic final")) {
+            val before = File(historyDirectory, "account-name").readBytes()
+            // A non-file at the real pending sidecar path fails the native write budget check.
+            val obstruction = File(historyDirectory, "account-name.pending")
+            assertTrue(obstruction.mkdir())
+            try {
+                first.renameAccount(edit, intended)
+                awaitName(first, previous, failed = true)
+                val reserved = catalog()
+                assertEquals(CatalogRename(original.storage.id, intended), reserved.snapshot().rename)
+                for (key in listOf(previous, intended)) assertFalse(reserved.insert(
+                    CatalogEntry(AccountStorage.fresh(), HistoryPartition(UUID.randomUUID()), key, true)))
+                assertEquals(original.storage.id, reserved.snapshot().selected)
+                assertArrayEquals(before, File(historyDirectory, "account-name").readBytes())
+                assertTrue(first.session.snapshot() is SessionResult.Ready)
+                assertEquals(ConnectionPhase.RESTORED, first.state.value.phase)
+            } finally { assertTrue(obstruction.delete()) }
+            first.renameAccount(edit, retry)
+            awaitName(first, retry)
+            assertSame(edit, first.accountName.value!!.edit)
+            val committed = catalog()
+            assertNull(committed.snapshot().rename)
+            assertEquals(original.copy(name = retry), committed.legacyEntry())
+            assertEquals(original.storage.id, committed.snapshot().selected)
+            previous = retry
+        }
+        stop(first)
+        assertSidecar("Synthetic final")
         assertArrayEquals(ciphertext, credentialFile.readBytes())
         assertProtectedReadback()
         assertEquals(0L, transport.requests.get())

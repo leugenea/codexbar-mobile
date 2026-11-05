@@ -78,8 +78,11 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
     }
 
     fun activate(generation: SessionGeneration) = synchronized(io) {
-        val partition = synchronized(admission) { staged.takeIf { accepts(generation) } }
-        if (partition != null) adopt(generation, storage.activate(partition))
+        if (accepts(generation)) {
+            val partition = synchronized(admission) { staged }
+            // Failed staging still needs checked catalog adoption before session publication.
+            adopt(generation, if (partition == null) storage.restore() else storage.activate(partition))
+        }
     }
 
     fun restore(generation: SessionGeneration) = synchronized(io) {
@@ -88,7 +91,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
 
     @Volatile var requiresRemoval = false
         private set
-    @Volatile var catalogReady = true
+    @Volatile var catalogReady = false
         private set
 
     private fun adopt(generation: SessionGeneration, result: HistoryLifetimeOutcome) {
@@ -162,6 +165,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         staged = null
         lifetime = null
         accountName = null
+        catalogReady = false
         availability = HistoryAvailability.UNAVAILABLE
     }
 

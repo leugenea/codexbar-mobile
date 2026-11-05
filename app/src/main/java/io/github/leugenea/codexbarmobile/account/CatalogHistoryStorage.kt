@@ -40,7 +40,8 @@ internal class CatalogHistoryStorage(
 
     override fun writeName(partition: HistoryPartition, name: AccountDisplayName?): Boolean = try {
         val entry = catalog.legacyEntry()
-        if (entry?.partition != partition || !catalog.reserveRename(entry.storage.id, name)) false
+        if (entry?.partition != partition || !recoverRename(entry)) false
+        else if (!catalog.reserveRename(entry.storage.id, name)) false
         else recoverRename(entry)
     } catch (_: Exception) { false }
 

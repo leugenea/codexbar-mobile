@@ -48,7 +48,12 @@ restoration reuses the committed ID. A catalog commit failure prevents adoption 
 erasing valid credentials/history; a later holder may retry migration. Unavailable
 history remains unavailable and does not become an invented empty partition or block
 otherwise valid live quota reads: the catalog records that the partition/name is unknown.
-It grants no history capability. Missing credentials, corrupt ciphertext, key loss and a
+It grants no history capability. When the same retained history becomes readable, an
+unknown partition/name is reconciled durably into the same entry and selected ID; an
+already known partition cannot be rebound. Login staging failure still goes through
+checked history restoration and catalog adoption before publishing usable credentials.
+A catalog failure at that boundary retains protected credentials for a later retry,
+without publishing a usable session. Missing credentials, corrupt ciphertext, key loss and a
 pending rotation marker retain the existing combined fail-closed cleanup behavior.
 Ordinary successful restoration remains dormant and sends no provider requests.
 
@@ -64,7 +69,9 @@ The existing history storage lane also owns catalog/name settlement. It first pe
 rename intent, reserving both the old and intended keys, then writes and syncs the existing
 partition-bound name sidecar, then commits the new catalog key and clears the intent.
 Restart replays an outstanding intent against that same partition before publishing its
-name. Failure never reports successful settlement; both keys stay reserved while pending.
+name. An explicit retry with the same live editor also settles the prior intent first,
+then reserves the requested key; it cannot discard or overwrite an unsettled intent.
+Failure never reports successful settlement; both keys stay reserved while pending.
 The captured generation/partition edit authority and deletion barriers remain unchanged.
 
 Synthetic JVM and hosted Android fixtures cover catalog conflicts/atomic interruption,
