@@ -55,6 +55,7 @@ internal class ConnectionController(
     private val history: HistoryLifetimeCoordinator? = null,
     historyQueueCapacity: Int = 16,
     private val backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit = {},
+    private val accountCatalog: AccountCatalog? = null,
 ) {
     internal val historyExportRequest = HistoryExportRequest()
     internal val historyImporterState = HistoryImporterState()
@@ -125,6 +126,7 @@ internal class ConnectionController(
     /** Continue only for the captured lifetime; interrupted removal uses one combined barrier. */
     private suspend fun completeHistoryRestoration(owner: Long, active: SessionGeneration): Boolean {
         if (!current(owner) || generation !== active || !store.isActive(active) || cleanupPending()) return false
+        if (history?.catalogReady == false) { publish(owner, storageFailure()); return false }
         if (history?.requiresRemoval != true) return true
         usageRefresh.reset()
         removeCredentials()
@@ -202,6 +204,7 @@ internal class ConnectionController(
             is CredentialResult.Success -> {
                 ownerScope.async(storageDispatcher) { history?.activate(terminal.generation) }.await()
                 if (!current(owner)) return
+                if (!completeHistoryRestoration(owner, terminal.generation)) return
                 session.adopt(credentials.value)
                 publishName()
                 pauseHistoryIfUnobserved()
@@ -528,7 +531,9 @@ internal class ConnectionController(
             val sessionRemoved = session.awaitRemoval()
             val credentialsRemoved = deletion?.await() !is CredentialResult.Failure
             val historyRemoved = historyDeletion?.await()?.successful() != false
-            sessionRemoved && credentialsRemoved && historyRemoved
+            val receipt = accountCatalog?.snapshot()?.deleting
+            if (!sessionRemoved || !credentialsRemoved || !historyRemoved) false
+            else ownerScope.async(storageDispatcher) { accountCatalog?.completeDeletion(receipt) != false }.await()
         } ?: false
     }
 

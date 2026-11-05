@@ -2,6 +2,9 @@
 
 ## Implemented application
 
+The [local Codex account catalog](docs/account-catalog.md) preserves installed storage
+and owns local-name uniqueness; public runtime activation remains single-account.
+
 One Android phone app module with namespace `io.github.leugenea.codexbarmobile` launches
 `MainActivity` via MAIN/LAUNCHER directly into the real `ConnectionScreen` dashboard.
 Disconnected, restoring/loading, reauthorization, error and unknown usage remain
@@ -85,9 +88,10 @@ The holder's factory setter, injected constructor and reset are marked
 restricting the normal factory getter. Reset also requires an installed test factory.
 Production construction stays private and uses the real transport/default clocks.
 
-The only durable selector is a random local UUID under noBackupFilesDir; it selects
-A6's encrypted slot and is not account/workspace identity. A fresh process owner may
-restore credentials only as Unresolved, without automatic network requests. The
+The retained credential-slot selector is a random local UUID under noBackupFilesDir;
+the local catalog references it without changing its encryption identity and separately
+records an opaque entry ID. Neither is account/workspace identity. A fresh process owner
+may restore credentials only as Unresolved, without automatic network requests. The
 selected flow provides no authoritative token lifetime: there is no inferred TTL,
 JWT inspection or expiry schedule. Key loss, corruption or an interrupted rotation
 restores as re-auth required, never a usable old credential.

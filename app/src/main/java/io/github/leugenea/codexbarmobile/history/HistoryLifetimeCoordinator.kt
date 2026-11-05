@@ -35,6 +35,7 @@ internal sealed interface HistoryLifetimeOutcome {
     data class Bound(val access: HistoryRuntimeAccess) : HistoryLifetimeOutcome
     data object Unavailable : HistoryLifetimeOutcome
     data object RemovalRequired : HistoryLifetimeOutcome
+    data object CatalogUnavailable : HistoryLifetimeOutcome
 }
 
 internal enum class HistoryAvailability { UNAVAILABLE, AVAILABLE, STORAGE_FAILURE, REMOVAL_PENDING }
@@ -87,6 +88,8 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
 
     @Volatile var requiresRemoval = false
         private set
+    @Volatile var catalogReady = true
+        private set
 
     private fun adopt(generation: SessionGeneration, result: HistoryLifetimeOutcome) {
         val bound = (result as? HistoryLifetimeOutcome.Bound)?.access
@@ -94,6 +97,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         synchronized(admission) {
             if (!accepts(generation)) { bound?.revoke(); return@synchronized }
             requiresRemoval = result == HistoryLifetimeOutcome.RemovalRequired
+            catalogReady = result != HistoryLifetimeOutcome.CatalogUnavailable
             staged = null
             lifetime = bound?.partition
             adoptName(generation, bound?.partition, name)

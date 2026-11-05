@@ -1,0 +1,73 @@
+# Local Codex account catalog
+
+The catalog introduces durable **local** entry addressing, not multiple active runtimes.
+The existing process owner still uses only the original credential slot and history
+location. There is no new account list, sign-in path, dashboard switch or scheduler policy.
+Account settings navigation does not select an account. The later dashboard dropdown
+and all-enrolled-account scheduling are separate integration work.
+
+## Identity and locations
+
+`noBackupFilesDir/account-catalog/catalog` stores versioned, checksummed, non-secret
+metadata, atomically replaced and directory-synced before publication. It is a sibling
+of `credentials` and `usage-history`, never an extra artifact inside the strict history
+directory. Interrupted temporary catalog files are not committed state.
+
+Each entry has an immutable random internal ID, account type (`CODEX`), explicit
+credential-slot reference, history-directory reference and the continuing history
+partition when available. These are distinct from the identity-compared runtime
+credential/history generations. The legacy entry retains `credentials/<slot>/value.bin`,
+the exact Android Keystore alias and authenticated credential header/AAD, and the
+existing `usage-history` directory. Neither protected bytes nor the history/name formats
+are migrated. New internal storage references use independently generated slot IDs and
+sibling `usage-history-<entry ID>` directories with the same existing stores/formats;
+allocating a reference does not authenticate or activate another runtime.
+
+The user key is the exact validated `(local name, account type)` pair. Existing alias
+validation, whitespace handling and Unicode limits remain unchanged. A conflicting key
+is rejected without replacing, merging or selecting another entry. Rename changes the
+key, not the internal ID, credential slot or history partition. Unnamed legacy state has
+no user key until named; unreadable name state stays unavailable, not an invented label
+or provider identity. A previously known key remains reserved if its sidecar becomes
+unreadable, until an explicit successful rename repairs it. No token/JWT comparison or
+real-provider-account deduplication is performed; distinct local aliases may represent
+the same real account.
+
+## Migration and recovery
+
+Catalog creation retains the original `connection-session` selector. An existing catalog
+and selector must agree. If both catalog and selector are absent but credential/history
+artifacts remain, restoration fails without treating them as a fresh installation.
+Catalog corruption is a storage failure, not an empty catalog, and does not delete the
+legacy installation.
+
+The ordinary protected-credential restoration runs first. Successful history restoration
+then adopts its existing partition and name into at most one legacy entry, committing
+that entry and the initial selected ID **before** session adoption/publication. Repeated
+restoration reuses the committed ID. A catalog commit failure prevents adoption without
+erasing valid credentials/history; a later holder may retry migration. Unavailable
+history remains unavailable and does not become an invented empty partition or block
+otherwise valid live quota reads: the catalog records that the partition/name is unknown.
+It grants no history capability. Missing credentials, corrupt ciphertext, key loss and a
+pending rotation marker retain the existing combined fail-closed cleanup behavior.
+Ordinary successful restoration remains dormant and sends no provider requests.
+
+Deletion writes a catalog receipt before erasing history. That receipt survives even if
+history is already physically gone while credentials remain readable. Restart requires
+combined removal, not restoration. Only the process owner's successful credential AND
+history deletion barrier removes the catalog association/selection and clears the receipt.
+A failed or interrupted barrier remains pending. No fallback selects an unrelated entry.
+
+## Rename transaction
+
+The existing history storage lane also owns catalog/name settlement. It first persists a
+rename intent, reserving both the old and intended keys, then writes and syncs the existing
+partition-bound name sidecar, then commits the new catalog key and clears the intent.
+Restart replays an outstanding intent against that same partition before publishing its
+name. Failure never reports successful settlement; both keys stay reserved while pending.
+The captured generation/partition edit authority and deletion barriers remain unchanged.
+
+Synthetic JVM and hosted Android fixtures cover catalog conflicts/atomic interruption,
+real Keystore credential readback, real SQLite records/reducer/high-water/retention
+continuation, sidecar readback and interrupted rename/deletion. Holder reconstruction is
+not evidence of actual process death or live-provider account identity.
