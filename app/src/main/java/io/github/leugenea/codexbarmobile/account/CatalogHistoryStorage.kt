@@ -31,7 +31,7 @@ internal class CatalogHistoryStorage(
     private fun reconcile(partition: HistoryPartition?) {
         val name = partition?.let(storage::readName) ?: AccountNameRead.Unavailable
         val entry = catalog.adopt(partition, name)
-        // False replay means optional metadata is pending; required catalog commits still throw.
+        // Rename settlement is optional metadata; adoption/selection commits above still throw.
         recoverRename(entry)
     }
 
@@ -60,8 +60,10 @@ internal class CatalogHistoryStorage(
         val partition = entry.partition ?: return false
         val name = pending.name?.let(AccountDisplayName::from)
         if (!storage.writeName(partition, name)) return false
-        catalog.finishRename(entry.storage.id)
-        return true
+        return try {
+            catalog.finishRename(entry.storage.id)
+            true
+        } catch (_: Exception) { false }
     }
 
     override fun reserveDeletion(): HistoryDeletion {

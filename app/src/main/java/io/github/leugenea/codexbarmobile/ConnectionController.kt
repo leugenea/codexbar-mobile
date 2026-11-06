@@ -337,10 +337,11 @@ internal class ConnectionController(
             ownerScope.async(storageDispatcher) { history.restore(active.generation) }.await()
             historyRestore = null
             if (!completeHistoryRestoration(owner, active.generation)) return@launch
-            bindHistory(active.generation)
-            if (mutableName.value != null) publishName()
+            // Admit a necessary successor before publishing null access as no longer pending.
             if ((usageRefresh.hasForegroundObservers || backgroundHistoryInterests > 0)
                 && historyAvailability == HistoryAvailability.UNAVAILABLE) resumeHistory()
+            bindHistory(active.generation)
+            if (mutableName.value != null) publishName()
         }.also { it.start() }
     }
 

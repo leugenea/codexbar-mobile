@@ -511,7 +511,7 @@ class AccountCatalogMigrationTest {
     }
 
     @Test fun nameRecoveryCommitFailureStillBlocksCredentialAdoption() = requiredMetadataCommitFailure(false)
-    @Test fun renameFinalizationCommitFailureStillBlocksCredentialAdoption() = requiredMetadataCommitFailure(true)
+    @Test fun renameFinalizationFailureKeepsAnAlreadyCataloguedRestorationUsable() = requiredMetadataCommitFailure(true)
 
     private fun requiredMetadataCommitFailure(rename: Boolean) {
         seed()
@@ -522,8 +522,12 @@ class AccountCatalogMigrationTest {
         val before = catalog().snapshot()
         val blocked = AccountCatalog.open(root, { slot }) { throw IOException("synthetic required metadata commit failure") }
         val owner = catalogOwner(blocked, SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(historyDirectory)))
-        phase(owner, ConnectionPhase.FAILED)
-        assertFalse(owner.session.snapshot() is SessionResult.Ready)
+        phase(owner, if (rename) ConnectionPhase.RESTORED else ConnectionPhase.FAILED)
+        assertEquals(rename, owner.session.snapshot() is SessionResult.Ready)
+        if (rename) {
+            assertTrue(owner.accountName.value!!.storageFailed)
+            assertReserved(original, "Synthetic intended")
+        }
         assertEquals(before, catalog().snapshot())
         assertEquals(0L, transport.requests.get())
         stop(owner)
@@ -539,17 +543,17 @@ class AccountCatalogMigrationTest {
         assertEquals(0L, transport.requests.get())
     }
 
-    @Test fun laterNameCommitFailureOnFirstForegroundRetiresReadySession() = laterMetadataCommitFailure(false, false)
-    @Test fun laterNameCommitFailureOnBackgroundReturnRetiresReadySession() = laterMetadataCommitFailure(false, true)
-    @Test fun laterRenameFinalizationFailureOnFirstForegroundRetiresReadySession() = laterMetadataCommitFailure(true, false)
-    @Test fun laterRenameFinalizationFailureOnBackgroundReturnRetiresReadySession() = laterMetadataCommitFailure(true, true)
+    @Test fun laterNameCommitFailureOnFirstForegroundRetiresReadySession() = laterMetadataCommitFailure(false)
+    @Test fun laterNameCommitFailureOnBackgroundReturnRetiresReadySession() = laterMetadataCommitFailure(true)
+    @Test fun liveRenameFinalizationErrorKeepsQuotaAndReservationsAcrossFirstForeground() = liveRenameFinalizationFailure(false)
+    @Test fun liveRenameFinalizationErrorKeepsQuotaAndReservationsAcrossBackgroundReturn() = liveRenameFinalizationFailure(true)
 
-    private fun laterMetadataCommitFailure(rename: Boolean, backgroundReturn: Boolean) {
+    private fun laterMetadataCommitFailure(backgroundReturn: Boolean) {
         seed()
         val ciphertext = credentialFile.readBytes()
         val retained = export()
         val pending = File(historyDirectory, "account-name.pending")
-        if (!rename) pending.writeBytes(byteArrayOf(1))
+        pending.writeBytes(byteArrayOf(1))
         val failCommit = java.util.concurrent.atomic.AtomicBoolean()
         val accountCatalog = AccountCatalog.open(root, { slot }) {
             if (failCommit.get()) throw IOException("synthetic later required catalog commit failure")
@@ -566,11 +570,6 @@ class AccountCatalogMigrationTest {
             settled(owner, "later catalog failure foreground setup") {
                 owner.commandsSettled(); owner.historyRestorationSettled()
             }
-        }
-        if (rename) {
-            assertTrue(pending.mkdir())
-            owner.renameAccount(editor, "Synthetic intended")
-            awaitName(owner, "Synthetic legacy", failed = true)
         }
         val before = catalog().snapshot()
         if (backgroundReturn) {
@@ -606,12 +605,79 @@ class AccountCatalogMigrationTest {
         assertEquals(before.entries.single().storage, catalog().legacyEntry()!!.storage)
         assertEquals(before.selected, catalog().snapshot().selected)
         assertNull(catalog().snapshot().rename)
-        awaitName(next, if (rename) "Synthetic intended" else "Synthetic legacy")
+        awaitName(next, "Synthetic legacy")
         stop(next)
-        assertSidecar(if (rename) "Synthetic intended" else "Synthetic legacy")
+        assertSidecar("Synthetic legacy")
         assertArrayEquals(ciphertext, credentialFile.readBytes())
         assertEquals(retained, export())
         assertEquals(0L, transport.requests.get())
+    }
+
+    private fun liveRenameFinalizationFailure(backgroundReturn: Boolean) {
+        seed()
+        val ciphertext = credentialFile.readBytes()
+        val retained = export()
+        val failCommit = java.util.concurrent.atomic.AtomicBoolean()
+        val failedReplay = CompletableDeferred<Unit>()
+        val attempts = java.util.concurrent.atomic.AtomicInteger()
+        val accountCatalog = AccountCatalog.open(root, { slot }) {
+            // Reservation commits; fail only finalization after the real sidecar write.
+            if (failCommit.get() && catalog().snapshot().rename != null) {
+                if (attempts.incrementAndGet() > 1) failedReplay.complete(Unit)
+                throw IOException("synthetic rename-only finalization failure")
+            }
+        }
+        val owner = catalogOwner(accountCatalog, SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(historyDirectory)))
+        phase(owner, ConnectionPhase.RESTORED)
+        val original = catalog().legacyEntry()!!
+        val editor = owner.accountName.value!!.edit!!
+        val ready = owner.session.snapshot() as SessionResult.Ready
+        val access = owner.historyCapability(ready.envelope.generation)!!
+        val observer = Any()
+        if (backgroundReturn) {
+            owner.usageForeground(observer, true)
+            settled(owner, "rename finalization foreground setup") { owner.commandsSettled() }
+        }
+        val beforeSidecar = File(historyDirectory, "account-name").readBytes()
+        failCommit.set(true)
+        owner.renameAccount(editor, "Synthetic intended")
+        awaitName(owner, "Synthetic legacy", failed = true)
+        assertFalse(beforeSidecar.contentEquals(File(historyDirectory, "account-name").readBytes()))
+        assertSame(access, owner.historyCapability(ready.envelope.generation))
+        assertTrue(owner.session.snapshot() is SessionResult.Ready)
+        assertReserved(original, "Synthetic intended")
+        // A different requested key cannot replace an unsettled operation.
+        owner.renameAccount(editor, "Synthetic later")
+        settled(owner, "rename retry reached the same failed finalization") { failedReplay.await() }
+        assertReserved(original, "Synthetic intended")
+        if (backgroundReturn) {
+            owner.usageForeground(observer, false)
+            settled(owner, "rename finalization foreground loss") { owner.commandsSettled() }
+        }
+        owner.usageForeground(observer, true)
+        settled(owner, "rename-only recovery remains usable") {
+            owner.commandsSettled(); owner.historyRestorationSettled()
+        }
+        assertTrue(owner.session.snapshot() is SessionResult.Ready)
+        assertTrue(owner.accountName.value!!.storageFailed)
+        assertSame(editor, owner.accountName.value!!.edit)
+        assertEquals(HistoryAvailability.AVAILABLE, owner.historyAvailability)
+        assertReserved(original, "Synthetic intended")
+        settled(owner, "rename-only failure retains history") {
+            assertEquals(retained, owner.exportHistory("synthetic", at))
+        }
+        owner.readUsage(); phase(owner, ConnectionPhase.OBSERVED)
+        assertEquals(2L, transport.gets.get())
+        assertNotNull(owner.state.value.refresh.usage.success?.usage)
+        failCommit.set(false)
+        owner.renameAccount(editor, "Synthetic later")
+        awaitName(owner, "Synthetic later")
+        assertNull(catalog().snapshot().rename)
+        assertEquals(original.copy(name = "Synthetic later"), catalog().legacyEntry())
+        stop(owner)
+        assertArrayEquals(ciphertext, credentialFile.readBytes())
+        assertProtectedReadback()
+        assertSidecar("Synthetic later")
     }
 
     @Test fun freshInstallStillSignsInAndRestoresDormantThroughTheCatalog() {

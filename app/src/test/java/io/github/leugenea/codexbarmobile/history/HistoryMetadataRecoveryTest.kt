@@ -50,11 +50,12 @@ class HistoryMetadataRecoveryTest {
         }
     }
 
-    @Test fun heldMetadataRetryCoalescesForegroundCommandsAndDoesNotDuplicateAnAdmittedRead() = runBlocking {
+    @Test fun heldMetadataRetryKeepsThePostReturnRecordingThroughItsSuccessorRebind() = runBlocking {
         val journal = LifetimeJournal().apply { failNameRead = true }
         LifetimeFixture(journal).use { h ->
             h.phase(ConnectionPhase.RESTORED)
             val access = h.capability()
+            val edit = h.owner.accountName.value!!.edit
             val gate = ControlledGate().also { journal.metadataGate = it }
             val observer = Any()
             val inventory = CompletableDeferred<io.github.leugenea.codexbarmobile.auth.AuthFake.Call>()
@@ -63,11 +64,16 @@ class HistoryMetadataRecoveryTest {
                 h.owner.usageForeground(observer, true)
                 gate.awaitEntered()
                 h.owner.usageForeground(observer, true)
-                h.owner.usageForeground(Any(), true)
                 settleCommands(h, "coalesced metadata admissions")
                 assertEquals(1, journal.metadataCalls)
                 assertSame(access, h.capability())
                 assertTrue(h.fake.calls.isEmpty())
+                h.owner.usageForeground(observer, false)
+                settleCommands(h, "last observer leaves during held metadata")
+                assertEquals(HistoryAvailability.UNAVAILABLE, h.owner.historyAvailability)
+                h.owner.usageForeground(observer, true)
+                settleCommands(h, "return joins held metadata before quota admission")
+                assertNull(h.owner.historyCapability(edit!!.generation))
                 h.fake.respond = { call ->
                     if (call.request.url.encodedPath.endsWith("/usage")) call.reply(SyntheticAuth.response(RecordingFixture.USAGE))
                     else inventory.complete(call)
@@ -81,7 +87,7 @@ class HistoryMetadataRecoveryTest {
                 }
                 inventoryCall.reply(SyntheticAuth.response("{}"))
                 h.phase(ConnectionPhase.OBSERVED)
-                assertSame(access, h.capability())
+                assertTrue(journal.admissions.isEmpty())
                 journal.failNameRead = false
             } finally { gate.release() }
             settle(h, "held metadata owner completion")
@@ -91,7 +97,10 @@ class HistoryMetadataRecoveryTest {
             assertEquals(1, journal.admissions.size)
             assertEquals(1, journal.entries.size)
             assertEquals(1, journal.metadataCalls)
-            assertSame(access, h.capability())
+            assertEquals(2, journal.restoreCalls)
+            assertEquals(access.partition, h.capability().partition)
+            assertNotSame(access, h.capability())
+            assertSame(edit, h.owner.accountName.value!!.edit)
         }
     }
 

@@ -88,8 +88,12 @@ valid credentials or revoke healthy history access: the entry, selection and res
 are already durable. Unavailable history still grants no history capability. A later
 checked restore or explicit retry can settle the same intent. While pending, sidecar
 reads never import a name over the journal, even when the prior name was unknown.
-An actual required catalog commit failure remains fail-closed, including finalization
-after a successful sidecar write; no name is published as settled before that commit.
+Rename-only finalization failure, including after a successful sidecar write, reports
+a save error without revoking otherwise healthy credentials, quota or history access.
+The retained intent reserves the old and intended keys; another rename must first
+settle that operation through the existing explicit retry or metadata recovery.
+Initial catalog adoption/selection and required identity reconciliation commits remain
+fail-closed. No name is published as settled before successful finalization.
 The captured generation/partition edit authority and deletion barriers remain unchanged.
 
 Synthetic JVM and hosted Android fixtures cover catalog conflicts/atomic interruption,
