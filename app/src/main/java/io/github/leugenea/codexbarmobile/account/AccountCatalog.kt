@@ -41,17 +41,21 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         return entry
     }
 
-    /** Only a previously unknown partition may gain the continuing history binding. */
+    /** Independently fill unknown metadata; never rebind an established history partition. */
     private fun reconcile(previous: CatalogEntry, partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
         check(partition == null || previous.partition == null || previous.partition == partition)
-        if (partition == null || previous.partition != null) return previous
-        val ready = name as? AccountNameRead.Ready
-        val entry = previous.copy(partition = partition,
-            name = if (previous.nameAvailable) previous.name else ready?.name?.text,
-            nameAvailable = previous.nameAvailable || ready != null)
+        val entry = reconcileName(previous, name).copy(partition = previous.partition ?: partition)
+        if (entry == previous) return previous
         check(!conflicts(entry.storage.id, entry.type, entry.name))
         commit(state.copy(entries = state.entries.map { if (it.storage.id == entry.storage.id) entry else it }))
         return entry
+    }
+
+    private fun reconcileName(previous: CatalogEntry, name: AccountNameRead): CatalogEntry {
+        // During rename only journal settlement may change the key, on either side of the sidecar write.
+        if (previous.nameAvailable || state.rename?.entry == previous.storage.id) return previous
+        val ready = name as? AccountNameRead.Ready ?: return previous
+        return previous.copy(name = ready.name?.text, nameAvailable = true)
     }
 
     /** Internal storage enrollment only; does not construct or activate another account runtime. */

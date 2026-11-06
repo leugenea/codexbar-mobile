@@ -245,6 +245,261 @@ class AccountCatalogMigrationTest {
         }
     }
 
+    @Test fun knownPartitionRecoversInitiallyUnavailableAliasInTheContinuingOwner() = recoverNameOnly(false, false)
+    @Test fun knownPartitionRecoversInitiallyUnavailableAliasAfterReconstruction() = recoverNameOnly(false, true)
+    @Test fun knownPartitionRecoversInitiallyUnavailableUnnamedState() = recoverNameOnly(true, false)
+
+    private fun recoverNameOnly(unnamed: Boolean, restart: Boolean) {
+        seed()
+        if (unnamed) SQLiteHistoryStore(historyDirectory).use { history ->
+            assertTrue(history.adopt(partition) is HistoryAccessOutcome.Bound)
+            assertTrue(history.writeName(partition, null))
+        }
+        val ciphertext = credentialFile.readBytes()
+        val before = export()
+        // A regular interrupted pending file makes only the name unreadable, not history.
+        val pending = File(historyDirectory, "account-name.pending").apply { writeBytes(byteArrayOf(1)) }
+        var owner = native(); phase(owner, ConnectionPhase.RESTORED)
+        val original = catalog().legacyEntry()!!
+        assertEquals(partition, original.partition)
+        assertFalse(original.nameAvailable)
+        assertNotNull(owner.accountName.value!!.edit)
+        assertTrue(owner.accountName.value!!.storageFailed)
+        if (restart) {
+            stop(owner)
+            owner = native(); phase(owner, ConnectionPhase.RESTORED)
+            assertEquals(original, catalog().legacyEntry())
+        }
+        assertTrue(pending.delete())
+        owner.usageForeground(Any(), true)
+        val expected = if (unnamed) null else "Synthetic legacy"
+        awaitName(owner, expected)
+        assertEquals(HistoryAvailability.AVAILABLE, owner.historyAvailability)
+        assertTrue(owner.session.snapshot() is SessionResult.Ready)
+        val recovered = original.copy(name = expected, nameAvailable = true)
+        assertEquals(recovered, catalog().legacyEntry())
+        assertEquals(original.storage.id, catalog().snapshot().selected)
+        stop(owner)
+        val next = native(); phase(next, ConnectionPhase.RESTORED)
+        assertEquals(recovered, catalog().legacyEntry())
+        stop(next)
+        assertArrayEquals(ciphertext, credentialFile.readBytes())
+        assertProtectedReadback()
+        assertEquals(before, export())
+        assertSidecar(expected)
+        assertEquals(0L, transport.requests.get())
+    }
+
+    @Test fun recoveredAliasConflictThroughTheWrapperPreservesBothEntriesAndSelection() {
+        seed()
+        SQLiteHistoryStore(historyDirectory).use { history ->
+            assertTrue(history.adopt(partition) is HistoryAccessOutcome.Bound)
+            assertTrue(history.writeName(partition, AccountDisplayName.from("Synthetic work")))
+        }
+        val before = export()
+        val ciphertext = credentialFile.readBytes()
+        val pending = File(historyDirectory, "account-name.pending").apply { writeBytes(byteArrayOf(1)) }
+        val first = native(); phase(first, ConnectionPhase.RESTORED)
+        val original = catalog().legacyEntry()!!
+        assertEquals(partition, original.partition)
+        assertFalse(original.nameAvailable)
+        stop(first)
+        val other = independentEntry()
+        assertTrue(catalog().insert(other))
+        val committed = catalog().snapshot()
+        assertTrue(pending.delete())
+        val blocked = native(); phase(blocked, ConnectionPhase.FAILED)
+        assertFalse(blocked.session.snapshot() is SessionResult.Ready)
+        assertEquals(committed, catalog().snapshot())
+        stop(blocked)
+        assertEquals(before, export())
+        assertArrayEquals(ciphertext, credentialFile.readBytes())
+        assertProtectedReadback()
+        assertIndependentEntry(other)
+        assertEquals(0L, transport.requests.get())
+    }
+
+    @Test fun readableDifferentSidecarDoesNotReplaceAnAlreadyKnownCatalogKey() {
+        seed()
+        val first = native(); phase(first, ConnectionPhase.RESTORED)
+        val original = catalog().legacyEntry()!!
+        stop(first)
+        SQLiteHistoryStore(historyDirectory).use { history ->
+            assertTrue(history.adopt(partition) is HistoryAccessOutcome.Bound)
+            assertTrue(history.writeName(partition, AccountDisplayName.from("Synthetic unexpected")))
+        }
+        val next = native(); phase(next, ConnectionPhase.RESTORED)
+        assertTrue(next.session.snapshot() is SessionResult.Ready)
+        assertTrue(next.accountName.value!!.storageFailed)
+        assertNull(next.accountName.value!!.name)
+        assertEquals(original, catalog().legacyEntry())
+        assertFalse(catalog().insert(CatalogEntry(AccountStorage.fresh(), HistoryPartition(UUID.randomUUID()), original.name, true)))
+        stop(next)
+        assertProtectedReadback()
+        assertEquals(0L, transport.requests.get())
+    }
+
+    private fun catalogOwner(accountCatalog: AccountCatalog, storage: HistoryLifetimeStorage): ConnectionController {
+        val protected = credentials()
+        return ConnectionController(protected,
+            DeviceCodeAuthenticator(transport, protected, transport.clock, transport::pause),
+            NativeFeasibilityReader(transport, transport.clock, transport::pause),
+            CoroutineScope(SupervisorJob() + Dispatchers.IO),
+            history = HistoryLifetimeCoordinator(CatalogHistoryStorage(storage, accountCatalog)), accountCatalog = accountCatalog)
+            .also { owners += it }
+    }
+
+    private fun assertReserved(original: CatalogEntry, intended: String?) {
+        val durable = catalog()
+        assertEquals(original, durable.legacyEntry())
+        assertEquals(original.storage.id, durable.snapshot().selected)
+        assertEquals(CatalogRename(original.storage.id, intended), durable.snapshot().rename)
+        for (key in listOfNotNull(original.name, intended)) assertFalse(durable.insert(
+            CatalogEntry(AccountStorage.fresh(), HistoryPartition(UUID.randomUUID()), key, true)))
+    }
+
+    @Test fun pendingRenameBeforeSidecarCommitKeepsRestoredCredentialsAndHealthyHistoryUsable() = pendingSidecar(false, false)
+    @Test fun pendingRenameAfterSidecarCommitKeepsRestoredCredentialsAndHealthyHistoryUsable() = pendingSidecar(true, false)
+    @Test fun pendingRenameDoesNotImportAnInitiallyUnknownOldNameBeforeSettlement() = pendingSidecar(false, true)
+    @Test fun pendingRenameDoesNotImportAnInitiallyUnknownNameBeforeSettlement() = pendingSidecar(true, true)
+
+    private fun pendingSidecar(replaced: Boolean, unknownName: Boolean) = runBlocking {
+        seed()
+        val ciphertext = credentialFile.readBytes()
+        val pending = File(historyDirectory, "account-name.pending")
+        if (unknownName) pending.writeBytes(byteArrayOf(1))
+        val first = native(); phase(first, ConnectionPhase.RESTORED)
+        val stale = first.accountName.value!!.edit!!
+        val original = catalog().legacyEntry()!!
+        assertEquals(!unknownName, original.nameAvailable)
+        stop(first)
+        if (unknownName) assertTrue(pending.delete())
+        val intended = "Synthetic intended"
+        assertTrue(catalog().reserveRename(original.storage.id, AccountDisplayName.from(intended)))
+        if (replaced) SQLiteHistoryStore(historyDirectory).use { history ->
+            assertTrue(history.adopt(partition) is HistoryAccessOutcome.Bound)
+            assertTrue(history.writeName(partition, AccountDisplayName.from(intended)))
+        }
+        val beforeSidecar = File(historyDirectory, "account-name").readBytes()
+        if (!unknownName) pending.writeBytes(byteArrayOf(1))
+        val limits = HistoryStorageLimits(bytes = 262_144)
+        // Fill the unformatted lane file without replacing its inode or bypassing its real lock.
+        // Reads fit the minimum native directory budget; the extra sidecar allowance does not.
+        val lane = File(historyDirectory, "lane")
+        val padding = limits.bytes - historyDirectory.listFiles()!!.sumOf { it.length() } - 128
+        assertTrue(padding > 0)
+        java.io.RandomAccessFile(lane, "rw").use { it.setLength(padding) }
+        fun restored() = catalogOwner(catalog(), SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(historyDirectory, limits)))
+        val interrupted = restored(); phase(interrupted, ConnectionPhase.RESTORED)
+        assertTrue(interrupted.session.snapshot() is SessionResult.Ready)
+        assertReserved(original, intended)
+        stop(interrupted)
+        val owner = restored(); phase(owner, ConnectionPhase.RESTORED)
+        val unavailable = owner.accountName.value!!
+        val edit = unavailable.edit!!
+        assertTrue(unavailable.storageFailed)
+        assertNull(unavailable.name)
+        assertEquals(0L, transport.requests.get())
+        owner.renameAccount(stale, "Synthetic stale")
+        owner.commandsSettled()
+        assertReserved(original, intended)
+        owner.usageForeground(Any(), true)
+        withTimeout(5_000) { owner.accountName.first { it !== unavailable } }
+        assertEquals(HistoryAvailability.AVAILABLE, owner.historyAvailability)
+        val ready = owner.session.snapshot() as SessionResult.Ready
+        assertNotNull(owner.historyCapability(ready.envelope.generation))
+        owner.readUsage(); phase(owner, ConnectionPhase.OBSERVED)
+        assertTrue(transport.gets.get() > 0)
+        assertNotNull(owner.state.value.refresh.usage.success?.usage)
+        assertTrue(owner.session.snapshot() is SessionResult.Ready)
+        assertReserved(original, intended)
+        assertArrayEquals(beforeSidecar, File(historyDirectory, "account-name").readBytes())
+        // Truncate in place: keep the existing locked inode and the same live editor.
+        java.io.RandomAccessFile(lane, "rw").use { it.setLength(0) }
+        if (!unknownName) assertTrue(pending.delete())
+        owner.renameAccount(edit, intended)
+        awaitName(owner, intended)
+        assertSame(edit, owner.accountName.value!!.edit)
+        assertEquals(original.copy(name = intended, nameAvailable = true), catalog().legacyEntry())
+        assertNull(catalog().snapshot().rename)
+        assertEquals(original.storage.id, catalog().snapshot().selected)
+        stop(owner)
+        assertSidecar(intended)
+        assertArrayEquals(ciphertext, credentialFile.readBytes())
+        assertProtectedReadback()
+    }
+
+    @Test fun pendingRenameBeforeSidecarCommitSurvivesUnavailableHistoryAcrossRestart() = pendingHistory(false)
+    @Test fun pendingRenameAfterSidecarCommitSurvivesUnavailableHistoryAcrossRestart() = pendingHistory(true)
+    @Test fun pendingClearBeforeSidecarCommitSurvivesUnavailableHistoryAcrossRestart() = pendingHistory(false, true)
+    @Test fun pendingClearAfterSidecarCommitSurvivesUnavailableHistoryAcrossRestart() = pendingHistory(true, true)
+
+    private fun pendingHistory(replaced: Boolean, unnamed: Boolean = false) {
+        seed()
+        val ciphertext = credentialFile.readBytes()
+        val original = catalog().adopt(partition, AccountNameRead.Ready(AccountDisplayName.from("Synthetic legacy")))
+        val intended = if (unnamed) null else "Synthetic intended"
+        val name = intended?.let(AccountDisplayName::from)
+        assertTrue(catalog().reserveRename(original.storage.id, name))
+        lateinit var owner: ConnectionController
+        SQLiteHistoryStore(historyDirectory).use { locked ->
+            assertTrue(locked.adopt(partition) is HistoryAccessOutcome.Bound)
+            if (replaced) assertTrue(locked.writeName(partition, name))
+            val first = native(); phase(first, ConnectionPhase.RESTORED)
+            assertTrue(first.session.snapshot() is SessionResult.Ready)
+            assertReserved(original, intended)
+            stop(first)
+            owner = native(); phase(owner, ConnectionPhase.RESTORED)
+            assertTrue(owner.session.snapshot() is SessionResult.Ready)
+            assertNull(owner.accountName.value!!.edit)
+            assertTrue(owner.accountName.value!!.storageFailed)
+            assertReserved(original, intended)
+            assertEquals(0L, transport.requests.get())
+        }
+        owner.usageForeground(Any(), true)
+        awaitName(owner, intended)
+        assertEquals(HistoryAvailability.AVAILABLE, owner.historyAvailability)
+        assertEquals(original.copy(name = intended), catalog().legacyEntry())
+        assertEquals(original.storage.id, catalog().snapshot().selected)
+        assertNull(catalog().snapshot().rename)
+        stop(owner)
+        val next = native(); phase(next, ConnectionPhase.RESTORED)
+        stop(next)
+        assertSidecar(intended)
+        assertArrayEquals(ciphertext, credentialFile.readBytes())
+        assertProtectedReadback()
+        assertEquals(0L, transport.requests.get())
+    }
+
+    @Test fun nameRecoveryCommitFailureStillBlocksCredentialAdoption() = requiredMetadataCommitFailure(false)
+    @Test fun renameFinalizationCommitFailureStillBlocksCredentialAdoption() = requiredMetadataCommitFailure(true)
+
+    private fun requiredMetadataCommitFailure(rename: Boolean) {
+        seed()
+        val ciphertext = credentialFile.readBytes()
+        val initial = if (rename) AccountNameRead.Ready(AccountDisplayName.from("Synthetic legacy")) else AccountNameRead.Unavailable
+        val original = catalog().adopt(partition, initial)
+        if (rename) assertTrue(catalog().reserveRename(original.storage.id, AccountDisplayName.from("Synthetic intended")))
+        val before = catalog().snapshot()
+        val blocked = AccountCatalog.open(root, { slot }) { throw IOException("synthetic required metadata commit failure") }
+        val owner = catalogOwner(blocked, SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(historyDirectory)))
+        phase(owner, ConnectionPhase.FAILED)
+        assertFalse(owner.session.snapshot() is SessionResult.Ready)
+        assertEquals(before, catalog().snapshot())
+        assertEquals(0L, transport.requests.get())
+        stop(owner)
+        assertSidecar(if (rename) "Synthetic intended" else "Synthetic legacy")
+        val next = native(); phase(next, ConnectionPhase.RESTORED)
+        assertEquals(original.storage, catalog().legacyEntry()!!.storage)
+        assertEquals(original.storage.id, catalog().snapshot().selected)
+        assertTrue(catalog().legacyEntry()!!.nameAvailable)
+        assertNull(catalog().snapshot().rename)
+        stop(next)
+        assertArrayEquals(ciphertext, credentialFile.readBytes())
+        assertProtectedReadback()
+        assertEquals(0L, transport.requests.get())
+    }
+
     @Test fun freshInstallStillSignsInAndRestoresDormantThroughTheCatalog() {
         val first = native(); phase(first, ConnectionPhase.IDLE)
         assertTrue(catalog().snapshot().entries.isEmpty())

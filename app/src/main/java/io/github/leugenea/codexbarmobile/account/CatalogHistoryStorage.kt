@@ -18,7 +18,9 @@ internal class CatalogHistoryStorage(
             val partition = bound?.access?.partition
             val name = partition?.let(storage::readName) ?: AccountNameRead.Unavailable
             val entry = catalog.adopt(partition, name)
-            check(recoverRename(entry))
+            // A pending sidecar is optional metadata, not a failed durable identity adoption.
+            // Required catalog commits still throw into the fail-closed boundary below.
+            recoverRename(entry)
             result
         } catch (_: Exception) {
             bound?.access?.revoke()

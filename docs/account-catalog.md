@@ -49,9 +49,11 @@ erasing valid credentials/history; a later holder may retry migration. Unavailab
 history remains unavailable and does not become an invented empty partition or block
 otherwise valid live quota reads: the catalog records that the partition/name is unknown.
 It grants no history capability. When the same retained history becomes readable, an
-unknown partition/name is reconciled durably into the same entry and selected ID; an
-already known partition cannot be rebound. Login staging failure still goes through
-checked history restoration and catalog adoption before publishing usable credentials.
+unknown partition/name is reconciled independently and durably into the same entry and
+selected ID, including name-only recovery with an already known partition. Known unnamed
+is not unknown. An already known partition cannot be rebound. Login staging failure
+still goes through checked history restoration and catalog adoption before publishing
+usable credentials.
 A catalog failure at that boundary retains protected credentials for a later retry,
 without publishing a usable session. Missing credentials, corrupt ciphertext, key loss and a
 pending rotation marker retain the existing combined fail-closed cleanup behavior.
@@ -72,6 +74,13 @@ Restart replays an outstanding intent against that same partition before publish
 name. An explicit retry with the same live editor also settles the prior intent first,
 then reserves the requested key; it cannot discard or overwrite an unsettled intent.
 Failure never reports successful settlement; both keys stay reserved while pending.
+An unsuccessful sidecar replay leaves the name unavailable but does not block otherwise
+valid credentials or revoke healthy history access: the entry, selection and reservation
+are already durable. Unavailable history still grants no history capability. A later
+checked restore or explicit retry can settle the same intent. While pending, sidecar
+reads never import a name over the journal, even when the prior name was unknown.
+An actual required catalog commit failure remains fail-closed, including finalization
+after a successful sidecar write; no name is published as settled before that commit.
 The captured generation/partition edit authority and deletion barriers remain unchanged.
 
 Synthetic JVM and hosted Android fixtures cover catalog conflicts/atomic interruption,
