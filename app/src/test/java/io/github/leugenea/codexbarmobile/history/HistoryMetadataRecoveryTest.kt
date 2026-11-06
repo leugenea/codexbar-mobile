@@ -91,11 +91,15 @@ class HistoryMetadataRecoveryTest {
                 journal.failNameRead = false
             } finally { gate.release() }
             settle(h, "held metadata owner completion")
-            val result = bounded(h, "single admitted read recording") { recording.await() } as BackgroundRefreshOutcome.Completed
-            assertTrue(result.history is HistoryRecordingOutcome.Stored)
+            val result = bounded(h, "original quota flight recording") { recording.await() } as BackgroundRefreshOutcome.Completed
+            assertEquals(HistoryRecordingOutcome.Stored(ObservationId(2)), result.history)
             assertEquals(2, h.fake.calls.size)
-            assertEquals(1, journal.admissions.size)
-            assertEquals(1, journal.entries.size)
+            // STOP/return contributes a gap, not a second USAGE observation.
+            assertEquals(listOf(HistoryEvent.Gap(HistoryGap.BACKGROUND),
+                HistoryEvent.Observed(requireNotNull(result.observations.usage.usage))), journal.admissions.map { it.event })
+            assertEquals(listOf(ObservationId(1), ObservationId(2)), journal.admissions.map { it.id })
+            assertEquals(journal.admissions.map { it.id }, journal.entries.map { it.id })
+            assertEquals(listOf(HistoryGap.BACKGROUND, null), journal.entries.map { it.gap })
             assertEquals(1, journal.metadataCalls)
             assertEquals(2, journal.restoreCalls)
             assertEquals(access.partition, h.capability().partition)
