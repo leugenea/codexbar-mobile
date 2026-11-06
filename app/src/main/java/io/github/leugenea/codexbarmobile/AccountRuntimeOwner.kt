@@ -23,8 +23,10 @@ internal class AccountRuntimeOwner(
     private val credentials: (Context, UUID) -> CredentialStore = ::KeystoreCredentialStore,
     private val historyStorage: (File) -> HistoryLifetimeStorage = { SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(it)) },
 ) {
-    private val app = context.applicationContext
-    private val root = app.noBackupFilesDir.canonicalFile
+    // Retain only application-scoped context. Native fixtures supply a storage-isolating
+    // ContextWrapper here, so preserve Context rather than casting it to Application.
+    private val applicationContext: Context = context.applicationContext
+    private val root = applicationContext.noBackupFilesDir.canonicalFile
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutations = Dispatchers.IO.limitedParallelism(1)
     private val runtimes = mutableMapOf<UUID, ConnectionController>()
@@ -49,7 +51,7 @@ internal class AccountRuntimeOwner(
         val knownSlot = address?.credentialSlot ?: catalog?.snapshot()?.legacySlot
         val slot = knownSlot ?: UUID.randomUUID()
         check(slots.add(slot)) { "Credential slot already owned" }
-        val store = credentials(app, slot)
+        val store = credentials(applicationContext, slot)
         val directory = address?.historyDirectory(root) ?: File(root, "usage-history")
         val storage = historyStorage(directory)
         val history = if (catalog == null) storage else CatalogHistoryStorage(storage, catalog, address)
