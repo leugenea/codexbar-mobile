@@ -1,8 +1,9 @@
 # Local Codex account catalog
 
-The catalog introduces durable **local** entry addressing, not multiple active runtimes.
-The existing process owner still uses only the original credential slot and history
-location. There is no new account list, sign-in path, dashboard switch or scheduler policy.
+The catalog provides durable **local** entry addressing. The single process holder retains
+concrete entry-owned controller/session/credential/history/recorder stacks behind an internal
+exact-entry ingress. Construction and restoration are dormant. The public UI and production
+worker still use the original compatibility runtime. There is no new account list, sign-in path, dashboard switch or scheduler policy.
 Account settings navigation does not select an account. The later dashboard dropdown
 and all-enrolled-account scheduling are separate integration work.
 
@@ -68,11 +69,22 @@ runtime as FAILED/STORAGE, preventing further reads or stale name publication. S
 credentials/history remain available to a fresh holder; the existing unfinished-token-
 rotation quarantine and deletion policy is unchanged.
 
-Deletion writes a catalog receipt before erasing history. That receipt survives even if
-history is already physically gone while credentials remain readable. Restart requires
+Deletion writes an entry-and-operation-tagged catalog receipt before erasing history.
+Independent terminal cleanups may overlap while their protected I/O is suspended, so the
+same journal retains one receipt per entry. Each existing deletion ticket captures its own receipt;
+each controller waiter captures that ticket and its deletion jobs before suspending.
+Completion never looks up whichever operation is current afterward. Catalog v2
+reads v1 metadata and its untagged legacy receipt without changing that operation UUID.
+An old receipt targets only the legacy association (or the pre-adoption empty legacy slot).
+The next successful catalog write uses v2; older app versions cannot read v2 metadata.
+
+That receipt survives even if history is already physically gone while credentials remain readable. Restart requires
 combined removal, not restoration. Only the process owner's successful credential AND
 history deletion barrier removes the catalog association/selection and clears the receipt.
-A failed or interrupted barrier remains pending. No fallback selects an unrelated entry.
+A failed or interrupted barrier remains pending. This substrate preserves the legacy
+selection invalidation; the following selection unit owns the approved deterministic
+remaining-entry fallback and explicit-selection quota request. No selection command is
+introduced here.
 
 ## Rename transaction
 
@@ -100,3 +112,25 @@ Synthetic JVM and hosted Android fixtures cover catalog conflicts/atomic interru
 real Keystore credential readback, real SQLite records/reducer/high-water/retention
 continuation, sidecar readback and interrupted rename/deletion. Holder reconstruction is
 not evidence of actual process death or live-provider account identity.
+
+## Runtime ownership boundary
+
+`AccountRuntimeOwner` serializes construction, retains controllers by immutable entry ID
+and rejects competing slot ownership. Legacy bootstrap and exact legacy addressing share
+one controller even when the ID was first adopted during restoration. All retained stacks
+share one serial mutation dispatcher; protected I/O remains off-lane. Each controller owns
+a child job, so its shutdown drains its own admitted work without cancelling a peer or the
+root. Root shutdown closes admission before draining all retained stacks. Address lookup
+never retires, adopts or activates a session; accepted rotation stays with its original
+store and generation after a network waiter detaches.
+
+The compatibility scheduler callback cancels only its captured continuing lifetime.
+Nonlegacy runtime ingress has no production enrollment callback in this intermediate unit;
+all-enrolled resolution and scheduling remain the scheduler integration's responsibility.
+There is no selected-only worker routing, dashboard observer transfer or new public control.
+
+Native composition cases reuse actual protected Keystore and SQLite fixtures for two
+preseeded entries, stable runtime identities, subordinate shutdown, detached rotation,
+overlapping terminal cleanup and reconstruction across incomplete barriers. Auth transports
+and faults are synthetic. Authored assertions and compilation are not native execution,
+live-provider rotation or actual process-death proof; exact-head hosted CI remains required.

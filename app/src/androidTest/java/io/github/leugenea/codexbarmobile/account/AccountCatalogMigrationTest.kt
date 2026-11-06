@@ -49,6 +49,8 @@ class AccountCatalogMigrationTest {
         fun attempt(work: () -> Unit) { try { work() } catch (problem: Throwable) {
             if (failure == null) failure = problem else failure!!.addSuppressed(problem)
         } }
+        runtimeGates.forEach { it.release() }
+        runtimeOwners.forEach { attempt { stop(it) } }
         owners.forEach { attempt { stop(it) } }
         slots.forEach { id -> attempt { keys().deleteEntry(KeystoreCredentialStore.alias(context, id)) } }
         attempt { check(root.deleteRecursively() || !root.exists()) }
@@ -64,6 +66,7 @@ class AccountCatalogMigrationTest {
         try { slots += NativeConnection.session(context) } catch (_: Exception) { /* Unreadable metadata is under test. */ }
     }
     private fun phase(owner: ConnectionController, expected: ConnectionPhase) = runBlocking {
+        withTimeout(5_000) { owner.commandsSettled() }
         try { withTimeout(5_000) { owner.state.first { it.phase == expected && !it.refresh.refreshing } } }
         catch (_: TimeoutCancellationException) { throw AssertionError("catalog phase $expected: last state=${owner.state.value}") }
     }
@@ -372,7 +375,7 @@ class AccountCatalogMigrationTest {
             DeviceCodeAuthenticator(transport, protected, transport.clock, transport::pause),
             NativeFeasibilityReader(transport, transport.clock, transport::pause),
             CoroutineScope(SupervisorJob() + Dispatchers.IO),
-            history = HistoryLifetimeCoordinator(observed), accountCatalog = accountCatalog)
+            history = HistoryLifetimeCoordinator(observed))
             .also { owners += it }
     }
 
@@ -695,7 +698,7 @@ class AccountCatalogMigrationTest {
         assertEquals(count, transport.requests.get())
         second.signOut(); phase(second, ConnectionPhase.SIGNED_OUT)
         assertTrue(catalog().snapshot().entries.isEmpty())
-        assertNull(catalog().snapshot().deleting)
+        assertTrue(catalog().snapshot().deletions.isEmpty())
         assertNull(catalog().snapshot().selected)
     }
 
@@ -730,7 +733,7 @@ class AccountCatalogMigrationTest {
             DeviceCodeAuthenticator(transport, protected, transport.clock, transport::pause),
             NativeFeasibilityReader(transport, transport.clock, transport::pause),
             CoroutineScope(SupervisorJob() + Dispatchers.IO),
-            history = HistoryLifetimeCoordinator(CatalogHistoryStorage(interrupted, accountCatalog)), accountCatalog = accountCatalog)
+            history = HistoryLifetimeCoordinator(CatalogHistoryStorage(interrupted, accountCatalog)))
         owners += owner
         phase(owner, ConnectionPhase.IDLE)
         val publication = CompletableDeferred<CatalogSnapshot>()
@@ -873,7 +876,7 @@ class AccountCatalogMigrationTest {
         val storage = CatalogHistoryStorage(SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(historyDirectory)), blocked)
         val owner = ConnectionController(store, DeviceCodeAuthenticator(transport, store, transport.clock, transport::pause),
             NativeFeasibilityReader(transport, transport.clock, transport::pause), CoroutineScope(SupervisorJob() + Dispatchers.IO),
-            history = HistoryLifetimeCoordinator(storage), accountCatalog = blocked).also { owners += it }
+            history = HistoryLifetimeCoordinator(storage)).also { owners += it }
         phase(owner, ConnectionPhase.FAILED)
         assertFalse(owner.session.snapshot() is SessionResult.Ready)
         assertTrue(catalog().snapshot().entries.isEmpty())
@@ -897,7 +900,7 @@ class AccountCatalogMigrationTest {
         assertFalse(credentialFile.exists())
         assertFalse(keys().containsAlias(KeystoreCredentialStore.alias(context, slot)))
         assertTrue(catalog().snapshot().entries.isEmpty())
-        assertNull(catalog().snapshot().deleting)
+        assertTrue(catalog().snapshot().deletions.isEmpty())
         assertEquals(0L, transport.requests.get())
     }
 
@@ -960,4 +963,360 @@ class AccountCatalogMigrationTest {
         assertProtectedReadback()
         assertEquals(0L, transport.requests.get())
     }
+    private val runtimeOwners = mutableListOf<AccountRuntimeOwner>()
+    private val runtimeGates = mutableListOf<RuntimeGate>()
+    private fun gate() = RuntimeGate().also { runtimeGates += it }
+    private fun runtimeOwner(fake: io.github.leugenea.codexbarmobile.auth.AuthTransport = transport,
+        clock: io.github.leugenea.codexbarmobile.transport.TransportClock = transport.clock,
+        decorate: (UUID, CredentialStore) -> CredentialStore = { _, store -> store },
+        history: (File) -> HistoryLifetimeStorage = { SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(it)) },
+    ) = AccountRuntimeOwner(context, catalog(), fake, clock, transport::pause,
+        credentials = { app, id -> decorate(id, KeystoreCredentialStore(app, id)) }, historyStorage = history)
+        .also { runtimeOwners += it }
+    private fun pair(): Pair<CatalogEntry, CatalogEntry> {
+        seed()
+        val a = catalog().adopt(partition, AccountNameRead.Ready(AccountDisplayName.from("Synthetic legacy")))
+        val b = independentEntry().also { assertTrue(catalog().insert(it)) }
+        return a to b
+    }
+    private fun bytes(entry: CatalogEntry): Map<String, List<Byte>> {
+        val files = entry.storage.historyDirectory(root).walkTopDown().filter { it.isFile }.map {
+            it.relativeTo(root).path to it.readBytes().toList()
+        }.toMap()
+        val credential = KeystoreCredentialStore.file(context, entry.storage.credentialSlot)
+        return files + (credential.relativeTo(root).path to credential.readBytes().toList())
+    }
+    private fun ready(owner: ConnectionController) = (owner.session.snapshot() as SessionResult.Ready).envelope
+    private fun stop(root: AccountRuntimeOwner) = runBlocking { withTimeout(5_000) { root.shutdown() } }
+
+    @Test fun twoProtectedRuntimesShareOnlyTheProcessLaneAndKeepStableObserverAndShutdownOwnership() = runBlocking {
+        val (a, b) = pair()
+        val beforeA = bytes(a); val beforeB = bytes(b)
+        val rootOwner = runtimeOwner()
+        val clients = List(8) { async(Dispatchers.Default) { rootOwner.runtime(a.storage.id)!! } }.awaitAll()
+        val first = clients.first(); val second = rootOwner.runtime(b.storage.id)!!
+        phase(first, ConnectionPhase.RESTORED); phase(second, ConnectionPhase.RESTORED)
+        clients.forEach { assertSame(first, it) }
+        assertSame(first, rootOwner.legacy())
+        assertSame(second, rootOwner.runtime(b.storage.id))
+        assertNull(rootOwner.runtime(UUID.randomUUID()))
+        assertNotSame(ready(first).generation, ready(second).generation)
+        assertEquals("Synthetic legacy", first.accountName.value!!.name!!.text)
+        assertEquals("Synthetic work", second.accountName.value!!.name!!.text)
+        val observerA = Any(); val observerB = Any()
+        first.usageForeground(observerA, true); first.usageForeground(observerB, true)
+        first.usageForeground(observerA, false)
+        first.commandsSettled(); first.historyRestorationSettled()
+        assertEquals(0L, transport.requests.get())
+        assertEquals(beforeA, bytes(a)); assertEquals(beforeB, bytes(b))
+        val firstGeneration = ready(first).generation
+        val peer = ready(second)
+        stop(first) // A subordinate close must leave the root/peer usable.
+        assertSame(peer, ready(second))
+        val bTarget = second.backgroundRefreshTarget()!!
+        val bResult = withTimeout(5_000) { second.refreshInBackground(bTarget) } as BackgroundRefreshOutcome.Completed
+        assertEquals(HistoryRecordingOutcome.Stored(ObservationId(1)), bResult.history)
+        phase(second, ConnectionPhase.OBSERVED)
+        assertEquals(2L, transport.requests.get())
+        assertEquals(beforeA, bytes(a))
+        stop(rootOwner)
+        val restarted = runtimeOwner()
+        val restoredA = restarted.runtime(a.storage.id)!!; val restoredB = restarted.runtime(b.storage.id)!!
+        phase(restoredA, ConnectionPhase.RESTORED); phase(restoredB, ConnectionPhase.RESTORED)
+        assertNotSame(firstGeneration, ready(restoredA).generation)
+        assertEquals(beforeA, bytes(a))
+        assertEquals(2L, transport.requests.get())
+        val continued = withTimeout(5_000) { restoredB.refreshInBackground(bTarget) } as BackgroundRefreshOutcome.Completed
+        assertEquals(HistoryRecordingOutcome.Stored(ObservationId(2)), continued.history)
+        assertEquals(4L, transport.requests.get())
+        assertEquals(beforeA, bytes(a))
+        stop(restarted)
+        SQLiteHistoryStore(b.storage.historyDirectory(root)).use { store ->
+            val access = (store.adopt(b.partition!!) as HistoryAccessOutcome.Bound).access
+            val page = (access.read(HistoryReadQuery(b.partition, 10)) as HistoryReadOutcome.Ready).snapshot
+            assertEquals(listOf(1L, 2L), page.entries.map { it.id.ordinal })
+            assertEquals(ObservationId(2), page.lastAdmitted)
+            assertEquals("Synthetic work", (store.readName(b.partition) as AccountNameRead.Ready).name!!.text)
+        }
+    }
+
+    @Test fun retainedSlotGuardRejectsASecondOwnerAfterCatalogReaddressingWithoutTouchingThePeer() {
+        val (a, b) = pair()
+        val metadata = catalog()
+        val rootOwner = AccountRuntimeOwner(context, metadata, transport, transport.clock, transport::pause)
+            .also { runtimeOwners += it }
+        val first = rootOwner.runtime(a.storage.id)!!; val peer = rootOwner.runtime(b.storage.id)!!
+        phase(first, ConnectionPhase.RESTORED); phase(peer, ConnectionPhase.RESTORED)
+        val peerEnvelope = ready(peer); val peerBytes = bytes(b)
+        first.signOut(); phase(first, ConnectionPhase.SIGNED_OUT)
+        val rebound = CatalogEntry(AccountStorage(UUID.randomUUID(), a.storage.credentialSlot), null, "Synthetic rebound", true)
+        assertTrue(metadata.insert(rebound))
+        assertThrows(IllegalStateException::class.java) { rootOwner.runtime(rebound.storage.id) }
+        assertNull(rootOwner.runtime(a.storage.id))
+        assertSame(first, rootOwner.legacy()); assertSame(peer, rootOwner.runtime(b.storage.id))
+        assertSame(peerEnvelope, ready(peer)); assertEquals(peerBytes, bytes(b))
+        assertFalse(credentialFile.exists()); assertEquals(0L, transport.requests.get())
+    }
+
+    @Test fun detachedRotationWaiterKeepsTheOriginalProtectedRuntimeAndNeverWritesThePeer() = runBlocking {
+        val (a, b) = pair()
+        val fake = SyntheticSamplingTransport().apply { heldPath = "/oauth/token" }
+        val write = gate()
+        val rootOwner = runtimeOwner(fake, fake.clock, decorate = { id, store ->
+            if (id != a.storage.credentialSlot) store else object : CredentialStore by store {
+                override fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation): CredentialResult<CredentialEnvelope> {
+                    write.pause("A token write")
+                    return store.replace(envelope, cancellation)
+                }
+            }
+        })
+        val first = rootOwner.runtime(a.storage.id)!!; val peer = rootOwner.runtime(b.storage.id)!!
+        phase(first, ConnectionPhase.RESTORED); phase(peer, ConnectionPhase.RESTORED)
+        val original = ready(first); val peerEnvelope = ready(peer); val beforePeer = bytes(b)
+        val observer = Any()
+        first.usageForeground(observer, true); first.commandsSettled()
+        first.readUsage(refreshSession = true)
+        val sent = fake.awaitHeld("A rotation sent")
+        assertTrue(File(credentialFile.parentFile, "rotation-pending").exists())
+        try {
+            first.usageForeground(observer, false); first.commandsSettled()
+            assertSame(first, rootOwner.runtime(a.storage.id))
+            assertSame(original, ready(first))
+            phase(first, ConnectionPhase.OBSERVED) // Actual cancelled read completion, before token settlement.
+            sent.reply(fake.tokens)
+            write.await("A accepted token persistence")
+            assertSame(peerEnvelope, ready(peer)); assertEquals(beforePeer, bytes(b))
+            assertTrue(File(credentialFile.parentFile, "rotation-pending").exists())
+        } finally { write.release() }
+        awaitRuntime("A rotation published after detached waiter", { first.session.snapshot().toString() }) {
+            (first.session.snapshot() as? SessionResult.Ready)?.let { it.envelope !== original } == true
+        }
+        val target = first.backgroundRefreshTarget()!!
+        val result = withTimeout(5_000) { first.refreshInBackground(target) }
+        assertTrue(result is BackgroundRefreshOutcome.Completed)
+        assertEquals(HistoryRecordingOutcome.Stored(ObservationId(5)), (result as BackgroundRefreshOutcome.Completed).history)
+        assertSame(original.generation, ready(first).generation)
+        assertNotSame(original, ready(first))
+        assertSame(peerEnvelope, ready(peer)); assertEquals(beforePeer, bytes(b))
+        assertEquals(3L, fake.requests.get()) // One token POST and exactly two GETs.
+        stop(rootOwner)
+        val readback = credentials(); val restored = readback.read(readback.openSession()) as CredentialResult.Success
+        assertArrayEquals("synthetic-sampling-access".toByteArray(), restored.value.accessToken.copyBytes())
+        assertFalse(File(credentialFile.parentFile, "rotation-pending").exists())
+        SQLiteHistoryStore(a.storage.historyDirectory(root)).use { store ->
+            val access = (store.adopt(a.partition!!) as HistoryAccessOutcome.Bound).access
+            val page = (access.read(HistoryReadQuery(a.partition, 10)) as HistoryReadOutcome.Ready).snapshot
+            assertEquals(listOf(2L, 3L, 4L, 5L), page.entries.map { it.id.ordinal })
+            assertEquals(HistoryGap.BACKGROUND, page.entries[2].gap)
+            assertTrue(page.entries[2].windows.isEmpty())
+            assertNull(page.entries[3].gap)
+            assertEquals(ObservationId(5), page.lastAdmitted)
+            assertEquals(listOf(WindowKind.FIVE_HOUR, WindowKind.WEEKLY), page.entries[3].windows.map { it.kind })
+            assertEquals(BigDecimal("12.375"), page.entries[3].windows.first().point!!.usedPercent)
+            assertNull(page.entries[3].windows.last().point)
+        }
+        assertEquals(beforePeer, bytes(b))
+    }
+
+    @Test fun overlappingTerminalReceiptsCompleteOnlyTheirCapturedEntryInEitherBarrierOrder() = runBlocking {
+        for (aFirst in listOf(true, false)) {
+            val (a, b) = pair()
+            val holdA = gate(); val holdB = gate()
+            val fake = SyntheticSamplingTransport().apply { tokens = io.github.leugenea.codexbarmobile.transport.TransportResult.Response.bounded(401, "{}".toByteArray()) }
+            val rootOwner = runtimeOwner(fake, fake.clock, history = { directory ->
+                val native = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(directory))
+                val hold = if (directory == a.storage.historyDirectory(root)) holdA else holdB
+                object : HistoryLifetimeStorage by native {
+                    override fun reserveDeletion(): HistoryDeletion {
+                        val ticket = native.reserveDeletion()
+                        return HistoryDeletion { hold.pause("captured history barrier"); ticket.complete() }
+                    }
+                }
+            })
+            val first = rootOwner.runtime(a.storage.id)!!; val second = rootOwner.runtime(b.storage.id)!!
+            phase(first, ConnectionPhase.RESTORED); phase(second, ConnectionPhase.RESTORED)
+            first.readUsage(refreshSession = true); second.readUsage(refreshSession = true)
+            try {
+                holdA.await("A history held"); holdB.await("B history held")
+                val receipts = catalog().snapshot().deletions
+                assertEquals(setOf(a.storage.id, b.storage.id), receipts.map { it.entry }.toSet())
+                val released = if (aFirst) first else second
+                val heldEntry = if (aFirst) b else a
+                if (aFirst) holdA.release() else holdB.release()
+                phase(released, ConnectionPhase.REAUTH_REQUIRED)
+                assertEquals(listOf(receipts.single { it.entry == heldEntry.storage.id }), catalog().snapshot().deletions)
+                assertNotNull(catalog().entry(heldEntry.storage.id))
+            } finally { holdA.release(); holdB.release() }
+            phase(first, ConnectionPhase.REAUTH_REQUIRED); phase(second, ConnectionPhase.REAUTH_REQUIRED)
+            assertTrue(catalog().snapshot().entries.isEmpty()); assertTrue(catalog().snapshot().deletions.isEmpty())
+            assertFalse(KeystoreCredentialStore.file(context, a.storage.credentialSlot).exists())
+            assertFalse(KeystoreCredentialStore.file(context, b.storage.credentialSlot).exists())
+            assertEquals(2L, fake.requests.get())
+            stop(rootOwner)
+        }
+    }
+
+    @Test fun keyLossAndRotationQuarantineReconstructOnlyTheCapturedAccountWithPeerBytesIntact() {
+        for (legacyFailed in listOf(true, false)) for (keyLost in listOf(true, false)) {
+            val (a, b) = pair()
+            val failed = if (legacyFailed) a else b
+            val peerEntry = if (legacyFailed) b else a
+            if (keyLost) keys().deleteEntry(KeystoreCredentialStore.alias(context, failed.storage.credentialSlot))
+            else File(KeystoreCredentialStore.file(context, failed.storage.credentialSlot).parentFile, "rotation-pending").writeBytes(byteArrayOf(1))
+            val peerBytes = bytes(peerEntry)
+            var failHistory = true
+            val firstRoot = runtimeOwner(history = { directory ->
+                val native = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(directory))
+                if (directory != failed.storage.historyDirectory(root)) native else object : HistoryLifetimeStorage by native {
+                    override fun reserveDeletion(): HistoryDeletion {
+                        val ticket = native.reserveDeletion()
+                        return HistoryDeletion {
+                            val result = ticket.complete()
+                            if (failHistory) HistoryDeleteOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE) else result
+                        }
+                    }
+                }
+            })
+            val first = firstRoot.runtime(failed.storage.id)!!; val peer = firstRoot.runtime(peerEntry.storage.id)!!
+            phase(first, ConnectionPhase.FAILED); phase(peer, ConnectionPhase.RESTORED)
+            val receipt = catalog().snapshot().deletions.single()
+            assertEquals(failed.storage.id, receipt.entry)
+            assertEquals(peerBytes, bytes(peerEntry)); assertTrue(peer.session.snapshot() is SessionResult.Ready)
+            stop(firstRoot); failHistory = false
+            val reconstructed = runtimeOwner()
+            val cleaned = reconstructed.runtime(failed.storage.id)!!; val continuing = reconstructed.runtime(peerEntry.storage.id)!!
+            phase(cleaned, ConnectionPhase.IDLE); phase(continuing, ConnectionPhase.RESTORED)
+            assertNull(catalog().entry(failed.storage.id)); assertEquals(peerEntry, catalog().entry(peerEntry.storage.id))
+            assertTrue(catalog().snapshot().deletions.isEmpty()); assertFalse(catalog().completeDeletion(receipt))
+            assertEquals(peerBytes, bytes(peerEntry)); assertEquals(0L, transport.requests.get())
+            stop(reconstructed)
+            // Leave only the independent peer for the next synthetic iteration's seed.
+            KeystoreCredentialStore(context, peerEntry.storage.credentialSlot).let { it.delete(it.openSession()) }
+            root.deleteRecursively(); assertTrue(root.mkdir())
+        }
+    }
+
+    @Test fun credentialBarrierAndReadableCredentialRestartKeepTheCapturedReceiptAndHealthyPeer() = runBlocking {
+        for (legacyFailed in listOf(true, false)) {
+            val (a, b) = pair()
+            val failed = if (legacyFailed) a else b
+            val peerEntry = if (legacyFailed) b else a
+            val hold = gate()
+            val firstRoot = runtimeOwner(decorate = { id, store ->
+                if (id != failed.storage.credentialSlot) store else object : CredentialStore by store {
+                    override fun admitDeletion(generation: SessionGeneration): CredentialResult<CredentialDeletion> {
+                        val reserved = store.admitDeletion(generation)
+                        if (reserved !is CredentialResult.Success) return reserved
+                        return CredentialResult.Success(object : CredentialDeletion {
+                            override fun complete(): CredentialResult<Unit> {
+                                hold.pause("credential barrier before physical deletion")
+                                return CredentialResult.Failure(CredentialFailure.FAILED_WRITE)
+                            }
+                        })
+                    }
+                }
+            })
+            val first = firstRoot.runtime(failed.storage.id)!!; val peer = firstRoot.runtime(peerEntry.storage.id)!!
+            phase(first, ConnectionPhase.RESTORED); phase(peer, ConnectionPhase.RESTORED)
+            val peerBytes = bytes(peerEntry); val peerEnvelope = ready(peer)
+            val protectedBefore = KeystoreCredentialStore.file(context, failed.storage.credentialSlot).readBytes()
+            first.signOut()
+            val receipt: CatalogDeletion
+            try {
+                hold.await("captured credential deletion")
+                awaitRuntime("history deleted while credential barrier held", { catalog().snapshot().toString() }) {
+                    catalog().snapshot().deletions.any { it.entry == failed.storage.id } &&
+                        !File(failed.storage.historyDirectory(root), "history.db").exists()
+                }
+                receipt = catalog().snapshot().deletions.single()
+                assertEquals(failed.storage.id, receipt.entry)
+                assertNotNull(catalog().entry(failed.storage.id))
+                assertArrayEquals(protectedBefore, KeystoreCredentialStore.file(context, failed.storage.credentialSlot).readBytes())
+                assertSame(peerEnvelope, ready(peer)); assertEquals(peerBytes, bytes(peerEntry))
+            } finally { hold.release() }
+            phase(first, ConnectionPhase.FAILED); stop(firstRoot)
+            val resumed = gate()
+            val restarted = runtimeOwner(history = { directory ->
+                val native = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(directory))
+                if (directory != failed.storage.historyDirectory(root)) native else object : HistoryLifetimeStorage by native {
+                    override fun reserveDeletion(): HistoryDeletion {
+                        val ticket = native.reserveDeletion()
+                        return HistoryDeletion { resumed.pause("reconstructed history barrier"); ticket.complete() }
+                    }
+                }
+            })
+            val retry = restarted.runtime(failed.storage.id)!!; val continuing = restarted.runtime(peerEntry.storage.id)!!
+            try {
+                resumed.await("receipt reconstructed before terminal completion")
+                phase(continuing, ConnectionPhase.RESTORED)
+                assertEquals(listOf(receipt), catalog().snapshot().deletions)
+                assertFalse(retry.session.snapshot() is SessionResult.Ready)
+                assertEquals(peerBytes, bytes(peerEntry))
+            } finally { resumed.release() }
+            phase(retry, ConnectionPhase.REAUTH_REQUIRED)
+            assertNull(catalog().entry(failed.storage.id)); assertEquals(peerEntry, catalog().entry(peerEntry.storage.id))
+            assertTrue(catalog().snapshot().deletions.isEmpty()); assertFalse(catalog().completeDeletion(receipt))
+            assertFalse(KeystoreCredentialStore.file(context, failed.storage.credentialSlot).exists())
+            assertEquals(peerBytes, bytes(peerEntry)); assertEquals(0L, transport.requests.get())
+            stop(restarted)
+            KeystoreCredentialStore(context, peerEntry.storage.credentialSlot).let { it.delete(it.openSession()) }
+            root.deleteRecursively(); assertTrue(root.mkdir())
+        }
+    }
+
+    @Test fun lateCompletedLegacyTicketCannotFinalizeASuccessorReceiptOrTheIndependentPeer() {
+        val (a, b) = pair()
+        val peerBytes = bytes(b)
+        val metadata = catalog()
+        val protected = credentials()
+        val firstGeneration = protected.openSession()
+        SQLiteHistoryStore(historyDirectory).use { native ->
+            val storage = CatalogHistoryStorage(SQLiteHistoryLifetimeStorage(native), metadata)
+            val first = storage.reserveDeletion()
+            assertTrue(first.complete().successful())
+            assertTrue(protected.delete(firstGeneration) is CredentialResult.Success)
+            val oldReceipt = metadata.snapshot().deletions.single()
+            assertEquals(a.storage.id, oldReceipt.entry)
+            assertTrue(first.completeCatalog())
+            val nextGeneration = protected.openSession()
+            assertTrue(protected.replace(CredentialEnvelope(nextGeneration,
+                SensitiveValue.copyOf("synthetic-successor-access".toByteArray()),
+                SensitiveValue.copyOf("synthetic-successor-refresh".toByteArray())), CredentialCancellation()) is CredentialResult.Success)
+            val nextPartition = (native.createPartition() as HistoryAccessOutcome.Bound).access.partition
+            val successor = metadata.adopt(nextPartition, AccountNameRead.Ready(null))
+            assertNotEquals(a.storage.id, successor.storage.id)
+            val next = storage.reserveDeletion()
+            assertTrue(next.complete().successful())
+            val successorReceipt = metadata.snapshot().deletions.single()
+            assertEquals(successor.storage.id, successorReceipt.entry)
+            assertNotEquals(oldReceipt.operation, successorReceipt.operation)
+            assertTrue(first.completeCatalog()) // Its own cached completion, never the new receipt.
+            assertEquals(listOf(successorReceipt), catalog().snapshot().deletions)
+            assertNotNull(catalog().entry(successor.storage.id))
+            assertTrue(credentialFile.exists()) // The successor credential barrier has not completed.
+            assertEquals(peerBytes, bytes(b)); assertEquals(b, catalog().entry(b.storage.id))
+            assertTrue(protected.delete(nextGeneration) is CredentialResult.Success)
+            assertTrue(next.completeCatalog())
+            assertEquals(listOf(b), catalog().snapshot().entries)
+            assertTrue(catalog().snapshot().deletions.isEmpty())
+            assertEquals(peerBytes, bytes(b)); assertEquals(0L, transport.requests.get())
+        }
+    }
+
+    private suspend fun awaitRuntime(step: String, last: () -> String, predicate: () -> Boolean) {
+        try { withTimeout(5_000) { while (!predicate()) yield() } }
+        catch (_: TimeoutCancellationException) { throw AssertionError("$step: last state=${last()}") }
+    }
+
+    private class RuntimeGate {
+        private val entered = java.util.concurrent.CountDownLatch(1)
+        private val released = java.util.concurrent.CountDownLatch(1)
+        fun pause(step: String) {
+            entered.countDown()
+            check(released.await(5, java.util.concurrent.TimeUnit.SECONDS)) { "$step: last state=held" }
+        }
+        fun await(step: String) { assertTrue("$step: last state=not-entered", entered.await(5, java.util.concurrent.TimeUnit.SECONDS)) }
+        fun release() { released.countDown() }
+    }
+
 }

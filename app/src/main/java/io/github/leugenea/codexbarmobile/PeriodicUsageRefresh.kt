@@ -21,6 +21,16 @@ internal class PeriodicUsageRefresh(private val manager: WorkManager) {
         else manager.enqueueUniquePeriodicWork(name(target), ExistingPeriodicWorkPolicy.KEEP, request(target))
     }
 
+    /** Compatibility runtime boundary: removal never cancels a peer's unique work. */
+    fun entryEnrollment(initial: HistoryPartition?): (BackgroundRefreshTarget?) -> Unit {
+        var continuing = initial?.let(::BackgroundRefreshTarget)
+        return { target ->
+            if (target == null) continuing?.let { manager.cancelUniqueWork(name(it)) }
+            else enrollment(target)
+            continuing = target
+        }
+    }
+
     companion object {
         const val TAG = "periodic-usage-refresh"
         const val LIFETIME = "credential-lifetime"

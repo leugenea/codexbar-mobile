@@ -48,9 +48,18 @@ class HistoryAccess internal constructor(
 }
 
 /** Exactly one settlement per ticket. Failure is truthful; explicit administration may retry cleanup. */
-class HistoryDeletion internal constructor(private val work: () -> HistoryDeleteOutcome) {
+class HistoryDeletion internal constructor(
+    private val catalogSettlement: () -> Boolean = { true },
+    private val work: () -> HistoryDeleteOutcome,
+) {
     @Volatile private var outcome: HistoryDeleteOutcome? = null
     @Synchronized fun complete(): HistoryDeleteOutcome = outcome ?: work().also { outcome = it }
+    private var catalogComplete = false
+    /** The controller calls this exact ticket only after both protected deletion barriers. */
+    @Synchronized internal fun completeCatalog(): Boolean {
+        if (catalogComplete) return true
+        return catalogSettlement().also { catalogComplete = it }
+    }
     internal fun failed(): Boolean = outcome is HistoryDeleteOutcome.Unavailable || outcome == HistoryDeleteOutcome.Corrupt
 }
 

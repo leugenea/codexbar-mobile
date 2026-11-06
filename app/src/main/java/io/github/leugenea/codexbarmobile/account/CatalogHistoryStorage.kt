@@ -6,9 +6,14 @@ import io.github.leugenea.codexbarmobile.history.*
 internal class CatalogHistoryStorage(
     private val storage: HistoryLifetimeStorage,
     private val catalog: AccountCatalog,
+    private val address: AccountStorage? = null,
 ) : HistoryLifetimeStorage by storage {
+    private fun entry() = address?.let { catalog.entry(it.id)?.also { entry -> check(entry.storage == it) } }
+        ?: if (address == null) catalog.legacyEntry() else null
+    private fun pending() = catalog.snapshot().deletions.any { it.entry == (address?.id ?: entry()?.storage?.id) }
+
     override fun activate(partition: HistoryPartition) = catalogued { storage.activate(partition) }
-    override fun restore() = if (catalog.snapshot().deleting != null) HistoryLifetimeOutcome.RemovalRequired else catalogued(storage::restore)
+    override fun restore() = if (pending()) HistoryLifetimeOutcome.RemovalRequired else catalogued(storage::restore)
 
     private fun catalogued(read: () -> HistoryLifetimeOutcome): HistoryLifetimeOutcome {
         val result = read()
@@ -30,7 +35,8 @@ internal class CatalogHistoryStorage(
 
     private fun reconcile(partition: HistoryPartition?) {
         val name = partition?.let(storage::readName) ?: AccountNameRead.Unavailable
-        val entry = catalog.adopt(partition, name)
+        val entry = if (address == null) catalog.adopt(partition, name)
+            else catalog.reconcile(address.id, partition, name)
         // Rename settlement is optional metadata; adoption/selection commits above still throw.
         recoverRename(entry)
     }
@@ -40,15 +46,15 @@ internal class CatalogHistoryStorage(
     } catch (_: Exception) { AccountNameRead.Unavailable }
 
     private fun consistent(partition: HistoryPartition): Boolean {
-        val entry = catalog.legacyEntry() ?: return false
-        if (entry.partition != partition || catalog.snapshot().rename != null) return false
+        val entry = entry() ?: return false
+        if (entry.partition != partition || catalog.snapshot().rename?.entry == entry.storage.id) return false
         val name = storage.readName(partition)
         if (!entry.nameAvailable) return name is AccountNameRead.Unavailable
         return name is AccountNameRead.Ready && name.name?.text == entry.name
     }
 
     override fun writeName(partition: HistoryPartition, name: AccountDisplayName?): Boolean = try {
-        val entry = catalog.legacyEntry()
+        val entry = entry()
         if (entry?.partition != partition || !recoverRename(entry)) false
         else if (!catalog.reserveRename(entry.storage.id, name)) false
         else recoverRename(entry)
@@ -56,7 +62,7 @@ internal class CatalogHistoryStorage(
 
     private fun recoverRename(entry: CatalogEntry): Boolean {
         val pending = catalog.snapshot().rename ?: return true
-        if (pending.entry != entry.storage.id) return false
+        if (pending.entry != entry.storage.id) return true
         val partition = entry.partition ?: return false
         val name = pending.name?.let(AccountDisplayName::from)
         if (!storage.writeName(partition, name)) return false
@@ -68,9 +74,10 @@ internal class CatalogHistoryStorage(
 
     override fun reserveDeletion(): HistoryDeletion {
         val ticket = storage.reserveDeletion()
-        return HistoryDeletion {
+        var receipt: CatalogDeletion? = null
+        return HistoryDeletion(catalogSettlement = { catalog.completeDeletion(requireNotNull(receipt)) }) {
             try {
-                catalog.beginDeletion()
+                receipt = catalog.beginDeletion(address?.id ?: entry()?.storage?.id)
                 ticket.complete()
             } catch (_: Exception) { HistoryDeleteOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE) }
         }

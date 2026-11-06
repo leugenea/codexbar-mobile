@@ -3,7 +3,9 @@
 ## Implemented application
 
 The [local Codex account catalog](docs/account-catalog.md) preserves installed storage
-and owns local-name uniqueness; public runtime activation remains single-account.
+and owns local-name uniqueness. The process holder now retains concrete entry-owned
+runtimes behind an exact-entry seam; public UI and worker integration remain single-account.
+The catalog document describes receipt v1/v2 compatibility and subordinate job ownership.
 
 One Android phone app module with namespace `io.github.leugenea.codexbarmobile` launches
 `MainActivity` via MAIN/LAUNCHER directly into the real `ConnectionScreen` dashboard.

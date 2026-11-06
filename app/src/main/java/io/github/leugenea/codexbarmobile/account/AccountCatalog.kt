@@ -6,7 +6,7 @@ import java.util.UUID
 
 /** Local addressing only; neither a provider identity nor a runtime capability. */
 internal data class AccountStorage(val id: UUID, val credentialSlot: UUID, val legacy: Boolean = false) {
-    fun historyDirectory(root: File) = File(root, if (legacy) "usage-history" else "usage-history-$id")
+    fun historyDirectory(root: File) = File(root.canonicalFile, if (legacy) "usage-history" else "usage-history-$id")
     companion object {
         fun fresh() = AccountStorage(UUID.randomUUID(), UUID.randomUUID())
     }
@@ -20,8 +20,9 @@ internal data class CatalogEntry(val storage: AccountStorage, val partition: His
 internal data class CatalogRename(val entry: UUID, val name: String?) {
     override fun toString() = "CatalogRename(redacted)"
 }
+internal data class CatalogDeletion(val entry: UUID?, val operation: UUID)
 internal data class CatalogSnapshot(val legacySlot: UUID, val entries: List<CatalogEntry> = emptyList(),
-    val selected: UUID? = null, val rename: CatalogRename? = null, val deleting: UUID? = null) {
+    val selected: UUID? = null, val rename: CatalogRename? = null, val deletions: List<CatalogDeletion> = emptyList()) {
     override fun toString() = "CatalogSnapshot(redacted)"
 }
 
@@ -31,7 +32,7 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     @Synchronized fun snapshot() = state.copy(entries = state.entries.toList())
 
     @Synchronized fun adopt(partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
-        check(state.deleting == null)
+        check(state.deletions.none { it.entry == legacyEntry()?.storage?.id })
         val previous = legacyEntry()
         if (previous != null) return reconcile(previous, partition, name)
         val ready = name as? AccountNameRead.Ready
@@ -69,10 +70,17 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         return true
     }
 
+    @Synchronized fun entry(id: UUID) = state.entries.singleOrNull { it.storage.id == id }
+
+    @Synchronized fun reconcile(id: UUID, partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
+        check(state.deletions.none { it.entry == id })
+        return reconcile(requireNotNull(entry(id)), partition, name)
+    }
+
     @Synchronized fun legacyEntry() = state.entries.singleOrNull { it.storage.legacy }
 
     @Synchronized fun reserveRename(id: UUID, name: AccountDisplayName?): Boolean {
-        if (state.deleting != null) return false
+        if (state.deletions.any { it.entry == id }) return false
         val entry = state.entries.singleOrNull { it.storage.id == id } ?: return false
         if (state.rename != null || conflicts(id, entry.type, name?.text)) return false
         commit(state.copy(rename = CatalogRename(id, name?.text)))
@@ -86,17 +94,24 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         commit(state.copy(entries = entries, rename = null))
     }
 
-    @Synchronized fun beginDeletion() {
-        if (state.deleting == null) commit(state.copy(deleting = UUID.randomUUID()))
+    @Synchronized fun beginDeletion(id: UUID? = legacyEntry()?.storage?.id): CatalogDeletion {
+        require(id == null || entry(id) != null)
+        state.deletions.singleOrNull { it.entry == id }?.let { return it }
+        val receipt = CatalogDeletion(id, UUID.randomUUID())
+        commit(state.copy(deletions = state.deletions + receipt))
+        return receipt
     }
 
-    /** Called only after the process owner's combined credential/history deletion barrier. */
-    @Synchronized fun completeDeletion(receipt: UUID?): Boolean = try {
-        if (state.deleting != receipt) false else {
-            val id = legacyEntry()?.storage?.id
-            if (receipt != null) commit(state.copy(entries = state.entries.filterNot { it.storage.legacy },
+    /** Called only with the adapter's captured receipt after BOTH deletion barriers. */
+    @Synchronized fun completeDeletion(receipt: CatalogDeletion?): Boolean = try {
+        if (receipt == null) state.deletions.isEmpty()
+        else if (receipt !in state.deletions) false
+        else {
+            val id = receipt.entry
+            commit(state.copy(entries = state.entries.filterNot { it.storage.id == id },
                 selected = state.selected.takeUnless { it == id },
-                rename = state.rename.takeUnless { it?.entry == id }, deleting = null))
+                rename = state.rename.takeUnless { it?.entry == id },
+                deletions = state.deletions - receipt))
             true
         }
     } catch (_: Exception) { false }

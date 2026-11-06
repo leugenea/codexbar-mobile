@@ -28,6 +28,9 @@ class AccountCatalogTest {
         assertEquals(listOf(entry), open(root).snapshot().entries)
         assertEquals(catalog.snapshot(), open(alias).snapshot())
         assertEquals(entry.storage.id, open(root).snapshot().selected)
+        assertEquals(File(root, "usage-history"), entry.storage.historyDirectory(alias))
+        val fresh = AccountStorage.fresh()
+        assertEquals(File(root, "usage-history-${fresh.id}"), fresh.historyDirectory(alias))
     }
 
     @Test fun applicationRootResolutionDoesNotPermitRedirectingTheCatalogChild() {
@@ -248,13 +251,13 @@ class AccountCatalogTest {
         val entry = catalog.adopt(partition, named("Synthetic legacy"))
         catalog.beginDeletion()
         val restarted = open(root)
-        val receipt = restarted.snapshot().deleting
+        val receipt = restarted.snapshot().deletions.singleOrNull()
         assertNotNull(receipt)
         assertEquals(entry, restarted.legacyEntry())
         assertFalse(restarted.reserveRename(entry.storage.id, AccountDisplayName.from("Synthetic rejected")))
         assertTrue(restarted.completeDeletion(receipt))
         assertTrue(restarted.completeDeletion(null))
-        assertNull(open(root).snapshot().deleting)
+        assertNull(open(root).snapshot().deletions.singleOrNull())
         assertTrue(open(root).snapshot().entries.isEmpty())
         assertNull(open(root).snapshot().selected)
         assertNotEquals(entry.storage.id, restarted.adopt(partition, named("Synthetic new login")).storage.id)
@@ -262,6 +265,106 @@ class AccountCatalogTest {
         val successor = restarted.snapshot()
         assertFalse(restarted.completeDeletion(receipt))
         assertEquals(successor, open(root).snapshot())
+    }
+
+    @Test fun addressedMetadataReconcilesOnlyItsOwnerWhileThePeerIsDeleting() {
+        val root = temporary.newFolder()
+        val catalog = open(root)
+        val a = catalog.adopt(partition, named("Synthetic A"))
+        val unknown = other(null).copy(partition = null, nameAvailable = false)
+        assertTrue(catalog.insert(unknown))
+        val receipt = catalog.beginDeletion(a.storage.id)
+        val bPartition = HistoryPartition(UUID(0, 90))
+        val b = catalog.reconcile(unknown.storage.id, bPartition, named("Synthetic B"))
+        assertEquals(unknown.storage, b.storage)
+        assertEquals(bPartition, b.partition)
+        assertEquals("Synthetic B", b.name)
+        assertEquals(a, open(root).entry(a.storage.id))
+        assertEquals(listOf(receipt), open(root).snapshot().deletions)
+        assertThrows(IllegalStateException::class.java) { catalog.reconcile(a.storage.id, partition, named("Synthetic wrong")) }
+        assertThrows(IllegalArgumentException::class.java) { catalog.reconcile(UUID.randomUUID(), bPartition, named("Synthetic missing")) }
+        assertEquals(b, open(root).entry(b.storage.id))
+        assertTrue(catalog.completeDeletion(receipt))
+        assertEquals(listOf(b), open(root).snapshot().entries)
+    }
+
+    @Test fun overlappingEntryReceiptsReconstructAndCannotCompleteEachOtherOrASuccessor() {
+        for (legacyFirst in listOf(true, false)) {
+            val root = temporary.newFolder()
+            val catalog = open(root)
+            val a = catalog.adopt(partition, named("Synthetic A"))
+            val b = other("Synthetic B").also { assertTrue(catalog.insert(it)) }
+            val first = catalog.beginDeletion(a.storage.id)
+            val second = catalog.beginDeletion(b.storage.id)
+            assertNotEquals(first.operation, second.operation)
+            assertEquals(first, catalog.beginDeletion(a.storage.id))
+            val restarted = open(root)
+            val ordered = if (legacyFirst) listOf(first, second) else listOf(second, first)
+            val before = restarted.snapshot()
+            assertFalse(restarted.completeDeletion(null))
+            assertFalse(restarted.completeDeletion(first.copy(operation = second.operation)))
+            assertEquals(before, open(root).snapshot())
+            assertTrue(restarted.completeDeletion(ordered.first()))
+            assertEquals(listOf(ordered.last()), open(root).snapshot().deletions)
+            assertNotNull(restarted.entry(ordered.last().entry!!))
+            assertFalse(restarted.completeDeletion(ordered.first()))
+            assertTrue(restarted.completeDeletion(ordered.last()))
+            assertTrue(open(root).snapshot().entries.isEmpty())
+            assertTrue(open(root).snapshot().deletions.isEmpty())
+        }
+    }
+
+    @Test fun failedReceiptFinalizationRetainsBothOperationsUntilTheirOwnSuccessfulRetry() {
+        val root = temporary.newFolder()
+        var fail = false
+        val catalog = open(root) { if (fail) throw IOException("synthetic finalization interruption") }
+        val a = catalog.adopt(partition, named("Synthetic A"))
+        val b = other("Synthetic B").also { assertTrue(catalog.insert(it)) }
+        val aReceipt = catalog.beginDeletion(a.storage.id)
+        val bReceipt = catalog.beginDeletion(b.storage.id)
+        val before = catalog.snapshot()
+        fail = true
+        assertFalse(catalog.completeDeletion(aReceipt))
+        assertEquals(before, open(root).snapshot())
+        fail = false
+        assertTrue(catalog.completeDeletion(aReceipt))
+        assertEquals(listOf(b), open(root).snapshot().entries)
+        assertEquals(listOf(bReceipt), open(root).snapshot().deletions)
+        assertTrue(catalog.completeDeletion(bReceipt))
+        assertTrue(open(root).snapshot().entries.isEmpty())
+    }
+
+    @Test fun legacyV1ReceiptRetainsItsOperationAndOnlyItsLegacyEntry() {
+        for (pending in listOf(false, true)) {
+            val root = temporary.newFolder()
+            val catalog = open(root)
+            val legacy = catalog.adopt(partition, named("Synthetic legacy"))
+            val operation = UUID(0, 42)
+            // Original v1 wire fixture, independent of the v2 writer.
+            val payload = java.io.ByteArrayOutputStream()
+            java.io.DataOutputStream(payload).use { out ->
+                fun uuid(value: UUID) { out.writeLong(value.mostSignificantBits); out.writeLong(value.leastSignificantBits) }
+                out.writeInt(0x41433100); uuid(slot)
+                out.writeBoolean(true); uuid(legacy.storage.id); out.writeInt(1)
+                uuid(legacy.storage.id); uuid(slot); out.writeBoolean(true)
+                out.writeBoolean(true); uuid(partition.value); out.writeUTF("CODEX")
+                out.writeBoolean(true); out.writeUTF("Synthetic legacy"); out.writeBoolean(true)
+                out.writeBoolean(false); out.writeBoolean(pending)
+                if (pending) uuid(operation)
+            }
+            val bytes = payload.toByteArray()
+            java.io.DataOutputStream(File(root, "account-catalog/catalog").outputStream()).use {
+                it.write(bytes); it.writeLong(java.util.zip.CRC32().apply { update(bytes) }.value)
+            }
+            val restored = open(root)
+            assertEquals(legacy, restored.legacyEntry())
+            val receipt = restored.snapshot().deletions.singleOrNull()
+            assertEquals(if (pending) CatalogDeletion(legacy.storage.id, operation) else null, receipt)
+            val b = other("Synthetic B").also { assertTrue(restored.insert(it)) }
+            if (pending) assertTrue(restored.completeDeletion(receipt))
+            assertEquals(b, open(root).entry(b.storage.id))
+            assertTrue(open(root).snapshot().deletions.isEmpty())
+        }
     }
 
     @Test fun corruptCatalogAndAbandonedStagingNeverBecomeAnEmptySuccessfulRead() {
