@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793973070436,
+  "lastUpdate": 1793973074091,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -6893,6 +6893,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/faed8d86b1a6eb3fb895acda083bbcf065fa6a49"
         },
         "date": 1793800627558,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a31d647510428df0384839d0b3b42b51c16ee6db",
+          "message": "Preserve the installed account in a durable catalog (#248)\n\n* Preserve the installed account in a durable catalog\n\n* Canonicalize application root before opening the account catalog\n\n* Recover catalog adoption and rename after transient storage failures\n\n* Separate durable catalog adoption from optional name recovery\n\n* Retry account metadata recovery through the existing owner lane\n\n* Keep quota access available during pending rename recovery\n\n* Assert the background gap and original usage recording separately",
+          "timestamp": "2026-11-06T16:50:44+03:00",
+          "tree_id": "8a2176ed74c6afc909a994d0885a3f03343400c0",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/a31d647510428df0384839d0b3b42b51c16ee6db"
+        },
+        "date": 1793973073571,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
