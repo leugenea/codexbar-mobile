@@ -22,6 +22,8 @@ internal class LifetimeJournal {
     var stageGate: ControlledGate? = null
     var activateGate: ControlledGate? = null
     var restoreGate: ControlledGate? = null
+    var metadataGate: ControlledGate? = null
+    @Volatile var metadataCalls = 0
     var active: Access? = null
     var deletions = 0
     var appendFailure: HistoryAppendOutcome? = null
@@ -64,6 +66,11 @@ internal class LifetimeJournal {
                 Phase.STAGED -> { entries.clear(); phase = Phase.EMPTY; HistoryLifetimeOutcome.Unavailable }
                 Phase.EMPTY -> HistoryLifetimeOutcome.Unavailable
             }
+        }
+        override fun reconcileMetadata(partition: HistoryPartition): Boolean {
+            metadataCalls++
+            metadataGate?.pause()
+            return true
         }
         override fun reserveDeletion(): HistoryDeletion {
             active?.revoke()
@@ -164,7 +171,7 @@ internal class LifetimeFixture(
         return owner.historyCapability(ready.envelope.generation) ?: throw AssertionError("history capability: ${owner.historyAvailability}")
     }
     override fun close() {
-        journal.deleteGate?.release(); journal.stageGate?.release(); journal.activateGate?.release(); journal.restoreGate?.release(); journal.nameGate?.release()
+        journal.deleteGate?.release(); journal.stageGate?.release(); journal.activateGate?.release(); journal.restoreGate?.release(); journal.metadataGate?.release(); journal.nameGate?.release()
         runBlocking { withTimeout(5_000) { owner.shutdown() } }
     }
 }

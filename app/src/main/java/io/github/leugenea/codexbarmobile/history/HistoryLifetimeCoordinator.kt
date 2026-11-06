@@ -8,6 +8,8 @@ internal interface HistoryLifetimeStorage : AutoCloseable {
     fun stage(): HistoryPartitionOutcome
     fun activate(partition: HistoryPartition): HistoryLifetimeOutcome
     fun restore(): HistoryLifetimeOutcome
+    /** Reconcile optional metadata without replacing an already healthy runtime port. */
+    fun reconcileMetadata(partition: HistoryPartition): Boolean = true
     fun readName(partition: HistoryPartition): AccountNameRead
     fun writeName(partition: HistoryPartition, name: AccountDisplayName?): Boolean
     /** Non-I/O reservation, including when no runtime access was adopted. */
@@ -35,6 +37,7 @@ internal sealed interface HistoryLifetimeOutcome {
     data class Bound(val access: HistoryRuntimeAccess) : HistoryLifetimeOutcome
     data object Unavailable : HistoryLifetimeOutcome
     data object RemovalRequired : HistoryLifetimeOutcome
+    data object CatalogUnavailable : HistoryLifetimeOutcome
 }
 
 internal enum class HistoryAvailability { UNAVAILABLE, AVAILABLE, STORAGE_FAILURE, REMOVAL_PENDING }
@@ -77,15 +80,45 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
     }
 
     fun activate(generation: SessionGeneration) = synchronized(io) {
-        val partition = synchronized(admission) { staged.takeIf { accepts(generation) } }
-        if (partition != null) adopt(generation, storage.activate(partition))
+        if (accepts(generation)) {
+            val partition = synchronized(admission) { staged }
+            // Failed staging still needs checked catalog adoption before session publication.
+            adopt(generation, if (partition == null) storage.restore() else storage.activate(partition))
+        }
+    }
+
+    fun needsRestoration(candidate: SessionGeneration): Boolean = synchronized(admission) {
+        accepts(candidate) && (availability in setOf(HistoryAvailability.UNAVAILABLE, HistoryAvailability.STORAGE_FAILURE)
+            || accountName?.storageFailed == true)
     }
 
     fun restore(generation: SessionGeneration) = synchronized(io) {
-        if (accepts(generation)) adopt(generation, storage.restore())
+        if (!accepts(generation)) return@synchronized
+        val healthy = synchronized(admission) { access }
+        if (healthy == null) adopt(generation, storage.restore())
+        else restoreMetadata(generation, healthy.partition)
+    }
+
+    /** Same I/O/deletion lane, but no native rebind or recorder replacement for a name retry. */
+    private fun restoreMetadata(generation: SessionGeneration, partition: HistoryPartition) {
+        val ready = storage.reconcileMetadata(partition)
+        val name = if (ready) storage.readName(partition) else AccountNameRead.Unavailable
+        synchronized(admission) {
+            if (!accepts(generation)) return@synchronized
+            catalogReady = ready
+            if (ready) adoptName(generation, partition, name)
+            else {
+                access?.revoke()
+                access = null
+                accountName = null
+                availability = HistoryAvailability.STORAGE_FAILURE
+            }
+        }
     }
 
     @Volatile var requiresRemoval = false
+        private set
+    @Volatile var catalogReady = false
         private set
 
     private fun adopt(generation: SessionGeneration, result: HistoryLifetimeOutcome) {
@@ -94,6 +127,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         synchronized(admission) {
             if (!accepts(generation)) { bound?.revoke(); return@synchronized }
             requiresRemoval = result == HistoryLifetimeOutcome.RemovalRequired
+            catalogReady = result != HistoryLifetimeOutcome.CatalogUnavailable
             staged = null
             lifetime = bound?.partition
             adoptName(generation, bound?.partition, name)
@@ -158,6 +192,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         staged = null
         lifetime = null
         accountName = null
+        catalogReady = false
         availability = HistoryAvailability.UNAVAILABLE
     }
 

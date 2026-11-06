@@ -55,6 +55,7 @@ internal class ConnectionController(
     private val history: HistoryLifetimeCoordinator? = null,
     historyQueueCapacity: Int = 16,
     private val backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit = {},
+    private val accountCatalog: AccountCatalog? = null,
 ) {
     internal val historyExportRequest = HistoryExportRequest()
     internal val historyImporterState = HistoryImporterState()
@@ -98,6 +99,7 @@ internal class ConnectionController(
                 session.adopt(restored.value)
                 publishName()
                 publish(0, ConnectionState(ConnectionPhase.RESTORED))
+                if (usageRefresh.hasForegroundObservers) resumeHistory()
             }
             is CredentialResult.Failure -> restoreFailure(restored)
         }
@@ -125,6 +127,13 @@ internal class ConnectionController(
     /** Continue only for the captured lifetime; interrupted removal uses one combined barrier. */
     private suspend fun completeHistoryRestoration(owner: Long, active: SessionGeneration): Boolean {
         if (!current(owner) || generation !== active || !store.isActive(active) || cleanupPending()) return false
+        if (history?.catalogReady == false) {
+            // A failed required catalog commit also closes an already-adopted session.
+            // Retirement preserves settled storage; existing uncertain-rotation quarantine remains.
+            val failedOwner = if (session.snapshot() is SessionResult.Ready) retire() else owner
+            publish(failedOwner, storageFailure())
+            return false
+        }
         if (history?.requiresRemoval != true) return true
         usageRefresh.reset()
         removeCredentials()
@@ -202,6 +211,7 @@ internal class ConnectionController(
             is CredentialResult.Success -> {
                 ownerScope.async(storageDispatcher) { history?.activate(terminal.generation) }.await()
                 if (!current(owner)) return
+                if (!completeHistoryRestoration(owner, terminal.generation)) return
                 session.adopt(credentials.value)
                 publishName()
                 pauseHistoryIfUnobserved()
@@ -319,14 +329,17 @@ internal class ConnectionController(
 
     private fun resumeHistory() {
         val active = (session.snapshot() as? SessionResult.Ready)?.envelope ?: return
-        if (cleanupPending() || historyAvailability !in setOf(HistoryAvailability.UNAVAILABLE, HistoryAvailability.STORAGE_FAILURE)
-            || historyRestore?.isActive == true) return
-        history?.resumeRuntime()
+        if (cleanupPending() || history?.needsRestoration(active.generation) != true) return
+        history.resumeRuntime()
+        if (historyRestore?.isActive == true) return
         val owner = revision
         historyRestore = ownerScope.launch(start = CoroutineStart.LAZY) {
-            ownerScope.async(storageDispatcher) { history?.restore(active.generation) }.await()
+            ownerScope.async(storageDispatcher) { history.restore(active.generation) }.await()
             historyRestore = null
             if (!completeHistoryRestoration(owner, active.generation)) return@launch
+            // Admit a necessary successor before publishing null access as no longer pending.
+            if ((usageRefresh.hasForegroundObservers || backgroundHistoryInterests > 0)
+                && historyAvailability == HistoryAvailability.UNAVAILABLE) resumeHistory()
             bindHistory(active.generation)
             if (mutableName.value != null) publishName()
         }.also { it.start() }
@@ -528,7 +541,9 @@ internal class ConnectionController(
             val sessionRemoved = session.awaitRemoval()
             val credentialsRemoved = deletion?.await() !is CredentialResult.Failure
             val historyRemoved = historyDeletion?.await()?.successful() != false
-            sessionRemoved && credentialsRemoved && historyRemoved
+            val receipt = accountCatalog?.snapshot()?.deleting
+            if (!sessionRemoved || !credentialsRemoved || !historyRemoved) false
+            else ownerScope.async(storageDispatcher) { accountCatalog?.completeDeletion(receipt) != false }.await()
         } ?: false
     }
 
@@ -578,6 +593,16 @@ internal class ConnectionController(
         val receipt = CompletableDeferred<Unit>()
         ownerScope.launch { receipt.complete(Unit) }
         receipt.await()
+    }
+
+    /** Completion receipt for the owner continuation, including a resumed runtime rebind. */
+    @androidx.annotation.VisibleForTesting(otherwise = androidx.annotation.VisibleForTesting.NONE)
+    internal suspend fun historyRestorationSettled() = withContext(mutationDispatcher) {
+        while (true) {
+            val pending = historyRestore ?: break
+            pending.join()
+            if (historyRestore === pending) break
+        }
     }
 
     internal suspend fun shutdown() {

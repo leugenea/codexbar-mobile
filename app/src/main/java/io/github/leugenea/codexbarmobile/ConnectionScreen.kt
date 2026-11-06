@@ -12,6 +12,9 @@ import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
 import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
 import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
+import io.github.leugenea.codexbarmobile.credentials.syncDirectory
+import io.github.leugenea.codexbarmobile.account.AccountCatalog
+import io.github.leugenea.codexbarmobile.account.CatalogHistoryStorage
 import io.github.leugenea.codexbarmobile.history.HistoryLifetimeCoordinator
 import io.github.leugenea.codexbarmobile.history.SQLiteHistoryLifetimeStorage
 import io.github.leugenea.codexbarmobile.history.SQLiteHistoryStore
@@ -62,14 +65,16 @@ internal object NativeConnection {
     private fun createController(context: Context, suppliedTransport: AuthTransport?, clock: TransportClock,
         pause: suspend (Long) -> Unit, backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit): ConnectionController {
         val app = context.applicationContext
-        val session = try { session(app) } catch (_: Exception) { null }
+        val catalog = try { catalog(app) } catch (_: Exception) { null }
+        val session = catalog?.snapshot()?.legacySlot
         val store = KeystoreCredentialStore(app, session ?: UUID.randomUUID())
         val transport = suppliedTransport ?: productionTransport(app)
         return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),
             NativeFeasibilityReader(transport, clock, pause),
             CoroutineScope(SupervisorJob() + Dispatchers.IO), storageReady = session != null, refreshClock = clock,
-            history = HistoryLifetimeCoordinator(SQLiteHistoryLifetimeStorage(SQLiteHistoryStore.open(app))),
-            backgroundEnrollment = backgroundEnrollment)
+            history = HistoryLifetimeCoordinator(SQLiteHistoryLifetimeStorage(SQLiteHistoryStore.open(app)).let {
+                if (catalog == null) it else CatalogHistoryStorage(it, catalog)
+            }), accountCatalog = catalog, backgroundEnrollment = backgroundEnrollment)
     }
 
     private fun productionTransport(context: Context): AuthTransport {
@@ -79,7 +84,16 @@ internal object NativeConnection {
         return AuthTransport(adapter::execute)
     }
 
-    internal fun session(context: Context): UUID {
+    internal fun session(context: Context): UUID = catalog(context).snapshot().legacySlot
+
+    private fun catalog(context: Context): AccountCatalog {
+        val catalog = AccountCatalog.open(context.noBackupFilesDir, legacySession = { legacySession(context) })
+        val selector = File(context.noBackupFilesDir, "connection-session")
+        if (selector.exists()) require(legacySession(context) == catalog.snapshot().legacySlot)
+        return catalog
+    }
+
+    private fun legacySession(context: Context): UUID {
         val target = File(context.noBackupFilesDir, "connection-session")
         if (target.exists()) {
             val text = target.inputStream().use { input ->
@@ -92,13 +106,22 @@ internal object NativeConnection {
             require(session.toString() == text) { "Invalid local session" }
             return session
         }
+        check(!legacyArtifacts(context.noBackupFilesDir)) { "Missing local session selector" }
         val session = UUID.randomUUID()
         val temporary = File.createTempFile("connection-", ".tmp", context.noBackupFilesDir)
         try {
             FileOutputStream(temporary).use { it.write(session.toString().toByteArray(Charsets.US_ASCII)); it.fd.sync() }
             check(temporary.renameTo(target)) { "Local session write failed" }
+            syncDirectory(context.noBackupFilesDir)
         } finally { temporary.delete() }
         return session
+    }
+
+    private fun legacyArtifacts(root: File): Boolean {
+        if (File(root, "usage-history").list()?.isNotEmpty() == true) return true
+        return File(root, "credentials").listFiles()?.any {
+            File(it, "value.bin").exists() || File(it, "rotation-pending").exists()
+        } == true
     }
 }
 
