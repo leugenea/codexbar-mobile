@@ -58,6 +58,15 @@ A catalog failure at that boundary retains protected credentials for a later ret
 without publishing a usable session. Missing credentials, corrupt ciphertext, key loss and a
 pending rotation marker retain the existing combined fail-closed cleanup behavior.
 Ordinary successful restoration remains dormant and sends no provider requests.
+The first foreground registration also retries unavailable name metadata when history
+is already healthy; a real foreground return or fresh holder retries the same durable
+association. These continuations use the existing generation-bound storage lane. A
+metadata-only retry retains the healthy runtime port and live editor rather than
+rebinding history or activating quota reads. Repeated triggers share in-flight recovery.
+A required catalog commit failure during later recovery retires an already usable
+runtime as FAILED/STORAGE, preventing further reads or stale name publication. Settled
+credentials/history remain available to a fresh holder; the existing unfinished-token-
+rotation quarantine and deletion policy is unchanged.
 
 Deletion writes a catalog receipt before erasing history. That receipt survives even if
 history is already physically gone while credentials remain readable. Restart requires

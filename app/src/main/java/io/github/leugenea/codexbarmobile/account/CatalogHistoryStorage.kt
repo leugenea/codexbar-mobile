@@ -15,17 +15,24 @@ internal class CatalogHistoryStorage(
         if (result == HistoryLifetimeOutcome.RemovalRequired) return result
         val bound = result as? HistoryLifetimeOutcome.Bound
         return try {
-            val partition = bound?.access?.partition
-            val name = partition?.let(storage::readName) ?: AccountNameRead.Unavailable
-            val entry = catalog.adopt(partition, name)
-            // A pending sidecar is optional metadata, not a failed durable identity adoption.
-            // Required catalog commits still throw into the fail-closed boundary below.
-            recoverRename(entry)
+            reconcile(bound?.access?.partition)
             result
         } catch (_: Exception) {
             bound?.access?.revoke()
             HistoryLifetimeOutcome.CatalogUnavailable
         }
+    }
+
+    override fun reconcileMetadata(partition: HistoryPartition): Boolean = try {
+        reconcile(partition)
+        true
+    } catch (_: Exception) { false }
+
+    private fun reconcile(partition: HistoryPartition?) {
+        val name = partition?.let(storage::readName) ?: AccountNameRead.Unavailable
+        val entry = catalog.adopt(partition, name)
+        // False replay means optional metadata is pending; required catalog commits still throw.
+        recoverRename(entry)
     }
 
     override fun readName(partition: HistoryPartition): AccountNameRead = try {

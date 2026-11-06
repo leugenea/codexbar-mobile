@@ -8,6 +8,8 @@ internal interface HistoryLifetimeStorage : AutoCloseable {
     fun stage(): HistoryPartitionOutcome
     fun activate(partition: HistoryPartition): HistoryLifetimeOutcome
     fun restore(): HistoryLifetimeOutcome
+    /** Reconcile optional metadata without replacing an already healthy runtime port. */
+    fun reconcileMetadata(partition: HistoryPartition): Boolean = true
     fun readName(partition: HistoryPartition): AccountNameRead
     fun writeName(partition: HistoryPartition, name: AccountDisplayName?): Boolean
     /** Non-I/O reservation, including when no runtime access was adopted. */
@@ -85,8 +87,33 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         }
     }
 
+    fun needsRestoration(candidate: SessionGeneration): Boolean = synchronized(admission) {
+        accepts(candidate) && (availability in setOf(HistoryAvailability.UNAVAILABLE, HistoryAvailability.STORAGE_FAILURE)
+            || accountName?.storageFailed == true)
+    }
+
     fun restore(generation: SessionGeneration) = synchronized(io) {
-        if (accepts(generation)) adopt(generation, storage.restore())
+        if (!accepts(generation)) return@synchronized
+        val healthy = synchronized(admission) { access }
+        if (healthy == null) adopt(generation, storage.restore())
+        else restoreMetadata(generation, healthy.partition)
+    }
+
+    /** Same I/O/deletion lane, but no native rebind or recorder replacement for a name retry. */
+    private fun restoreMetadata(generation: SessionGeneration, partition: HistoryPartition) {
+        val ready = storage.reconcileMetadata(partition)
+        val name = if (ready) storage.readName(partition) else AccountNameRead.Unavailable
+        synchronized(admission) {
+            if (!accepts(generation)) return@synchronized
+            catalogReady = ready
+            if (ready) adoptName(generation, partition, name)
+            else {
+                access?.revoke()
+                access = null
+                accountName = null
+                availability = HistoryAvailability.STORAGE_FAILURE
+            }
+        }
     }
 
     @Volatile var requiresRemoval = false
