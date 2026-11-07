@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794061422450,
+  "lastUpdate": 1794061425055,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -6961,6 +6961,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/a31d647510428df0384839d0b3b42b51c16ee6db"
         },
         "date": 1793973073571,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d6a9f149412a305906dd3188b3964790ad5d3026",
+          "message": "Keep Codex runtimes and terminal cleanup entry-owned (#251)\n\n* Keep account runtimes and cleanup settlement bound to exact entries\n\n* Make retained application-context lifetime explicit to lint\n\n* Update pinned Gradle wrapper and matching integrity literals to 9.9.0\n\n* Retry applied catalog deletion durability through its original ticket",
+          "timestamp": "2026-11-07T17:23:20+03:00",
+          "tree_id": "1b60376b860c97b554e97ff1dff52b9a0f8d6472",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/d6a9f149412a305906dd3188b3964790ad5d3026"
+        },
+        "date": 1794061424622,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
