@@ -6,6 +6,9 @@ import android.content.Intent
 import androidx.core.net.toUri
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.awaitCancellation
@@ -28,39 +31,45 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 
 class MainActivity : ComponentActivity() {
-    internal lateinit var connection: ConnectionController
-        private set
+    private lateinit var dashboard: kotlinx.coroutines.flow.StateFlow<DashboardSelection?>
+    internal val connection: ConnectionController get() = requireNotNull(dashboard.value).controller
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Activities observe the process owner; destruction never closes its work.
-        connection = NativeConnection.get(applicationContext)
+        dashboard = NativeConnection.dashboard(applicationContext)
         enableEdgeToEdge()
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
-                val connectionState by connection.state.collectAsState()
+                val selection by dashboard.collectAsState()
+                val root = requireNotNull(selection)
+                val connectionState by root.controller.state.collectAsState()
                 // Launch and recreation attach the same identity-tagged STARTED observer.
                 // Fresh restored owners remain dormant; already activated owners may resume reads.
-                ObserveUsageLifecycle(connection, lifecycle)
+                ObserveUsageLifecycle(lifecycle) { NativeConnection.observeDashboard(applicationContext) }
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background,
                     contentColor = MaterialTheme.colorScheme.onBackground) {
                     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-                        ConnectionScreen(connectionState, connection, ::openVerificationBrowser, historyUiObserver)
+                        key(root) {
+                            ConnectionScreen(connectionState, root.controller, { openVerificationBrowser(root.controller) }, historyUiObserver, root)
+                        }
                     }
                 }
             }
         }
     }
 
-    internal fun openVerificationBrowser() {
-        val awaiting = connection.state.value.auth as? AuthState.AwaitingUser ?: return
+    internal fun openVerificationBrowser() = openVerificationBrowser(connection)
+
+    private fun openVerificationBrowser(target: ConnectionController) {
+        val awaiting = target.state.value.auth as? AuthState.AwaitingUser ?: return
         val intent = Intent(Intent.ACTION_VIEW, awaiting.verificationUrl.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
         try {
             browserLauncher(this, intent)
         } catch (_: ActivityNotFoundException) {
-            connection.browserFailed()
+            target.browserFailed()
         } catch (_: SecurityException) {
-            connection.browserFailed()
+            target.browserFailed()
         }
     }
 
@@ -72,12 +81,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun ObserveUsageLifecycle(controller: ConnectionController, lifecycle: Lifecycle) {
-    LaunchedEffect(controller, lifecycle) {
-        val observer = Any()
+private fun ObserveUsageLifecycle(lifecycle: Lifecycle, register: suspend () -> DashboardObserver) {
+    LaunchedEffect(lifecycle) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            controller.usageForeground(observer, true)
-            try { awaitCancellation() } finally { controller.usageForeground(observer, false) }
+            val observer = register()
+            try { awaitCancellation() } finally { withContext(NonCancellable) { observer.stop() } }
         }
     }
 }

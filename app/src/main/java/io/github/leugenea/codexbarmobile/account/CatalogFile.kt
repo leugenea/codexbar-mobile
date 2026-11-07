@@ -13,11 +13,12 @@ import java.util.zip.CRC32
 
 /** Versioned non-secret metadata, beside (never inside) the strict history directory. */
 internal class CatalogFile(private val directory: File, private val beforeRename: () -> Unit = {},
-    private val beforeDirectorySync: () -> Unit = {}) {
+    private val beforeDirectorySync: () -> Unit = {}, private val beforeRead: () -> Unit = {}) {
     private val target = File(directory, "catalog")
     fun exists() = target.exists()
 
     fun read(): CatalogSnapshot {
+        beforeRead()
         val bytes = target.readBytes()
         require(bytes.size >= 8)
         val payload = bytes.copyOf(bytes.size - 8)
@@ -25,7 +26,7 @@ internal class CatalogFile(private val directory: File, private val beforeRename
         require(CRC32().apply { update(payload) }.value == checksum)
         return DataInputStream(ByteArrayInputStream(payload)).use { input ->
             val version = input.readInt()
-            require(version == MAGIC || version == LEGACY_MAGIC)
+            require(version == MAGIC || version == V2_MAGIC || version == LEGACY_MAGIC)
             val slot = input.uuid()
             val selected = if (input.readBoolean()) input.uuid() else null
             val count = input.readInt().also { require(it >= 0) }
@@ -54,6 +55,7 @@ internal class CatalogFile(private val directory: File, private val beforeRename
             state.deletions.forEach { receipt ->
                 output.writeBoolean(receipt.entry != null); receipt.entry?.let { output.uuid(it) }
                 output.uuid(receipt.operation)
+                output.writeUTF(receipt.disposition.name)
             }
         }
         val bytes = payload.toByteArray()
@@ -111,7 +113,12 @@ internal class CatalogFile(private val directory: File, private val beforeRename
             return listOf(CatalogDeletion(entries.singleOrNull { it.storage.legacy }?.storage?.id, uuid()))
         }
         val count = readInt().also { require(it in 0..entries.size + 1) }
-        return List(count) { CatalogDeletion(if (readBoolean()) uuid() else null, uuid()) }
+        return List(count) {
+            val entry = if (readBoolean()) uuid() else null
+            val operation = uuid()
+            val disposition = if (version == MAGIC) CleanupDisposition.valueOf(readUTF()) else CleanupDisposition.REMOVE
+            CatalogDeletion(entry, operation, disposition)
+        }
     }
 
     private fun DataInputStream.entry(): CatalogEntry {
@@ -132,6 +139,7 @@ internal class CatalogFile(private val directory: File, private val beforeRename
 
     companion object {
         private const val LEGACY_MAGIC = 0x41433100
-        private const val MAGIC = 0x41433200
+        private const val V2_MAGIC = 0x41433200
+        private const val MAGIC = 0x41433300
     }
 }

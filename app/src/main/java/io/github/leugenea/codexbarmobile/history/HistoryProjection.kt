@@ -57,7 +57,7 @@ internal class HistoryGraphEntry(val source: HistoryEntry, windows: Collection<H
 }
 
 /** Opaque diagnostic context or bound runtime context; never persisted or reused after revocation. */
-internal class HistoryDisplayContext(val generation: HistoryGeneration?) {
+internal class HistoryDisplayContext(val generation: HistoryGeneration?, val hostCurrent: () -> Boolean = { true }) {
     /** Updated on the existing owner lane before publication; independent of delayed collectors. */
     @Volatile var periods: CurrentHistoryPeriods = CurrentHistoryPeriods()
     @Volatile var selection: HistoryDisplaySelection? = null

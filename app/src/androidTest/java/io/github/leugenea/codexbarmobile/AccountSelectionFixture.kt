@@ -1,0 +1,170 @@
+package io.github.leugenea.codexbarmobile
+
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.test.core.app.ApplicationProvider
+import io.github.leugenea.codexbarmobile.account.*
+import io.github.leugenea.codexbarmobile.auth.AuthTransport
+import io.github.leugenea.codexbarmobile.credentials.*
+import io.github.leugenea.codexbarmobile.history.*
+import io.github.leugenea.codexbarmobile.transport.*
+import io.github.leugenea.codexbarmobile.usage.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
+import org.junit.Assert.*
+import java.io.File
+import java.math.BigDecimal
+import java.security.KeyStore
+import java.time.Instant
+import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+
+/** Two real protected/SQLite accounts, distinguished by facts, not provider/JWT identity. */
+internal class AccountSelectionFixture {
+    private val application = ApplicationProvider.getApplicationContext<Context>()
+    val directory = File(application.noBackupFilesDir, "synthetic-selection-${UUID.randomUUID()}").canonicalFile
+    val context = object : ContextWrapper(application) {
+        override fun getApplicationContext(): Context = this
+        override fun getNoBackupFilesDir() = directory
+    }
+    private val slot = UUID.randomUUID()
+    val aTransport = NavigationTransport()
+    val bTransport = NavigationTransport().apply { usageBody = NavigationTransport.USAGE.replace("12.375", "62.5") }
+    val transport = AuthTransport { request, deadline, terminal ->
+        val token = (request as? ProviderHttpRequest.Get)?.bearer?.copyBytes()?.toString(Charsets.UTF_8)
+        val target = if (token?.contains("-B-") == true) bTransport else aTransport
+        target.execute(request, deadline, terminal)
+    }
+    lateinit var catalog: AccountCatalog
+    lateinit var a: CatalogEntry
+    lateinit var b: CatalogEntry
+    lateinit var owner: AccountRuntimeOwner
+    var decorateCredential: (UUID, CredentialStore) -> CredentialStore = { _, store -> store }
+    var hooks: (File) -> HistoryStorageHooks = { object : HistoryStorageHooks {} }
+    var decorateHistory: (File, HistoryLifetimeStorage) -> HistoryLifetimeStorage = { _, storage -> storage }
+    data class AppendReceipt(val directory: File, val admission: HistoryAdmission, val result: HistoryAppendOutcome)
+    val appends = java.util.concurrent.CopyOnWriteArrayList<AppendReceipt>()
+    private val gates = mutableListOf<SelectionGate>()
+    private val originalRootFactory = NativeConnection.rootFactory
+    private var installed = false
+    private val at = Instant.ofEpochSecond(1_800_000_000)
+
+    fun prepare() {
+        assertTrue(directory.mkdir())
+        File(directory, "connection-session").writeText(slot.toString())
+        catalog = AccountCatalog.open(directory, { slot })
+        a = seed(AccountStorage(UUID.randomUUID(), slot, true), "A", "12.375")
+        b = seed(AccountStorage.fresh(), "B", "62.5")
+    }
+
+    fun start(): AccountRuntimeOwner {
+        owner = AccountRuntimeOwner(context, catalog, transport, aTransport.clock, aTransport::pause,
+            credentials = { app, id -> decorateCredential(id, KeystoreCredentialStore(app, id)) },
+            historyStorage = { path ->
+                val storage = decorateHistory(path, SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(path, hooks = hooks(path))))
+                object : HistoryLifetimeStorage by storage {
+                    override fun restore() = observed(path, storage.restore())
+                    override fun activate(partition: HistoryPartition) = observed(path, storage.activate(partition))
+                }
+            })
+        return owner
+    }
+
+    private fun observed(path: File, outcome: HistoryLifetimeOutcome): HistoryLifetimeOutcome {
+        if (outcome !is HistoryLifetimeOutcome.Bound) return outcome
+        val native = outcome.access
+        return HistoryLifetimeOutcome.Bound(object : HistoryRuntimeAccess by native {
+            override fun append(admission: HistoryAdmission): HistoryAppendOutcome = native.append(admission).also {
+                appends += AppendReceipt(path, admission, it)
+            }
+        })
+    }
+
+    fun installActivity() {
+        NativeConnection.rootFactory = { owner }
+        installed = true
+        NativeConnection.resetForTests()
+    }
+
+    private fun seed(address: AccountStorage, label: String, percent: String): CatalogEntry {
+        val store = KeystoreCredentialStore(context, address.credentialSlot)
+        val active = store.openSession()
+        assertTrue(store.replace(CredentialEnvelope(active,
+            SensitiveValue.copyOf("synthetic-$label-access".toByteArray()),
+            SensitiveValue.copyOf("synthetic-$label-refresh".toByteArray())), CredentialCancellation()) is CredentialResult.Success)
+        val partition = SQLiteHistoryStore(address.historyDirectory(directory)).use { history ->
+            val access = (history.createPartition() as HistoryAccessOutcome.Bound).access
+            val input = WindowInput(Input.Value(18000L), Input.Value(BigDecimal(percent)), Input.Value(1_800_003_600L), Input.Missing)
+            val usage = UsageNormalizer.normalize(UsageInput(Input.Value(input), Input.Missing), at)
+            for (id in 1L..3L) assertTrue(access.append(HistoryAdmission(access.partition, ObservationId(id),
+                HistoryClock(ClockEpoch(UUID(0, 99)), id * 1000), HistoryEvent.Observed(usage))) is HistoryAppendOutcome.Stored)
+            assertTrue(history.writeName(access.partition, AccountDisplayName.from("Synthetic $label")))
+            access.partition
+        }
+        return CatalogEntry(address, partition, "Synthetic $label", true).also { assertTrue(catalog.insert(it)) }
+    }
+
+    fun runtime(entry: CatalogEntry): ConnectionController = requireNotNull(owner.runtime(entry.storage.id))
+    fun ready(controller: ConnectionController) = (controller.session.snapshot() as SessionResult.Ready).envelope
+    fun phase(controller: ConnectionController, phase: ConnectionPhase) = receipt("phase $phase", controller) {
+        controller.commandsSettled()
+        controller.state.first { it.phase == phase && !it.refresh.refreshing }
+    }
+    fun settle(controller: ConnectionController) = receipt("commands and restoration", controller) {
+        controller.commandsSettled(); controller.historyRestorationSettled()
+    }
+    fun select(entry: CatalogEntry) = receipt("durable selection ${entry.name}") { owner.select(entry.storage.id) }.also { assertTrue(it) }
+    fun observer() = receipt("STARTED registration") { owner.registerForeground() }
+    fun stop(observer: DashboardObserver) = receipt("STOP exact registration") { observer.stop() }
+    fun gate() = SelectionGate().also { gates += it }
+
+    fun <T> receipt(label: String, controller: ConnectionController? = null, block: suspend () -> T): T = runBlocking {
+        try { withTimeout(8_000) { block() } }
+        catch (error: TimeoutCancellationException) {
+            throw AssertionError("$label: last state=${controller?.state?.value}, selected=${catalog.snapshot().selected}", error)
+        }
+    }
+    fun await(label: String, predicate: () -> Boolean) = receipt(label) { while (!predicate()) yield() }
+
+    fun bytes(entry: CatalogEntry): Map<String, List<Byte>> {
+        val history = entry.storage.historyDirectory(directory).walkTopDown().filter { it.isFile }.associate {
+            it.relativeTo(directory).path to it.readBytes().toList()
+        }
+        val credential = KeystoreCredentialStore.file(context, entry.storage.credentialSlot)
+        return history + (credential.relativeTo(directory).path to credential.readBytes().toList())
+    }
+    fun page(controller: ConnectionController) = receipt("actual page completion", controller) {
+        controller.commandsSettled()
+        controller.historySnapshots.first { it.storage?.lastAdmitted?.ordinal != null }
+    }
+    fun diskPage(entry: CatalogEntry) = SQLiteHistoryStore(entry.storage.historyDirectory(directory)).use { history ->
+        val access = (history.adopt(entry.partition!!) as HistoryAccessOutcome.Bound).access
+        (access.read(HistoryReadQuery(entry.partition, 32)) as HistoryReadOutcome.Ready).snapshot
+    }
+
+    fun cleanup() {
+        gates.forEach { it.release() }
+        aTransport.releaseHeld(); bTransport.releaseHeld()
+        try {
+            if (installed) NativeConnection.resetForTests()
+            if (::owner.isInitialized) receipt("root shutdown") { owner.shutdown() }
+        } finally {
+            if (installed) NativeConnection.rootFactory = originalRootFactory
+            val keys = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            listOf(a, b).forEach { keys.deleteEntry(KeystoreCredentialStore.alias(context, it.storage.credentialSlot)) }
+            assertTrue(directory.deleteRecursively())
+        }
+    }
+}
+
+internal class SelectionGate {
+    private val entered = CountDownLatch(1)
+    private val released = CountDownLatch(1)
+    fun pause(label: String) {
+        entered.countDown()
+        check(released.await(15, TimeUnit.SECONDS)) { "$label: last state=held" }
+    }
+    fun await(label: String) { assertTrue("$label: last state=not reached", entered.await(8, TimeUnit.SECONDS)) }
+    fun release() { released.countDown() }
+}

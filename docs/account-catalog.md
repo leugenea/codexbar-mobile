@@ -2,8 +2,9 @@
 
 The catalog provides durable **local** entry addressing. The single process holder retains
 concrete entry-owned controller/session/credential/history/recorder stacks behind an internal
-exact-entry ingress. Construction and restoration are dormant. The public UI and production
-worker still use the original compatibility runtime. There is no new account list, sign-in path, dashboard switch or scheduler policy.
+exact-entry ingress. Construction and restoration are dormant. The Activity observes the internal
+persisted dashboard selection; the production worker keeps its original exact compatibility
+runtime. There is no new account list, sign-in path, dropdown or scheduler policy.
 Account settings navigation does not select an account. The later dashboard dropdown
 and all-enrolled-account scheduling are separate integration work.
 
@@ -73,23 +74,30 @@ Deletion writes an entry-and-operation-tagged catalog receipt before erasing his
 Independent terminal cleanups may overlap while their protected I/O is suspended, so the
 same journal retains one receipt per entry. Each existing deletion ticket captures its own receipt;
 each controller waiter captures that ticket and its deletion jobs before suspending.
-Completion never looks up whichever operation is current afterward. Catalog v2
-reads v1 metadata and its untagged legacy receipt without changing that operation UUID.
-An old receipt targets only the legacy association (or the pre-adoption empty legacy slot).
-The next successful catalog write uses v2; older app versions cannot read v2 metadata.
+Completion never looks up whichever operation is current afterward. Catalog v3 adds a captured
+`RETAIN`/`REMOVE` disposition to each exact entry/operation receipt. It reads v1 and v2
+receipts as `REMOVE`, preserving their original semantics and operation UUID; it never
+guesses unavailable historical intent from the current phase or selection. A v1 receipt
+targets only the legacy association (or the pre-adoption empty legacy slot). Every new
+write uses v3; older applications cannot read this format.
 
 That receipt survives even if history is already physically gone while credentials remain readable. Restart requires
 combined removal, not restoration. Only the process owner's successful credential AND
-history deletion barrier removes the catalog association/selection and clears the receipt.
+history deletion barrier settles its captured disposition and clears the receipt.
+`RETAIN` invalidates credentials/history and clears the old partition association, but keeps
+the immutable address, valid local name and dashboard selection. Reauthorization is not a
+request to choose a healthier peer. The old partition never authorizes the invalidated entry;
+a later checked fresh adoption may bind a new partition and restore the retained local name
+to its sidecar. `REMOVE` deletes the entry and, if selected, chooses the first remaining entry
+in stable catalog order (or null when empty), without sorting labels or inspecting health.
 A failed or interrupted barrier remains pending. Each ticket retains its own applied
 finalization provenance in memory: if its exact receipt was present when completion
 attempted replacement and readback confirms its removal after a directory-sync failure,
 that same ticket retries directory durability. It never rewrites its old snapshot or
 accepts an unrelated absent receipt; newer peer and successor changes remain untouched.
 Failure remains a storage error until sync succeeds, without another persisted journal.
-This substrate preserves the legacy selection invalidation; the following selection unit
-owns the approved deterministic remaining-entry fallback and explicit-selection quota
-request. No selection command is introduced here.
+The existing controller removal path consumes this primitive; public multi-account Add,
+reauthorization and removal workflows remain a separate integration unit.
 
 ## Rename transaction
 
@@ -132,7 +140,41 @@ store and generation after a network waiter detaches.
 The compatibility scheduler callback cancels only its captured continuing lifetime.
 Nonlegacy runtime ingress has no production enrollment callback in this intermediate unit;
 all-enrolled resolution and scheduling remain the scheduler integration's responsibility.
-There is no selected-only worker routing, dashboard observer transfer or new public control.
+There is no selected-only worker routing or new public control.
+
+## Dashboard selection and display authority
+
+`AccountCatalog.select` accepts only a saved immutable address. The selected ID is
+replaced and directory-synced before the process owner publishes successor display or
+network authority. Idempotent selection keeps the same `DashboardSelection` identity
+but still requests quotas as an explicit action. Actual selected-entry removal uses the
+same immediate request policy, including a previously dormant remaining entry. Passive
+construction, cold restoration and settings/history navigation never activate quotas.
+`settings(id)` returns an independent addressed controller handle, without selecting it.
+
+After a failed replacement or fsync, the catalog re-reads the actual file and fences the
+next write until readback and current-directory sync succeed. Unreadable uncertainty
+cannot be overwritten from stale memory. The observable catalog remains at its last
+confirmed publication until that confirmation. Initial identity/selection failures are
+fail-closed. Optional rename-finalization uncertainty keeps the existing old/new key
+reservation and healthy quota access; its existing settlement path confirms the current
+file instead of replaying an old snapshot or adding a rollback journal.
+
+Each actual selection transition creates a fresh root identity in a `StateFlow`, including
+A → B → equal-query A. MainActivity collects it and registers one exact STARTED lease per
+lifecycle interval. Transfer removes only those captured foreground tokens and acquires
+them on the selected retained controller. A late STOP is idempotent and cannot release a
+peer or a newer registration. No switch calls connect, session retirement or adoption.
+Accepted rotation, protected writes and admitted recorder work retain their original
+controller, store and native capability. Deselection hides history without pausing or
+rebinding that accepted storage; occasional missed observations remain noncritical.
+
+History contexts capture their actual-host root check at issuance. The host checks both
+the current root and recorder/request identity before using a delivered page or plot
+cache. A valid account-local storage binding alone cannot make a predecessor root's page
+visible again. Fresh root collection also invalidates same-phase Compose/strong-skipping
+presentation; a plain latest-ID field is not the notification mechanism. These are
+host-pass authorization checks, not atomic erasure of already-drawn pixels.
 
 Native composition cases reuse actual protected Keystore and SQLite fixtures for two
 preseeded entries, stable runtime identities, subordinate shutdown, detached rotation,

@@ -41,7 +41,7 @@ internal fun allowedDashboardRoute(requested: DashboardRoute, diagnosticsEnabled
 /** Only ephemeral presentation choices; no saved account, payload, cursor or capability. */
 @Composable
 internal fun ConnectionScreen(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit,
-    observer: HistoryUiObserver? = null) {
+    observer: HistoryUiObserver? = null, selection: DashboardSelection? = null) {
     var selectedRoute by remember(controller) { mutableStateOf(DashboardRoute.DASHBOARD) }
     // Normalize before Back, history interest, header and content; never render a denied route.
     val route = allowedDashboardRoute(selectedRoute, BuildConfig.DEBUG)
@@ -55,7 +55,7 @@ internal fun ConnectionScreen(state: ConnectionState, controller: ConnectionCont
     ModalNavigationDrawer(drawerState = drawer, drawerContent = {
         DetailDrawer(route) { selectedRoute = it; scope.launch { drawer.close() } }
     }) {
-        ConnectionRoute(state, controller, route, openBrowser, observer, exporter, importer,
+        ConnectionRoute(state, controller, route, openBrowser, observer, exporter, importer, selection,
             { scope.launch { drawer.open() } }, { selectedRoute = DashboardRoute.DASHBOARD },
             { selectedRoute = DashboardRoute.ACCOUNT_SETTINGS })
     }
@@ -81,10 +81,10 @@ private fun DetailDrawer(route: DashboardRoute, select: (DashboardRoute) -> Unit
 
 @Composable
 private fun ConnectionRoute(state: ConnectionState, controller: ConnectionController, route: DashboardRoute,
-    openBrowser: () -> Unit, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter, openDrawer: () -> Unit, back: () -> Unit, openAccountSettings: () -> Unit) {
+    openBrowser: () -> Unit, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter, selection: DashboardSelection?, openDrawer: () -> Unit, back: () -> Unit, openAccountSettings: () -> Unit) {
     val source = collectedHistory(controller, observer)
     // Collection triggers a pass; this actual volatile slot is the permission on that pass.
-    val authority = controller.currentHistoryDisplayContext()
+    val authority = if (selection == null) controller.currentHistoryDisplayContext() else selection.historyContext()
     val periods = authority?.periods ?: CurrentHistoryPeriods()
     var kind by remember(controller, source.generation) { mutableStateOf(WindowKind.FIVE_HOUR) }
     var after by remember(controller, source.generation, route) { mutableStateOf<ObservationId?>(null) }
