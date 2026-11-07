@@ -1144,7 +1144,7 @@ class AccountCatalogMigrationTest {
                 val native = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(directory))
                 val hold = if (directory == a.storage.historyDirectory(root)) holdA else holdB
                 object : HistoryLifetimeStorage by native {
-                    override fun reserveDeletion(): HistoryDeletion {
+                    override fun reserveDeletion(disposition: io.github.leugenea.codexbarmobile.account.CleanupDisposition): HistoryDeletion {
                         val ticket = native.reserveDeletion()
                         return HistoryDeletion { hold.pause("captured history barrier"); ticket.complete() }
                     }
@@ -1165,11 +1165,14 @@ class AccountCatalogMigrationTest {
                 assertNotNull(catalog().entry(heldEntry.storage.id))
             } finally { holdA.release(); holdB.release() }
             phase(first, ConnectionPhase.REAUTH_REQUIRED); phase(second, ConnectionPhase.REAUTH_REQUIRED)
-            assertTrue(catalog().snapshot().entries.isEmpty()); assertTrue(catalog().snapshot().deletions.isEmpty())
+            assertEquals(listOf(a.copy(partition = null), b.copy(partition = null)), catalog().snapshot().entries)
+            assertEquals(a.storage.id, catalog().snapshot().selected)
+            assertTrue(catalog().snapshot().deletions.isEmpty())
             assertFalse(KeystoreCredentialStore.file(context, a.storage.credentialSlot).exists())
             assertFalse(KeystoreCredentialStore.file(context, b.storage.credentialSlot).exists())
             assertEquals(2L, fake.requests.get())
             stop(rootOwner)
+            root.deleteRecursively(); assertTrue(root.mkdir())
         }
     }
 
@@ -1185,7 +1188,7 @@ class AccountCatalogMigrationTest {
             val firstRoot = runtimeOwner(history = { directory ->
                 val native = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(directory))
                 if (directory != failed.storage.historyDirectory(root)) native else object : HistoryLifetimeStorage by native {
-                    override fun reserveDeletion(): HistoryDeletion {
+                    override fun reserveDeletion(disposition: io.github.leugenea.codexbarmobile.account.CleanupDisposition): HistoryDeletion {
                         val ticket = native.reserveDeletion()
                         return HistoryDeletion {
                             val result = ticket.complete()
@@ -1202,8 +1205,9 @@ class AccountCatalogMigrationTest {
             stop(firstRoot); failHistory = false
             val reconstructed = runtimeOwner()
             val cleaned = reconstructed.runtime(failed.storage.id)!!; val continuing = reconstructed.runtime(peerEntry.storage.id)!!
-            phase(cleaned, ConnectionPhase.IDLE); phase(continuing, ConnectionPhase.RESTORED)
-            assertNull(catalog().entry(failed.storage.id)); assertEquals(peerEntry, catalog().entry(peerEntry.storage.id))
+            phase(cleaned, ConnectionPhase.REAUTH_REQUIRED); phase(continuing, ConnectionPhase.RESTORED)
+            assertEquals(failed.copy(partition = null), catalog().entry(failed.storage.id))
+            assertEquals(peerEntry, catalog().entry(peerEntry.storage.id))
             assertTrue(catalog().snapshot().deletions.isEmpty()); assertFalse(catalog().completeDeletion(receipt))
             assertEquals(peerBytes, bytes(peerEntry)); assertEquals(0L, transport.requests.get())
             stop(reconstructed)
@@ -1256,7 +1260,7 @@ class AccountCatalogMigrationTest {
             val restarted = runtimeOwner(history = { directory ->
                 val native = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(directory))
                 if (directory != failed.storage.historyDirectory(root)) native else object : HistoryLifetimeStorage by native {
-                    override fun reserveDeletion(): HistoryDeletion {
+                    override fun reserveDeletion(disposition: io.github.leugenea.codexbarmobile.account.CleanupDisposition): HistoryDeletion {
                         val ticket = native.reserveDeletion()
                         return HistoryDeletion { resumed.pause("reconstructed history barrier"); ticket.complete() }
                     }

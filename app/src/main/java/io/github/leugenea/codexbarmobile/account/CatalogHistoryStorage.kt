@@ -34,6 +34,10 @@ internal class CatalogHistoryStorage(
     } catch (_: Exception) { false }
 
     private fun reconcile(partition: HistoryPartition?) {
+        val saved = entry()
+        if (partition != null && saved?.partition == null && saved?.nameAvailable == true) {
+            check(storage.writeName(partition, saved.name?.let(AccountDisplayName::from)))
+        }
         val name = partition?.let(storage::readName) ?: AccountNameRead.Unavailable
         val entry = if (address == null) catalog.adopt(partition, name)
             else catalog.reconcile(address.id, partition, name)
@@ -72,12 +76,17 @@ internal class CatalogHistoryStorage(
         } catch (_: Exception) { false }
     }
 
-    override fun reserveDeletion(): HistoryDeletion {
+    override fun reserveDeletion(disposition: CleanupDisposition): HistoryDeletion {
+        val id = address?.id ?: entry()?.storage?.id
         val ticket = storage.reserveDeletion()
         var settlement: (() -> Boolean)? = null
-        return HistoryDeletion(catalogSettlement = { requireNotNull(settlement).invoke() }) {
+        var capturedDisposition = disposition
+        return HistoryDeletion(catalogSettlement = { requireNotNull(settlement).invoke() },
+            cleanupDisposition = { capturedDisposition }) {
             try {
-                settlement = catalog.deletionSettlement(catalog.beginDeletion(address?.id ?: entry()?.storage?.id))
+                val receipt = catalog.beginDeletion(id, disposition)
+                capturedDisposition = receipt.disposition
+                settlement = catalog.deletionSettlement(receipt)
                 ticket.complete()
             } catch (_: Exception) { HistoryDeleteOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE) }
         }

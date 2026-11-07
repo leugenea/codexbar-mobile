@@ -56,6 +56,7 @@ internal class UsageRefresh(
     private var pending = false
     private var forceSession = false
     private var explicitRead = false
+    private var pendingSelection = false
     private var nextPollMillis = 0L
     private var notBeforeMillis = 0L
     private val visible get() = observers.isNotEmpty()
@@ -85,25 +86,35 @@ internal class UsageRefresh(
             flight?.foreground = true
             if (activated) { reevaluate(); startTicks(); request() }
         } else {
-            poll?.cancel(); poll = null
-            ticks?.cancel(); ticks = null
-            flight?.let { it.foreground = false; cancelUnobserved(it) }
+            stopForeground()
         }
     }
 
+    private fun stopForeground() {
+        poll?.cancel(); poll = null
+        ticks?.cancel(); ticks = null
+        flight?.let { it.foreground = false; cancelUnobserved(it) }
+    }
+
+    fun deselect() {
+        if (pendingSelection) { pendingSelection = false; pending = false }
+        if (!visible) stopForeground()
+    }
+
     /** Duplicate triggers during a healthy flight are consumed, not queued as another read. */
-    fun request(refreshSession: Boolean = false, explicit: Boolean = false) {
+    fun request(refreshSession: Boolean = false, explicit: Boolean = false, selection: Boolean = false) {
         activated = true
         if (visible && ticks == null) startTicks()
         if (flight?.job?.isActive == true) { flight?.foreground = eligible; return }
         pending = true
+        pendingSelection = pendingSelection || selection
         forceSession = forceSession || refreshSession
         explicitRead = explicitRead || explicit
         drain()
     }
 
     private fun drain() {
-        if (!pending || !eligible || flight != null) return
+        if (!pending || (!eligible && !pendingSelection) || flight != null) return
         if (clock.now().monotonicMillis < notBeforeMillis) {
             // A pending explicit/resume read wakes at the boundary, not an older poll floor.
             poll?.cancel(); poll = null
@@ -112,6 +123,7 @@ internal class UsageRefresh(
         val force = forceSession.also { forceSession = false }
         val explicit = explicitRead.also { explicitRead = false }
         pending = false
+        pendingSelection = false
         startFlight(force, explicit, foreground = true)
     }
 
@@ -182,7 +194,7 @@ internal class UsageRefresh(
     }
 
     private fun schedule() {
-        if (!activated || !eligible || (!visible && !pending) || flight != null || poll != null) return
+        if (!activated || (!eligible && !pendingSelection) || (!visible && !pending) || flight != null || poll != null) return
         val at = maxOf(if (pending) 0L else nextPollMillis, notBeforeMillis)
         poll = scope.launch {
             delay((at - clock.now().monotonicMillis).coerceAtLeast(0))
@@ -217,6 +229,7 @@ internal class UsageRefresh(
         pending = false
         forceSession = false
         explicitRead = false
+        pendingSelection = false
         notBeforeMillis = 0
         nextPollMillis = 0
         ticks?.cancel(); ticks = null

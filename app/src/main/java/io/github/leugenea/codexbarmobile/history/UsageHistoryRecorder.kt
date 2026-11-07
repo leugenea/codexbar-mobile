@@ -32,8 +32,8 @@ internal class UsageHistoryRecorder(
     /** Only this recorder writes the slot on its existing owner lane. Readers never wait. */
     private class DisplayAuthority : HistoryDisplayAuthority {
         @Volatile private var context: HistoryDisplayContext? = null
-        override fun current(): HistoryDisplayContext? = context
-        fun install(generation: HistoryGeneration?) { context = HistoryDisplayContext(generation) }
+        override fun current(): HistoryDisplayContext? = context?.takeIf { it.hostCurrent() }
+        fun install(generation: HistoryGeneration?, hostCurrent: () -> Boolean) { context = HistoryDisplayContext(generation, hostCurrent) }
         fun clear() { context = null }
         fun permission(): HistoryDisplayPermission? = context?.let { HistoryDisplayPermission(it, this) }
     }
@@ -62,6 +62,7 @@ internal class UsageHistoryRecorder(
     private var binding: Binding? = null
     private var epoch = 0L
     private var foreground = false
+    private var hostCurrent: () -> Boolean = { true }
     private var background = 0
     private val recordingEligible get() = foreground || background > 0
     private var pendingGap: HistoryGap? = null
@@ -86,11 +87,11 @@ internal class UsageHistoryRecorder(
     /** Reads the actual revocation slot even before a collector receives its first permission. */
     fun currentDisplayContext(): HistoryDisplayContext? = displayAuthority.current()
 
-    fun foreground(visible: Boolean) {
+    fun foreground(visible: Boolean, retainStorage: Boolean = false) {
         if (foreground == visible) return
         foreground = visible
         if (!visible) {
-            if (background == 0) invalidate(HistoryGap.BACKGROUND) else hide()
+            if (background == 0 && !retainStorage) invalidate(HistoryGap.BACKGROUND) else hide()
         } else binding?.let {
             installContext(HistoryGeneration())
             it.permission = displayAuthority.permission()
@@ -99,6 +100,19 @@ internal class UsageHistoryRecorder(
             publish(HistoryReadiness.LOADING)
             drain()
         }
+    }
+
+    /** A root transition revokes display only; accepted Work keeps its original native binding. */
+    fun displayHost(current: () -> Boolean) {
+        hostCurrent = current
+        if (!foreground) return
+        installContext(binding?.let { HistoryGeneration() })
+        binding?.permission = displayAuthority.permission()
+        displayAuthority.current()?.periods = currentHistoryPeriods(binding?.access?.partition, refresh)
+        clearPages()
+        readPending = request != HistoryPresentationRequest.Idle
+        publish(HistoryReadiness.LOADING)
+        drain()
     }
 
     /** Bounded storage interest, never a visible observer or a display permission. */
@@ -246,7 +260,7 @@ internal class UsageHistoryRecorder(
     }
 
     private fun installContext(generation: HistoryGeneration?) {
-        displayAuthority.install(generation)
+        displayAuthority.install(generation, hostCurrent)
         selection = HistoryDisplaySelection(request)
         displayAuthority.current()?.selection = selection
     }

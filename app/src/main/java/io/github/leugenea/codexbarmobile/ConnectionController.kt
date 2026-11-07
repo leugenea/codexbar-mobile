@@ -55,6 +55,7 @@ internal class ConnectionController(
     private val history: HistoryLifetimeCoordinator? = null,
     historyQueueCapacity: Int = 16,
     private val backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit = {},
+    private val savedAccount: () -> Boolean = { false },
 ) {
     internal val historyExportRequest = HistoryExportRequest()
     internal val historyImporterState = HistoryImporterState()
@@ -145,7 +146,8 @@ internal class ConnectionController(
     private suspend fun missingCredentials(): ConnectionPhase {
         if (history == null) return ConnectionPhase.IDLE
         removeCredentials()
-        return if (awaitDeletion()) ConnectionPhase.IDLE else ConnectionPhase.FAILED
+        return if (!awaitDeletion()) ConnectionPhase.FAILED
+            else if (savedAccount()) ConnectionPhase.REAUTH_REQUIRED else ConnectionPhase.IDLE
     }
 
     /** M4a-5/#8 seam: capture with the exact adopted runtime generation, never a slot UUID. */
@@ -155,18 +157,21 @@ internal class ConnectionController(
     internal val historyAvailability: HistoryAvailability
         get() = history?.availability ?: HistoryAvailability.UNAVAILABLE
 
-    private fun removeHistory() {
+    private fun removeHistory(disposition: CleanupDisposition = CleanupDisposition.RETAIN) {
         backgroundEnrollment(null)
         mutableAccountRemoval.value = AccountRemoval()
         mutableName.value = null
         backgroundSession = null
         backgroundHistoryInterests = 0
         val coordinator = history ?: return
-        if (historyDeletion != null) return
+        if (historyDeletion != null && !removesRetainedCleanup(disposition)) return
         historyRecorder.retire()
-        val reserved = coordinator.beginDeletion().also { historyCleanup = it }
+        val reserved = coordinator.beginDeletion(disposition).also { historyCleanup = it }
         historyDeletion = ownerScope.async(storageDispatcher) { reserved.complete() }
     }
+
+    private fun removesRetainedCleanup(disposition: CleanupDisposition) =
+        disposition == CleanupDisposition.REMOVE && historyCleanup?.catalogSettled == true && historyCleanup?.disposition == CleanupDisposition.RETAIN
 
     private fun command(context: CoroutineContext = EmptyCoroutineContext, action: suspend () -> Unit) {
         ownerScope.launch(context) { if (!closed) action() }
@@ -224,10 +229,12 @@ internal class ConnectionController(
         }
     }
 
-    fun readUsage(refreshSession: Boolean = false) = command {
-        if (cleanupPending() || session.snapshot() !is SessionResult.Ready) return@command
+    fun readUsage(refreshSession: Boolean = false) = command { requestUsage(refreshSession) }
+
+    private fun requestUsage(refreshSession: Boolean, selection: Boolean = false) {
+        if (cleanupPending() || session.snapshot() !is SessionResult.Ready) return
         generation?.let(::enrollBackground)
-        usageRefresh.request(refreshSession, explicit = true)
+        usageRefresh.request(refreshSession, explicit = true, selection = selection)
     }
 
     private fun enrollBackground(active: SessionGeneration) {
@@ -319,11 +326,24 @@ internal class ConnectionController(
     @androidx.annotation.VisibleForTesting(otherwise = androidx.annotation.VisibleForTesting.NONE)
     internal suspend fun backgroundRefreshNetworkInterests(): Int = withContext(mutationDispatcher) { usageRefresh.backgroundInterests }
 
+    internal fun dashboardDisplay(current: () -> Boolean) = command { historyRecorder.displayHost(current) }
+
+    internal fun dashboardHidden() = command {
+        usageRefresh.deselect()
+        historyRecorder.foreground(usageRefresh.hasForegroundObservers, retainStorage = true)
+    }
+
+    /** Selection is explicit activation, but still bound to its root after restoration suspends. */
+    internal suspend fun requestSelectedUsage(current: () -> Boolean) = withContext(mutationDispatcher) {
+        if (mutableState.value.phase == ConnectionPhase.RESTORING) work?.join()
+        if (current()) requestUsage(false, selection = true)
+    }
+
     /** Observer identities keep one Activity from cancelling another visible Activity. */
-    fun usageForeground(observer: Any, foreground: Boolean) = command(UsageForegroundCommand(observer, foreground)) {
+    fun usageForeground(observer: Any, foreground: Boolean, retainStorage: Boolean = false) = command(UsageForegroundCommand(observer, foreground)) {
         usageRefresh.foreground(observer, foreground)
-        historyRecorder.foreground(usageRefresh.hasForegroundObservers)
-        pauseHistoryIfUnobserved()
+        historyRecorder.foreground(usageRefresh.hasForegroundObservers, retainStorage)
+        if (!retainStorage) pauseHistoryIfUnobserved()
         if (foreground) resumeHistory()
         (session.snapshot() as? SessionResult.Ready)?.envelope?.generation?.let(::bindHistory)
     }
@@ -499,12 +519,19 @@ internal class ConnectionController(
     internal fun signOut(expected: AccountRemoval?) = command {
         if (expected != null && expected !== accountRemoval) return@command
         if (!storageReady) { mutableState.value = storageFailure(); return@command }
-        val owner = retire()
+        val owner = retire(CleanupDisposition.REMOVE)
         retryFailedDeletion()
-        removeCredentials()
+        removeCredentials(CleanupDisposition.REMOVE)
         mutableState.value = ConnectionState(ConnectionPhase.SIGNING_OUT)
         work = ownerScope.launch {
-            publish(owner, if (awaitDeletion()) ConnectionState(ConnectionPhase.SIGNED_OUT) else storageFailure())
+            val cleaned = awaitDeletion()
+            if (!cleaned || !current(owner)) { publish(owner, storageFailure()); return@launch }
+            // A terminal invalidation may have been pending when explicit removal was captured.
+            val removed = if (removesRetainedCleanup(CleanupDisposition.REMOVE)) {
+                removeCredentials(CleanupDisposition.REMOVE)
+                awaitDeletion()
+            } else true
+            publish(owner, if (removed) ConnectionState(ConnectionPhase.SIGNED_OUT) else storageFailure())
         }
     }
 
@@ -524,8 +551,8 @@ internal class ConnectionController(
     }
 
     /** Reserve synchronously on the owner lane; the independent owner child performs I/O once. */
-    private fun removeCredentials() {
-        removeHistory()
+    private fun removeCredentials(disposition: CleanupDisposition = CleanupDisposition.RETAIN) {
+        removeHistory(disposition)
         val active = generation ?: return
         val admitted = store.admitDeletion(active)
         generation = null
@@ -552,7 +579,7 @@ internal class ConnectionController(
 
     private fun cleanupPending() = deletion?.isCompleted == false || historyDeletion?.isCompleted == false || session.removalPending()
 
-    private fun retire(): Long {
+    private fun retire(disposition: CleanupDisposition = CleanupDisposition.RETAIN): Long {
         mutableAccountRemoval.value = AccountRemoval()
         revision++
         usageRefresh.reset()
@@ -563,7 +590,7 @@ internal class ConnectionController(
         historyRecorder.retire()
         history?.retire()
         mutableName.value = null
-        session.retire()
+        session.retire(disposition)
         return revision
     }
 

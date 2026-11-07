@@ -47,7 +47,7 @@ internal fun currentHistoryForDisplay(source: HistoryGraphSnapshot, expected: Hi
 }
 
 private fun currentContext(source: HistoryGraphSnapshot, actual: HistoryDisplayContext?) =
-    actual != null && actual === source.displayPermission?.context && source.displayPermission?.current() === actual
+    actual != null && actual.hostCurrent() && actual === source.displayPermission?.context && source.displayPermission?.current() === actual
 
 private fun currentSelection(source: HistoryGraphSnapshot, actual: HistoryDisplayContext, expected: HistoryPresentationRequest) =
     source.generation === actual.generation && source.selection === actual.selection && source.request == expected

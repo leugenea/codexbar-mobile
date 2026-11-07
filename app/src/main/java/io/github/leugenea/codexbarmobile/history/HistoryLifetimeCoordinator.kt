@@ -13,7 +13,7 @@ internal interface HistoryLifetimeStorage : AutoCloseable {
     fun readName(partition: HistoryPartition): AccountNameRead
     fun writeName(partition: HistoryPartition, name: AccountDisplayName?): Boolean
     /** Non-I/O reservation, including when no runtime access was adopted. */
-    fun reserveDeletion(): HistoryDeletion
+    fun reserveDeletion(disposition: CleanupDisposition = CleanupDisposition.REMOVE): HistoryDeletion
 }
 
 internal sealed interface HistoryPartitionOutcome {
@@ -197,11 +197,12 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
     }
 
     /** Reservation is immediate; the owner schedules complete off-lane and awaits both stores. */
-    fun beginDeletion(): HistoryDeletion = synchronized(admission) {
+    fun beginDeletion(disposition: CleanupDisposition = CleanupDisposition.REMOVE): HistoryDeletion = synchronized(admission) {
         retire()
         availability = HistoryAvailability.REMOVAL_PENDING
-        removal ?: storage.reserveDeletion().let { reserved ->
-            HistoryDeletion(catalogSettlement = { synchronized(io) { reserved.completeCatalog() } }) {
+        removal ?: storage.reserveDeletion(disposition).let { reserved ->
+            HistoryDeletion(catalogSettlement = { synchronized(io) { reserved.completeCatalog() } },
+                cleanupDisposition = { reserved.disposition }) {
                 synchronized(io) { settle(reserved.complete()) }
             }.also { removal = it }
         }

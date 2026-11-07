@@ -9,7 +9,7 @@ internal class SQLiteHistoryLifetimeStorage(private val store: SQLiteHistoryStor
     override fun restore() = store.restorePartition()
     override fun readName(partition: HistoryPartition) = store.readName(partition)
     override fun writeName(partition: HistoryPartition, name: AccountDisplayName?) = store.writeName(partition, name)
-    override fun reserveDeletion() = store.reserveDeletion()
+    override fun reserveDeletion(disposition: io.github.leugenea.codexbarmobile.account.CleanupDisposition) = store.reserveDeletion()
     override fun close() = store.close()
 }
 

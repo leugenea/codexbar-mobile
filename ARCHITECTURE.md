@@ -480,6 +480,27 @@ registry. Application behavior remains in the A10 and history-store suites. All 
 handwritten code remains in the unchanged >=90% compatible JVM/native INSTRUCTION union;
 compilation alone does not establish runtime or coverage acceptance.
 
+## Internal dashboard account selection
+
+The [local catalog](docs/account-catalog.md) and existing `AccountRuntimeOwner` retain
+entry-owned stacks. MainActivity collects a fresh identity-bearing selected projection,
+while the compatibility worker getter remains the original exact legacy controller.
+Internal selection commits before display/network authority and immediately requests
+quotas, including dormant entries; actual removal selects the first remaining catalog
+entry and applies the same request policy. Reauthorization instead retains that saved
+entry and current selection, with no usable credential or old history-partition authority.
+The existing captured cleanup receipt now persists this retain/remove disposition in v3;
+old pending v1/v2 receipts keep removal semantics.
+
+Selection transfers only exact STARTED registrations and root display authority, not
+session ownership. Same-controller initial legacy adoption renews display identity without
+churning foreground leases or cancelling the fresh login's accepted read. Deselection
+hides delivered history while accepted rotation/native storage settles under its original
+entry. Root checks precede recorder/request/cache use, so A → B → equal-query A cannot
+re-authorize an already-delivered predecessor. Settings handles remain independently
+addressed and dormant. No new public list, dropdown, authentication/removal workflow,
+SAF policy or all-account scheduler is introduced by this internal selection boundary.
+
 ## Local account display name
 
 The Account settings screen shows the single connected/restored account's user-authored local label or

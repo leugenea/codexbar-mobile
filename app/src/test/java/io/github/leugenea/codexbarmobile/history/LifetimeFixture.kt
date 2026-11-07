@@ -72,7 +72,7 @@ internal class LifetimeJournal {
             metadataGate?.pause()
             return true
         }
-        override fun reserveDeletion(): HistoryDeletion {
+        override fun reserveDeletion(disposition: io.github.leugenea.codexbarmobile.account.CleanupDisposition): HistoryDeletion {
             active?.revoke()
             return HistoryDeletion {
                 phase = Phase.DELETING
