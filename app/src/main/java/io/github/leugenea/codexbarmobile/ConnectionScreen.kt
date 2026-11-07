@@ -10,27 +10,19 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
-import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
-import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
 import io.github.leugenea.codexbarmobile.credentials.syncDirectory
 import io.github.leugenea.codexbarmobile.account.AccountCatalog
-import io.github.leugenea.codexbarmobile.account.CatalogHistoryStorage
-import io.github.leugenea.codexbarmobile.history.HistoryLifetimeCoordinator
-import io.github.leugenea.codexbarmobile.history.SQLiteHistoryLifetimeStorage
-import io.github.leugenea.codexbarmobile.history.SQLiteHistoryStore
 import io.github.leugenea.codexbarmobile.transport.HttpTransportAdapter
 import io.github.leugenea.codexbarmobile.transport.SystemTransportClock
 import io.github.leugenea.codexbarmobile.transport.TransportClock
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 
-/** One holder for the entire default application process, not one entry per Activity or slot. */
+/** One holder for the default application process and its retained entry runtimes. */
 internal object NativeConnection {
+    private var owner: AccountRuntimeOwner? = null
     private var controller: ConnectionController? = null
     private val productionFactory: (Context) -> ConnectionController = ::create
     @set:VisibleForTesting(otherwise = VisibleForTesting.NONE)
@@ -46,12 +38,28 @@ internal object NativeConnection {
         controller?.let { old -> kotlinx.coroutines.runBlocking {
             kotlinx.coroutines.withTimeout(5_000) { old.shutdown() }
         } }
+        owner?.let { old -> kotlinx.coroutines.runBlocking {
+            kotlinx.coroutines.withTimeout(5_000) { old.shutdown() }
+        } }
+        owner = null
         controller = null
     }
 
-    private fun create(context: Context): ConnectionController =
-        createController(context.applicationContext, null, SystemTransportClock, { delay(it) },
-            PeriodicUsageRefresh(androidx.work.WorkManager.getInstance(context.applicationContext))::enrollment)
+    private fun create(context: Context): ConnectionController = processOwner(context).legacy()
+
+    @Synchronized private fun processOwner(context: Context): AccountRuntimeOwner {
+        owner?.let { return it }
+        val catalog = try { catalog(context) } catch (_: Exception) { null }
+        val periodic = PeriodicUsageRefresh(androidx.work.WorkManager.getInstance(context.applicationContext))
+        return AccountRuntimeOwner(context, catalog, productionTransport(context), SystemTransportClock, { delay(it) },
+            periodic.entryEnrollment(catalog?.legacyEntry()?.partition)).also { owner = it }
+    }
+
+    /** Internal entry ingress; no selected-dashboard or all-account scheduler policy. */
+    @Synchronized internal fun entry(context: Context, id: UUID): ConnectionController? {
+        check(factory === productionFactory)
+        return processOwner(context.applicationContext).runtime(id)
+    }
 
     @VisibleForTesting(otherwise = VisibleForTesting.NONE)
     internal fun create(context: Context, transport: AuthTransport, clock: TransportClock,
@@ -64,17 +72,13 @@ internal object NativeConnection {
 
     private fun createController(context: Context, suppliedTransport: AuthTransport?, clock: TransportClock,
         pause: suspend (Long) -> Unit, backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit): ConnectionController {
-        val app = context.applicationContext
-        val catalog = try { catalog(app) } catch (_: Exception) { null }
-        val session = catalog?.snapshot()?.legacySlot
-        val store = KeystoreCredentialStore(app, session ?: UUID.randomUUID())
-        val transport = suppliedTransport ?: productionTransport(app)
-        return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),
-            NativeFeasibilityReader(transport, clock, pause),
-            CoroutineScope(SupervisorJob() + Dispatchers.IO), storageReady = session != null, refreshClock = clock,
-            history = HistoryLifetimeCoordinator(SQLiteHistoryLifetimeStorage(SQLiteHistoryStore.open(app)).let {
-                if (catalog == null) it else CatalogHistoryStorage(it, catalog)
-            }), accountCatalog = catalog, backgroundEnrollment = backgroundEnrollment)
+        return createOwner(context, suppliedTransport ?: productionTransport(context), clock, pause, backgroundEnrollment).legacy()
+    }
+
+    internal fun createOwner(context: Context, transport: AuthTransport, clock: TransportClock,
+        pause: suspend (Long) -> Unit, legacyEnrollment: (BackgroundRefreshTarget?) -> Unit = {}): AccountRuntimeOwner {
+        val catalog = try { catalog(context.applicationContext) } catch (_: Exception) { null }
+        return AccountRuntimeOwner(context, catalog, transport, clock, pause, legacyEnrollment)
     }
 
     private fun productionTransport(context: Context): AuthTransport {

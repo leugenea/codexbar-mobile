@@ -97,6 +97,24 @@ class PeriodicUsageRefreshTest {
         assertEquals(mapOf(PeriodicUsageRefresh.LIFETIME to target.partition.value.toString()), input)
     }
 
+    @Test fun capturedEntryEnrollmentCancelsOnlyItsOwnContinuingWorkAcrossCallbackReconstruction() {
+        val a = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
+        val b = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
+        val periodic = PeriodicUsageRefresh(manager)
+        val first = periodic.entryEnrollment(null)
+        first(a); periodic.enrollment(b)
+        val aWork = unique(a).single(); val bWork = unique(b).single()
+        first(a)
+        assertEquals(aWork.id, unique(a).single().id)
+        val reconstructed = periodic.entryEnrollment(a.partition)
+        reconstructed(null); reconstructed(null)
+        await("only captured A work cancelled") { info(aWork.id).state == WorkInfo.State.CANCELLED }
+        assertEquals(bWork.id, unique(b).single().id)
+        assertFalse(info(bWork.id).state.isFinished)
+        assertEquals(1, activeWork().size)
+        assertEquals(0L, transport.requests.get())
+    }
+
     @Test fun minimizedAppRunsThroughRealSystemJobServiceAndDurableHistorySurvivesReopen() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             awaitConnectionScreen(compose, owner)

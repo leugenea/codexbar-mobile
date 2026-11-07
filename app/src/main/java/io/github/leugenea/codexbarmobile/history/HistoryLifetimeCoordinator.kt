@@ -201,7 +201,9 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         retire()
         availability = HistoryAvailability.REMOVAL_PENDING
         removal ?: storage.reserveDeletion().let { reserved ->
-            HistoryDeletion { synchronized(io) { settle(reserved.complete()) } }.also { removal = it }
+            HistoryDeletion(catalogSettlement = { synchronized(io) { reserved.completeCatalog() } }) {
+                synchronized(io) { settle(reserved.complete()) }
+            }.also { removal = it }
         }
     }
 

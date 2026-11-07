@@ -38,7 +38,7 @@ internal class UsageForegroundCommand(val observer: Any, val foreground: Boolean
 }
 
 /**
- * The one process-wide session owner. Every command, request admission and publication
+ * One retained entry session under the process holder. Commands, request admission and publication
  * runs on one serial coroutine dispatcher. Protected I/O suspends off that dispatcher.
  * Activities only observe/submit commands; finishing the last Activity has no side effect.
  */
@@ -46,7 +46,7 @@ internal class ConnectionController(
     private val store: CredentialStore,
     private val authenticator: DeviceCodeAuthenticator,
     reader: NativeFeasibilityReader,
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
     private val storageReady: Boolean = true,
     private val mutationDispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1),
     private val storageWaitMillis: Long = 5_000L,
@@ -55,11 +55,11 @@ internal class ConnectionController(
     private val history: HistoryLifetimeCoordinator? = null,
     historyQueueCapacity: Int = 16,
     private val backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit = {},
-    private val accountCatalog: AccountCatalog? = null,
 ) {
     internal val historyExportRequest = HistoryExportRequest()
     internal val historyImporterState = HistoryImporterState()
-    private val ownerScope = CoroutineScope(scope.coroutineContext + mutationDispatcher)
+    private val ownerJob = SupervisorJob(scope.coroutineContext[Job])
+    private val ownerScope = CoroutineScope(scope.coroutineContext + ownerJob + mutationDispatcher)
     private val mutableState = MutableStateFlow(ConnectionState(ConnectionPhase.RESTORING))
     val state: StateFlow<ConnectionState> = mutableState
     private val mutableName = MutableStateFlow<AccountNameState?>(null)
@@ -75,6 +75,7 @@ internal class ConnectionController(
     private var generation: SessionGeneration? = null
     private var deletion: Deferred<CredentialResult<Unit>>? = null
     private var historyDeletion: Deferred<HistoryDeleteOutcome>? = null
+    private var historyCleanup: HistoryDeletion? = null
     private var historyRestore: Job? = null
     private var historyImport: Deferred<HistoryImportOutcome>? = null
     private var backgroundHistoryInterests = 0
@@ -163,7 +164,7 @@ internal class ConnectionController(
         val coordinator = history ?: return
         if (historyDeletion != null) return
         historyRecorder.retire()
-        val reserved = coordinator.beginDeletion()
+        val reserved = coordinator.beginDeletion().also { historyCleanup = it }
         historyDeletion = ownerScope.async(storageDispatcher) { reserved.complete() }
     }
 
@@ -537,13 +538,15 @@ internal class ConnectionController(
     }
 
     private suspend fun awaitDeletion(): Boolean {
+        val credentialRemoval = deletion
+        val historyRemoval = historyDeletion
+        val cleanup = historyCleanup
         return withTimeoutOrNull(storageWaitMillis) {
             val sessionRemoved = session.awaitRemoval()
-            val credentialsRemoved = deletion?.await() !is CredentialResult.Failure
-            val historyRemoved = historyDeletion?.await()?.successful() != false
-            val receipt = accountCatalog?.snapshot()?.deleting
+            val credentialsRemoved = credentialRemoval?.await() !is CredentialResult.Failure
+            val historyRemoved = historyRemoval?.await()?.successful() != false
             if (!sessionRemoved || !credentialsRemoved || !historyRemoved) false
-            else ownerScope.async(storageDispatcher) { accountCatalog?.completeDeletion(receipt) != false }.await()
+            else ownerScope.async(storageDispatcher) { cleanup?.completeCatalog() != false }.await()
         } ?: false
     }
 
@@ -585,7 +588,7 @@ internal class ConnectionController(
             // A cancelled stage/activation waiter can leave its process-owned child running.
             history?.let { coordinator -> withContext(storageDispatcher) { coordinator.close() } }
             stopped.complete(Unit)
-            scope.cancel()
+            ownerJob.cancel()
         }
     }
 
@@ -608,6 +611,6 @@ internal class ConnectionController(
     internal suspend fun shutdown() {
         close()
         stopped.await()
-        scope.coroutineContext[Job]?.join()
+        ownerJob.join()
     }
 }

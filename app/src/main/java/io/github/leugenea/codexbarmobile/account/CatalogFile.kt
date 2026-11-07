@@ -12,7 +12,8 @@ import java.util.UUID
 import java.util.zip.CRC32
 
 /** Versioned non-secret metadata, beside (never inside) the strict history directory. */
-internal class CatalogFile(private val directory: File, private val beforeRename: () -> Unit = {}) {
+internal class CatalogFile(private val directory: File, private val beforeRename: () -> Unit = {},
+    private val beforeDirectorySync: () -> Unit = {}) {
     private val target = File(directory, "catalog")
     fun exists() = target.exists()
 
@@ -23,16 +24,17 @@ internal class CatalogFile(private val directory: File, private val beforeRename
         val checksum = DataInputStream(ByteArrayInputStream(bytes, bytes.size - 8, 8)).readLong()
         require(CRC32().apply { update(payload) }.value == checksum)
         return DataInputStream(ByteArrayInputStream(payload)).use { input ->
-            require(input.readInt() == MAGIC)
+            val version = input.readInt()
+            require(version == MAGIC || version == LEGACY_MAGIC)
             val slot = input.uuid()
             val selected = if (input.readBoolean()) input.uuid() else null
             val count = input.readInt().also { require(it >= 0) }
             val entries = mutableListOf<CatalogEntry>()
             repeat(count) { entries += input.entry() }
             val rename = if (input.readBoolean()) CatalogRename(input.uuid(), input.name()) else null
-            val deleting = if (input.readBoolean()) input.uuid() else null
+            val deletions = input.deletions(version, entries)
             require(input.read() == -1)
-            CatalogSnapshot(slot, entries, selected, rename, deleting).also(::validate)
+            CatalogSnapshot(slot, entries, selected, rename, deletions).also(::validate)
         }
     }
 
@@ -48,7 +50,11 @@ internal class CatalogFile(private val directory: File, private val beforeRename
             state.entries.forEach { output.entry(it) }
             output.writeBoolean(state.rename != null)
             state.rename?.let { output.uuid(it.entry); output.name(it.name) }
-            output.writeBoolean(state.deleting != null); state.deleting?.let { output.uuid(it) }
+            output.writeInt(state.deletions.size)
+            state.deletions.forEach { receipt ->
+                output.writeBoolean(receipt.entry != null); receipt.entry?.let { output.uuid(it) }
+                output.uuid(receipt.operation)
+            }
         }
         val bytes = payload.toByteArray()
         val temporary = File.createTempFile("catalog-", ".tmp", directory)
@@ -60,9 +66,15 @@ internal class CatalogFile(private val directory: File, private val beforeRename
             }
             beforeRename()
             check(temporary.renameTo(target))
-            syncDirectory(directory)
-            syncDirectory(directory.parentFile!!)
+            sync()
         } finally { temporary.delete() }
+    }
+
+    /** Retry durability of the current replacement, without rewriting a captured snapshot. */
+    fun sync() {
+        beforeDirectorySync()
+        syncDirectory(directory)
+        syncDirectory(directory.parentFile!!)
     }
 
     private fun validate(state: CatalogSnapshot) {
@@ -74,6 +86,9 @@ internal class CatalogFile(private val directory: File, private val beforeRename
         state.entries.forEach { validateEntry(it, state.legacySlot) }
         require(state.selected == null || state.entries.any { it.storage.id == state.selected })
         state.rename?.let { validateRename(it, state.entries) }
+        require(state.deletions.map { it.entry }.distinct().size == state.deletions.size)
+        require(state.deletions.map { it.operation }.distinct().size == state.deletions.size)
+        require(state.deletions.all { it.entry == null || state.entries.any { entry -> entry.storage.id == it.entry } })
     }
 
     private fun validateEntry(entry: CatalogEntry, slot: UUID) {
@@ -88,6 +103,15 @@ internal class CatalogFile(private val directory: File, private val beforeRename
         require(rename.name == null || entries.none {
             it.storage.id != rename.entry && it.type == entry.type && it.name == rename.name
         })
+    }
+
+    private fun DataInputStream.deletions(version: Int, entries: List<CatalogEntry>): List<CatalogDeletion> {
+        if (version == LEGACY_MAGIC) {
+            if (!readBoolean()) return emptyList()
+            return listOf(CatalogDeletion(entries.singleOrNull { it.storage.legacy }?.storage?.id, uuid()))
+        }
+        val count = readInt().also { require(it in 0..entries.size + 1) }
+        return List(count) { CatalogDeletion(if (readBoolean()) uuid() else null, uuid()) }
     }
 
     private fun DataInputStream.entry(): CatalogEntry {
@@ -107,6 +131,7 @@ internal class CatalogFile(private val directory: File, private val beforeRename
     private fun DataOutputStream.name(value: String?) { writeBoolean(value != null); value?.let(::writeUTF) }
 
     companion object {
-        private const val MAGIC = 0x41433100
+        private const val LEGACY_MAGIC = 0x41433100
+        private const val MAGIC = 0x41433200
     }
 }
