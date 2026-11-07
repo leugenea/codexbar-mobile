@@ -66,15 +66,17 @@ class AccountCatalogMigrationTest {
         try { slots += NativeConnection.session(context) } catch (_: Exception) { /* Unreadable metadata is under test. */ }
     }
     private fun phase(owner: ConnectionController, expected: ConnectionPhase) = runBlocking {
-        withTimeout(5_000) { owner.commandsSettled() }
-        try { withTimeout(5_000) { owner.state.first { it.phase == expected && !it.refresh.refreshing } } }
+        try { withTimeout(5_000) {
+            owner.commandsSettled()
+            owner.state.first { it.phase == expected && !it.refresh.refreshing }
+        } }
         catch (_: TimeoutCancellationException) { throw AssertionError("catalog phase $expected: last state=${owner.state.value}") }
     }
     private fun awaitName(owner: ConnectionController, expected: String?, failed: Boolean = false) = runBlocking {
         try { withTimeout(5_000) { owner.accountName.first { it != null && it.storageFailed == failed && it.name?.text == expected } } }
         catch (_: TimeoutCancellationException) { throw AssertionError("catalog name settlement: last state=${owner.accountName.value}") }
     }
-    private fun settled(owner: ConnectionController, step: String, receipt: suspend () -> Unit) = runBlocking {
+    private fun <T> settled(owner: ConnectionController, step: String, receipt: suspend () -> T): T = runBlocking {
         try { withTimeout(5_000) { receipt() } }
         catch (_: TimeoutCancellationException) {
             throw AssertionError("$step: state=${owner.state.value}, name=${owner.accountName.value}, history=${owner.historyAvailability}")
@@ -871,7 +873,7 @@ class AccountCatalogMigrationTest {
         catalog()
         val before = export()
         val ciphertext = credentialFile.readBytes()
-        val blocked = AccountCatalog.open(root, { slot }, { throw IOException("synthetic interruption") })
+        val blocked = AccountCatalog.open(root, { slot }, beforeRename = { throw IOException("synthetic interruption") })
         val store = credentials()
         val storage = CatalogHistoryStorage(SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(historyDirectory)), blocked)
         val owner = ConnectionController(store, DeviceCodeAuthenticator(transport, store, transport.clock, transport::pause),
@@ -968,9 +970,10 @@ class AccountCatalogMigrationTest {
     private fun gate() = RuntimeGate().also { runtimeGates += it }
     private fun runtimeOwner(fake: io.github.leugenea.codexbarmobile.auth.AuthTransport = transport,
         clock: io.github.leugenea.codexbarmobile.transport.TransportClock = transport.clock,
+        metadata: AccountCatalog = catalog(),
         decorate: (UUID, CredentialStore) -> CredentialStore = { _, store -> store },
         history: (File) -> HistoryLifetimeStorage = { SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(it)) },
-    ) = AccountRuntimeOwner(context, catalog(), fake, clock, transport::pause,
+    ) = AccountRuntimeOwner(context, metadata, fake, clock, transport::pause,
         credentials = { app, id -> decorate(id, KeystoreCredentialStore(app, id)) }, historyStorage = history)
         .also { runtimeOwners += it }
     private fun pair(): Pair<CatalogEntry, CatalogEntry> {
@@ -987,13 +990,20 @@ class AccountCatalogMigrationTest {
         return files + (credential.relativeTo(root).path to credential.readBytes().toList())
     }
     private fun ready(owner: ConnectionController) = (owner.session.snapshot() as SessionResult.Ready).envelope
-    private fun stop(root: AccountRuntimeOwner) = runBlocking { withTimeout(5_000) { root.shutdown() } }
+    private fun stop(root: AccountRuntimeOwner) = runBlocking {
+        try { withTimeout(5_000) { root.shutdown() } }
+        catch (_: TimeoutCancellationException) { throw AssertionError("catalog runtime root shutdown: last state=shutdown incomplete") }
+    }
 
     @Test fun twoProtectedRuntimesShareOnlyTheProcessLaneAndKeepStableObserverAndShutdownOwnership() = runBlocking {
         val (a, b) = pair()
         val beforeA = bytes(a); val beforeB = bytes(b)
         val rootOwner = runtimeOwner()
-        val clients = List(8) { async(Dispatchers.Default) { rootOwner.runtime(a.storage.id)!! } }.awaitAll()
+        val lookups = List(8) { async(Dispatchers.Default) { rootOwner.runtime(a.storage.id)!! } }
+        val clients = try { withTimeout(5_000) { lookups.awaitAll() } }
+        catch (_: TimeoutCancellationException) {
+            throw AssertionError("concurrent A runtime lookups: last state=${lookups.count { it.isCompleted }}/8 completed")
+        }
         val first = clients.first(); val second = rootOwner.runtime(b.storage.id)!!
         phase(first, ConnectionPhase.RESTORED); phase(second, ConnectionPhase.RESTORED)
         clients.forEach { assertSame(first, it) }
@@ -1006,15 +1016,18 @@ class AccountCatalogMigrationTest {
         val observerA = Any(); val observerB = Any()
         first.usageForeground(observerA, true); first.usageForeground(observerB, true)
         first.usageForeground(observerA, false)
-        first.commandsSettled(); first.historyRestorationSettled()
+        settled(first, "A observer commands") { first.commandsSettled() }
+        settled(first, "A observer history restoration") { first.historyRestorationSettled() }
         assertEquals(0L, transport.requests.get())
         assertEquals(beforeA, bytes(a)); assertEquals(beforeB, bytes(b))
         val firstGeneration = ready(first).generation
         val peer = ready(second)
         stop(first) // A subordinate close must leave the root/peer usable.
         assertSame(peer, ready(second))
-        val bTarget = second.backgroundRefreshTarget()!!
-        val bResult = withTimeout(5_000) { second.refreshInBackground(bTarget) } as BackgroundRefreshOutcome.Completed
+        val bTarget = settled(second, "B background target after A shutdown") { second.backgroundRefreshTarget() }!!
+        val bResult = settled(second, "B background recording after A shutdown") {
+            second.refreshInBackground(bTarget)
+        } as BackgroundRefreshOutcome.Completed
         assertEquals(HistoryRecordingOutcome.Stored(ObservationId(1)), bResult.history)
         phase(second, ConnectionPhase.OBSERVED)
         assertEquals(2L, transport.requests.get())
@@ -1026,7 +1039,9 @@ class AccountCatalogMigrationTest {
         assertNotSame(firstGeneration, ready(restoredA).generation)
         assertEquals(beforeA, bytes(a))
         assertEquals(2L, transport.requests.get())
-        val continued = withTimeout(5_000) { restoredB.refreshInBackground(bTarget) } as BackgroundRefreshOutcome.Completed
+        val continued = settled(restoredB, "B background recording after reconstruction") {
+            restoredB.refreshInBackground(bTarget)
+        } as BackgroundRefreshOutcome.Completed
         assertEquals(HistoryRecordingOutcome.Stored(ObservationId(2)), continued.history)
         assertEquals(4L, transport.requests.get())
         assertEquals(beforeA, bytes(a))
@@ -1074,12 +1089,14 @@ class AccountCatalogMigrationTest {
         phase(first, ConnectionPhase.RESTORED); phase(peer, ConnectionPhase.RESTORED)
         val original = ready(first); val peerEnvelope = ready(peer); val beforePeer = bytes(b)
         val observer = Any()
-        first.usageForeground(observer, true); first.commandsSettled()
+        first.usageForeground(observer, true)
+        settled(first, "A rotation observer attached") { first.commandsSettled() }
         first.readUsage(refreshSession = true)
         val sent = fake.awaitHeld("A rotation sent")
         assertTrue(File(credentialFile.parentFile, "rotation-pending").exists())
         try {
-            first.usageForeground(observer, false); first.commandsSettled()
+            first.usageForeground(observer, false)
+            settled(first, "A rotation observer detached") { first.commandsSettled() }
             assertSame(first, rootOwner.runtime(a.storage.id))
             assertSame(original, ready(first))
             phase(first, ConnectionPhase.OBSERVED) // Actual cancelled read completion, before token settlement.
@@ -1091,8 +1108,8 @@ class AccountCatalogMigrationTest {
         awaitRuntime("A rotation published after detached waiter", { first.session.snapshot().toString() }) {
             (first.session.snapshot() as? SessionResult.Ready)?.let { it.envelope !== original } == true
         }
-        val target = first.backgroundRefreshTarget()!!
-        val result = withTimeout(5_000) { first.refreshInBackground(target) }
+        val target = settled(first, "A background target after rotation") { first.backgroundRefreshTarget() }!!
+        val result = settled(first, "A background recording after rotation") { first.refreshInBackground(target) }
         assertTrue(result is BackgroundRefreshOutcome.Completed)
         assertEquals(HistoryRecordingOutcome.Stored(ObservationId(5)), (result as BackgroundRefreshOutcome.Completed).history)
         assertSame(original.generation, ready(first).generation)
@@ -1264,10 +1281,58 @@ class AccountCatalogMigrationTest {
         }
     }
 
+    @Test fun appliedCatalogFinalizationFailureRecoversThroughTheSameLiveControllerWithoutRestart() {
+        val (a, b) = pair()
+        val failSync = java.util.concurrent.atomic.AtomicBoolean(false)
+        val syncFailures = java.util.concurrent.atomic.AtomicInteger()
+        val metadata = AccountCatalog.open(root, { slot }, beforeDirectorySync = {
+            if (failSync.get() && catalog().entry(a.storage.id) == null) {
+                syncFailures.incrementAndGet()
+                throw IOException("synthetic directory sync failure after A replacement")
+            }
+        })
+        val rootOwner = runtimeOwner(metadata = metadata)
+        val first = rootOwner.runtime(a.storage.id)!!; val peer = rootOwner.runtime(b.storage.id)!!
+        phase(first, ConnectionPhase.RESTORED); phase(peer, ConnectionPhase.RESTORED)
+        val peerEnvelope = ready(peer); val peerBytes = bytes(b)
+        failSync.set(true)
+        first.signOut(); phase(first, ConnectionPhase.FAILED)
+        assertEquals(ConnectionProblem.STORAGE, first.state.value.problem)
+        assertEquals(1, syncFailures.get())
+        assertFalse(credentialFile.exists())
+        assertFalse(File(historyDirectory, "history.db").exists())
+        assertNull(metadata.entry(a.storage.id))
+        assertTrue(catalog().snapshot().deletions.isEmpty()) // Replacement really happened.
+        assertFalse(first.session.snapshot() is SessionResult.Ready)
+        assertSame(first, rootOwner.legacy()); assertSame(peerEnvelope, ready(peer))
+        assertEquals(peerBytes, bytes(b)); assertEquals(0L, transport.requests.get())
+
+        first.signOut(); phase(first, ConnectionPhase.FAILED)
+        assertEquals(ConnectionProblem.STORAGE, first.state.value.problem)
+        assertEquals(2, syncFailures.get()) // Same ticket reached the durability retry, not an absent-receipt rejection.
+        failSync.set(false)
+        first.signOut(); phase(first, ConnectionPhase.SIGNED_OUT)
+        assertSame(first, rootOwner.legacy()); assertSame(peerEnvelope, ready(peer))
+        assertEquals(listOf(b), catalog().snapshot().entries)
+        assertEquals(peerBytes, bytes(b)); assertEquals(0L, transport.requests.get())
+        first.connect(); phase(first, ConnectionPhase.OBSERVED)
+        val successor = metadata.legacyEntry()!!
+        assertNotEquals(a.storage.id, successor.storage.id)
+        assertSame(first, rootOwner.runtime(successor.storage.id))
+        assertNull(rootOwner.runtime(a.storage.id))
+        assertTrue(first.session.snapshot() is SessionResult.Ready)
+        assertTrue(credentialFile.exists()); assertTrue(catalog().snapshot().deletions.isEmpty())
+        assertSame(peerEnvelope, ready(peer)); assertEquals(peerBytes, bytes(b))
+        assertEquals(5L, transport.requests.get()) // User-code, auth poll, token exchange and two GETs.
+    }
+
     @Test fun lateCompletedLegacyTicketCannotFinalizeASuccessorReceiptOrTheIndependentPeer() {
         val (a, b) = pair()
         val peerBytes = bytes(b)
-        val metadata = catalog()
+        val failSync = java.util.concurrent.atomic.AtomicBoolean(false)
+        val metadata = AccountCatalog.open(root, { slot }, beforeDirectorySync = {
+            if (failSync.get()) throw IOException("synthetic directory sync failure after replacement")
+        })
         val protected = credentials()
         val firstGeneration = protected.openSession()
         SQLiteHistoryStore(historyDirectory).use { native ->
@@ -1277,7 +1342,11 @@ class AccountCatalogMigrationTest {
             assertTrue(protected.delete(firstGeneration) is CredentialResult.Success)
             val oldReceipt = metadata.snapshot().deletions.single()
             assertEquals(a.storage.id, oldReceipt.entry)
-            assertTrue(first.completeCatalog())
+            failSync.set(true)
+            assertFalse(first.completeCatalog())
+            assertNull(metadata.entry(a.storage.id))
+            assertTrue(catalog().snapshot().deletions.isEmpty())
+            failSync.set(false)
             val nextGeneration = protected.openSession()
             assertTrue(protected.replace(CredentialEnvelope(nextGeneration,
                 SensitiveValue.copyOf("synthetic-successor-access".toByteArray()),
@@ -1290,6 +1359,12 @@ class AccountCatalogMigrationTest {
             val successorReceipt = metadata.snapshot().deletions.single()
             assertEquals(successor.storage.id, successorReceipt.entry)
             assertNotEquals(oldReceipt.operation, successorReceipt.operation)
+            val pending = catalog().snapshot()
+            failSync.set(true)
+            assertFalse(first.completeCatalog()) // Absence alone cannot acknowledge a still-failing fsync.
+            assertEquals(pending, catalog().snapshot())
+            failSync.set(false)
+            assertTrue(first.completeCatalog()) // Applied old ticket syncs current state, never its old snapshot.
             assertTrue(first.completeCatalog()) // Its own cached completion, never the new receipt.
             assertEquals(listOf(successorReceipt), catalog().snapshot().deletions)
             assertNotNull(catalog().entry(successor.storage.id))

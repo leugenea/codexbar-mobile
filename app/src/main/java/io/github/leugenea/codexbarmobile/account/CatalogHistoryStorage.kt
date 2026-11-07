@@ -74,10 +74,10 @@ internal class CatalogHistoryStorage(
 
     override fun reserveDeletion(): HistoryDeletion {
         val ticket = storage.reserveDeletion()
-        var receipt: CatalogDeletion? = null
-        return HistoryDeletion(catalogSettlement = { catalog.completeDeletion(requireNotNull(receipt)) }) {
+        var settlement: (() -> Boolean)? = null
+        return HistoryDeletion(catalogSettlement = { requireNotNull(settlement).invoke() }) {
             try {
-                receipt = catalog.beginDeletion(address?.id ?: entry()?.storage?.id)
+                settlement = catalog.deletionSettlement(catalog.beginDeletion(address?.id ?: entry()?.storage?.id))
                 ticket.complete()
             } catch (_: Exception) { HistoryDeleteOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE) }
         }

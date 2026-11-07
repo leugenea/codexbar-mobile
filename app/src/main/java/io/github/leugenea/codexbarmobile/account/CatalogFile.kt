@@ -12,7 +12,8 @@ import java.util.UUID
 import java.util.zip.CRC32
 
 /** Versioned non-secret metadata, beside (never inside) the strict history directory. */
-internal class CatalogFile(private val directory: File, private val beforeRename: () -> Unit = {}) {
+internal class CatalogFile(private val directory: File, private val beforeRename: () -> Unit = {},
+    private val beforeDirectorySync: () -> Unit = {}) {
     private val target = File(directory, "catalog")
     fun exists() = target.exists()
 
@@ -65,9 +66,15 @@ internal class CatalogFile(private val directory: File, private val beforeRename
             }
             beforeRename()
             check(temporary.renameTo(target))
-            syncDirectory(directory)
-            syncDirectory(directory.parentFile!!)
+            sync()
         } finally { temporary.delete() }
+    }
+
+    /** Retry durability of the current replacement, without rewriting a captured snapshot. */
+    fun sync() {
+        beforeDirectorySync()
+        syncDirectory(directory)
+        syncDirectory(directory.parentFile!!)
     }
 
     private fun validate(state: CatalogSnapshot) {

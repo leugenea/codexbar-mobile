@@ -102,6 +102,25 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         return receipt
     }
 
+    /** Retained by one history ticket; only its own attempted removal can authorize a sync retry. */
+    fun deletionSettlement(receipt: CatalogDeletion): () -> Boolean {
+        var applied = false
+        return {
+            synchronized(this) {
+                if (applied) syncDeletion()
+                else {
+                    val pending = receipt in state.deletions
+                    val complete = completeDeletion(receipt)
+                    // commit re-reads an uncertain replacement before returning failure.
+                    applied = pending && receipt !in state.deletions
+                    complete
+                }
+            }
+        }
+    }
+
+    private fun syncDeletion(): Boolean = try { file.sync(); true } catch (_: Exception) { false }
+
     /** Called only with the adapter's captured receipt after BOTH deletion barriers. */
     @Synchronized fun completeDeletion(receipt: CatalogDeletion?): Boolean = try {
         if (receipt == null) state.deletions.isEmpty()
@@ -131,9 +150,10 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     }
 
     companion object {
-        fun open(root: File, legacySession: () -> UUID, beforeRename: () -> Unit = {}): AccountCatalog {
+        fun open(root: File, legacySession: () -> UUID, beforeDirectorySync: () -> Unit = {},
+            beforeRename: () -> Unit = {}): AccountCatalog {
             // Resolve the application root alias, not a redirected catalog child.
-            val file = CatalogFile(File(root.canonicalFile, "account-catalog"), beforeRename)
+            val file = CatalogFile(File(root.canonicalFile, "account-catalog"), beforeRename, beforeDirectorySync)
             val initial = if (file.exists()) file.read() else CatalogSnapshot(legacySession()).also(file::write)
             return AccountCatalog(file, initial)
         }

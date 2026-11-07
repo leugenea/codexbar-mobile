@@ -14,7 +14,7 @@ class AccountCatalogTest {
     @get:Rule val temporary = TemporaryFolder()
     private val slot = UUID(0, 17)
     private val partition = HistoryPartition(UUID(0, 23))
-    private fun open(root: File, fault: () -> Unit = {}) = AccountCatalog.open(root, { slot }, fault)
+    private fun open(root: File, fault: () -> Unit = {}) = AccountCatalog.open(root, { slot }, beforeRename = fault)
     private fun named(text: String) = AccountNameRead.Ready(AccountDisplayName.from(text))
     private fun other(name: String?) = CatalogEntry(AccountStorage.fresh(), HistoryPartition(UUID.randomUUID()), name, true)
 
@@ -323,14 +323,67 @@ class AccountCatalogTest {
         val aReceipt = catalog.beginDeletion(a.storage.id)
         val bReceipt = catalog.beginDeletion(b.storage.id)
         val before = catalog.snapshot()
+        val finish = catalog.deletionSettlement(aReceipt)
         fail = true
-        assertFalse(catalog.completeDeletion(aReceipt))
+        assertFalse(finish())
         assertEquals(before, open(root).snapshot())
         fail = false
-        assertTrue(catalog.completeDeletion(aReceipt))
+        assertTrue(finish())
         assertEquals(listOf(b), open(root).snapshot().entries)
         assertEquals(listOf(bReceipt), open(root).snapshot().deletions)
         assertTrue(catalog.completeDeletion(bReceipt))
+        assertTrue(open(root).snapshot().entries.isEmpty())
+    }
+
+    @Test fun appliedDeletionRetriesDurabilityWithoutRewritingNewerPeerOrSuccessorReceipts() {
+        val root = temporary.newFolder()
+        var failSync = false
+        var syncs = 0
+        var replacements = 0
+        val catalog = AccountCatalog.open(root, { slot }, beforeDirectorySync = {
+            syncs++
+            if (failSync) throw IOException("synthetic directory sync failure after replacement")
+        }, beforeRename = { replacements++ })
+        val a = catalog.adopt(partition, named("Synthetic A"))
+        val b = other("Synthetic B").also { assertTrue(catalog.insert(it)) }
+        val receipt = catalog.beginDeletion(a.storage.id)
+        val finish = catalog.deletionSettlement(receipt)
+        failSync = true
+        assertFalse(finish())
+        assertNull(catalog.entry(a.storage.id))
+        assertEquals(listOf(b), open(root).snapshot().entries)
+        assertTrue(open(root).snapshot().deletions.isEmpty())
+        val failedSyncs = syncs
+        val appliedReplacements = replacements
+        assertFalse(finish()) // Still unavailable, not an acknowledgement based on absence.
+        assertEquals(failedSyncs + 1, syncs)
+        assertEquals(appliedReplacements, replacements)
+
+        failSync = false
+        val peerReceipt = catalog.beginDeletion(b.storage.id)
+        val successor = catalog.adopt(HistoryPartition(UUID(0, 24)), named("Synthetic successor"))
+        val successorReceipt = catalog.beginDeletion(successor.storage.id)
+        assertNotEquals(receipt.entry, successorReceipt.entry)
+        assertNotEquals(receipt.operation, successorReceipt.operation)
+        val before = catalog.snapshot()
+        val bytes = File(root, "account-catalog/catalog").readBytes()
+        val beforeSyncs = syncs
+        val beforeReplacements = replacements
+        assertFalse(catalog.completeDeletion(receipt))
+        assertFalse(catalog.deletionSettlement(receipt)()) // A new callback has no applied provenance.
+        assertFalse(catalog.deletionSettlement(successorReceipt.copy(operation = receipt.operation))())
+        assertEquals(beforeSyncs, syncs)
+        assertTrue(finish()) // Original callback retries only current directory durability.
+        assertEquals(beforeSyncs + 1, syncs)
+        assertEquals(beforeReplacements, replacements)
+        assertEquals(before, open(root).snapshot())
+        assertArrayEquals(bytes, File(root, "account-catalog/catalog").readBytes())
+        assertEquals(listOf(peerReceipt, successorReceipt), catalog.snapshot().deletions)
+        assertTrue(catalog.completeDeletion(successorReceipt))
+        assertTrue(finish())
+        assertEquals(listOf(peerReceipt), open(root).snapshot().deletions)
+        assertEquals(listOf(b), open(root).snapshot().entries)
+        assertTrue(catalog.completeDeletion(peerReceipt))
         assertTrue(open(root).snapshot().entries.isEmpty())
     }
 

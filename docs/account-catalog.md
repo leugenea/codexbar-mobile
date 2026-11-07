@@ -81,10 +81,15 @@ The next successful catalog write uses v2; older app versions cannot read v2 met
 That receipt survives even if history is already physically gone while credentials remain readable. Restart requires
 combined removal, not restoration. Only the process owner's successful credential AND
 history deletion barrier removes the catalog association/selection and clears the receipt.
-A failed or interrupted barrier remains pending. This substrate preserves the legacy
-selection invalidation; the following selection unit owns the approved deterministic
-remaining-entry fallback and explicit-selection quota request. No selection command is
-introduced here.
+A failed or interrupted barrier remains pending. Each ticket retains its own applied
+finalization provenance in memory: if its exact receipt was present when completion
+attempted replacement and readback confirms its removal after a directory-sync failure,
+that same ticket retries directory durability. It never rewrites its old snapshot or
+accepts an unrelated absent receipt; newer peer and successor changes remain untouched.
+Failure remains a storage error until sync succeeds, without another persisted journal.
+This substrate preserves the legacy selection invalidation; the following selection unit
+owns the approved deterministic remaining-entry fallback and explicit-selection quota
+request. No selection command is introduced here.
 
 ## Rename transaction
 
