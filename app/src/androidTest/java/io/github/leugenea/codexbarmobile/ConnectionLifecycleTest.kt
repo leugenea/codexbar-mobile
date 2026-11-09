@@ -5,6 +5,8 @@ import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.os.Bundle
@@ -30,6 +32,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
+import io.github.leugenea.codexbarmobile.account.AccountCatalog
 import io.github.leugenea.codexbarmobile.credentials.*
 import io.github.leugenea.codexbarmobile.transport.*
 import io.github.leugenea.codexbarmobile.usage.SelectionState
@@ -48,6 +51,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.security.KeyStore
 import java.time.Instant
+import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicLong
 
@@ -55,29 +59,40 @@ import java.util.concurrent.atomic.AtomicLong
 @RunWith(AndroidJUnit4::class)
 class ConnectionLifecycleTest {
     @get:Rule val compose = createEmptyComposeRule()
-    private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
+    private val application = InstrumentationRegistry.getInstrumentation().targetContext
+    private val root = File(application.noBackupFilesDir, "synthetic-connection-${UUID.randomUUID()}").canonicalFile
+    private val context = object : ContextWrapper(application) {
+        override fun getApplicationContext(): Context = this
+        override fun getNoBackupFilesDir(): File = root
+    }
     private val fake = NativeFake()
     private var factories = 0
     private val defaultFactory = NativeConnection.factory
     private val defaultLauncher = MainActivity.browserLauncher
 
     @Before fun setup() {
-        NativeConnection.factory = { app ->
+        assertTrue(root.mkdir())
+        NativeConnection.factory = {
             factories++
-            NativeConnection.create(app, fake, fake.clock, fake::pause)
+            NativeConnection.create(context, fake, fake.clock, fake::pause)
         }
         NativeConnection.resetForTests()
         val installed = context.packageManager.getActivityInfo(ComponentName(context, MainActivity::class.java), 0)
         assertEquals(ActivityInfo.LAUNCH_SINGLE_TASK, installed.launchMode)
         assertEquals("Launcher uses the default app process", context.packageName, installed.processName)
         cleanStore()
+        assertEmptyDurablePrerequisites()
     }
 
     @After fun cleanup() {
-        NativeConnection.resetForTests()
-        NativeConnection.factory = defaultFactory
-        MainActivity.browserLauncher = defaultLauncher
-        cleanStore()
+        try {
+            NativeConnection.resetForTests()
+            cleanStore()
+            assertTrue("Delete only the drained fixture-owned root", root.deleteRecursively() || !root.exists())
+        } finally {
+            NativeConnection.factory = defaultFactory
+            MainActivity.browserLauncher = defaultLauncher
+        }
     }
 
     private fun assertResetRequiresInstalledTestFactoryAndPreservesOwner() {
@@ -418,10 +433,53 @@ class ConnectionLifecycleTest {
     }
 
     @Test
+    fun credentialOnlyDeletionRetainsSavedSelectionButAnIsolatedEmptyRootStartsIdle() {
+        // setup positively reads an empty catalog and missing protected credentials for every test.
+        launch().use { scenario ->
+            openGate(scenario)
+            click("connect")
+            await(scenario, "retention seed code") { it.auth is AuthState.AwaitingUser }
+            fake.poll.complete(Unit)
+            await(scenario, "retention seed protected account") { it.phase == ConnectionPhase.OBSERVED }
+            val owner = NativeConnection.get(context)
+            owner.renameAccount(owner.accountName.value!!.edit!!, "Synthetic retained fixture")
+            bounded("retention seed name committed", { owner.accountName.value.toString() }) {
+                owner.accountName.value?.let { !it.storageFailed && it.name?.text == "Synthetic retained fixture" } == true
+            }
+        }
+        NativeConnection.resetForTests()
+        val saved = catalog().snapshot()
+        val entry = saved.entries.single()
+        assertEquals(entry.storage.id, saved.selected)
+        assertNotNull(entry.partition)
+        assertEquals(ACCESS, persistedEnvelope(saved.legacySlot).accessToken.copyBytes().toString(Charsets.UTF_8))
+        cleanStore() // Deliberately reproduce credential-only cleanup, not a fresh installation.
+        val store = KeystoreCredentialStore(context, saved.legacySlot)
+        assertEquals(CredentialResult.Failure(CredentialFailure.MISSING), store.read(store.openSession()))
+        assertEquals(saved, catalog().snapshot())
+        val requests = fake.calls.size
+        repeat(2) {
+            launch().use { scenario ->
+                openGate(scenario, ConnectionPhase.REAUTH_REQUIRED)
+                val owner = NativeConnection.get(context)
+                assertFalse(owner.session.snapshot() is SessionResult.Ready)
+                assertNull(owner.accountName.value)
+                assertNull(owner.state.value.observations)
+                assertEquals(listOf(entry.copy(partition = null)), catalog().snapshot().entries)
+                assertEquals(entry.storage.id, catalog().snapshot().selected)
+                assertTrue(catalog().snapshot().deletions.isEmpty())
+                assertFalse(File(root, "usage-history/history.db").exists())
+                assertEquals(requests, fake.calls.size)
+            }
+            NativeConnection.resetForTests() // Same owned root survives deliberate owner reconstruction.
+        }
+    }
+
+    @Test
     fun nativeFailedRotationWriteQuarantinesRealStoreBeforeReauth() {
         val failWrite = java.util.concurrent.atomic.AtomicBoolean()
-        NativeConnection.factory = { app ->
-            val actual = KeystoreCredentialStore(app, NativeConnection.session(app))
+        NativeConnection.factory = {
+            val actual = KeystoreCredentialStore(context, NativeConnection.session(context))
             val store = object : CredentialStore by actual {
                 override fun replace(envelope: CredentialEnvelope, cancellation: CredentialCancellation): CredentialResult<CredentialEnvelope> =
                     if (failWrite.get()) CredentialResult.Failure(CredentialFailure.FAILED_WRITE)
@@ -852,7 +910,22 @@ class ConnectionLifecycleTest {
     private fun cleanStore() {
         val session = NativeConnection.session(context)
         val store = KeystoreCredentialStore(context, session)
-        store.delete(store.openSession())
+        assertTrue("Fixture credential deletion must settle", store.delete(store.openSession()) is CredentialResult.Success)
+    }
+    private fun catalog(): AccountCatalog {
+        val slot = NativeConnection.session(context)
+        return AccountCatalog.open(root, { slot })
+    }
+    private fun assertEmptyDurablePrerequisites() {
+        val saved = catalog().snapshot()
+        assertTrue("Fresh fixture has no saved accounts", saved.entries.isEmpty())
+        assertTrue("Fresh fixture has no pending cleanup", saved.deletions.isEmpty())
+        assertNull(saved.selected)
+        assertNull(saved.rename)
+        val store = KeystoreCredentialStore(context, saved.legacySlot)
+        assertEquals(CredentialResult.Failure(CredentialFailure.MISSING), store.read(store.openSession()))
+        assertFalse(File(root, "usage-history/history.db").exists())
+        assertTrue(fake.calls.isEmpty())
     }
     private fun persistedEnvelope(slot: java.util.UUID): CredentialEnvelope {
         val store = KeystoreCredentialStore(context, slot)

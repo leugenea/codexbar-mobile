@@ -179,15 +179,18 @@ internal class ConnectionController(
 
     fun connect() = command {
         if (!storageReady || mutableState.value.busy || cleanupPending()) return@command
-        val owner = retire()
+        // A healthy explicit replacement removes its old local identity; reauthorization keeps it.
+        // Capture before retirement can quarantine an unfinished rotation and clear the session.
+        val disposition = if (session.snapshot() is SessionResult.Ready) CleanupDisposition.REMOVE else CleanupDisposition.RETAIN
+        val owner = retire(disposition)
         retryFailedDeletion()
-        removeCredentials()
+        removeCredentials(disposition)
         mutableState.value = ConnectionState(ConnectionPhase.AUTHENTICATING)
-        work = ownerScope.launch { login(owner) }
+        work = ownerScope.launch { login(owner, disposition) }
     }
 
-    private suspend fun login(owner: Long) {
-        if (!awaitDeletion()) { publish(owner, storageFailure()); return }
+    private suspend fun login(owner: Long, disposition: CleanupDisposition) {
+        if (!awaitCleanup(owner, disposition)) { publish(owner, storageFailure()); return }
         if (!current(owner)) return
         historyDeletion = null // The preceding combined barrier has actually settled.
         val next = store.openSession().also { generation = it; history?.open(it) }
@@ -524,15 +527,17 @@ internal class ConnectionController(
         removeCredentials(CleanupDisposition.REMOVE)
         mutableState.value = ConnectionState(ConnectionPhase.SIGNING_OUT)
         work = ownerScope.launch {
-            val cleaned = awaitDeletion()
-            if (!cleaned || !current(owner)) { publish(owner, storageFailure()); return@launch }
-            // A terminal invalidation may have been pending when explicit removal was captured.
-            val removed = if (removesRetainedCleanup(CleanupDisposition.REMOVE)) {
-                removeCredentials(CleanupDisposition.REMOVE)
-                awaitDeletion()
-            } else true
+            val removed = awaitCleanup(owner, CleanupDisposition.REMOVE)
             publish(owner, if (removed) ConnectionState(ConnectionPhase.SIGNED_OUT) else storageFailure())
         }
+    }
+
+    /** Settle the original ticket unchanged before reserving a later explicit removal. */
+    private suspend fun awaitCleanup(owner: Long, disposition: CleanupDisposition): Boolean {
+        if (!awaitDeletion() || !current(owner)) return false
+        if (!removesRetainedCleanup(disposition)) return true
+        removeCredentials(disposition)
+        return awaitDeletion()
     }
 
     private suspend fun retryFailedDeletion() {

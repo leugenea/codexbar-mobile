@@ -525,8 +525,13 @@ class AccountCatalogMigrationTest {
         val original = catalog().adopt(partition, initial)
         if (rename) assertTrue(catalog().reserveRename(original.storage.id, AccountDisplayName.from("Synthetic intended")))
         val before = catalog().snapshot()
-        val blocked = AccountCatalog.open(root, { slot }) { throw IOException("synthetic required metadata commit failure") }
+        val failedCommit = CompletableDeferred<Unit>()
+        val blocked = AccountCatalog.open(root, { slot }, beforeRename = {
+            failedCommit.complete(Unit)
+            throw IOException("synthetic required metadata commit failure")
+        })
         val owner = catalogOwner(blocked, SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(historyDirectory)))
+        settled(owner, "required metadata beforeRename fault entered") { failedCommit.await() }
         phase(owner, if (rename) ConnectionPhase.RESTORED else ConnectionPhase.FAILED)
         assertEquals(rename, owner.session.snapshot() is SessionResult.Ready)
         if (rename) {
@@ -560,9 +565,13 @@ class AccountCatalogMigrationTest {
         val pending = File(historyDirectory, "account-name.pending")
         pending.writeBytes(byteArrayOf(1))
         val failCommit = java.util.concurrent.atomic.AtomicBoolean()
-        val accountCatalog = AccountCatalog.open(root, { slot }) {
-            if (failCommit.get()) throw IOException("synthetic later required catalog commit failure")
-        }
+        val failedCommit = CompletableDeferred<Unit>()
+        val accountCatalog = AccountCatalog.open(root, { slot }, beforeRename = {
+            if (failCommit.get()) {
+                failedCommit.complete(Unit)
+                throw IOException("synthetic later required catalog commit failure")
+            }
+        })
         val owner = catalogOwner(accountCatalog, SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(historyDirectory)))
         phase(owner, ConnectionPhase.RESTORED)
         val ready = owner.session.snapshot() as SessionResult.Ready
@@ -585,6 +594,7 @@ class AccountCatalogMigrationTest {
         assertTrue(pending.delete())
         failCommit.set(true)
         owner.usageForeground(observer, true)
+        settled(owner, "later required metadata beforeRename fault entered") { failedCommit.await() }
         phase(owner, ConnectionPhase.FAILED)
         assertEquals(ConnectionProblem.STORAGE, owner.state.value.problem)
         assertFalse(owner.session.snapshot() is SessionResult.Ready)
@@ -624,14 +634,16 @@ class AccountCatalogMigrationTest {
         val retained = export()
         val failCommit = java.util.concurrent.atomic.AtomicBoolean()
         val failedReplay = CompletableDeferred<Unit>()
+        val failedCommit = CompletableDeferred<Unit>()
         val attempts = java.util.concurrent.atomic.AtomicInteger()
-        val accountCatalog = AccountCatalog.open(root, { slot }) {
+        val accountCatalog = AccountCatalog.open(root, { slot }, beforeRename = {
             // Reservation commits; fail only finalization after the real sidecar write.
             if (failCommit.get() && catalog().snapshot().rename != null) {
+                failedCommit.complete(Unit)
                 if (attempts.incrementAndGet() > 1) failedReplay.complete(Unit)
                 throw IOException("synthetic rename-only finalization failure")
             }
-        }
+        })
         val owner = catalogOwner(accountCatalog, SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(historyDirectory)))
         phase(owner, ConnectionPhase.RESTORED)
         val original = catalog().legacyEntry()!!
@@ -646,7 +658,9 @@ class AccountCatalogMigrationTest {
         val beforeSidecar = File(historyDirectory, "account-name").readBytes()
         failCommit.set(true)
         owner.renameAccount(editor, "Synthetic intended")
+        settled(owner, "rename finalization beforeRename fault entered") { failedCommit.await() }
         awaitName(owner, "Synthetic legacy", failed = true)
+        assertTrue("Finalization fault ran after its durable reservation", attempts.get() > 0)
         assertFalse(beforeSidecar.contentEquals(File(historyDirectory, "account-name").readBytes()))
         assertSame(access, owner.historyCapability(ready.envelope.generation))
         assertTrue(owner.session.snapshot() is SessionResult.Ready)
@@ -711,9 +725,13 @@ class AccountCatalogMigrationTest {
     private fun stagingFailure(failCatalog: Boolean) = runBlocking {
         File(root, "connection-session").writeText(slot.toString())
         val failCommit = java.util.concurrent.atomic.AtomicBoolean()
-        val accountCatalog = AccountCatalog.open(root, { slot }) {
-            if (failCommit.get()) throw IOException("synthetic post-auth catalog failure")
-        }
+        val failedCommit = CompletableDeferred<Unit>()
+        val accountCatalog = AccountCatalog.open(root, { slot }, beforeRename = {
+            if (failCommit.get()) {
+                failedCommit.complete(Unit)
+                throw IOException("synthetic post-auth catalog failure")
+            }
+        })
         val storage = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(historyDirectory))
         var stageCalls = 0
         var restoreCalls = 0
@@ -748,7 +766,9 @@ class AccountCatalogMigrationTest {
         }
         try {
             owner.connect()
+            if (failCatalog) settled(owner, "post-auth adoption beforeRename fault entered") { failedCommit.await() }
             phase(owner, if (failCatalog) ConnectionPhase.FAILED else ConnectionPhase.OBSERVED)
+            assertEquals("Only the armed commit fault ran", failCatalog, failedCommit.isCompleted)
             assertEquals(1, stageCalls)
             assertEquals(1, restoreCalls)
             assertEquals(HistoryAvailability.STORAGE_FAILURE, owner.historyAvailability)
@@ -1133,6 +1153,183 @@ class AccountCatalogMigrationTest {
             assertNull(page.entries[3].windows.last().point)
         }
         assertEquals(beforePeer, bytes(b))
+    }
+
+    @Test fun healthyReplacementCapturesRemoveBeforeRotationQuarantineAndPublishesUnnamedSuccessor() {
+        val (a, b) = pair()
+        val peerBytes = bytes(b)
+        val fake = SyntheticSamplingTransport().apply { heldPath = "/oauth/token" }
+        val credentialBarrier = gate(); val historyBarrier = gate()
+        val rootOwner = runtimeOwner(fake, fake.clock, decorate = { id, store ->
+            if (id != a.storage.credentialSlot) store else object : CredentialStore by store {
+                override fun admitDeletion(generation: SessionGeneration): CredentialResult<CredentialDeletion> {
+                    val admitted = store.admitDeletion(generation)
+                    if (admitted !is CredentialResult.Success) return admitted
+                    return CredentialResult.Success(object : CredentialDeletion {
+                        override fun complete(): CredentialResult<Unit> {
+                            credentialBarrier.pause("replacement protected deletion")
+                            return admitted.value.complete()
+                        }
+                    })
+                }
+            }
+        }, history = { directory ->
+            val native = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(directory))
+            if (directory != historyDirectory) native else object : HistoryLifetimeStorage by native {
+                override fun reserveDeletion(disposition: CleanupDisposition): HistoryDeletion {
+                    val ticket = native.reserveDeletion()
+                    return HistoryDeletion { historyBarrier.pause("replacement history deletion"); ticket.complete() }
+                }
+            }
+        })
+        val first = rootOwner.legacy(); val peer = rootOwner.runtime(b.storage.id)!!
+        phase(first, ConnectionPhase.RESTORED); phase(peer, ConnectionPhase.RESTORED)
+        val predecessor = ready(first); val edit = first.accountName.value!!.edit!!
+        val ciphertext = credentialFile.readBytes()
+        val observer = Any()
+        first.usageForeground(observer, true)
+        settled(first, "replacement foreground attached") { first.commandsSettled() }
+        first.readUsage(refreshSession = true)
+        val late = fake.awaitHeld("replacement accepted rotation")
+        first.usageForeground(observer, false)
+        phase(first, ConnectionPhase.OBSERVED) // Detach the read waiter, not the accepted rotation.
+        assertSame(predecessor, ready(first))
+        fake.heldPath = null
+        first.connect()
+        try {
+            settled(first, "healthy replacement command captured intent") { first.commandsSettled() }
+            credentialBarrier.await("replacement protected barrier entered")
+            historyBarrier.await("replacement history barrier entered")
+            val receipt = catalog().snapshot().deletions.single()
+            assertEquals(a.storage.id, receipt.entry)
+            assertEquals(CleanupDisposition.REMOVE, receipt.disposition)
+            assertEquals(a, catalog().entry(a.storage.id))
+            assertArrayEquals(ciphertext, credentialFile.readBytes())
+            assertTrue(File(historyDirectory, "account-name").isFile)
+            assertFalse(first.session.snapshot() is SessionResult.Ready)
+            assertNull(first.historyCapability(predecessor.generation))
+            assertEquals(1L, fake.requests.get()) // No successor authentication before both barriers.
+            assertEquals(peerBytes, bytes(b))
+            first.usageForeground(observer, true)
+            settled(first, "replacement foreground restored while cleanup is held") { first.commandsSettled() }
+        } finally { credentialBarrier.release(); historyBarrier.release() }
+        phase(first, ConnectionPhase.OBSERVED)
+        val successor = catalog().legacyEntry()!!
+        assertNotEquals(a.storage.id, successor.storage.id)
+        assertNotEquals(a.partition, successor.partition)
+        assertNull(successor.name)
+        assertNull(first.accountName.value!!.name)
+        assertNotSame(edit, first.accountName.value!!.edit)
+        assertFalse(File(historyDirectory, "account-name").exists())
+        assertFalse(File(historyDirectory, "account-name.pending").exists())
+        assertTrue(catalog().snapshot().deletions.isEmpty())
+        val saved = credentialFile.readBytes()
+        late.reply(fake.tokens)
+        first.renameAccount(edit, "Synthetic stale replacement edit")
+        settled(first, "replacement rejects predecessor callbacks") { first.commandsSettled() }
+        assertArrayEquals(saved, credentialFile.readBytes())
+        assertNull(first.accountName.value!!.name)
+        assertEquals(peerBytes, bytes(b))
+        assertEquals(6L, fake.requests.get()) // Old rotation plus one new auth and two quota endpoints.
+    }
+
+    @Test fun reauthorizationReconnectRetainsCatalogIdentityNameAndSelection() {
+        val (a, b) = pair()
+        val peerBytes = bytes(b)
+        val fake = SyntheticSamplingTransport().apply {
+            tokens = io.github.leugenea.codexbarmobile.transport.TransportResult.Response.bounded(401, "{}".toByteArray())
+        }
+        val firstRoot = runtimeOwner(fake, fake.clock)
+        val first = firstRoot.legacy()
+        phase(first, ConnectionPhase.RESTORED)
+        val old = ready(first)
+        first.readUsage(refreshSession = true); phase(first, ConnectionPhase.REAUTH_REQUIRED)
+        assertEquals(a.copy(partition = null), catalog().entry(a.storage.id))
+        assertEquals(a.storage.id, catalog().snapshot().selected)
+        assertFalse(credentialFile.exists())
+        assertFalse(File(historyDirectory, "account-name").exists())
+        assertNull(first.historyCapability(old.generation))
+        assertEquals(peerBytes, bytes(b))
+        stop(firstRoot)
+        val restarted = runtimeOwner(fake, fake.clock)
+        val reauth = restarted.legacy(); phase(reauth, ConnectionPhase.REAUTH_REQUIRED)
+        assertEquals(1L, fake.requests.get()) // Retained restoration stays dormant.
+        fake.tokens = io.github.leugenea.codexbarmobile.transport.TransportResult.Response.bounded(200,
+            """{"access_token":"synthetic-reauthorized-access","refresh_token":"synthetic-reauthorized-refresh"}""".toByteArray())
+        reauth.connect(); phase(reauth, ConnectionPhase.OBSERVED)
+        val saved = catalog().entry(a.storage.id)!!
+        assertEquals(a.storage, saved.storage)
+        assertNotEquals(a.partition, saved.partition)
+        assertEquals(a.name, saved.name)
+        assertEquals(a.storage.id, catalog().snapshot().selected)
+        assertEquals(a.name, reauth.accountName.value!!.name!!.text)
+        assertTrue(catalog().snapshot().deletions.isEmpty())
+        assertEquals(peerBytes, bytes(b))
+        assertEquals(6L, fake.requests.get())
+        stop(restarted)
+        SQLiteHistoryStore(historyDirectory).use { history ->
+            assertTrue(history.adopt(saved.partition!!) is HistoryAccessOutcome.Bound)
+            assertEquals(a.name, (history.readName(saved.partition) as AccountNameRead.Ready).name!!.text)
+        }
+        val protected = credentials()
+        val readback = protected.read(protected.openSession()) as CredentialResult.Success
+        assertArrayEquals("synthetic-reauthorized-access".toByteArray(), readback.value.accessToken.copyBytes())
+        assertEquals(peerBytes, bytes(b))
+    }
+
+    @Test fun explicitRemovalSettlesPendingRetainTicketBeforeReservingRemove() {
+        val (a, b) = pair()
+        val metadata = catalog()
+        val peerBytes = bytes(b)
+        val retainedBarrier = gate(); val removedBarrier = gate()
+        val reservations = java.util.concurrent.atomic.AtomicInteger()
+        val fake = SyntheticSamplingTransport().apply {
+            tokens = io.github.leugenea.codexbarmobile.transport.TransportResult.Response.bounded(401, "{}".toByteArray())
+        }
+        val rootOwner = runtimeOwner(fake, fake.clock, metadata = metadata, history = { directory ->
+            val native = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(directory))
+            if (directory != historyDirectory) native else object : HistoryLifetimeStorage by native {
+                override fun reserveDeletion(disposition: CleanupDisposition): HistoryDeletion {
+                    val ticket = native.reserveDeletion()
+                    val barrier = if (reservations.incrementAndGet() == 1) retainedBarrier else removedBarrier
+                    return HistoryDeletion { barrier.pause("captured cleanup barrier"); ticket.complete() }
+                }
+            }
+        })
+        val first = rootOwner.legacy(); phase(first, ConnectionPhase.RESTORED)
+        first.readUsage(refreshSession = true)
+        try {
+            retainedBarrier.await("terminal retained history barrier entered")
+            val original = catalog().snapshot().deletions.single()
+            assertEquals(CleanupDisposition.RETAIN, original.disposition)
+            assertEquals(a.storage.id, original.entry)
+            first.signOut()
+            settled(first, "explicit removal admitted during retained cleanup") { first.commandsSettled() }
+            assertEquals(listOf(original), catalog().snapshot().deletions)
+            assertEquals(a, catalog().entry(a.storage.id))
+            retainedBarrier.release()
+            removedBarrier.await("new explicit removal history barrier entered")
+            val next = catalog().snapshot().deletions.single()
+            assertNotEquals(original.operation, next.operation)
+            assertEquals(a.storage.id, next.entry)
+            assertEquals(CleanupDisposition.REMOVE, next.disposition)
+            assertEquals(a.copy(partition = null), catalog().entry(a.storage.id))
+            assertEquals(a.storage.id, catalog().snapshot().selected)
+            val pending = catalog().snapshot()
+            assertFalse(metadata.completeDeletion(original))
+            assertEquals(pending, catalog().snapshot())
+            assertFalse(first.session.snapshot() is SessionResult.Ready)
+            assertFalse(credentialFile.exists())
+            assertEquals(peerBytes, bytes(b))
+            assertEquals(2, reservations.get())
+            assertEquals(1L, fake.requests.get())
+        } finally { retainedBarrier.release(); removedBarrier.release() }
+        phase(first, ConnectionPhase.SIGNED_OUT)
+        assertEquals(listOf(b), catalog().snapshot().entries)
+        assertEquals(b.storage.id, catalog().snapshot().selected)
+        assertTrue(catalog().snapshot().deletions.isEmpty())
+        assertFalse(File(historyDirectory, "account-name").exists())
+        assertEquals(peerBytes, bytes(b))
     }
 
     @Test fun overlappingTerminalReceiptsCompleteOnlyTheirCapturedEntryInEitherBarrierOrder() = runBlocking {
