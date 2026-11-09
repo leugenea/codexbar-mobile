@@ -45,13 +45,11 @@ class AccountSelectionDisplayTest {
         fixture.settle(a)
         assertEquals(0L, fixture.aTransport.requests.get()); assertEquals(0L, fixture.bTransport.requests.get())
         fixture.select(fixture.a); fixture.phase(a, ConnectionPhase.OBSERVED)
-        await("A actual host delivered a bound page") {
-            val pair = observer.currentFrame
-            pair?.source?.partition == fixture.a.partition && pair.fiveHour.points.isNotEmpty() &&
+        val delivered = awaitFrame("A actual host delivered a bound page") { pair ->
+            pair.source.partition == fixture.a.partition && pair.fiveHour.points.isNotEmpty() &&
                 observer.deliverySource === pair.source
         }
         val firstRoot = selected.value!!
-        val delivered = observer.currentFrame!!
         val request = delivered.source.request as HistoryPresentationRequest.Current
         val oldPage = delivered.fiveHour.storage!!
         val cache = HistoryPlotCache()
@@ -95,12 +93,10 @@ class AccountSelectionDisplayTest {
                 .assertCountEquals(0)
             assertEquals(bRequests, fixture.bTransport.requests.get())
         } finally { observer.release() }
-        await("positive fresh A source delivered to actual host") {
-            val frame = observer.currentFrame
-            frame?.source?.partition == fixture.a.partition && frame.source !== delivered.source &&
+        val fresh = awaitFrame("positive fresh A source delivered to actual host") { frame ->
+            frame.source.partition == fixture.a.partition && frame.source !== delivered.source &&
                 frame.fiveHour.points.lastOrNull()?.usedPercent == BigDecimal("23.125") && observer.deliverySource === frame.source
         }
-        val fresh = observer.currentFrame!!
         assertEquals(request, fresh.source.request)
         assertNotSame(delivered.source.displayPermission!!.context, fresh.source.displayPermission!!.context)
         assertEquals(listOf(1L, 2L, 3L, 4L, 6L), fresh.fiveHour.entries.map { it.source.id.ordinal })
@@ -146,6 +142,16 @@ class AccountSelectionDisplayTest {
                 assertEquals(0L, fixture.bTransport.requests.get())
             } finally { fixture.stop(successorObserver) }
         } finally { fixture.stop(oldObserver); fixture.stop(peer) }
+    }
+
+    private fun awaitFrame(label: String, condition: (HeldHistoryObserver.CurrentPass) -> Boolean): HeldHistoryObserver.CurrentPass {
+        var captured: HeldHistoryObserver.CurrentPass? = null
+        await(label) {
+            val frame = observer.currentFrame
+            if (frame != null && condition(frame)) captured = frame
+            captured != null
+        }
+        return checkNotNull(captured) { "$label: no matching host projection captured after readiness" }
     }
 
     private fun await(label: String, condition: () -> Boolean) {
