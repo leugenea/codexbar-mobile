@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794511156518,
+  "lastUpdate": 1794511159217,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -7097,6 +7097,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/ef5c0de8bb975f81c0385fff10aafe6c1218ecdc"
         },
         "date": 1794506660532,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fcb6cb3165c00f288576e999c2f49c4b7266be0a",
+          "message": "build: update Gradle wrapper to 9.9.1 (#254)",
+          "timestamp": "2026-11-12T22:18:51+03:00",
+          "tree_id": "258d5c3e6ea5140ca8bf2310133ff9ed9a12527e",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/fcb6cb3165c00f288576e999c2f49c4b7266be0a"
+        },
+        "date": 1794511158768,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
