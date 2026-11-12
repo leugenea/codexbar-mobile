@@ -1,6 +1,7 @@
 package io.github.leugenea.codexbarmobile
 
 import io.github.leugenea.codexbarmobile.auth.*
+import io.github.leugenea.codexbarmobile.account.CleanupDisposition
 import io.github.leugenea.codexbarmobile.credentials.*
 import io.github.leugenea.codexbarmobile.transport.*
 import kotlinx.coroutines.*
@@ -21,7 +22,7 @@ internal class SessionCoordinator(
     private val clock: TransportClock = SystemTransportClock,
     private val storageDispatcher: CoroutineDispatcher = Dispatchers.IO,
     private val invalidated: () -> Unit = {},
-    private val removing: () -> Unit = {},
+    private val removing: (CleanupDisposition) -> Unit = {},
 ) {
     @Volatile private var current: CredentialEnvelope? = null
     @Volatile private var problem = SessionProblem.STALE
@@ -52,14 +53,14 @@ internal class SessionCoordinator(
     }
 
     /** A sent refresh is uncertain. Its deletion lives in the owner scope, not in a read waiter. */
-    fun retire() {
+    fun retire(disposition: CleanupDisposition = CleanupDisposition.RETAIN) {
         val detached = flight
         flight = null
         current = null
         problem = SessionProblem.STALE
         if (detached != null && !detached.result.isCompleted) {
             detached.write.cancel()
-            quarantine(detached.envelope.generation)
+            quarantine(detached.envelope.generation, disposition)
             detached.job.cancel()
             detached.result.complete(SessionResult.Failed(SessionProblem.STALE))
         }
@@ -74,8 +75,8 @@ internal class SessionCoordinator(
         awaitRemoval()
     }
 
-    private fun quarantine(generation: SessionGeneration) {
-        removing()
+    private fun quarantine(generation: SessionGeneration, disposition: CleanupDisposition = CleanupDisposition.RETAIN) {
+        removing(disposition)
         when (val admitted = store.admitDeletion(generation)) {
             is CredentialResult.Failure -> Unit // A newer lifecycle command already revoked this capability.
             is CredentialResult.Success -> {

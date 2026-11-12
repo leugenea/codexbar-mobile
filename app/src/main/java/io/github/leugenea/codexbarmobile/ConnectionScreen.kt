@@ -24,9 +24,12 @@ import java.util.UUID
 internal object NativeConnection {
     private var owner: AccountRuntimeOwner? = null
     private var controller: ConnectionController? = null
+    private var injectedDashboard: kotlinx.coroutines.flow.MutableStateFlow<DashboardSelection?>? = null
     private val productionFactory: (Context) -> ConnectionController = ::create
     @set:VisibleForTesting(otherwise = VisibleForTesting.NONE)
     internal var factory: (Context) -> ConnectionController = productionFactory
+    @set:VisibleForTesting(otherwise = VisibleForTesting.NONE)
+    internal var rootFactory: ((Context) -> AccountRuntimeOwner)? = null
 
     @Synchronized fun get(context: Context): ConnectionController =
         controller ?: factory(context.applicationContext).also { controller = it }
@@ -34,7 +37,7 @@ internal object NativeConnection {
     /** Instrumentation only: install a test factory, then drain the previous owner's durable work. */
     @VisibleForTesting(otherwise = VisibleForTesting.NONE)
     @Synchronized internal fun resetForTests() {
-        check(factory !== productionFactory) { "Test factory required" }
+        check(factory !== productionFactory || rootFactory != null) { "Test factory required" }
         controller?.let { old -> kotlinx.coroutines.runBlocking {
             kotlinx.coroutines.withTimeout(5_000) { old.shutdown() }
         } }
@@ -43,12 +46,30 @@ internal object NativeConnection {
         } }
         owner = null
         controller = null
+        injectedDashboard = null
+    }
+
+    @Synchronized internal fun dashboard(context: Context): kotlinx.coroutines.flow.StateFlow<DashboardSelection?> {
+        if (factory === productionFactory) return processOwner(context.applicationContext).dashboard()
+        return injectedDashboard ?: kotlinx.coroutines.flow.MutableStateFlow<DashboardSelection?>(null).also { flow ->
+            flow.value = DashboardSelection(null, get(context)) { flow.value }
+            injectedDashboard = flow
+        }
+    }
+
+    internal suspend fun observeDashboard(context: Context): DashboardObserver {
+        if (factory === productionFactory) return processOwner(context.applicationContext).registerForeground()
+        val captured = get(context)
+        val token = Any()
+        captured.usageForeground(token, true)
+        return DashboardObserver { captured.usageForeground(token, false) }
     }
 
     private fun create(context: Context): ConnectionController = processOwner(context).legacy()
 
     @Synchronized private fun processOwner(context: Context): AccountRuntimeOwner {
         owner?.let { return it }
+        rootFactory?.let { factory -> return factory(context).also { owner = it } }
         val catalog = try { catalog(context) } catch (_: Exception) { null }
         val periodic = PeriodicUsageRefresh(androidx.work.WorkManager.getInstance(context.applicationContext))
         return AccountRuntimeOwner(context, catalog, productionTransport(context), SystemTransportClock, { delay(it) },

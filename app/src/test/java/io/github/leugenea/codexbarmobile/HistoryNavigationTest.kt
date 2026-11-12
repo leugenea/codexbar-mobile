@@ -148,6 +148,32 @@ class HistoryNavigationTest {
         assertNull(hidden.problem)
     }
 
+    @Test fun unchangedRecorderSlotCannotAuthorizeAnOldRootAfterBThenEqualQueryASuccessor() {
+        val query = HistoryNavigation().query
+        val originalRoot = Any()
+        var actualRoot = originalRoot
+        val issuer = DisplayIssuer()
+        val originalContext = HistoryDisplayContext(HistoryGeneration()) { actualRoot === originalRoot }
+        issuer.context = originalContext
+        val delivered = source(query, more = false, issuer = issuer)
+        val cache = HistoryPlotCache()
+        assertTrue(cache.project(delivered).fiveHour.samples.isNotEmpty())
+        assertSame(delivered, historyForDisplay(delivered, query, originalContext))
+        actualRoot = Any() // B; the recorder slot deliberately still accepts its own context.
+        assertSame(originalContext, issuer.current())
+        val inB = historyForDisplay(delivered, query, issuer.current())
+        assertHidden(inB, HistoryReadiness.LOADING)
+        assertTrue(cache.project(inB).fiveHour.samples.isEmpty())
+        actualRoot = Any() // Equal-query A, but a fresh actual-host root lifetime.
+        assertHidden(historyForDisplay(delivered, query, originalContext), HistoryReadiness.LOADING)
+        val successorRoot = actualRoot
+        issuer.context = HistoryDisplayContext(HistoryGeneration()) { actualRoot === successorRoot }
+        val successor = source(query, more = false, issuer = issuer)
+        assertSame(successor, historyForDisplay(successor, query, issuer.current()))
+        assertTrue(cache.project(successor).fiveHour.samples.isNotEmpty())
+        assertNotSame(originalContext, successor.displayPermission!!.context)
+    }
+
     private fun source(query: HistoryGraphQuery, more: Boolean, readiness: HistoryReadiness = HistoryReadiness.READY,
         lostSamples: Long = 0, issuer: DisplayIssuer = DisplayIssuer()): HistoryGraphSnapshot {
         var cursor = HistoryCursor(SyntheticHistory.partition, lastOrdinal = query.after?.ordinal ?: 0)
