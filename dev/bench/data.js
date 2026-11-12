@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794506658453,
+  "lastUpdate": 1794506660804,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -7029,6 +7029,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/d6a9f149412a305906dd3188b3964790ad5d3026"
         },
         "date": 1794061424622,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ef5c0de8bb975f81c0385fff10aafe6c1218ecdc",
+          "message": "Persist non-destructive account selection and isolate dashboard lifetimes (#253)\n\n* Persist account selection without retiring account-owned work\n\n* Capture non-null native display observations at readiness\n\n* fix: preserve replacement cleanup intent and isolate native fixtures",
+          "timestamp": "2026-11-12T21:03:55+03:00",
+          "tree_id": "bf13147abc953f55cec319f6236aab23c9f37b8e",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/ef5c0de8bb975f81c0385fff10aafe6c1218ecdc"
+        },
+        "date": 1794506660532,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
