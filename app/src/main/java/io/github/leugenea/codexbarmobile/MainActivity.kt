@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() {
         if (state.auth !== awaiting || state.operation !== target.accountRemoval) return@launch
         val intent = Intent(Intent.ACTION_VIEW, url.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
         try {
-            browserLauncher(this, intent)
+            browserLauncher(this@MainActivity, intent)
         } catch (_: ActivityNotFoundException) {
             target.browserFailed(awaiting)
         } catch (_: SecurityException) {
