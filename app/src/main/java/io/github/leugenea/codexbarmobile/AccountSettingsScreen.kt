@@ -42,13 +42,13 @@ private fun AccountSignIn(state: ConnectionState, controller: ConnectionControll
         }
     }
     if (state.phase !in setOf(ConnectionPhase.RESTORED, ConnectionPhase.READING, ConnectionPhase.OBSERVED)) {
-        Button(onClick = controller::connect, enabled = !state.busy,
+        Button(onClick = { controller.connect(state.operation) }, enabled = !state.busy,
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("connect")) {
             Text(stringResource(if (state.phase == ConnectionPhase.REAUTH_REQUIRED) R.string.gate_reauth else R.string.account_add))
         }
     }
     if (state.phase == ConnectionPhase.AUTHENTICATING) {
-        OutlinedButton(onClick = controller::cancel,
+        OutlinedButton(onClick = { controller.cancel(state.operation) },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("cancel-connect")) {
             Text(stringResource(R.string.gate_cancel))
         }

@@ -96,8 +96,34 @@ attempted replacement and readback confirms its removal after a directory-sync f
 that same ticket retries directory durability. It never rewrites its old snapshot or
 accepts an unrelated absent receipt; newer peer and successor changes remain untouched.
 Failure remains a storage error until sync succeeds, without another persisted journal.
-The existing controller removal path consumes this primitive; public multi-account Add,
-reauthorization and removal workflows remain a separate integration unit.
+The existing controller removal path consumes this primitive. Captured management of saved
+entries uses it directly; additive authentication remains a separate integration unit.
+
+## Captured saved-account management
+
+Existing settings render the controller's operation permission with its state. Reauthorization
+and Cancel submit that displayed permission, and the serial owner checks it before retirement.
+The permission is the existing opaque `AccountRemoval`, not a second generation or owner.
+Ordinary quota updates, rotation and dashboard A → B → A do not renew it; retirement and
+required cleanup do. A delayed reauthorization cannot become replacement of a healthy successor.
+The UI Cancel additionally requires an unfinished authentication and a live displayed code
+when one is present; completing that login does not authorize a late cancellation of its session.
+
+Browser clicks retain the exact displayed `AwaitingUser` and controller. The owner reuses the
+copy identity/generation/poll-deadline gate to return only the fixed verification URL. Activity
+launch runs on Main and rechecks state/retirement after admission suspends; platform failure
+returns only to that captured auth operation. Neither path looks up dashboard selection. Copy
+and live rename retain their existing exact code/editor fences; there is no credentialless
+catalog-only rename. No user-provided browser URL is accepted.
+
+Removal confirmation also remains on its captured controller/permission. A saved retained
+REAUTH_REQUIRED entry is removable without a usable credential, unlike an empty anonymous
+installation. Dismissal sends no removal command, and the existing modal-open state rejects
+an already captured confirmation after the modal was closed. Confirmation uses the original combined
+protected/history/catalog barriers and RETAIN-then-REMOVE escalation; it does not reinterpret
+an old ticket. Nonselected removal does not activate a peer. Selected removal applies the
+stable immediate-request fallback below, including a dormant peer. No Add, public account
+list/dropdown or all-account scheduler is supplied by these management controls.
 
 ## Rename transaction
 

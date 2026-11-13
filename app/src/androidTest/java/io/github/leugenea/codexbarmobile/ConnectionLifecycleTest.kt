@@ -117,6 +117,7 @@ class ConnectionLifecycleTest {
             await(scenario, "code ready") { it.auth is AuthState.AwaitingUser }
             compose.onNodeWithTag("device-code").assertTextEquals(CODE)
             click("open-browser")
+            bounded("admitted fixed browser intent", { "intents=${intents.size}; ${NativeConnection.get(context).state.value}" }) { intents.size == 1 }
             assertEquals(1, intents.size)
             val intent = intents.single()
             assertEquals(Intent.ACTION_VIEW, intent.action)
@@ -130,7 +131,7 @@ class ConnectionLifecycleTest {
             // the external Activity starts: no real browser, account or network in CI.
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val boundary = object : android.app.Instrumentation.ActivityMonitor() {
-                var launched: Intent? = null
+                @Volatile var launched: Intent? = null
                 override fun onStartActivity(intent: Intent): android.app.Instrumentation.ActivityResult {
                     launched = Intent(intent)
                     return android.app.Instrumentation.ActivityResult(android.app.Activity.RESULT_CANCELED, null)
@@ -140,6 +141,7 @@ class ConnectionLifecycleTest {
             MainActivity.browserLauncher = defaultLauncher
             try {
                 click("open-browser")
+                bounded("actual system-browser launch intercepted", { "launched=${boundary.launched != null}; ${NativeConnection.get(context).state.value}" }) { boundary.launched != null }
                 assertEquals(Intent.ACTION_VIEW, boundary.launched!!.action)
                 assertEquals(intent.data, boundary.launched!!.data)
                 assertNull(boundary.launched!!.extras)
@@ -724,7 +726,7 @@ class ConnectionLifecycleTest {
             settleCopyCommands("failure login receipt")
             await(scenario, "capture failed attempt copy") { it.auth is AuthState.AwaitingUser }
             val failed = owner.state.value.auth as AuthState.AwaitingUser
-            owner.browserFailed()
+            owner.browserFailed(failed)
             settleCopyCommands("browser failure receipt")
             await(scenario, "failed attempt removes copy control") { it.phase == ConnectionPhase.FAILED }
             assertFalse(copyResult("failed attempt rejects copy") { owner.copyDeviceCode(failed, clipboard) })

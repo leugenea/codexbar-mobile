@@ -11,6 +11,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.awaitCancellation
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import androidx.activity.ComponentActivity
@@ -44,6 +46,7 @@ class MainActivity : ComponentActivity() {
                 val selection by dashboard.collectAsState()
                 val root = requireNotNull(selection)
                 val connectionState by root.controller.state.collectAsState()
+                val displayedAuth = connectionState.auth as? AuthState.AwaitingUser
                 // Launch and recreation attach the same identity-tagged STARTED observer.
                 // Fresh restored owners remain dormant; already activated owners may resume reads.
                 ObserveUsageLifecycle(lifecycle) { NativeConnection.observeDashboard(applicationContext) }
@@ -51,7 +54,9 @@ class MainActivity : ComponentActivity() {
                     contentColor = MaterialTheme.colorScheme.onBackground) {
                     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                         key(root) {
-                            ConnectionScreen(connectionState, root.controller, { openVerificationBrowser(root.controller) }, historyUiObserver, root)
+                            ConnectionScreen(connectionState, root.controller, {
+                                displayedAuth?.let { openVerificationBrowser(root.controller, it) }
+                            }, historyUiObserver, root)
                         }
                     }
                 }
@@ -59,17 +64,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    internal fun openVerificationBrowser() = openVerificationBrowser(connection)
+    internal fun openVerificationBrowser() {
+        val target = connection
+        (target.state.value.auth as? AuthState.AwaitingUser)?.let { openVerificationBrowser(target, it) }
+    }
 
-    private fun openVerificationBrowser(target: ConnectionController) {
-        val awaiting = target.state.value.auth as? AuthState.AwaitingUser ?: return
-        val intent = Intent(Intent.ACTION_VIEW, awaiting.verificationUrl.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
+    internal fun openVerificationBrowser(target: ConnectionController, awaiting: AuthState.AwaitingUser) = lifecycleScope.launch {
+        val url = target.verificationUrl(awaiting) ?: return@launch
+        // Admission suspends off Main. Recheck publication/retirement before this synchronous
+        // platform effect; never reacquire whichever attempt or dashboard is current now.
+        val state = target.state.value
+        if (state.auth !== awaiting || state.operation !== target.accountRemoval) return@launch
+        val intent = Intent(Intent.ACTION_VIEW, url.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
         try {
             browserLauncher(this, intent)
         } catch (_: ActivityNotFoundException) {
-            target.browserFailed()
+            target.browserFailed(awaiting)
         } catch (_: SecurityException) {
-            target.browserFailed()
+            target.browserFailed(awaiting)
         }
     }
 

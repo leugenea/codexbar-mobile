@@ -128,11 +128,29 @@ internal class AccountSelectionFixture {
     fun await(label: String, predicate: () -> Boolean) = receipt(label) { while (!predicate()) yield() }
 
     fun bytes(entry: CatalogEntry): Map<String, List<Byte>> {
-        val history = entry.storage.historyDirectory(directory).walkTopDown().filter { it.isFile }.associate {
+        assertTrue("Saved peer ciphertext remains present", KeystoreCredentialStore.file(context, entry.storage.credentialSlot).isFile)
+        val roots = listOf(entry.storage.historyDirectory(directory),
+            requireNotNull(KeystoreCredentialStore.file(context, entry.storage.credentialSlot).parentFile))
+        return roots.flatMap { it.walkTopDown().filter(File::isFile).toList() }.associate {
             it.relativeTo(directory).path to it.readBytes().toList()
         }
-        val credential = KeystoreCredentialStore.file(context, entry.storage.credentialSlot)
-        return history + (credential.relativeTo(directory).path to credential.readBytes().toList())
+    }
+    fun keyExists(entry: CatalogEntry) = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        .containsAlias(KeystoreCredentialStore.alias(context, entry.storage.credentialSlot))
+    fun protectedReadback(entry: CatalogEntry): CredentialEnvelope {
+        assertTrue("Peer key remains usable", keyExists(entry))
+        val store = KeystoreCredentialStore(context, entry.storage.credentialSlot)
+        return (store.read(store.openSession()) as CredentialResult.Success).value
+    }
+    fun assertRemoved(entry: CatalogEntry) {
+        assertFalse(keyExists(entry))
+        val protected = KeystoreCredentialStore(context, entry.storage.credentialSlot)
+        assertTrue(protected.read(protected.openSession()) is CredentialResult.Failure)
+        assertTrue(KeystoreCredentialStore.file(context, entry.storage.credentialSlot).parentFile!!.listFiles().orEmpty().isEmpty())
+        val path = entry.storage.historyDirectory(directory)
+        for (name in listOf("history.db", "history.db-journal", "history.db-wal", "history.db-shm",
+            AccountNameFile.FILE_NAME, AccountNameFile.PENDING_NAME)) assertFalse(File(path, name).exists())
+        assertNull(AccountCatalog.open(directory, { error("existing catalog") }).entry(entry.storage.id))
     }
     fun page(controller: ConnectionController) = receipt("actual page completion", controller) {
         controller.commandsSettled()
@@ -153,7 +171,9 @@ internal class AccountSelectionFixture {
             if (installed) NativeConnection.rootFactory = originalRootFactory
             val keys = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
             listOf(a, b).forEach { keys.deleteEntry(KeystoreCredentialStore.alias(context, it.storage.credentialSlot)) }
+            check(directory.parentFile == application.noBackupFilesDir.canonicalFile && directory.name.startsWith("synthetic-selection-"))
             assertTrue(directory.deleteRecursively())
+            assertFalse(directory.exists())
         }
     }
 }
