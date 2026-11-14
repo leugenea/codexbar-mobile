@@ -15,6 +15,7 @@ import io.github.leugenea.codexbarmobile.history.HistoryAppendOutcome
 import io.github.leugenea.codexbarmobile.history.HistoryEvent
 import io.github.leugenea.codexbarmobile.transport.ReadOperation
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -89,18 +90,44 @@ class CapturedAccountActionsTest {
             a.connect(a.state.value.operation)
             await("same-entry successor awaiting code", a) { a.state.value.auth is AuthState.AwaitingUser && a.state.value.auth !== first }
             val successor = a.state.value.auth as AuthState.AwaitingUser
+            val successorOperation = a.state.value.operation
+            fixture.await("same-entry successor poll is live") { fixture.aTransport.liveHeldCall("/api/accounts/deviceauth/token") != null }
+            val successorPoll = requireNotNull(fixture.aTransport.liveHeldCall("/api/accounts/deviceauth/token"))
             invoke(browser); invoke(cancel); invoke(reauth); invoke(remove)
             settleBrowser(a)
             assertSame(successor, a.state.value.auth)
             assertEquals(2, launches.get())
             assertFalse(fixture.receipt("old A copy cannot borrow equal-text successor", a) { a.copyDeviceCode(first, DeviceCodeClipboard { copied += it; true }) })
             a.renameAccount(oldEditor, "Forbidden stale name")
+            assertFalse(a.session.snapshot() is SessionResult.Ready)
             fixture.aTransport.releaseHeld()
-            fixture.phase(a, ConnectionPhase.OBSERVED)
+            // B owns foreground interest. A's completed login is healthy but dormant,
+            // not an OBSERVED quota read; require this exact successor's adoption.
+            val completed = fixture.receipt("nonselected A successor durably adopted", a) {
+                a.commandsSettled()
+                a.state.first { state -> state.phase == ConnectionPhase.RESTORED && state.auth is AuthState.Connected &&
+                    state.operation === successorOperation && !state.refresh.refreshing }
+            }
             val healthy = fixture.ready(a)
+            assertSame((completed.auth as AuthState.Connected).generation, healthy.generation)
+            assertFalse(successorPoll.cancelled)
+            assertFalse(successorPoll.live())
+            val durable = fixture.protectedReadback(fixture.a)
+            assertArrayEquals("synthetic-navigation-access".toByteArray(), healthy.accessToken.copyBytes())
+            assertArrayEquals("synthetic-navigation-refresh".toByteArray(), requireNotNull(healthy.refreshToken).copyBytes())
+            assertArrayEquals(healthy.accessToken.copyBytes(), durable.accessToken.copyBytes())
+            assertArrayEquals(requireNotNull(healthy.refreshToken).copyBytes(), requireNotNull(durable.refreshToken).copyBytes())
+            val healthyBytes = fixture.bytes(fixture.a)
+            val healthyCounts = fixture.aTransport.counts()
             invoke(reauth); invoke(cancel); invoke(remove); invoke(browser)
             settleBrowser(a)
+            assertEquals(ConnectionPhase.RESTORED, a.state.value.phase)
+            assertSame(completed.auth, a.state.value.auth)
+            assertSame(successorOperation, a.state.value.operation)
             assertSame(healthy, fixture.ready(a))
+            assertEquals(healthyBytes, fixture.bytes(fixture.a))
+            assertEquals(healthyCounts, fixture.aTransport.counts())
+            assertEquals(2, launches.get())
             assertEquals(fixture.a.name, a.accountName.value!!.name!!.text)
             assertEquals(fixture.b.storage.id, fixture.catalog.snapshot().selected)
             assertSame(peerEnvelope, fixture.ready(b))
