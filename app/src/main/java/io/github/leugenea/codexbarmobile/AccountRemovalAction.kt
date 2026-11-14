@@ -37,7 +37,7 @@ private fun AccountRemovalDialog(dismiss: () -> Unit, confirm: () -> Unit) {
         title = { Text(stringResource(R.string.account_remove_title)) },
         text = { Text(stringResource(R.string.account_remove_scope)) },
         confirmButton = {
-            TextButton(onClick = confirm, modifier = Modifier.testTag("remove-account-confirm")) {
+            TextButton(onClick = confirm, modifier = Modifier.testTag("remove-account-confirm").observeAccountAction(confirm)) {
                 Text(stringResource(R.string.account_remove_confirm))
             }
         },

@@ -85,7 +85,7 @@ class CapturedAccountRemovalTest {
             assertSame(peerEnvelope, fixture.ready(b))
             assertArrayEquals(peerCiphertext, KeystoreCredentialStore.file(fixture.context, fixture.b.storage.credentialSlot).readBytes())
             assertArrayEquals(peerEnvelope.accessToken.copyBytes(), fixture.protectedReadback(fixture.b).accessToken.copyBytes())
-            assertEquals(listOf(1L, 2L, 3L, 4L), fixture.diskPage(fixture.b).entries.map { it.id.ordinal })
+            assertEquals(listOf(1L, 2L, 3L, 4L), fixture.settledDiskPage(fixture.b).entries.map { it.id.ordinal })
             assertEquals(1L, countsAfter[ReadOperation.USAGE.path])
             assertEquals(1L, countsAfter[ReadOperation.RESET_INVENTORY.path])
             assertEquals(if (protected) 0L else 1L, fixture.aTransport.counts()[ReadOperation.USAGE.path] ?: 0L)
@@ -152,7 +152,11 @@ class CapturedAccountRemovalTest {
     private fun completedPeer(controller: ConnectionController) {
         fixture.phase(controller, ConnectionPhase.OBSERVED)
         fixture.await("B exact native observation completion") { fixture.appends.any {
-            it.admission.partition == fixture.b.partition && it.admission.id == ObservationId(4) && it.result is HistoryAppendOutcome.Stored
+            it.admission.partition == fixture.b.partition && it.admission.event is HistoryEvent.Observed &&
+                it.admission.id == ObservationId(4) && it.result is HistoryAppendOutcome.Stored
         } }
+        val counts = fixture.bTransport.counts()
+        assertEquals(1L, counts[ReadOperation.USAGE.path])
+        assertEquals(1L, counts[ReadOperation.RESET_INVENTORY.path])
     }
 }

@@ -4,7 +4,7 @@ import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.platform.ViewRootForTest
-import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -48,10 +48,10 @@ class AccountRemovalLifecycleTest {
             // AlertDialog's separate window must inherit the capture-enabled Activity policy.
             assertPlatformScreenshot(compose, "account-removal-dialog", "remove-account-confirm")
             val cancelledConfirm = requireNotNull(compose.onNodeWithTag("remove-account-confirm")
-                .fetchSemanticsNode().config[SemanticsActions.OnClick].action)
+                .assertIsDisplayed().assertIsEnabled().fetchSemanticsNode().config.getOrNull(DisplayedAccountAction))
             click("remove-account-cancel")
             awaitDialogDismissed("Cancel dismisses restored account confirmation")
-            compose.runOnUiThread { assertTrue(cancelledConfirm()) }
+            compose.runOnUiThread { cancelledConfirm() }
             settle(owner, "closed Cancelled modal cannot issue delayed confirmation")
             assertEquals(ConnectionPhase.RESTORED, owner.state.value.phase)
             click("remove-account")
@@ -179,7 +179,7 @@ class AccountRemovalLifecycleTest {
             compose.onNodeWithTag("remove-account").performClick()
             compose.onNodeWithTag("remove-account-dialog").assertIsDisplayed()
             val oldConfirm = requireNotNull(compose.onNodeWithTag("remove-account-confirm")
-                .fetchSemanticsNode().config[SemanticsActions.OnClick].action)
+                .assertIsDisplayed().assertIsEnabled().fetchSemanticsNode().config.getOrNull(DisplayedAccountAction))
             controller.connect()
             settle(controller, "same-phase replacement connect command processed")
             await("same-phase successor adopted") {
@@ -191,7 +191,7 @@ class AccountRemovalLifecycleTest {
             assertEquals(ConnectionPhase.OBSERVED, controller.state.value.phase)
             val successorCredentials = credentialFile().readBytes()
             val successorRequests = fixture.transport.counts()
-            compose.runOnUiThread { assertTrue(oldConfirm()) }
+            compose.runOnUiThread { oldConfirm() }
             settle(controller, "actual same-composition predecessor confirmation rejected")
             assertEquals(ConnectionPhase.OBSERVED, controller.state.value.phase)
             assertArrayEquals(successorCredentials, credentialFile().readBytes())

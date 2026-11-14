@@ -2,6 +2,7 @@ package io.github.leugenea.codexbarmobile
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.system.Os
 import androidx.test.core.app.ApplicationProvider
 import io.github.leugenea.codexbarmobile.account.*
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
@@ -156,7 +157,52 @@ internal class AccountSelectionFixture {
         controller.commandsSettled()
         controller.historySnapshots.first { it.storage?.lastAdmitted?.ordinal != null }
     }
-    fun diskPage(entry: CatalogEntry) = SQLiteHistoryStore(entry.storage.historyDirectory(directory)).use { history ->
+    /** Independent original-directory readback: callers must first shut down its retained owner. */
+    fun diskPage(entry: CatalogEntry) = readDiskPage(entry, entry.storage.historyDirectory(directory))
+
+    /** Only for settled fixture writes, not an arbitrary concurrent SQLite backup. Keep the owner live. */
+    fun settledDiskPage(entry: CatalogEntry): HistoryReadSnapshot {
+        val state = runtime(entry).state.value
+        assertEquals("Settled readback phase", ConnectionPhase.OBSERVED, state.phase)
+        assertFalse("Settled readback endpoint cycle", state.refresh.refreshing)
+        assertNotNull("Settled usage endpoint", state.refresh.usage.success)
+        assertNotNull("Settled inventory endpoint", state.refresh.inventory.success)
+        val receipts = appends.filter { it.directory == entry.storage.historyDirectory(directory) &&
+            it.admission.partition == entry.partition && it.admission.event is HistoryEvent.Observed }
+        assertTrue("Original observer must have completed an append", receipts.isNotEmpty())
+        receipts.forEach { assertTrue("Original append ${it.admission.id}: ${it.result}", it.result is HistoryAppendOutcome.Stored) }
+        val source = entry.storage.historyDirectory(directory)
+        val before = historyArtifacts(source)
+        assertTrue("Unsettled SQLite artifacts: ${before.keys}",
+            before.keys.none { it in setOf("history.db-journal", "history.db-wal", "history.db-shm") })
+        val copy = File(directory, "settled-history-readback-${UUID.randomUUID()}").canonicalFile
+        check(source.parentFile == directory && copy.parentFile == directory && copy != source)
+        assertTrue("Fresh detached readback directory", copy.mkdir())
+        try {
+            for (name in before.keys) {
+                val original = File(source, name)
+                val target = original.copyTo(File(copy, name))
+                val originalStat = Os.stat(original.path); val copiedStat = Os.stat(target.path)
+                assertFalse("Readback must not share the original inode: $name",
+                    originalStat.st_dev == copiedStat.st_dev && originalStat.st_ino == copiedStat.st_ino)
+            }
+            assertEquals("Original artifact set/bytes changed during copy", before, historyArtifacts(source))
+            assertEquals("Detached artifact set/bytes differ", before, historyArtifacts(copy))
+            return readDiskPage(entry, copy)
+        } finally {
+            assertTrue("Delete only detached readback", copy.deleteRecursively())
+            assertFalse("Detached readback removed", copy.exists())
+        }
+    }
+
+    private fun historyArtifacts(path: File): Map<String, List<Byte>> = requireNotNull(path.listFiles()) {
+        "Cannot inventory history directory $path"
+    }.sortedBy { it.name }.associate { file ->
+        check(file.isFile && file.canonicalFile == file.absoluteFile) { "Non-regular history artifact: $file" }
+        file.name to file.readBytes().toList()
+    }
+
+    private fun readDiskPage(entry: CatalogEntry, path: File) = SQLiteHistoryStore(path).use { history ->
         val access = (history.adopt(entry.partition!!) as HistoryAccessOutcome.Bound).access
         (access.read(HistoryReadQuery(entry.partition, 32)) as HistoryReadOutcome.Ready).snapshot
     }

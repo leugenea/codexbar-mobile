@@ -125,6 +125,12 @@ an old ticket. Nonselected removal does not activate a peer. Selected removal ap
 stable immediate-request fallback below, including a dormant peer. No Add, public account
 list/dropdown or all-account scheduler is supplied by these management controls.
 
+The existing Connect, Cancel, browser and removal-confirm controls expose their exact
+application callback through one internal non-action semantics property. Each control
+uses the same immutable callback value for ordinary `onClick` and observation; no
+accessibility action is replaced. Retaining that value observes displayed authority
+without retaining a framework click wrapper that can detach or change its callback.
+
 ## Rename transaction
 
 The existing history storage lane also owns catalog/name settlement. It first persists a

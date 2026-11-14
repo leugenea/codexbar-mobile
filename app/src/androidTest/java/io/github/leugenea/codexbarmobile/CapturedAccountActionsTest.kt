@@ -3,7 +3,7 @@ package io.github.leugenea.codexbarmobile
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.os.Looper
-import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -11,6 +11,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.leugenea.codexbarmobile.account.*
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.credentials.*
+import io.github.leugenea.codexbarmobile.history.HistoryAppendOutcome
+import io.github.leugenea.codexbarmobile.history.HistoryEvent
 import io.github.leugenea.codexbarmobile.transport.ReadOperation
 import kotlinx.coroutines.*
 import org.junit.*
@@ -41,7 +43,7 @@ class CapturedAccountActionsTest {
         fixture.installActivity()
         ActivityScenario.launch(MainActivity::class.java).use {
             openDetailRoute(compose, a, DashboardRoute.ACCOUNT_SETTINGS)
-            val reauth = displayedClick("connect")
+            val reauth = displayedAction("connect")
             fixture.select(fixture.b); fixture.phase(b, ConnectionPhase.OBSERVED)
             peerAppend(b, 1)
             val peerEnvelope = fixture.ready(b)
@@ -53,16 +55,16 @@ class CapturedAccountActionsTest {
             fixture.select(fixture.a)
             openDetailRoute(compose, a, DashboardRoute.ACCOUNT_SETTINGS)
             val first = a.state.value.auth as AuthState.AwaitingUser
-            val browser = displayedClick("open-browser")
-            val cancel = displayedClick("cancel-connect")
+            val browser = displayedAction("open-browser")
+            val cancel = displayedAction("cancel-connect")
             compose.onNodeWithTag("remove-account").performScrollTo().performClick()
-            val remove = displayedClick("remove-account-confirm")
+            val remove = displayedAction("remove-account-confirm")
             compose.onNodeWithTag("remove-account-cancel").performClick()
             fixture.select(fixture.b); fixture.phase(b, ConnectionPhase.OBSERVED)
             peerAppend(b, 2)
             val peer = fixture.bytes(fixture.b)
             val peerCounts = fixture.bTransport.counts()
-            val peerHistory = fixture.diskPage(fixture.b).entries.map { entry -> entry.id to entry.windows.map { it.point?.usedPercent } }
+            val peerHistory = fixture.settledDiskPage(fixture.b).entries.map { entry -> entry.id to entry.windows.map { it.point?.usedPercent } }
             val launches = AtomicInteger()
             var failBrowser = false
             MainActivity.browserLauncher = { _, intent ->
@@ -103,7 +105,7 @@ class CapturedAccountActionsTest {
             assertEquals(fixture.b.storage.id, fixture.catalog.snapshot().selected)
             assertSame(peerEnvelope, fixture.ready(b))
             assertEquals(peer, fixture.bytes(fixture.b))
-            assertEquals(peerHistory, fixture.diskPage(fixture.b).entries.map { entry -> entry.id to entry.windows.map { it.point?.usedPercent } })
+            assertEquals(peerHistory, fixture.settledDiskPage(fixture.b).entries.map { entry -> entry.id to entry.windows.map { it.point?.usedPercent } })
             assertEquals(peerCounts, fixture.bTransport.counts())
             assertArrayEquals(peerEnvelope.accessToken.copyBytes(), fixture.protectedReadback(fixture.b).accessToken.copyBytes())
             assertEquals(2L, peerCounts[ReadOperation.USAGE.path])
@@ -124,9 +126,9 @@ class CapturedAccountActionsTest {
         MainActivity.browserLauncher = { _, _ -> launches.incrementAndGet() }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             openDetailRoute(compose, a, DashboardRoute.ACCOUNT_SETTINGS)
-            invoke(displayedClick("connect"))
+            click("connect")
             await("first live A attempt", a) { a.state.value.auth is AuthState.AwaitingUser }
-            val cancel = displayedClick("cancel-connect")
+            val cancel = displayedAction("cancel-connect")
             fixture.select(fixture.b); fixture.phase(b, ConnectionPhase.OBSERVED); peerAppend(b, 1)
             val peer = fixture.bytes(fixture.b); val peerCounts = fixture.bTransport.counts()
             invoke(cancel); fixture.phase(a, ConnectionPhase.CANCELLED)
@@ -135,12 +137,12 @@ class CapturedAccountActionsTest {
 
             fixture.select(fixture.a)
             openDetailRoute(compose, a, DashboardRoute.ACCOUNT_SETTINGS)
-            invoke(displayedClick("connect"))
+            click("connect")
             await("continuously composed second A attempt", a) { a.state.value.auth is AuthState.AwaitingUser }
             val second = a.state.value.auth as AuthState.AwaitingUser
-            val browser = displayedClick("open-browser")
-            invoke(displayedClick("cancel-connect")); fixture.phase(a, ConnectionPhase.CANCELLED)
-            invoke(displayedClick("connect"))
+            val browser = displayedAction("open-browser")
+            click("cancel-connect"); fixture.phase(a, ConnectionPhase.CANCELLED)
+            click("connect")
             await("same-root third A attempt", a) { a.state.value.auth is AuthState.AwaitingUser && a.state.value.auth !== second }
             val third = a.state.value.auth as AuthState.AwaitingUser
             invoke(browser); settleBrowser(a)
@@ -269,12 +271,13 @@ class CapturedAccountActionsTest {
         assertArrayEquals(peerEnvelope.accessToken.copyBytes(), fixture.protectedReadback(fixture.b).accessToken.copyBytes())
     }
 
-    private fun displayedClick(tag: String): () -> Boolean {
+    private fun displayedAction(tag: String): () -> Unit {
         val node = compose.onNodeWithTag(tag)
         if (tag != "remove-account-confirm") node.performScrollTo()
-        return requireNotNull(node.fetchSemanticsNode().config[SemanticsActions.OnClick].action)
+        return requireNotNull(node.assertIsDisplayed().assertIsEnabled().fetchSemanticsNode().config.getOrNull(DisplayedAccountAction))
     }
-    private fun invoke(action: () -> Boolean) { compose.runOnUiThread { assertTrue(action()) } }
+    private fun invoke(action: () -> Unit) { compose.runOnUiThread { action() } }
+    private fun click(tag: String) { compose.onNodeWithTag(tag).performScrollTo().assertIsEnabled().performClick() }
     private fun settleBrowser(controller: ConnectionController) {
         fixture.settle(controller)
         // The serialized admission preceded its owner receipt; now drain its already
@@ -284,9 +287,16 @@ class CapturedAccountActionsTest {
     private fun peerAppend(controller: ConnectionController, observations: Int) {
         fixture.await("B exact admitted observation $observations") {
             fixture.appends.count { it.admission.partition == fixture.b.partition &&
-                it.admission.event is io.github.leugenea.codexbarmobile.history.HistoryEvent.Observed } == observations
+                it.admission.event is HistoryEvent.Observed } == observations
         }
         fixture.settle(controller)
+        fixture.phase(controller, ConnectionPhase.OBSERVED)
+        val receipts = fixture.appends.filter { it.admission.partition == fixture.b.partition && it.admission.event is HistoryEvent.Observed }
+        assertEquals(observations, receipts.size)
+        receipts.forEach { assertTrue("B original append ${it.admission.id}: ${it.result}", it.result is HistoryAppendOutcome.Stored) }
+        val counts = fixture.bTransport.counts()
+        assertEquals(observations.toLong(), counts[ReadOperation.USAGE.path])
+        assertEquals(observations.toLong(), counts[ReadOperation.RESET_INVENTORY.path])
     }
     private fun await(label: String, controller: ConnectionController, predicate: () -> Boolean) {
         try { compose.waitUntil(timeoutMillis = 8_000, condition = predicate) }
