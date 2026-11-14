@@ -13,16 +13,19 @@ import androidx.compose.ui.res.stringResource
 @Composable
 internal fun AccountRemovalAction(phase: ConnectionPhase, controller: ConnectionController) {
     val removal by controller.accountRemovalPermissions.collectAsState()
-    val enabled = phase !in setOf(ConnectionPhase.RESTORING, ConnectionPhase.SIGNING_OUT,
-        ConnectionPhase.SIGNED_OUT, ConnectionPhase.REAUTH_REQUIRED, ConnectionPhase.IDLE)
+    val displayedRemoval = removal
+    val enabled = phase !in setOf(ConnectionPhase.RESTORING, ConnectionPhase.SIGNING_OUT, ConnectionPhase.SIGNED_OUT) &&
+        (phase !in setOf(ConnectionPhase.REAUTH_REQUIRED, ConnectionPhase.IDLE) || controller.hasSavedAccount)
     var confirming by remember(controller, removal, enabled) { mutableStateOf(false) }
     OutlinedButton(onClick = { confirming = true }, enabled = enabled,
         modifier = Modifier.testTag("remove-account")) {
         Text(stringResource(R.string.account_remove))
     }
     if (confirming && enabled) AccountRemovalDialog({ confirming = false }) {
-        controller.signOut(removal)
-        confirming = false
+        if (confirming) {
+            controller.signOut(displayedRemoval)
+            confirming = false
+        }
     }
 }
 
@@ -34,7 +37,7 @@ private fun AccountRemovalDialog(dismiss: () -> Unit, confirm: () -> Unit) {
         title = { Text(stringResource(R.string.account_remove_title)) },
         text = { Text(stringResource(R.string.account_remove_scope)) },
         confirmButton = {
-            TextButton(onClick = confirm, modifier = Modifier.testTag("remove-account-confirm")) {
+            TextButton(onClick = confirm, modifier = Modifier.testTag("remove-account-confirm").observeAccountAction(confirm)) {
                 Text(stringResource(R.string.account_remove_confirm))
             }
         },

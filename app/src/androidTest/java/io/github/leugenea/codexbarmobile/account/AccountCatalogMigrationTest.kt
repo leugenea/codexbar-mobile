@@ -1303,7 +1303,8 @@ class AccountCatalogMigrationTest {
             val original = catalog().snapshot().deletions.single()
             assertEquals(CleanupDisposition.RETAIN, original.disposition)
             assertEquals(a.storage.id, original.entry)
-            first.signOut()
+            val confirmation = first.accountRemoval
+            first.signOut(confirmation)
             settled(first, "explicit removal admitted during retained cleanup") { first.commandsSettled() }
             assertEquals(listOf(original), catalog().snapshot().deletions)
             assertEquals(a, catalog().entry(a.storage.id))
@@ -1317,6 +1318,9 @@ class AccountCatalogMigrationTest {
             assertEquals(a.storage.id, catalog().snapshot().selected)
             val pending = catalog().snapshot()
             assertFalse(metadata.completeDeletion(original))
+            assertEquals(pending, catalog().snapshot())
+            first.signOut(confirmation)
+            settled(first, "old confirmation cannot reinterpret the new REMOVE ticket") { first.commandsSettled() }
             assertEquals(pending, catalog().snapshot())
             assertFalse(first.session.snapshot() is SessionResult.Ready)
             assertFalse(credentialFile.exists())

@@ -2,6 +2,7 @@ package io.github.leugenea.codexbarmobile
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.system.Os
 import androidx.test.core.app.ApplicationProvider
 import io.github.leugenea.codexbarmobile.account.*
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
@@ -128,17 +129,80 @@ internal class AccountSelectionFixture {
     fun await(label: String, predicate: () -> Boolean) = receipt(label) { while (!predicate()) yield() }
 
     fun bytes(entry: CatalogEntry): Map<String, List<Byte>> {
-        val history = entry.storage.historyDirectory(directory).walkTopDown().filter { it.isFile }.associate {
+        assertTrue("Saved peer ciphertext remains present", KeystoreCredentialStore.file(context, entry.storage.credentialSlot).isFile)
+        val roots = listOf(entry.storage.historyDirectory(directory),
+            requireNotNull(KeystoreCredentialStore.file(context, entry.storage.credentialSlot).parentFile))
+        return roots.flatMap { it.walkTopDown().filter(File::isFile).toList() }.associate {
             it.relativeTo(directory).path to it.readBytes().toList()
         }
-        val credential = KeystoreCredentialStore.file(context, entry.storage.credentialSlot)
-        return history + (credential.relativeTo(directory).path to credential.readBytes().toList())
+    }
+    fun keyExists(entry: CatalogEntry) = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        .containsAlias(KeystoreCredentialStore.alias(context, entry.storage.credentialSlot))
+    fun protectedReadback(entry: CatalogEntry): CredentialEnvelope {
+        assertTrue("Peer key remains usable", keyExists(entry))
+        val store = KeystoreCredentialStore(context, entry.storage.credentialSlot)
+        return (store.read(store.openSession()) as CredentialResult.Success).value
+    }
+    fun assertRemoved(entry: CatalogEntry) {
+        assertFalse(keyExists(entry))
+        val protected = KeystoreCredentialStore(context, entry.storage.credentialSlot)
+        assertTrue(protected.read(protected.openSession()) is CredentialResult.Failure)
+        assertTrue(KeystoreCredentialStore.file(context, entry.storage.credentialSlot).parentFile!!.listFiles().orEmpty().isEmpty())
+        val path = entry.storage.historyDirectory(directory)
+        for (name in listOf("history.db", "history.db-journal", "history.db-wal", "history.db-shm",
+            AccountNameFile.FILE_NAME, AccountNameFile.PENDING_NAME)) assertFalse(File(path, name).exists())
+        assertNull(AccountCatalog.open(directory, { error("existing catalog") }).entry(entry.storage.id))
     }
     fun page(controller: ConnectionController) = receipt("actual page completion", controller) {
         controller.commandsSettled()
         controller.historySnapshots.first { it.storage?.lastAdmitted?.ordinal != null }
     }
-    fun diskPage(entry: CatalogEntry) = SQLiteHistoryStore(entry.storage.historyDirectory(directory)).use { history ->
+    /** Independent original-directory readback: callers must first shut down its retained owner. */
+    fun diskPage(entry: CatalogEntry) = readDiskPage(entry, entry.storage.historyDirectory(directory))
+
+    /** Only for settled fixture writes, not an arbitrary concurrent SQLite backup. Keep the owner live. */
+    fun settledDiskPage(entry: CatalogEntry): HistoryReadSnapshot {
+        val state = runtime(entry).state.value
+        assertEquals("Settled readback phase", ConnectionPhase.OBSERVED, state.phase)
+        assertFalse("Settled readback endpoint cycle", state.refresh.refreshing)
+        assertNotNull("Settled usage endpoint", state.refresh.usage.success)
+        assertNotNull("Settled inventory endpoint", state.refresh.inventory.success)
+        val receipts = appends.filter { it.directory == entry.storage.historyDirectory(directory) &&
+            it.admission.partition == entry.partition && it.admission.event is HistoryEvent.Observed }
+        assertTrue("Original observer must have completed an append", receipts.isNotEmpty())
+        receipts.forEach { assertTrue("Original append ${it.admission.id}: ${it.result}", it.result is HistoryAppendOutcome.Stored) }
+        val source = entry.storage.historyDirectory(directory)
+        val before = historyArtifacts(source)
+        assertTrue("Unsettled SQLite artifacts: ${before.keys}",
+            before.keys.none { it in setOf("history.db-journal", "history.db-wal", "history.db-shm") })
+        val copy = File(directory, "settled-history-readback-${UUID.randomUUID()}").canonicalFile
+        check(source.parentFile == directory && copy.parentFile == directory && copy != source)
+        assertTrue("Fresh detached readback directory", copy.mkdir())
+        try {
+            for (name in before.keys) {
+                val original = File(source, name)
+                val target = original.copyTo(File(copy, name))
+                val originalStat = Os.stat(original.path); val copiedStat = Os.stat(target.path)
+                assertFalse("Readback must not share the original inode: $name",
+                    originalStat.st_dev == copiedStat.st_dev && originalStat.st_ino == copiedStat.st_ino)
+            }
+            assertEquals("Original artifact set/bytes changed during copy", before, historyArtifacts(source))
+            assertEquals("Detached artifact set/bytes differ", before, historyArtifacts(copy))
+            return readDiskPage(entry, copy)
+        } finally {
+            assertTrue("Delete only detached readback", copy.deleteRecursively())
+            assertFalse("Detached readback removed", copy.exists())
+        }
+    }
+
+    private fun historyArtifacts(path: File): Map<String, List<Byte>> = requireNotNull(path.listFiles()) {
+        "Cannot inventory history directory $path"
+    }.sortedBy { it.name }.associate { file ->
+        check(file.isFile && file.canonicalFile == file.absoluteFile) { "Non-regular history artifact: $file" }
+        file.name to file.readBytes().toList()
+    }
+
+    private fun readDiskPage(entry: CatalogEntry, path: File) = SQLiteHistoryStore(path).use { history ->
         val access = (history.adopt(entry.partition!!) as HistoryAccessOutcome.Bound).access
         (access.read(HistoryReadQuery(entry.partition, 32)) as HistoryReadOutcome.Ready).snapshot
     }
@@ -153,7 +217,9 @@ internal class AccountSelectionFixture {
             if (installed) NativeConnection.rootFactory = originalRootFactory
             val keys = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
             listOf(a, b).forEach { keys.deleteEntry(KeystoreCredentialStore.alias(context, it.storage.credentialSlot)) }
+            check(directory.parentFile == application.noBackupFilesDir.canonicalFile && directory.name.startsWith("synthetic-selection-"))
             assertTrue(directory.deleteRecursively())
+            assertFalse(directory.exists())
         }
     }
 }
