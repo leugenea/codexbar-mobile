@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794511159217,
+  "lastUpdate": 1794746909967,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -3559,6 +3559,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/fcb6cb3165c00f288576e999c2f49c4b7266be0a"
         },
         "date": 1794511155833,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "13e432cfa75e80c4eb7fce8cc0491e05504f83b5",
+          "message": "Bind account management actions and removal to captured authority (#257)\n\n* fix: bind account management actions to captured authority\n\n* fix: pass activity receiver to captured browser launcher\n\n* test(accounts): exercise captured callbacks and settled history\n\n* test(accounts): verify durable dormant auth successor\n\n* fix(accounts): preserve browser admission permission across retirement",
+          "timestamp": "2026-11-15T15:47:58+03:00",
+          "tree_id": "2529e97392ef8005c7eda14f2f8fbeb54befc1eb",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/13e432cfa75e80c4eb7fce8cc0491e05504f83b5"
+        },
+        "date": 1794746909619,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
