@@ -171,20 +171,24 @@ class CapturedAccountActionsTest {
             click("cancel-connect"); fixture.phase(a, ConnectionPhase.CANCELLED)
             click("connect")
             await("same-root third A attempt", a) { a.state.value.auth is AuthState.AwaitingUser && a.state.value.auth !== second }
-            val third = a.state.value.auth as AuthState.AwaitingUser
+            val thirdState = a.state.value
+            val third = thirdState.auth as AuthState.AwaitingUser
             invoke(browser); settleBrowser(a)
             assertEquals(0, launches.get())
             assertSame(third, a.state.value.auth)
 
-            // Hold Main after the real ingress enqueues its owner admission. Its return
-            // continuation cannot launch until the later serialized revocation has settled.
+            // Block the actual owner lane before ingress, so even fast IO cannot finish
+            // URL admission inline. Main stays held from the adapter's return through revocation.
             val enqueued = CountDownLatch(1); val retired = CountDownLatch(1)
+            val ownerBlocked = CountDownLatch(1); val releaseAdmission = CountDownLatch(1)
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-            lateinit var browserJob: Job
+            var browserJob: Job? = null
+            val blocker = blockOwnerForBrowserAdmission(scope, a, third, ownerBlocked, releaseAdmission)
             val revoke = scope.async {
                 try {
                     check(enqueued.await(8, TimeUnit.SECONDS)) { "browser ingress: last state=${a.state.value}" }
-                    withTimeout(8_000) { a.commandsSettled() }
+                    releaseAdmission.countDown()
+                    withTimeout(8_000) { blocker.await(); a.commandsSettled() }
                     assertSame(third, a.state.value.auth)
                     assertEquals("https://auth.openai.com/codex/device", a.verificationUrl(third))
                     a.cancel(a.state.value.operation)
@@ -193,16 +197,32 @@ class CapturedAccountActionsTest {
                 } finally { retired.countDown() }
             }
             try {
+                assertTrue("owner lane blocked before full-cancel browser ingress: last state=${a.state.value}",
+                    ownerBlocked.await(8, TimeUnit.SECONDS))
                 scenario.onActivity { activity ->
-                    browserJob = activity.openVerificationBrowser(a, third)
+                    browserJob = activity.openVerificationBrowser(a, thirdState)
+                    // The blocked owner forces suspension; this uninterrupted Main callback
+                    // now fences its continuation before permitting admission to finish.
                     enqueued.countDown()
                     assertTrue("Main resume after revocation: last state=${a.state.value}", retired.await(8, TimeUnit.SECONDS))
                 }
-                fixture.receipt("admitted browser Main continuation and revocation outcome", a) { revoke.await(); browserJob.join() }
+                fixture.receipt("admitted browser Main continuation and revocation outcome", a) { revoke.await(); requireNotNull(browserJob).join() }
                 assertEquals(0, launches.get())
                 assertEquals(peer, fixture.bytes(fixture.b)); assertEquals(peerCounts, fixture.bTransport.counts())
                 assertArrayEquals("synthetic-B-access".toByteArray(), fixture.protectedReadback(fixture.b).accessToken.copyBytes())
-            } finally { retired.countDown(); scope.cancel() }
+            } finally {
+                releaseAdmission.countDown(); enqueued.countDown(); retired.countDown()
+                fixture.receipt("full-cancellation race drained", a) {
+                    try { browserJob?.cancelAndJoin() }
+                    finally { scope.coroutineContext[Job]!!.cancelAndJoin() }
+                }
+            }
+
+            click("connect")
+            await("fourth A attempt before mixed retirement", a) { a.state.value.auth is AuthState.AwaitingUser }
+            rejectBrowserDuringMixedRetirement(scenario, a, launches)
+            assertEquals(peer, fixture.bytes(fixture.b)); assertEquals(peerCounts, fixture.bTransport.counts())
+            assertArrayEquals("synthetic-B-access".toByteArray(), fixture.protectedReadback(fixture.b).accessToken.copyBytes())
         }
     }
 
@@ -296,6 +316,97 @@ class CapturedAccountActionsTest {
         assertEquals(peer, fixture.bytes(fixture.b)) // No foreground recorder was activated in this case.
         assertEquals(counts[ReadOperation.USAGE.path]!! + 1, countsAfterABA[ReadOperation.USAGE.path])
         assertArrayEquals(peerEnvelope.accessToken.copyBytes(), fixture.protectedReadback(fixture.b).accessToken.copyBytes())
+    }
+
+    private fun rejectBrowserDuringMixedRetirement(scenario: ActivityScenario<MainActivity>, controller: ConnectionController,
+        launches: AtomicInteger) {
+        val displayed = controller.state.value
+        val awaiting = displayed.auth as AuthState.AwaitingUser
+        val enqueued = CountDownLatch(1); val published = CountDownLatch(1); val releaseOwner = CountDownLatch(1)
+        val ownerBlocked = CountDownLatch(1); val releaseAdmission = CountDownLatch(1)
+        val initial = CompletableDeferred<ConnectionState>(); val mixed = CompletableDeferred<ConnectionState>()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        var browserJob: Job? = null
+        try {
+            // Unconfined observes the real StateFlow setter inline on the owner IO lane.
+            // Do not suspend in the predicate: hold reset's publication before retire can cancel auth.
+            val observer = scope.async(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+                withTimeout(8_000) {
+                    controller.state.first { state ->
+                        if (!initial.isCompleted) initial.complete(state)
+                        if (state.auth !== awaiting || state.operation === displayed.operation) false else {
+                            check(Looper.myLooper() !== Looper.getMainLooper()) { "mixed publication must hold only owner IO" }
+                            mixed.complete(state)
+                            published.countDown()
+                            check(releaseOwner.await(8, TimeUnit.SECONDS)) { "mixed publication owner release: last state=${controller.state.value}" }
+                            true
+                        }
+                    }
+                }
+            }
+            fixture.receipt("original browser display observed before retirement", controller) { assertSame(displayed, initial.await()) }
+            val blocker = blockOwnerForBrowserAdmission(scope, controller, awaiting, ownerBlocked, releaseAdmission)
+            val revoke = scope.async {
+                withTimeout(8_000) {
+                    check(enqueued.await(8, TimeUnit.SECONDS)) { "mixed race browser ingress: last state=${controller.state.value}" }
+                    releaseAdmission.countDown()
+                    blocker.await()
+                    controller.commandsSettled() // The actual Activity URL admission has returned; Main is held below.
+                    assertSame(displayed, controller.state.value)
+                    assertEquals("https://auth.openai.com/codex/device", controller.verificationUrl(awaiting))
+                    controller.cancel(displayed.operation)
+                    controller.commandsSettled()
+                    assertEquals(ConnectionPhase.CANCELLED, controller.state.value.phase)
+                }
+            }
+            assertTrue("owner lane blocked before mixed browser ingress: last state=${controller.state.value}",
+                ownerBlocked.await(8, TimeUnit.SECONDS))
+            scenario.onActivity { activity ->
+                browserJob = activity.openVerificationBrowser(controller, displayed)
+                // Admission is still blocked when the adapter returns; Main cannot run its
+                // continuation until this callback observes the real mixed publication.
+                enqueued.countDown()
+                assertTrue("actual mixed publication before Main resumes: last state=${controller.state.value}",
+                    published.await(8, TimeUnit.SECONDS))
+                assertFalse(requireNotNull(browserJob).isCompleted)
+            }
+            val snapshot = fixture.receipt("retired permission and old auth published together", controller) { mixed.await() }
+            assertSame(awaiting, snapshot.auth)
+            assertNotSame(displayed.operation, snapshot.operation)
+            assertSame(snapshot.operation, controller.accountRemoval)
+            assertEquals(ConnectionPhase.AUTHENTICATING, snapshot.phase)
+            fixture.receipt("actual admitted Activity Main continuation drained at mixed cut", controller) { requireNotNull(browserJob).join() }
+            assertSame(snapshot, controller.state.value)
+            assertFalse(observer.isCompleted)
+            assertFalse(revoke.isCompleted)
+            assertEquals(0, launches.get())
+            releaseOwner.countDown()
+            fixture.receipt("mixed observer and remaining owner cancellation completed", controller) {
+                assertSame(snapshot, observer.await())
+                revoke.await()
+            }
+            assertNotSame(awaiting, controller.state.value.auth)
+            assertEquals(ConnectionPhase.CANCELLED, controller.state.value.phase)
+            assertEquals(0, launches.get())
+        } finally {
+            releaseAdmission.countDown(); enqueued.countDown(); published.countDown(); releaseOwner.countDown()
+            fixture.receipt("mixed retirement jobs drained", controller) {
+                try { browserJob?.cancelAndJoin() }
+                finally { scope.coroutineContext[Job]!!.cancelAndJoin() }
+            }
+        }
+    }
+
+    /** Existing synchronous clipboard admission holds the real IO lane, never Android Main. */
+    private fun blockOwnerForBrowserAdmission(scope: CoroutineScope, controller: ConnectionController,
+        awaiting: AuthState.AwaitingUser, entered: CountDownLatch, released: CountDownLatch) = scope.async {
+        assertTrue("live owner clipboard admission before browser", controller.copyDeviceCode(awaiting, DeviceCodeClipboard { code ->
+            assertSame(awaiting.userCode, code)
+            check(Looper.myLooper() !== Looper.getMainLooper()) { "browser admission blocker must hold only owner IO" }
+            entered.countDown()
+            check(released.await(8, TimeUnit.SECONDS)) { "browser admission owner release: last state=${controller.state.value}" }
+            true
+        }))
     }
 
     private fun displayedAction(tag: String): () -> Unit {

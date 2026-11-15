@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
                 val selection by dashboard.collectAsState()
                 val root = requireNotNull(selection)
                 val connectionState by root.controller.state.collectAsState()
-                val displayedAuth = connectionState.auth as? AuthState.AwaitingUser
+                val displayedState = connectionState
                 // Launch and recreation attach the same identity-tagged STARTED observer.
                 // Fresh restored owners remain dormant; already activated owners may resume reads.
                 ObserveUsageLifecycle(lifecycle) { NativeConnection.observeDashboard(applicationContext) }
@@ -55,7 +55,7 @@ class MainActivity : ComponentActivity() {
                     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                         key(root) {
                             ConnectionScreen(connectionState, root.controller, {
-                                displayedAuth?.let { openVerificationBrowser(root.controller, it) }
+                                openVerificationBrowser(root.controller, displayedState)
                             }, historyUiObserver, root)
                         }
                     }
@@ -66,15 +66,16 @@ class MainActivity : ComponentActivity() {
 
     internal fun openVerificationBrowser() {
         val target = connection
-        (target.state.value.auth as? AuthState.AwaitingUser)?.let { openVerificationBrowser(target, it) }
+        openVerificationBrowser(target, target.state.value)
     }
 
-    internal fun openVerificationBrowser(target: ConnectionController, awaiting: AuthState.AwaitingUser) = lifecycleScope.launch {
+    internal fun openVerificationBrowser(target: ConnectionController, displayed: ConnectionState) = lifecycleScope.launch {
+        val awaiting = displayed.auth as? AuthState.AwaitingUser ?: return@launch
         val url = target.verificationUrl(awaiting) ?: return@launch
         // Admission suspends off Main. Recheck publication/retirement before this synchronous
-        // platform effect; never reacquire whichever attempt or dashboard is current now.
+        // platform effect against the original displayed permission, not a republished one.
         val state = target.state.value
-        if (state.auth !== awaiting || state.operation !== target.accountRemoval) return@launch
+        if (state.auth !== awaiting || displayed.operation !== target.accountRemoval) return@launch
         val intent = Intent(Intent.ACTION_VIEW, url.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
         try {
             browserLauncher(this@MainActivity, intent)
