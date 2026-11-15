@@ -179,11 +179,40 @@ jobs:
           comment-on-alert: true
           fail-on-alert: false
 
+  # Finish the upload in a separate read-only job before Pages metadata lookup.
+  snapshot:
+    name: Upload code metric chart snapshot
+    needs: history
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.history.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      artifact_name: ${{ steps.artifact.outputs.artifact_name }}
+    steps:
+      - name: Check out history branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: gh-pages
+          persist-credentials: false
+      - name: Bypass Jekyll in the uploaded snapshot
+        run: touch .nojekyll
+      - name: Select snapshot artifact name
+        id: artifact
+        run: printf 'artifact_name=github-pages-%s\n' "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - name: Upload chart snapshot
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          name: ${{ steps.artifact.outputs.artifact_name }}
+          path: .
+          include-hidden-files: true
+
   # Token-made branch pushes do not trigger branch-based Pages builds.
   pages:
     name: Deploy code metric chart
-    needs: history
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.history.result == 'success' }}
+    needs: [history, snapshot]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.history.result == 'success' && needs.snapshot.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -198,21 +227,9 @@ jobs:
       queue: max
       cancel-in-progress: false
     steps:
-      - name: Check out history branch
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: gh-pages
-          persist-credentials: false
-      - name: Bypass Jekyll in the uploaded snapshot
-        run: touch .nojekyll
-      - name: Upload chart snapshot
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          name: github-pages-${{ github.run_attempt }}
-          path: .
-          include-hidden-files: true
       - name: Deploy chart
         id: deploy
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
         with:
-          artifact_name: github-pages-${{ github.run_attempt }}
+          # Failed-only reruns retain the successful snapshot's original attempt.
+          artifact_name: ${{ needs.snapshot.outputs.artifact_name }}

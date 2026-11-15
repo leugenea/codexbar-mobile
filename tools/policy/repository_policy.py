@@ -59,7 +59,8 @@ WRITERS = {
     ),
     "pages": (
         {"contents": "read", "pages": "write", "id-token": "write"},
-        "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.history.result == 'success' }}",
+        "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && "
+        "needs.history.result == 'success' && needs.snapshot.result == 'success' }}",
     ),
 }
 
