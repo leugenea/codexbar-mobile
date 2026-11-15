@@ -16,7 +16,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 internal enum class ConnectionPhase { RESTORING, IDLE, AUTHENTICATING, READING, OBSERVED, RESTORED, CANCELLED, SIGNING_OUT, SIGNED_OUT, REAUTH_REQUIRED, FAILED }
 internal enum class ConnectionProblem { STORAGE, AUTH, READ, BROWSER }
 
-/** Nonpersistable permission for one removal intent; identity is checked on the owner lane. */
+/** Nonpersistable account-operation permission; also used by confirmed removal. */
 internal class AccountRemoval
 
 /** Never serialize this state. Diagnostics deliberately omit even the in-memory code. */
@@ -26,6 +26,7 @@ internal class ConnectionState(
     val observations: FeasibilityObservations? = null,
     val problem: ConnectionProblem? = null,
     val refresh: UsageRefreshState = UsageRefreshState(),
+    val operation: AccountRemoval? = null,
 ) {
     val busy: Boolean get() = phase in setOf(ConnectionPhase.RESTORING, ConnectionPhase.AUTHENTICATING, ConnectionPhase.READING, ConnectionPhase.SIGNING_OUT)
     override fun toString(): String = "ConnectionState(phase=$phase, binding=UNRESOLVED, identity=UNVERIFIED, problem=$problem)"
@@ -61,7 +62,8 @@ internal class ConnectionController(
     internal val historyImporterState = HistoryImporterState()
     private val ownerJob = SupervisorJob(scope.coroutineContext[Job])
     private val ownerScope = CoroutineScope(scope.coroutineContext + ownerJob + mutationDispatcher)
-    private val mutableState = MutableStateFlow(ConnectionState(ConnectionPhase.RESTORING))
+    private val mutableAccountRemoval = MutableStateFlow(AccountRemoval())
+    private val mutableState = MutableStateFlow(ConnectionState(ConnectionPhase.RESTORING, operation = accountRemoval))
     val state: StateFlow<ConnectionState> = mutableState
     private val mutableName = MutableStateFlow<AccountNameState?>(null)
     internal val accountName: StateFlow<AccountNameState?> = mutableName
@@ -70,9 +72,9 @@ internal class ConnectionController(
     private val authenticatedReader = AuthenticatedProviderReader(session, reader)
     private var work: Job? = null
     private var revision = 0L
-    private val mutableAccountRemoval = MutableStateFlow(AccountRemoval())
     internal val accountRemovalPermissions: StateFlow<AccountRemoval> = mutableAccountRemoval
     internal val accountRemoval: AccountRemoval get() = mutableAccountRemoval.value
+    internal val hasSavedAccount: Boolean get() = savedAccount()
     private var generation: SessionGeneration? = null
     private var deletion: Deferred<CredentialResult<Unit>>? = null
     private var historyDeletion: Deferred<HistoryDeleteOutcome>? = null
@@ -177,7 +179,11 @@ internal class ConnectionController(
         ownerScope.launch(context) { if (!closed) action() }
     }
 
-    fun connect() = command {
+    fun connect() = connect(accountRemoval)
+
+    /** Capture from the rendered state, not whichever lifetime receives a delayed click. */
+    internal fun connect(expected: AccountRemoval?) = command {
+        if (expected !== accountRemoval) return@command
         if (!storageReady || mutableState.value.busy || cleanupPending()) return@command
         // A healthy explicit replacement removes its old local identity; reauthorization keeps it.
         // Capture before retirement can quarantine an unfinished rotation and clear the session.
@@ -185,7 +191,7 @@ internal class ConnectionController(
         val owner = retire(disposition)
         retryFailedDeletion()
         removeCredentials(disposition)
-        mutableState.value = ConnectionState(ConnectionPhase.AUTHENTICATING)
+        updateState(ConnectionState(ConnectionPhase.AUTHENTICATING))
         work = ownerScope.launch { login(owner, disposition) }
     }
 
@@ -444,7 +450,7 @@ internal class ConnectionController(
         historyRecorder.metadata(refresh)
         val previous = mutableState.value
         val phase = if (previous.phase == ConnectionPhase.READING && !refresh.refreshing) ConnectionPhase.OBSERVED else previous.phase
-        mutableState.value = ConnectionState(phase, previous.auth, refresh.observations, previous.problem, refresh)
+        updateState(ConnectionState(phase, previous.auth, refresh.observations, previous.problem, refresh))
     }
 
     private suspend fun refreshUsage(refreshSession: Boolean, explicit: Boolean,
@@ -501,19 +507,38 @@ internal class ConnectionController(
             clipboard.copy(expected.userCode)
         }
 
-    fun cancel() = command { cancelTo(ConnectionState(ConnectionPhase.CANCELLED)) }
-    fun browserFailed() = command { cancelTo(ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.BROWSER)) }
+    /** Reuse exact code identity, generation and poll-deadline admission for the fixed URL. */
+    internal suspend fun verificationUrl(expected: AuthState.AwaitingUser): String? = withContext(mutationDispatcher) {
+        if (closed || mutableState.value.auth !== expected || !authenticator.canCopyUserCode(expected)) null
+        else expected.verificationUrl
+    }
+
+    fun cancel() {
+        val expected = accountRemoval
+        command { if (expected === accountRemoval) cancelTo(ConnectionState(ConnectionPhase.CANCELLED)) }
+    }
+    internal fun cancel(expected: AccountRemoval?) = command {
+        val awaiting = mutableState.value.auth as? AuthState.AwaitingUser
+        if (awaiting != null && !authenticator.canCopyUserCode(awaiting)) return@command
+        if (expected === accountRemoval && mutableState.value.phase == ConnectionPhase.AUTHENTICATING)
+            cancelTo(ConnectionState(ConnectionPhase.CANCELLED))
+    }
+
+    internal fun browserFailed(expected: AuthState.AwaitingUser) = command {
+        if (mutableState.value.auth === expected && authenticator.canCopyUserCode(expected))
+            cancelTo(ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.BROWSER))
+    }
 
     private fun cancelTo(terminal: ConnectionState) {
         if (mutableState.value.phase in setOf(ConnectionPhase.RESTORING, ConnectionPhase.SIGNING_OUT)) return
         if (cleanupPending() && mutableState.value.phase == ConnectionPhase.FAILED) return
         val owner = retire()
         if (cleanupPending()) {
-            mutableState.value = ConnectionState(ConnectionPhase.SIGNING_OUT)
+            updateState(ConnectionState(ConnectionPhase.SIGNING_OUT))
             work = ownerScope.launch {
                 publish(owner, if (awaitDeletion()) terminal else storageFailure())
             }
-        } else mutableState.value = terminal
+        } else updateState(terminal)
     }
 
     fun signOut() = signOut(null)
@@ -521,11 +546,11 @@ internal class ConnectionController(
     /** A delayed confirmation may remove only the lifetime it originally captured. */
     internal fun signOut(expected: AccountRemoval?) = command {
         if (expected != null && expected !== accountRemoval) return@command
-        if (!storageReady) { mutableState.value = storageFailure(); return@command }
+        if (!storageReady) { updateState(storageFailure()); return@command }
         val owner = retire(CleanupDisposition.REMOVE)
         retryFailedDeletion()
         removeCredentials(CleanupDisposition.REMOVE)
-        mutableState.value = ConnectionState(ConnectionPhase.SIGNING_OUT)
+        updateState(ConnectionState(ConnectionPhase.SIGNING_OUT))
         work = ownerScope.launch {
             val removed = awaitCleanup(owner, CleanupDisposition.REMOVE)
             publish(owner, if (removed) ConnectionState(ConnectionPhase.SIGNED_OUT) else storageFailure())
@@ -600,7 +625,10 @@ internal class ConnectionController(
     }
 
     private fun current(owner: Long) = !closed && revision == owner
-    private fun publish(owner: Long, state: ConnectionState) { if (current(owner)) mutableState.value = state }
+    private fun publish(owner: Long, state: ConnectionState) { if (current(owner)) updateState(state) }
+    private fun updateState(state: ConnectionState) {
+        mutableState.value = ConnectionState(state.phase, state.auth, state.observations, state.problem, state.refresh, accountRemoval)
+    }
     private fun storageFailure() = ConnectionState(ConnectionPhase.FAILED, problem = ConnectionProblem.STORAGE)
 
     /** Test/process shutdown only, never Activity.onDestroy/ViewModel.onCleared. */
@@ -608,7 +636,7 @@ internal class ConnectionController(
         closed = true
         retire()
         usageRefresh.close()
-        mutableState.value = ConnectionState(ConnectionPhase.CANCELLED)
+        updateState(ConnectionState(ConnectionPhase.CANCELLED))
         ownerScope.launch {
             // Do not clear a holder while an old deletion can still erase its successor.
             deletion?.join()

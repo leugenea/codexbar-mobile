@@ -6,10 +6,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.leugenea.codexbarmobile.auth.AuthState
+
+/** Observes the displayed application callback, independently of the clickable node's lifetime. */
+internal val DisplayedAccountAction = SemanticsPropertyKey<() -> Unit>("DisplayedAccountAction")
+internal fun Modifier.observeAccountAction(action: () -> Unit) = semantics { this[DisplayedAccountAction] = action }
 
 /** Account commands stay on the existing process owner; this route owns only presentation. */
 @Composable
@@ -37,19 +42,22 @@ private fun AccountSignIn(state: ConnectionState, controller: ConnectionControll
     if (awaiting != null) {
         Text(awaiting.verificationUrl, Modifier.testTag("verification-url"))
         DeviceLoginCode(awaiting, controller)
-        Button(onClick = openBrowser, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("open-browser")) {
+        Button(onClick = openBrowser,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("open-browser").observeAccountAction(openBrowser)) {
             Text(stringResource(R.string.gate_browser))
         }
     }
     if (state.phase !in setOf(ConnectionPhase.RESTORED, ConnectionPhase.READING, ConnectionPhase.OBSERVED)) {
-        Button(onClick = controller::connect, enabled = !state.busy,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("connect")) {
+        val connect: () -> Unit = { controller.connect(state.operation) }
+        Button(onClick = connect, enabled = !state.busy,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("connect").observeAccountAction(connect)) {
             Text(stringResource(if (state.phase == ConnectionPhase.REAUTH_REQUIRED) R.string.gate_reauth else R.string.account_add))
         }
     }
     if (state.phase == ConnectionPhase.AUTHENTICATING) {
-        OutlinedButton(onClick = controller::cancel,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("cancel-connect")) {
+        val cancel: () -> Unit = { controller.cancel(state.operation) }
+        OutlinedButton(onClick = cancel,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("cancel-connect").observeAccountAction(cancel)) {
             Text(stringResource(R.string.gate_cancel))
         }
     }

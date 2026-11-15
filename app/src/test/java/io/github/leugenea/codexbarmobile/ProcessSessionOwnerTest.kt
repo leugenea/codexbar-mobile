@@ -89,7 +89,7 @@ class ProcessSessionOwnerTest {
                 val before = h.fake.calls.size
                 h.first.owner.connect()
                 h.second.owner.cancel()
-                h.first.owner.browserFailed()
+                h.first.owner.browserFailed(AuthState.AwaitingUser(SensitiveValue.copyOf("SYNTHETIC-STALE".toByteArray())))
                 h.second.owner.readUsage(refreshSession = true)
                 h.owner.commandsSettled()
                 assertEquals(ConnectionPhase.SIGNING_OUT, h.owner.state.value.phase)

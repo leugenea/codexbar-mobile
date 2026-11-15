@@ -81,10 +81,11 @@ class ConnectionControllerTest {
             assertEquals(ConnectionProblem.AUTH, h.controller.state.value.problem)
             assertNull(h.persistence.durable)
             h.persistence.prepareFailure = null
-            h.fake.respond = {}
+            h.fake.respond = { call -> if (call.request.url.encodedPath == "/api/accounts/deviceauth/usercode") h.respond(call) }
             h.controller.connect()
             val pending = h.fake.calls.last()
-            h.controller.browserFailed()
+            val awaiting = h.controller.state.value.auth as AuthState.AwaitingUser
+            h.controller.browserFailed(awaiting)
             assertTrue(pending.cancelled)
             assertEquals(ConnectionProblem.BROWSER, h.controller.state.value.problem)
             h.persistence.deleteFailure = CredentialFailure.FAILED_WRITE
@@ -96,7 +97,7 @@ class ConnectionControllerTest {
             h.controller.connect()
             h.controller.signOut()
             h.controller.cancel()
-            h.controller.browserFailed()
+            h.controller.browserFailed(awaiting)
             assertEquals(ConnectionPhase.CANCELLED, h.controller.state.value.phase)
         }
     }
@@ -314,7 +315,7 @@ class ConnectionControllerTest {
             h.controller.connect()
             h.controller.commandsSettled()
             val captured = h.controller.state.value.auth as AuthState.AwaitingUser
-            h.controller.browserFailed()
+            h.controller.browserFailed(captured)
             h.controller.commandsSettled()
             assertFalse(h.controller.copyDeviceCode(captured, clipboard))
             h.controller.close()
@@ -366,6 +367,124 @@ class ConnectionControllerTest {
             assertEquals(ConnectionPhase.CANCELLED, h.controller.state.value.phase)
         }
         dispatcher.drain()
+    }
+
+    @Test
+    fun capturedBrowserFailureAndCancelRejectEqualCodeSuccessorAndHealthyCompletion() = runBlocking {
+        Harness().use { h ->
+            val connect = h.controller.state.value.operation
+            h.fake.respond = { call -> if (call.request.url.encodedPath == "/api/accounts/deviceauth/usercode") h.respond(call) }
+            h.controller.connect(connect)
+            actionReceipt(h, "first displayed code")
+            val first = h.controller.state.value.auth as AuthState.AwaitingUser
+            val cancel = h.controller.state.value.operation
+            assertEquals(AuthProtocol.VERIFICATION_URL, h.controller.verificationUrl(first))
+            h.controller.cancel(cancel)
+            actionReceipt(h, "captured cancel admitted")
+            assertEquals(ConnectionPhase.CANCELLED, h.controller.state.value.phase)
+            h.controller.connect(h.controller.state.value.operation)
+            actionReceipt(h, "equal-text successor code")
+            val second = h.controller.state.value.auth as AuthState.AwaitingUser
+            assertNotSame(first, second)
+            assertArrayEquals(first.userCode.copyBytes(), second.userCode.copyBytes())
+            h.controller.browserFailed(first)
+            h.controller.cancel(cancel)
+            h.controller.connect(connect)
+            actionReceipt(h, "stale ingress checked on owner lane")
+            assertSame(second, h.controller.state.value.auth)
+            assertNull(h.controller.verificationUrl(first))
+            assertEquals(AuthProtocol.VERIFICATION_URL, h.controller.verificationUrl(second))
+            h.controller.browserFailed(second)
+            actionReceipt(h, "current browser failure admitted")
+            assertEquals(ConnectionProblem.BROWSER, h.controller.state.value.problem)
+
+            val reauth = h.controller.state.value.operation
+            h.respondNormally()
+            h.controller.connect(reauth)
+            actionReceipt(h, "healthy successor")
+            assertEquals(ConnectionPhase.OBSERVED, h.controller.state.value.phase)
+            val durable = h.persistence.durable
+            val calls = h.fake.calls.size
+            h.controller.connect(reauth)
+            h.controller.cancel(cancel)
+            h.controller.browserFailed(second)
+            actionReceipt(h, "late reauth cannot replace healthy successor")
+            assertSame(durable, h.persistence.durable)
+            assertEquals(calls, h.fake.calls.size)
+            assertEquals(ConnectionPhase.OBSERVED, h.controller.state.value.phase)
+        }
+    }
+
+    @Test
+    fun elapsedDisplayedOperationRejectsBrowserFailureAndCancelBeforePollResumes() = runBlocking {
+        Harness().use { h ->
+            h.fake.respond = { call -> if (call.request.url.encodedPath == "/api/accounts/deviceauth/usercode") h.respond(call) }
+            h.controller.connect()
+            actionReceipt(h, "expiring displayed operation")
+            val displayed = h.controller.state.value
+            val awaiting = displayed.auth as AuthState.AwaitingUser
+            assertEquals(AuthProtocol.VERIFICATION_URL, h.controller.verificationUrl(awaiting))
+            h.clock.millis = AuthProtocol.POLL_BUDGET_MILLIS
+            assertNull(h.controller.verificationUrl(awaiting))
+            h.controller.browserFailed(awaiting)
+            h.controller.cancel(displayed.operation)
+            actionReceipt(h, "expired actions rejected")
+            assertSame(awaiting, h.controller.state.value.auth)
+            assertEquals(ConnectionPhase.AUTHENTICATING, h.controller.state.value.phase)
+            h.controller.close()
+            assertNull(h.controller.verificationUrl(awaiting))
+        }
+    }
+
+    @Test
+    fun queuedCapturedConnectAndCancelCannotBorrowSuccessorPermissionAtIngress() = runBlocking {
+        val dispatcher = QueuedCopyDispatcher()
+        Harness(mutation = dispatcher).use { h ->
+            dispatcher.drain()
+            h.fake.respond = {}
+            h.controller.connect(null); h.controller.cancel(null)
+            dispatcher.drain()
+            assertTrue(h.fake.calls.isEmpty())
+            val predecessor = h.controller.state.value.operation
+            h.controller.cancel()
+            h.controller.connect(predecessor)
+            dispatcher.drain()
+            assertEquals(ConnectionPhase.CANCELLED, h.controller.state.value.phase)
+            assertTrue(h.fake.calls.isEmpty())
+            val current = h.controller.state.value.operation
+            h.controller.connect(current)
+            h.controller.cancel(current)
+            dispatcher.drain()
+            assertEquals(ConnectionPhase.AUTHENTICATING, h.controller.state.value.phase)
+            assertEquals(1, h.fake.calls.size)
+            assertFalse(h.fake.calls.single().cancelled)
+        }
+        dispatcher.drain()
+    }
+
+    @Test
+    fun capturedAuthenticatingCancelCannotRetireItsAlreadySuccessfulLogin() = runBlocking {
+        Harness().use { h ->
+            h.fake.respond = { call -> if (call.request.url.encodedPath == "/api/accounts/deviceauth/usercode") h.respond(call) }
+            h.controller.connect()
+            actionReceipt(h, "capture pending login cancellation")
+            val displayed = h.controller.state.value
+            h.respondNormally()
+            h.fake.calls.last().reply(SyntheticAuth.response(SyntheticAuth.AUTHORIZATION))
+            actionReceipt(h, "same operation becomes healthy")
+            assertEquals(ConnectionPhase.OBSERVED, h.controller.state.value.phase)
+            assertSame(displayed.operation, h.controller.state.value.operation)
+            val durable = h.persistence.durable
+            h.controller.cancel(displayed.operation)
+            actionReceipt(h, "completed cancellation rejected")
+            assertEquals(ConnectionPhase.OBSERVED, h.controller.state.value.phase)
+            assertSame(durable, h.persistence.durable)
+        }
+    }
+
+    private suspend fun actionReceipt(h: Harness, label: String) {
+        try { withTimeout(2_000) { h.controller.commandsSettled() } }
+        catch (error: TimeoutCancellationException) { throw AssertionError("$label: last state=${h.controller.state.value}", error) }
     }
 
     private class QueuedCopyDispatcher : CoroutineDispatcher() {

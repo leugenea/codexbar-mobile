@@ -59,6 +59,12 @@ MainActivity / thin StateFlow observer
 ```
 
 MainActivity builds a fixed ACTION_VIEW/BROWSABLE intent for the system browser.
+The callback captures the displayed auth value before constructing the closure, not a
+delegated State value read when the click eventually arrives. Owner-lane identity,
+generation and poll-deadline admission precedes the Main-thread intent; Main rechecks
+retirement after suspension. Platform failures return only to that captured operation.
+Settings Connect/Cancel also carry the displayed operation permission; a late Cancel
+cannot retire an already successful login. See [captured management](docs/account-catalog.md#captured-saved-account-management).
 The user code is displayed from A7's owned memory and never saved. Copy code is an
 explicit resource-backed TextButton beside that visible code; only its click writes
 a plain-text clip through a write-only Android adapter. The description is marked
@@ -568,7 +574,8 @@ history and the local display name as the local removal scope, and explicitly
 excludes OpenAI/ChatGPT account deletion and subscription cancellation. Cancel,
 Back/outside dismissal and Activity recreation discard the memory-only confirmation
 without issuing an owner command. The action remains available for a current or
-restored account and failed storage cleanup, and is disabled while signing out.
+restored account, a saved credentialless reauthorization entry and failed storage cleanup,
+and is disabled while signing out. An empty anonymous installation is not a saved entry.
 
 `AccountRemoval` is an opaque nonpersistable identity permission, not another
 session or teardown owner. The dialog captures the current process owner's permission;
@@ -590,8 +597,8 @@ confirmation cannot silently retry or erase a later login.
 Three added `ProcessSessionOwnerTest` methods cover production-default-lane admission,
 ordinary rotation, queued replacement, duplicate confirmation and credential failure
 retry. `AccountRemovalLifetimeTest` covers combined synthetic cleanup, admitted name
-writes, failed history removal, cancel invalidation and fresh-owner isolation. Five
-mandatory `AccountRemovalLifecycleTest` cases exercise the production Activity/default
+writes, failed history removal, cancel invalidation and fresh-owner isolation. The
+`AccountRemovalLifecycleTest` cases exercise the production Activity/default
 factory with isolated actual Keystore/SQLite, local-scope/accessibility text, cancel/Back/
 recreation, restored/current removal, actual name-artifact deletion failure and fresh
 confirmed retry, captured dialog permission replay at the owner boundary and late provider
