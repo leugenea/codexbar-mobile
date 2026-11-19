@@ -17,5 +17,5 @@ class WrapperIntegrityTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256((ROOT / path).read_bytes()).hexdigest(), digest, path)
         self.assertTrue((ROOT / "gradlew").stat().st_mode & 0o111)
         wrapper = (ROOT / "gradle/wrapper/gradle-wrapper.properties").read_text()
-        self.assertIn("distributionUrl=https\\://services.gradle.org/distributions/gradle-9.9.1-bin.zip", wrapper)
-        self.assertIn("distributionSha256Sum=d8a18a7a841dd5df825d35a685fad6f2d7f12ac0c280e57b67c27b4a520ba228", wrapper)
+        self.assertIn("distributionUrl=https\\://services.gradle.org/distributions/gradle-9.9.2-bin.zip", wrapper)
+        self.assertIn("distributionSha256Sum=971fcd7150ca4ba04852c0b2ca0d2d0ab9468e14b03473eab19528809914c76b", wrapper)
