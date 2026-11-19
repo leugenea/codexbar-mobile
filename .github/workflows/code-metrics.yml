@@ -10,10 +10,12 @@ permissions:
   contents: read
 
 concurrency:
-  # PR/manual runs follow the Android workflow's cancellation style. Every main
-  # push needs a distinct group so its history point cannot be cancelled upstream.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event_name == 'push' && github.run_id || github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Hold the main-push mutex from analysis through snapshot checkout and deployment.
+  # Retain up to GitHub's 100 pending runs; overflow requires manual recovery.
+  # PR/manual groups and superseded-run cancellation remain unchanged.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  queue: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'max' || 'single' }}
+  cancel-in-progress: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
 
 jobs:
   erosion:

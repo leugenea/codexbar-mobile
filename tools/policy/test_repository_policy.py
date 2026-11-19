@@ -215,6 +215,62 @@ class RepositoryPolicyTests(unittest.TestCase):
             with self.subTest(mutation=old), self.assertRaises(ValueError):
                 workflow_policy(original.replace(old, new, 1), "code-metrics.yml")
 
+    def test_main_workflow_queue_excludes_overlapping_snapshots_without_losing_pending_runs(self):
+        original = (ROOT / ".github/workflows/code-metrics.yml").read_text()
+        workflow = load_yaml(original)
+        # The policy binds this model to the actual workflow-level expressions:
+        # main pushes share one noncanceling max queue; PR/manual remain single/cancel.
+        workflow_policy(original, "code-metrics.yml")
+        concurrency = workflow["concurrency"]
+        old_group = ("${{ github.workflow }}-${{ github.event_name }}-"
+                     "${{ github.event_name == 'push' && github.run_id || "
+                     "github.event.pull_request.number || github.ref }}")
+        for key, value in (("group", old_group), ("queue", "single"),
+                           ("queue", "max"), ("cancel-in-progress", True),
+                           ("cancel-in-progress", False)):
+            changed = original.replace(str(concurrency[key]),
+                                       str(value).lower() if isinstance(value, bool) else value, 1)
+            with self.subTest(key=key, value=value), self.assertRaisesRegex(ValueError, "Code metrics requires"):
+                workflow_policy(changed, "code-metrics.yml")
+
+        def replay(trace, shared):
+            # A workflow holds its group across all jobs, including slow upload.
+            # The old run-id groups permit R1; the validated main-ref group does not.
+            active, pending, history, snapshots, served = set(), [], [], {}, []
+            for run, phase in trace:
+                group = concurrency["group"] if shared else run
+                if phase == "queue":
+                    pending.append(run)
+                elif phase == "start":
+                    if group in active:
+                        return None
+                    if run in pending:
+                        pending.remove(run)
+                    active.add(group)
+                elif phase == "history":
+                    history.append(run)
+                elif phase == "snapshot":
+                    snapshots[run] = list(history)
+                elif phase == "deploy":
+                    served = snapshots[run]
+                    active.remove(group)
+            self.assertEqual(pending, [])
+            return history, served
+
+        stale = [("A", "start"), ("A", "history"), ("A", "snapshot"),
+                 ("B", "start"), ("B", "history"), ("B", "snapshot"),
+                 ("B", "deploy"), ("A", "deploy")]
+        self.assertEqual(replay(stale, shared=False), (["A", "B"], ["A"]))
+        self.assertIsNone(replay(stale, shared=True))
+        # Three pending pushes fit the documented max queue without replacement.
+        # Admission order need not be dispatch order; each later checkout sees
+        # all durable points from preceding workflows, including reordered ones.
+        for admitted in (("A", "B", "C"), ("B", "C", "A")):
+            trace = [(run, "queue") for run in admitted]
+            trace += [(run, phase) for run in admitted
+                      for phase in ("start", "history", "snapshot", "deploy")]
+            self.assertEqual(replay(trace, shared=True), (list(admitted), list(admitted)))
+
     def assert_pages_snapshot_boundary(self, workflow):
         jobs = workflow["jobs"]
         snapshot, pages = jobs["snapshot"], jobs["pages"]
