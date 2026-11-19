@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795125825415,
+  "lastUpdate": 1795131326783,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -3627,6 +3627,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/8fcd0fff7a756240150af93a449d56ce37557c5e"
         },
         "date": 1795125822726,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1953f457f328feda4add748524cb83420ace4020",
+          "message": "ci: update Gradle Wrapper distribution to 9.9.2 (#259)\n\nPin the verified Gradle 9.9.2 distribution and update coupled assertions and docs. Part of #255.",
+          "timestamp": "2026-11-20T02:34:47+03:00",
+          "tree_id": "69091d060bee045e89d84ea31d3049346e631bf5",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/1953f457f328feda4add748524cb83420ace4020"
+        },
+        "date": 1795131326417,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
