@@ -59,7 +59,8 @@ WRITERS = {
     ),
     "pages": (
         {"contents": "read", "pages": "write", "id-token": "write"},
-        "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.history.result == 'success' }}",
+        "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && "
+        "needs.history.result == 'success' && needs.snapshot.result == 'success' }}",
     ),
 }
 
@@ -250,6 +251,14 @@ def workflow_policy(text, filename):
     require(isinstance(jobs, dict) and jobs, "workflow must have jobs")
     if filename == 'release.yml':
         release_workflow_policy(workflow)
+    if filename == 'code-metrics.yml':
+        # Main pushes serialize the entire snapshot-to-deploy critical section;
+        # PR/manual runs keep their original groups and cancellation behavior.
+        require(workflow.get('concurrency') == {
+            'group': '${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}',
+            'queue': "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'max' || 'single' }}",
+            'cancel-in-progress': "${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}",
+        }, 'Code metrics requires a noncanceling main-push workflow queue and canceling PR/manual groups')
     for name, job in jobs.items():
         require(isinstance(job, dict), f"{name}: job must be a mapping")
         runner = job.get("runs-on")
