@@ -18,6 +18,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
+    if: github.event_name != 'workflow_dispatch' || github.ref != 'refs/heads/diag/259-codeql-marker' || github.run_attempt == '1'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
@@ -86,7 +87,7 @@ jobs:
         with:
           cache-provider: basic
           cache-disabled: false
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-read-only: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/diag/259-codeql-marker') }}
           validate-wrappers: true
           allow-snapshot-wrappers: false
           dependency-graph: disabled
@@ -94,12 +95,14 @@ jobs:
           add-job-summary: always
           add-job-summary-as-pr-comment: never
       - name: Initialize CodeQL analysis
+        if: matrix.language == 'java-kotlin' || github.event_name != 'workflow_dispatch' || github.ref != 'refs/heads/diag/259-codeql-marker'
         uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           # Omitted query/config overrides retain the default suite and remote threat model.
       - name: Compile Kotlin application and test sources for extraction
+        id: compile-kotlin
         if: matrix.language == 'java-kotlin'
         timeout-minutes: 15
         run: |
@@ -114,7 +117,29 @@ jobs:
           set -e
           if (( build_status[0] != 0 )); then exit "${build_status[0]}"; fi
           (( build_status[1] == 0 ))
+      - name: Capture Compose marker verification evidence
+        id: marker-evidence
+        if: >-
+          always() && !cancelled() && matrix.language == 'java-kotlin' &&
+          github.repository == 'leugenea/codexbar-mobile' && github.event_name == 'workflow_dispatch' &&
+          github.ref == 'refs/heads/diag/259-codeql-marker' && github.run_attempt == '1' &&
+          (steps.compile-kotlin.outcome == 'failure' || steps.compile-kotlin.outcome == 'success')
+        timeout-minutes: 1
+        env:
+          COMPILE_OUTCOME: ${{ steps.compile-kotlin.outcome }}
+        run: python3 -I -B tools/build/capture_compose_marker.py
+      - name: Retain Compose marker verification evidence
+        if: always() && !cancelled() && steps.marker-evidence.outcome == 'success'
+        timeout-minutes: 2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: codeql-compose-marker-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/codeql-compose-marker/evidence.json
+          if-no-files-found: error
+          retention-days: 3
       - name: Analyze selected language
+        # The manual diagnostic is for extraction/build evidence, not a Code Scanning submission.
+        if: github.event_name != 'workflow_dispatch' || github.ref != 'refs/heads/diag/259-codeql-marker'
         uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           category: /language:${{ matrix.language }}
