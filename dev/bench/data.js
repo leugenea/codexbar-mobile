@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795125823126,
+  "lastUpdate": 1795125825415,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -7233,6 +7233,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/13e432cfa75e80c4eb7fce8cc0491e05504f83b5"
         },
         "date": 1794746911720,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8fcd0fff7a756240150af93a449d56ce37557c5e",
+          "message": "ci: separate metrics snapshot upload from Pages deployment (#258)\n\nSerialize main metrics runs and require a current-attempt snapshot for deployment. Update policy coverage and recovery instructions. Part of #255.",
+          "timestamp": "2026-11-20T01:03:13+03:00",
+          "tree_id": "8e89a13de6af09d1895bd6edba306d5a4d3a09d1",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/8fcd0fff7a756240150af93a449d56ce37557c5e"
+        },
+        "date": 1795125825155,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
