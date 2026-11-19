@@ -298,12 +298,14 @@ class RepositoryPolicyTests(unittest.TestCase):
                          {"artifact_name": "${{ steps.artifact.outputs.artifact_name }}"})
         self.assertEqual(upload["with"], {"name": snapshot["outputs"]["artifact_name"],
                                          "path": ".", "include-hidden-files": True})
-        deployment, = pages["steps"]
+        guard, deployment = pages["steps"]
         self.assertEqual(deployment["uses"],
                          "actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346")
         self.assertEqual(deployment["id"], "deploy")
         self.assertEqual(deployment["with"],
                          {"artifact_name": "${{ needs.snapshot.outputs.artifact_name }}"})
+        self.assertEqual(guard["shell"], "bash")
+        self.assertEqual(guard["env"], {"SNAPSHOT_ARTIFACT_NAME": deployment["with"]["artifact_name"]})
         for job in (snapshot, pages):
             self.assertNotIn("continue-on-error", job)
             for step in job["steps"]:
@@ -345,23 +347,56 @@ class RepositoryPolicyTests(unittest.TestCase):
             with self.subTest(guard=replacement), self.assertRaisesRegex(ValueError, "pages: writer"):
                 workflow_policy(original.replace(guard, replacement, 1), "code-metrics.yml")
 
-    def test_snapshot_name_comes_from_producer_attempt_not_deploy_rerun(self):
+    def test_pages_retry_requires_a_fresh_snapshot_before_deploy(self):
         workflow = load_yaml((ROOT / ".github/workflows/code-metrics.yml").read_text())
         self.assert_pages_snapshot_boundary(workflow)
-        command = workflow["jobs"]["snapshot"]["steps"][2]["run"]
-        # Execute the actual output producer. A failed-only deploy rerun retains
-        # the earlier successful job output; a full rerun executes this step anew.
-        for producer_attempt, deploy_attempt in ((1, 1), (1, 2), (2, 2), (2, 3)):
-            with self.subTest(producer=producer_attempt, deploy=deploy_attempt), tempfile.TemporaryDirectory() as directory:
+        producer = workflow["jobs"]["snapshot"]["steps"][2]["run"]
+        guard = workflow["jobs"]["pages"]["steps"][0]["run"]
+
+        def artifact_name(attempt):
+            with tempfile.TemporaryDirectory() as directory:
                 output = Path(directory) / "output"
-                execution = subprocess.run(["bash", "-eu", "-c", command],
-                                           env=dict(os.environ, GITHUB_RUN_ATTEMPT=str(producer_attempt),
+                execution = subprocess.run(["bash", "-eu", "-c", producer],
+                                           env=dict(os.environ, GITHUB_RUN_ATTEMPT=str(attempt),
                                                     GITHUB_OUTPUT=str(output)),
                                            text=True, capture_output=True, timeout=5)
                 self.assertEqual(execution.returncode, 0, execution.stderr)
-                self.assertEqual(output.read_text(), f"artifact_name=github-pages-{producer_attempt}\n")
-                if producer_attempt != deploy_attempt:
-                    self.assertNotEqual(output.read_text(), f"artifact_name=github-pages-{deploy_attempt}\n")
+                line = output.read_text()
+                self.assertEqual(line, f"artifact_name=github-pages-{attempt}\n")
+                return line.removeprefix("artifact_name=").removesuffix("\n")
+
+        def preflight(attempt, name):
+            return subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", guard],
+                                  env=dict(os.environ, GITHUB_RUN_ATTEMPT=str(attempt),
+                                           SNAPSHOT_ARTIFACT_NAME=name),
+                                  text=True, capture_output=True, timeout=5)
+
+        # Artifacts and publication are simulated; the producer and guard above
+        # execute the actual workflow shell steps.
+        a1_name = artifact_name(1)
+        a_snapshots: dict[str, tuple[str, ...]] = {a1_name: ("A",)}
+        self.assertEqual(preflight(1, a1_name).returncode, 0)  # Deploy then fails.
+        history = ("A", "B")
+        self.assertEqual(preflight(1, artifact_name(1)).returncode, 0)
+        published: tuple[str, ...] | None = history  # B publishes A+B.
+
+        # A's deploy-only retry must not replace B's published chart.
+        for name in (a1_name, ""):
+            with self.subTest(name=name):
+                refused = preflight(2, name)
+                if refused.returncode == 0:
+                    published = a_snapshots.get(name)
+                self.assertEqual(published, ("A", "B"))
+                self.assertEqual(refused.returncode, 1, refused.stderr)
+                self.assertIn("::error::", refused.stdout)
+                self.assertIn("Re-run the Upload code metric chart snapshot job", refused.stdout)
+
+        # Restarting A at snapshot fetches the current branch and uploads A+B
+        # under the new attempt's name. The deploy input still comes from A.
+        a3_name = artifact_name(3)
+        a_snapshots[a3_name] = history
+        self.assertEqual(preflight(3, a3_name).returncode, 0)
+        self.assertEqual(a_snapshots[a3_name], ("A", "B"))
 
     def test_yaml_on_booleans_and_duplicate_keys(self):
         self.assertEqual(load_yaml("on: [pull_request]\nflag: false\n"),

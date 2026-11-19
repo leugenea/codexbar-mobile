@@ -229,9 +229,17 @@ jobs:
       queue: max
       cancel-in-progress: false
     steps:
+      - name: Require a snapshot from this attempt
+        shell: bash
+        env:
+          SNAPSHOT_ARTIFACT_NAME: ${{ needs.snapshot.outputs.artifact_name }}
+        run: |
+          if [[ "$SNAPSHOT_ARTIFACT_NAME" != "github-pages-$GITHUB_RUN_ATTEMPT" ]]; then
+            echo '::error::Missing or stale Pages snapshot. Re-run the Upload code metric chart snapshot job, not Deploy code metric chart alone.'
+            exit 1
+          fi
       - name: Deploy chart
         id: deploy
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
         with:
-          # Failed-only reruns retain the successful snapshot's original attempt.
           artifact_name: ${{ needs.snapshot.outputs.artifact_name }}

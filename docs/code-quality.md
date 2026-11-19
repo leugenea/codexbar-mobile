@@ -184,20 +184,30 @@ writes two `customSmallerIsBetter` series to `gh-pages:dev/bench/data.js`:
 
 Values retain full precision. PR runs and manual dispatch never write history.
 If only one analyzer succeeds, only its valid series is recorded; the other
-job remains visibly red. Only history has `contents: write`. Main runs have
-unique upstream concurrency groups; history and Pages retain pending jobs
-with `queue: max` and no cancellation (GitHub's queue limit is 100).
+job remains visibly red. Only history has `contents: write`. Main-push runs
+share a workflow queue from analysis through deployment, with `queue: max`
+and no cancellation (up to 100 pending runs). History and Pages also retain
+their job-level queues. PR and manual groups still cancel superseded runs.
 
 **Chart:** <https://leugenea.github.io/codexbar-mobile/dev/bench/> after the
 first successful main deployment. Before that run, the maintainer must create
 an orphan `gh-pages` branch and select **Settings → Pages → Build and
-deployment → Source: GitHub Actions**. The **Deploy code metric chart** job
-checks out `gh-pages`, adds `.nojekyll`, uploads its snapshot, and deploys it
-with `contents: read`, `pages: write`, and `id-token: write` in the
-`github-pages` environment. A branch push made with `GITHUB_TOKEN` does not
-itself trigger branch-based Pages builds. To republish an edited history
-branch, rerun only the Pages job of a successful main run; the upload/deploy
-artifact name includes the run attempt to support reruns.
+deployment → Source: GitHub Actions**. The read-only **Upload code metric chart
+snapshot** job checks out the current `gh-pages` branch, adds `.nojekyll`, and
+uploads an artifact named for its run attempt. **Deploy code metric chart**
+uses the producer's artifact name and fails before deployment if the name is
+missing or from an earlier attempt. Deployment uses `contents: read`,
+`pages: write`, and `id-token: write` in the `github-pages` environment. A
+branch push made with `GITHUB_TOKEN` does not trigger a branch-based Pages build.
+
+To recover from a deploy-only failure or republish an edited history branch,
+open a main-push run with this workflow version and successful history. Re-run
+**Upload code metric chart snapshot** from its job menu, or use
+`gh run rerun --job JOB_ID`. To find the snapshot job's `databaseId`, run
+`gh run view RUN_ID --json jobs --jq '.jobs[] | {name, databaseId}'`.
+GitHub also re-runs the dependent deployment, without re-running history.
+Re-running only the deployment (including **Re-run failed jobs** when only the
+deployment failed) does not refresh the snapshot and will fail the freshness check.
 
 ## Interpretation and alerts
 
