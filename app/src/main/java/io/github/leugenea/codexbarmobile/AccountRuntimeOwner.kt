@@ -20,13 +20,14 @@ import java.util.UUID
 /** Retains concrete Codex stacks; addressing never retires, selects or activates a peer. */
 internal class AccountRuntimeOwner(
     context: Context,
-    private val catalog: AccountCatalog?,
+    initialCatalog: AccountCatalog?,
     private val transport: AuthTransport,
     private val clock: TransportClock,
     private val pause: suspend (Long) -> Unit,
-    private val legacyEnrollment: (BackgroundRefreshTarget?) -> Unit = {},
+    private val legacyEnrollment: (HistoryPartition?) -> (BackgroundRefreshTarget?) -> Unit = { {} },
     private val credentials: (Context, UUID) -> CredentialStore = ::KeystoreCredentialStore,
     private val historyStorage: (File) -> HistoryLifetimeStorage = { SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(it)) },
+    private val openCatalog: (() -> AccountCatalog)? = null,
 ) {
     // Retain only application-scoped context. Native fixtures supply a storage-isolating
     // ContextWrapper here, so preserve Context rather than casting it to Application.
@@ -37,6 +38,8 @@ internal class AccountRuntimeOwner(
     private val runtimes = mutableMapOf<UUID, ConnectionController>()
     private val slots = mutableSetOf<UUID>()
     private var legacyController: ConnectionController? = null
+    private var unavailableLegacy: ConnectionController? = null
+    @Volatile private var catalog = initialCatalog ?: tryOpenCatalog()
     @Volatile private var closing = false
     private val selected = kotlinx.coroutines.flow.MutableStateFlow<DashboardSelection?>(null)
     private val observers = mutableSetOf<Any>()
@@ -145,15 +148,30 @@ internal class AccountRuntimeOwner(
     suspend fun recoverAddition(expected: CodexAddition? = null): Boolean = scope.async(mutations) {
         recovery.withLock {
             if (closing) return@withLock false
-            val metadata = catalog ?: return@withLock false
             val pending = addition
             if (expected != null && pending?.handle !== expected) return@withLock false
+            val metadata = catalog ?: recoverCatalog() ?: return@withLock false
             if (pending == null) return@withLock removeOrphan(metadata)
             if (pending.job?.isCompleted != true || pending.commit == null) return@withLock false
             settleAddition(metadata, pending)?.let { rejectAddition(metadata, pending, it) }
             addition == null && metadata.snapshots.value.candidate == null
         }
     }.await()
+
+    private fun tryOpenCatalog(): AccountCatalog? {
+        return try { openCatalog?.invoke() } catch (_: Exception) { null }
+    }
+
+    /** Retry on the Add recovery lane; publish through the same dashboard and observer set. */
+    private fun recoverCatalog(): AccountCatalog? {
+        val confirmed = tryOpenCatalog() ?: return null
+        synchronized(this) {
+            if (closing) return null
+            catalog = confirmed
+            dashboard()
+        }
+        return confirmed
+    }
 
     private suspend fun removeOrphan(metadata: AccountCatalog, expected: AccountStorage? = null): Boolean {
         return try {
@@ -196,15 +214,20 @@ internal class AccountRuntimeOwner(
 
     /** Dormant observation; the original compatibility ingress remains independent. */
     @Synchronized fun dashboard(): kotlinx.coroutines.flow.StateFlow<DashboardSelection?> {
-        if (selected.value == null) display(catalog?.snapshots?.value)
-        if (selectionWatch == null) selectionWatch = scope.launch(mutations) {
-            catalog?.snapshots?.collect {
-                val pending = addition
-                if (pending?.commit != null && it.candidate != pending.address) recoverAddition()
-                display(catalog?.snapshots?.value)
-            }
+        if (selectionWatch == null) {
+            val metadata = catalog
+            display(metadata?.snapshots?.value)
+            if (metadata != null) selectionWatch = scope.launch(mutations) { watchSelection(metadata) }
         }
         return selected
+    }
+
+    private suspend fun watchSelection(metadata: AccountCatalog) {
+        metadata.snapshots.collect {
+            val pending = addition
+            if (pending?.commit != null && it.candidate != pending.address) recoverAddition()
+            display(metadata.snapshots.value)
+        }
     }
 
     /** Successor display and network admission follow confirmed durable selection, never precede it. */
@@ -275,6 +298,7 @@ internal class AccountRuntimeOwner(
     /** Compatibility ingress, including the empty installation before legacy adoption. */
     @Synchronized fun legacy(): ConnectionController {
         check(!closing)
+        if (catalog == null) return unavailableLegacy ?: create(null).also { unavailableLegacy = it }
         return legacyController ?: create(null).also { legacyController = it }
     }
 
@@ -287,23 +311,26 @@ internal class AccountRuntimeOwner(
     }
 
     @Synchronized private fun create(address: AccountStorage?, pendingAddition: Boolean = false): ConnectionController {
-        val knownSlot = address?.credentialSlot ?: catalog?.snapshot()?.legacySlot
+        val metadata = catalog
+        val knownSlot = address?.credentialSlot ?: metadata?.snapshot()?.legacySlot
         val slot = knownSlot ?: UUID.randomUUID()
         check(slot !in slots) { "Credential slot already owned" }
         val store = credentials(applicationContext, slot)
         val directory = address?.historyDirectory(root) ?: File(root, "usage-history")
-        val storage = historyStorage(directory)
-        val history = if (catalog == null) storage else CatalogHistoryStorage(storage, catalog, address)
+        val history = metadata?.let { HistoryLifetimeCoordinator(CatalogHistoryStorage(historyStorage(directory), it, address)) }
         // Production scheduling still consumes only the compatibility ingress. Multi-entry
         // consumers must supply exact entry/lifetime admission in the scheduler integration.
-        val enrollment = if (address == null) legacyEnrollment else { _: BackgroundRefreshTarget? -> }
+        val enrollment = enrollment(address, metadata)
         return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),
             NativeFeasibilityReader(transport, clock, pause), scope, storageReady = knownSlot != null,
             mutationDispatcher = mutations, refreshClock = clock,
-            history = HistoryLifetimeCoordinator(history), backgroundEnrollment = enrollment,
-            savedAccount = { if (address == null) catalog?.legacyEntry() != null else catalog?.entry(address.id) != null },
+            history = history, backgroundEnrollment = enrollment,
+            savedAccount = { if (address == null) metadata?.legacyEntry() != null else metadata?.entry(address.id) != null },
             pendingAddition = pendingAddition).also { slots.add(slot) }
     }
+
+    private fun enrollment(address: AccountStorage?, metadata: AccountCatalog?): (BackgroundRefreshTarget?) -> Unit =
+        if (address == null && metadata != null) legacyEnrollment(metadata.legacyEntry()?.partition) else { _ -> }
 
     suspend fun shutdown() {
         val pending = withContext(mutations) {
@@ -319,7 +346,7 @@ internal class AccountRuntimeOwner(
         }
         val controllers = synchronized(this) {
             closing = true
-            (runtimes.values + listOfNotNull(legacyController)).distinct()
+            (runtimes.values + listOfNotNull(legacyController, unavailableLegacy)).distinct()
         }
         selectionWatch?.cancelAndJoin()
         controllers.forEach { it.close() }

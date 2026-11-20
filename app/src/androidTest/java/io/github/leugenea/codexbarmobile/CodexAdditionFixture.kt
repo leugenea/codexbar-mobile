@@ -44,15 +44,17 @@ internal class CodexAdditionFixture {
         catalog = AccountCatalog.open(directory, { legacy })
     }
 
-    fun start() {
+    fun start(openCatalog: (() -> AccountCatalog)? = null) {
         val network = AuthTransport { request, deadline, terminal ->
             if (denyPoll && request.url.encodedPath == POLL) {
                 terminal(TransportResult.Response.bounded(401, byteArrayOf()))
                 CancellationHandle {}
             } else transport.execute(request, deadline, terminal)
         }
-        owner = AccountRuntimeOwner(context, catalog, network, transport.clock, transport::pause, { enrollment.add(it) },
-            credentials = { _, slot -> track(slot) }, historyStorage = { observingHistory(it) })
+        owner = if (openCatalog == null) {
+            AccountRuntimeOwner(context, catalog, network, transport.clock, transport::pause, { { enrollment.add(it) } },
+                credentials = { _, slot -> track(slot) }, historyStorage = { observingHistory(it) })
+        } else NativeConnection.createOwner(context, network, transport.clock, transport::pause, openCatalog = openCatalog)
         NativeConnection.rootFactory = { owner }
         installed = true
         owner.dashboard()

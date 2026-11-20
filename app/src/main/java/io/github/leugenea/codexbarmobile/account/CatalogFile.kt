@@ -79,10 +79,6 @@ internal class CatalogFile(private val directory: File, private val beforeRename
     /** Retry durability of the current replacement, without rewriting a captured snapshot. */
     fun sync() {
         beforeDirectorySync()
-        syncExisting()
-    }
-
-    fun syncExisting() {
         require(directory.canonicalFile == directory.absoluteFile)
         syncDirectory(directory)
         syncDirectory(directory.parentFile!!)

@@ -166,33 +166,144 @@ class CodexAdditionRecoveryTest {
     @Test fun unsyncedReplacementStaysFencedThenHandsOffTheOriginalRuntimeWithoutRewriting() = uncertain(reconstruct = false)
     @Test fun replacedBeforeAcknowledgmentSurvivesProcessOwnerReconstructionWithoutIncidentalRead() = uncertain(reconstruct = true)
 
-    private fun uncertain(reconstruct: Boolean) {
-        val sync = AtomicBoolean(false)
-        val read = AtomicBoolean(false)
+    @Test fun selectedPeerRebindsHistoryAndReadsUsageWhileReplacedAdditionIsFenced() {
+        val fault = ReplacementFault()
+        f.catalog = fault.open(f.directory)
+        startEmpty()
+        val observer = f.wait("A lifecycle START") { NativeConnection.observeDashboard(f.context) }
+        val a = (f.result(requireNotNull(f.begin("Synthetic incumbent"))) as AdditionResult.Added).id
+        val peer = f.runtime(a)
+        f.observe(peer)
+        val session = f.ready(peer)
+        val history = requireNotNull(peer.historyCapability(session.generation))
+        val enrollment = f.enrollment.toList()
+
+        f.transport.heldPath = CodexAdditionFixture.EXCHANGE
+        val handle = requireNotNull(f.begin("Synthetic uncertain successor"))
+        val call = f.held(CodexAdditionFixture.EXCHANGE)
+        val address = f.pending()
+        fault.arm()
+        call.reply()
+        val raw = awaitReplacement(fault, address)
+
+        f.wait("A last foreground STOP completes") { observer.stop(); peer.commandsSettled() }
+        assertNull(peer.historyCapability(session.generation))
+        f.transport.advance(60_001L)
+        val next = f.wait("A lifecycle START rebind completes") {
+            NativeConnection.observeDashboard(f.context).also { peer.commandsSettled(); peer.historyRestorationSettled() }
+        }
+        try {
+            assertSame(session, f.ready(peer))
+            val rebound = requireNotNull(peer.historyCapability(session.generation))
+            assertNotSame(history, rebound)
+            assertEquals(history.partition, rebound.partition)
+            f.wait("fresh A quota succeeds after rebind while B is fenced") {
+                peer.state.first { (it.refresh.usage.successfulAtMillis ?: 0L) >= 60_001L && !it.refresh.refreshing }
+            }
+            assertEquals(a, f.owner.dashboard().value?.id)
+            assertSame(peer, f.owner.dashboard().value?.controller)
+            assertEquals(enrollment, f.enrollment.toList())
+            assertNull(f.owner.runtime(address.id))
+            assertFalse(f.wait("catalog selection write stays fenced") { f.owner.select(a) })
+            fault.read.set(false)
+            assertFalse(f.wait("readable B remains fenced on failed directory sync") { handle.retryDurability() })
+            assertEquals(address.id, raw.read().selected)
+            assertEquals(a, f.catalog.snapshots.value.selected)
+            assertTrue(f.key(address.credentialSlot))
+
+            fault.sync.set(false)
+            assertTrue(f.wait("recover B after the fault clears") { handle.retryDurability() })
+            assertEquals(AdditionResult.Added(address.id), f.result(handle))
+            assertEquals(address.id, f.owner.dashboard().value?.id)
+            assertSame(f.writes[address.credentialSlot], f.ready(f.runtime(address.id)).generation)
+            assertSame(session, f.ready(peer))
+        } finally { f.wait("release resumed foreground observer") { next.stop() } }
+    }
+
+    @Test fun coldOpenSyncFailureKeepsOwnedKeyPrivateUntilSameProcessExplicitRecovery() {
+        val address = reserve(f.catalog)
+        createKey(address)
+        val raw = CatalogFile(File(f.directory, "account-catalog"))
+        val syncAttempts = AtomicInteger()
+        val blocked = AtomicBoolean(true)
+        f.start(openCatalog = {
+            AccountCatalog.open(f.directory, { error("existing") }, beforeDirectorySync = {
+                syncAttempts.incrementAndGet()
+                if (blocked.get()) throw IOException("cold-open directory sync failure")
+            })
+        })
+        val dashboard = NativeConnection.dashboard(f.context)
+        val unavailable = NativeConnection.get(f.context)
+        f.wait("cold open exposes only unavailable compatibility display") {
+            unavailable.state.first { it.phase == ConnectionPhase.FAILED && it.problem == ConnectionProblem.STORAGE }
+        }
+        assertSame(unavailable, dashboard.value?.controller)
+        assertEquals(1, syncAttempts.get())
+        assertFalse(f.wait("explicit recovery still fails while cold-open durability is blocked") {
+            NativeConnection.recoverAddition(f.context)
+        })
+        assertEquals(2, syncAttempts.get())
+        assertEquals(address, raw.read().candidate)
+        assertTrue(f.key(address.credentialSlot))
+        assertNull(NativeConnection.entry(f.context, address.id))
+        assertNull(f.begin("Synthetic not admitted during bootstrap failure"))
+        assertEquals(0L, f.transport.requests.get())
+
+        blocked.set(false)
+        assertTrue(f.wait("same singleton reopens and cleans its exact owned key") { NativeConnection.recoverAddition(f.context) })
+        assertSame(dashboard, NativeConnection.dashboard(f.context))
+        val available = NativeConnection.get(f.context)
+        assertNotSame(unavailable, available)
+        assertSame(available, dashboard.value?.controller)
+        f.wait("recovered empty installation is usable and dormant") { available.state.first { it.phase == ConnectionPhase.IDLE } }
+        assertNull(raw.read().candidate)
+        assertTrue(raw.read().entries.isEmpty())
+        assertFalse(f.key(address.credentialSlot))
+        assertEquals(0L, f.transport.requests.get())
+    }
+
+    private fun awaitReplacement(fault: ReplacementFault, address: AccountStorage): CatalogFile {
+        f.until("actual replacement followed by failed readback and durability retry") {
+            fault.syncHits.get() > 0 && fault.readHits.get() >= 2
+        }
+        return CatalogFile(File(f.directory, "account-catalog")).also {
+            assertEquals(address.id, it.read().selected) // Raw read must not supply a directory barrier.
+        }
+    }
+
+    private class ReplacementFault {
+        val sync = AtomicBoolean()
+        val read = AtomicBoolean()
         val syncHits = AtomicInteger()
         val readHits = AtomicInteger()
-        f.catalog = AccountCatalog.open(f.directory, { error("existing") }, beforeDirectorySync = {
+
+        fun arm() { sync.set(true); read.set(true) }
+
+        fun open(root: File) = AccountCatalog.open(root, { error("existing") }, beforeDirectorySync = {
             if (sync.get()) { syncHits.incrementAndGet(); throw IOException("replacement not synced") }
         }, beforeRead = {
             if (read.get()) { readHits.incrementAndGet(); throw IOException("replacement not readable") }
         })
+    }
+
+    private fun uncertain(reconstruct: Boolean) {
+        val fault = ReplacementFault()
+        f.catalog = fault.open(f.directory)
         startEmpty()
         f.transport.heldPath = CodexAdditionFixture.EXCHANGE
         val handle = requireNotNull(f.begin("Synthetic uncertain"))
         val call = f.held(CodexAdditionFixture.EXCHANGE)
         val address = f.pending()
-        sync.set(true); read.set(true)
+        fault.arm()
         call.reply()
-        f.until("actual replacement followed by failed readback and durability retry") { syncHits.get() > 0 && readHits.get() >= 2 }
-        val raw = CatalogFile(File(f.directory, "account-catalog"))
-        assertEquals(address.id, raw.read().selected) // Read bytes without introducing a directory sync.
+        awaitReplacement(fault, address)
         assertNull(f.owner.dashboard().value?.id)
         assertNull(f.owner.runtime(address.id))
         assertFalse(f.wait("cancel cannot turn uncertain replacement into destructive cleanup") { handle.cancel() })
         assertFalse(f.wait("unreadable admission still fenced") { handle.retryDurability() })
         assertTrue(f.key(address.credentialSlot))
         assertEquals(0L, f.transport.gets.get())
-        read.set(false)
+        fault.read.set(false)
         assertFalse(f.wait("readable but unsynced admission still fenced") { handle.retryDurability() })
         assertEquals(0L, f.transport.gets.get())
         assertNull(f.owner.runtime(address.id))
@@ -209,7 +320,7 @@ class CodexAdditionRecoveryTest {
             val newer = AccountCatalog.open(f.directory, { error("existing") })
             assertTrue(newer.reserveRename(address.id, AccountDisplayName.from("Synthetic later")))
             val bytes = file.readBytes()
-            sync.set(false)
+            fault.sync.set(false)
             assertTrue(f.wait("confirm current catalog without replaying an older snapshot") { handle.retryDurability() })
             assertEquals(AdditionResult.Added(address.id), f.result(handle))
             assertEquals(address.id, f.owner.dashboard().value?.id)

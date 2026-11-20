@@ -34,14 +34,14 @@ internal data class CatalogSnapshot(val legacySlot: UUID, val entries: List<Cata
 /** One process-owner storage lane. A rename intent reserves both keys until sidecar settlement. */
 internal class AccountCatalog private constructor(private val file: CatalogFile, initial: CatalogSnapshot) {
     private var state = initial
-    private enum class Uncertainty { NONE, REQUIRED_IDENTITY, OPTIONAL_RENAME }
+    private enum class Uncertainty { NONE, REQUIRED_IDENTITY, OPTIONAL_RENAME, ADDITION }
     private var uncertainty = Uncertainty.NONE
     private val published = MutableStateFlow(initial)
     val snapshots: StateFlow<CatalogSnapshot> = published
     @Synchronized fun snapshot() = state.copy(entries = state.entries.toList())
 
     @Synchronized fun adopt(partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
-        confirmIdentity()
+        confirmIdentity(legacyEntry(), partition)
         check(state.deletions.none { it.entry == legacyEntry()?.storage?.id })
         val previous = legacyEntry()
         if (previous != null) return reconcile(previous, partition, name)
@@ -120,7 +120,7 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     @Synchronized fun entry(id: UUID) = state.entries.singleOrNull { it.storage.id == id }
 
     @Synchronized fun reconcile(id: UUID, partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
-        confirmIdentity()
+        confirmIdentity(entry(id), partition)
         check(state.deletions.none { it.entry == id })
         return reconcile(requireNotNull(entry(id)), partition, name)
     }
@@ -227,7 +227,11 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
             published.value = next
         }
         catch (failure: Exception) {
-            uncertainty = if (settlingRename) Uncertainty.OPTIONAL_RENAME else Uncertainty.REQUIRED_IDENTITY
+            uncertainty = when {
+                readback -> Uncertainty.ADDITION
+                settlingRename -> Uncertainty.OPTIONAL_RENAME
+                else -> Uncertainty.REQUIRED_IDENTITY
+            }
             try {
                 val observed = file.read()
                 if (!settlingRename && !readback) state = observed
@@ -236,8 +240,12 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         }
     }
 
-    private fun confirmIdentity() {
-        if (uncertainty != Uncertainty.OPTIONAL_RENAME) confirmCommit()
+    private fun confirmIdentity(peer: CatalogEntry?, partition: HistoryPartition?) {
+        if (uncertainty == Uncertainty.OPTIONAL_RENAME) return
+        // Add only appends and selects; it cannot change an established peer binding.
+        // Keep using that binding, but reconcile() still confirms before any metadata write.
+        if (uncertainty == Uncertainty.ADDITION && partition != null && peer?.partition == partition) return
+        confirmCommit()
     }
 
     /** Never admit a write from stale RAM or publish an unsynced replacement. */
@@ -255,7 +263,7 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
             beforeRename: () -> Unit = {}, beforeRead: () -> Unit = {}): AccountCatalog {
             // Resolve the application root alias, not a redirected catalog child.
             val file = CatalogFile(File(root.canonicalFile, "account-catalog"), beforeRename, beforeDirectorySync, beforeRead)
-            val initial = if (file.exists()) file.read().also { file.syncExisting() }
+            val initial = if (file.exists()) file.read().also { file.sync() }
                 else CatalogSnapshot(legacySession()).also(file::write)
             return AccountCatalog(file, initial)
         }
