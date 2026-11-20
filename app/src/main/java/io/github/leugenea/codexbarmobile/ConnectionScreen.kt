@@ -12,6 +12,7 @@ import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
 import io.github.leugenea.codexbarmobile.credentials.syncDirectory
 import io.github.leugenea.codexbarmobile.account.AccountCatalog
+import io.github.leugenea.codexbarmobile.account.AccountType
 import io.github.leugenea.codexbarmobile.transport.HttpTransportAdapter
 import io.github.leugenea.codexbarmobile.transport.SystemTransportClock
 import io.github.leugenea.codexbarmobile.transport.TransportClock
@@ -75,6 +76,13 @@ internal object NativeConnection {
         return AccountRuntimeOwner(context, catalog, productionTransport(context), SystemTransportClock, { delay(it) },
             periodic.entryEnrollment(catalog?.legacyEntry()?.partition)).also { owner = it }
     }
+
+    /** Internal additive ingress; no public account/name UI in this unit. */
+    internal suspend fun beginAddition(context: Context, name: String, type: AccountType): CodexAddition? =
+        processOwner(context.applicationContext).beginAddition(name, type)
+
+    internal suspend fun recoverAddition(context: Context): Boolean =
+        processOwner(context.applicationContext).recoverAddition()
 
     /** Internal entry ingress; no selected-dashboard or all-account scheduler policy. */
     @Synchronized internal fun entry(context: Context, id: UUID): ConnectionController? {

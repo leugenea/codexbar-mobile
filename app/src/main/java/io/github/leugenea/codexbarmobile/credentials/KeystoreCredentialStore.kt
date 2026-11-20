@@ -39,7 +39,7 @@ class KeystoreCredentialStore(context: Context, localSessionId: UUID) : Credenti
     }
 
     internal companion object {
-        fun file(context: Context, session: UUID): File = File(context.noBackupFilesDir, "credentials/$session/value.bin")
+        fun file(context: Context, session: UUID): File = File(context.noBackupFilesDir.canonicalFile, "credentials/$session/value.bin")
         fun alias(context: Context, session: UUID): String = "${context.packageName}.credentials.$session"
     }
 }

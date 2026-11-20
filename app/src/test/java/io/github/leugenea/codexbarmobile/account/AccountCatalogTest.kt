@@ -18,6 +18,27 @@ class AccountCatalogTest {
     private fun named(text: String) = AccountNameRead.Ready(AccountDisplayName.from(text))
     private fun other(name: String?) = CatalogEntry(AccountStorage.fresh(), HistoryPartition(UUID.randomUUID()), name, true)
 
+    @Test fun reservedAddressCannotBeInsertedOrSelectedAndOnlyExactAdmissionConsumesIt() {
+        val root = temporary.newFolder()
+        val catalog = open(root)
+        val peer = catalog.adopt(partition, named("Synthetic peer"))
+        val name = requireNotNull(AccountDisplayName.from("Synthetic candidate"))
+        val address = requireNotNull(catalog.reserveAddition(name, AccountType.CODEX))
+        val entry = other(name.text).copy(storage = address)
+        assertFalse(catalog.insert(entry))
+        assertFalse(catalog.select(address.id))
+        assertFalse(catalog.discardAddition(AccountStorage.fresh()))
+        assertFalse(catalog.admitAddition(entry.copy(storage = AccountStorage.fresh())))
+        assertEquals(listOf(peer), open(root).snapshot().entries)
+        assertEquals(peer.storage.id, open(root).snapshot().selected)
+        assertTrue(catalog.admitAddition(entry))
+        val saved = open(root).snapshot()
+        assertNull(saved.candidate)
+        assertEquals(listOf(peer, entry), saved.entries)
+        assertEquals(address.id, saved.selected)
+        assertFalse(catalog.discardAddition(address))
+    }
+
     @Test fun applicationRootAliasCreatesAndReopensTheSameCatalog() {
         val root = temporary.newFolder().canonicalFile
         val alias = File(temporary.root, "root-alias")

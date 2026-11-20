@@ -57,6 +57,7 @@ internal class ConnectionController(
     historyQueueCapacity: Int = 16,
     private val backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit = {},
     private val savedAccount: () -> Boolean = { false },
+    pendingAddition: Boolean = false,
 ) {
     internal val historyExportRequest = HistoryExportRequest()
     internal val historyImporterState = HistoryImporterState()
@@ -89,7 +90,40 @@ internal class ConnectionController(
     internal val historySnapshots = historyRecorder.state
     private val usageRefresh = UsageRefresh(ownerScope, refreshClock, ::refreshUsage, ::refreshChanged)
 
-    init { work = ownerScope.launch { restore() } }
+    init { if (!pendingAddition) work = ownerScope.launch { restore() } }
+
+    /** Called only by the owner's private candidate operation; no session or quota authority yet. */
+    internal suspend fun prepareAddition(name: AccountDisplayName,
+        report: (AuthState) -> Unit): PreparedAddition = coroutineScope {
+        val coordinator = requireNotNull(history)
+        val active = store.openSession().also { generation = it; coordinator.open(it) }
+        if (!withContext(storageDispatcher) { coordinator.stage(active) }) return@coroutineScope PreparedAddition.StorageFailure
+        val terminal = try { authenticateAddition(active, report) } finally { authenticator.cancel() }
+        if (terminal !is AuthState.Connected) return@coroutineScope PreparedAddition.AuthFailure
+        val credentials = withContext(storageDispatcher) { store.read(terminal.generation) }
+        if (credentials !is CredentialResult.Success) return@coroutineScope PreparedAddition.StorageFailure
+        val partition = withContext(storageDispatcher) { coordinator.activateAddition(active, name) }
+            ?: return@coroutineScope PreparedAddition.StorageFailure
+        PreparedAddition.Ready(terminal, credentials.value, partition)
+    }
+
+    private suspend fun CoroutineScope.authenticateAddition(active: SessionGeneration, report: (AuthState) -> Unit): AuthState {
+        authenticator.start(this, active)
+        return authenticator.state.first {
+            if (it !is AuthState.Connected) report(it)
+            it is AuthState.Connected || it is AuthState.Failed || it == AuthState.Cancelled
+        }
+    }
+
+    internal fun verificationForAddition(expected: AuthState.AwaitingUser): String? =
+        expected.verificationUrl.takeIf { authenticator.canCopyUserCode(expected) }
+
+    /** Called on the same owner lane after catalog durability, before exposing this controller. */
+    internal fun acceptAddition(prepared: PreparedAddition.Ready) {
+        session.adopt(prepared.envelope)
+        publishName()
+        publish(0, ConnectionState(ConnectionPhase.RESTORED, prepared.auth))
+    }
 
     private suspend fun restore() {
         if (!storageReady) { publish(0, storageFailure()); return }
@@ -638,18 +672,27 @@ internal class ConnectionController(
         usageRefresh.close()
         updateState(ConnectionState(ConnectionPhase.CANCELLED))
         ownerScope.launch {
-            // Do not clear a holder while an old deletion can still erase its successor.
-            deletion?.join()
-            session.awaitShutdown()
-            historyDeletion?.join()
-            historyRecorder.settled()
-            historyImport?.join()
-            nameWrite?.join()
-            // A cancelled stage/activation waiter can leave its process-owned child running.
-            history?.let { coordinator -> withContext(storageDispatcher) { coordinator.close() } }
-            stopped.complete(Unit)
-            ownerJob.cancel()
+            try {
+                drainStorage()
+                stopped.complete(Unit)
+            } catch (failure: Exception) {
+                stopped.completeExceptionally(failure)
+            } finally {
+                ownerJob.cancel()
+            }
         }
+    }
+
+    private suspend fun drainStorage() {
+        // Do not clear a holder while an old deletion can still erase its successor.
+        deletion?.join()
+        session.awaitShutdown()
+        historyDeletion?.join()
+        historyRecorder.settled()
+        historyImport?.join()
+        nameWrite?.join()
+        // A cancelled stage/activation waiter can leave its process-owned child running.
+        history?.let { coordinator -> withContext(storageDispatcher) { coordinator.close() } }
     }
 
     internal suspend fun commandsSettled() {
@@ -670,7 +713,6 @@ internal class ConnectionController(
 
     internal suspend fun shutdown() {
         close()
-        stopped.await()
-        ownerJob.join()
+        try { stopped.await() } finally { ownerJob.join() }
     }
 }

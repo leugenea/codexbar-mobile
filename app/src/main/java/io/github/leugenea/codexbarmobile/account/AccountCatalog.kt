@@ -26,7 +26,8 @@ internal enum class CleanupDisposition { REMOVE, RETAIN }
 internal data class CatalogDeletion(val entry: UUID?, val operation: UUID,
     val disposition: CleanupDisposition = CleanupDisposition.REMOVE)
 internal data class CatalogSnapshot(val legacySlot: UUID, val entries: List<CatalogEntry> = emptyList(),
-    val selected: UUID? = null, val rename: CatalogRename? = null, val deletions: List<CatalogDeletion> = emptyList()) {
+    val selected: UUID? = null, val rename: CatalogRename? = null, val deletions: List<CatalogDeletion> = emptyList(),
+    val candidate: AccountStorage? = null) {
     override fun toString() = "CatalogSnapshot(redacted)"
 }
 
@@ -71,9 +72,42 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         return previous.copy(name = ready.name?.text, nameAvailable = true)
     }
 
+    /** Reserve the exact address before creating any history or credential material. */
+    @Synchronized fun reserveAddition(name: AccountDisplayName, type: AccountType): AccountStorage? {
+        confirmCommit()
+        val address = AccountStorage.fresh()
+        if (state.candidate != null || conflicts(address.id, type, name.text)) return null
+        commit(state.copy(candidate = address))
+        return address
+    }
+
+    /** One checked replacement, never insert followed by select. */
+    @Synchronized fun admitAddition(entry: CatalogEntry): Boolean {
+        confirmCommit()
+        if (state.candidate != entry.storage || conflicts(entry.storage.id, entry.type, entry.name)) return false
+        check(entry.partition != null && entry.name != null && entry.nameAvailable)
+        commit(state.copy(entries = state.entries + entry, selected = entry.storage.id, candidate = null), readback = true)
+        return true
+    }
+
+    @Synchronized fun confirmAddition(): CatalogSnapshot {
+        confirmCommit()
+        return state
+    }
+
+    /** Only used after checked physical cleanup of the captured pending address. */
+    @Synchronized fun discardAddition(address: AccountStorage): Boolean {
+        confirmCommit()
+        if (state.candidate != address) return false
+        commit(state.copy(candidate = null))
+        return true
+    }
+
     /** Internal storage enrollment only; does not construct or activate another account runtime. */
     @Synchronized fun insert(entry: CatalogEntry): Boolean {
         confirmCommit()
+        val reserved = state.candidate
+        if (reserved?.id == entry.storage.id || reserved?.credentialSlot == entry.storage.credentialSlot) return false
         if (state.entries.any { it.storage.id == entry.storage.id || it.storage.credentialSlot == entry.storage.credentialSlot }) return false
         if (conflicts(entry.storage.id, entry.type, entry.name)) return false
         check(entry.name == null || AccountDisplayName.from(entry.name)?.text == entry.name)
@@ -182,16 +216,21 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         return pending.entry != id && owner.type == type && pending.name == name
     }
 
-    private fun commit(next: CatalogSnapshot) {
+    private fun commit(next: CatalogSnapshot, readback: Boolean = false) {
         // Re-read after an uncertain rename/fsync outcome; never overwrite it from stale memory.
         check(uncertainty == Uncertainty.NONE)
         val settlingRename = state.rename != null && next.rename == null && state.deletions == next.deletions
-        try { file.write(next); state = next; published.value = next }
+        try {
+            file.write(next)
+            if (readback) check(file.read() == next)
+            state = next
+            published.value = next
+        }
         catch (failure: Exception) {
             uncertainty = if (settlingRename) Uncertainty.OPTIONAL_RENAME else Uncertainty.REQUIRED_IDENTITY
             try {
-                val readback = file.read()
-                if (!settlingRename) state = readback
+                val observed = file.read()
+                if (!settlingRename && !readback) state = observed
             } catch (_: Exception) { /* Fenced until confirmed readback. */ }
             throw failure
         }
@@ -216,7 +255,8 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
             beforeRename: () -> Unit = {}, beforeRead: () -> Unit = {}): AccountCatalog {
             // Resolve the application root alias, not a redirected catalog child.
             val file = CatalogFile(File(root.canonicalFile, "account-catalog"), beforeRename, beforeDirectorySync, beforeRead)
-            val initial = if (file.exists()) file.read() else CatalogSnapshot(legacySession()).also(file::write)
+            val initial = if (file.exists()) file.read().also { file.syncExisting() }
+                else CatalogSnapshot(legacySession()).also(file::write)
             return AccountCatalog(file, initial)
         }
     }

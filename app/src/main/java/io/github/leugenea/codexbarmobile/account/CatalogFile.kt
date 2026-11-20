@@ -18,6 +18,7 @@ internal class CatalogFile(private val directory: File, private val beforeRename
     fun exists() = target.exists()
 
     fun read(): CatalogSnapshot {
+        require(directory.canonicalFile == directory.absoluteFile && target.canonicalFile == target.absoluteFile)
         beforeRead()
         val bytes = target.readBytes()
         require(bytes.size >= 8)
@@ -26,7 +27,7 @@ internal class CatalogFile(private val directory: File, private val beforeRename
         require(CRC32().apply { update(payload) }.value == checksum)
         return DataInputStream(ByteArrayInputStream(payload)).use { input ->
             val version = input.readInt()
-            require(version == MAGIC || version == V2_MAGIC || version == LEGACY_MAGIC)
+            require(version in listOf(MAGIC, V3_MAGIC, V2_MAGIC, LEGACY_MAGIC))
             val slot = input.uuid()
             val selected = if (input.readBoolean()) input.uuid() else null
             val count = input.readInt().also { require(it >= 0) }
@@ -34,8 +35,9 @@ internal class CatalogFile(private val directory: File, private val beforeRename
             repeat(count) { entries += input.entry() }
             val rename = if (input.readBoolean()) CatalogRename(input.uuid(), input.name()) else null
             val deletions = input.deletions(version, entries)
+            val candidate = if (version == MAGIC && input.readBoolean()) AccountStorage(input.uuid(), input.uuid()) else null
             require(input.read() == -1)
-            CatalogSnapshot(slot, entries, selected, rename, deletions).also(::validate)
+            CatalogSnapshot(slot, entries, selected, rename, deletions, candidate).also(::validate)
         }
     }
 
@@ -57,6 +59,8 @@ internal class CatalogFile(private val directory: File, private val beforeRename
                 output.uuid(receipt.operation)
                 output.writeUTF(receipt.disposition.name)
             }
+            output.writeBoolean(state.candidate != null)
+            state.candidate?.let { output.uuid(it.id); output.uuid(it.credentialSlot) }
         }
         val bytes = payload.toByteArray()
         val temporary = File.createTempFile("catalog-", ".tmp", directory)
@@ -75,6 +79,11 @@ internal class CatalogFile(private val directory: File, private val beforeRename
     /** Retry durability of the current replacement, without rewriting a captured snapshot. */
     fun sync() {
         beforeDirectorySync()
+        syncExisting()
+    }
+
+    fun syncExisting() {
+        require(directory.canonicalFile == directory.absoluteFile)
         syncDirectory(directory)
         syncDirectory(directory.parentFile!!)
     }
@@ -86,6 +95,7 @@ internal class CatalogFile(private val directory: File, private val beforeRename
         require(keyed.map { it.type to it.name }.distinct().size == keyed.size)
         require(state.entries.count { it.storage.legacy } <= 1)
         state.entries.forEach { validateEntry(it, state.legacySlot) }
+        checkAvailableAddress(state)
         require(state.selected == null || state.entries.any { it.storage.id == state.selected })
         state.rename?.let { validateRename(it, state.entries) }
         require(state.deletions.map { it.entry }.distinct().size == state.deletions.size)
@@ -116,7 +126,7 @@ internal class CatalogFile(private val directory: File, private val beforeRename
         return List(count) {
             val entry = if (readBoolean()) uuid() else null
             val operation = uuid()
-            val disposition = if (version == MAGIC) CleanupDisposition.valueOf(readUTF()) else CleanupDisposition.REMOVE
+            val disposition = if (version == MAGIC || version == V3_MAGIC) CleanupDisposition.valueOf(readUTF()) else CleanupDisposition.REMOVE
             CatalogDeletion(entry, operation, disposition)
         }
     }
@@ -140,6 +150,14 @@ internal class CatalogFile(private val directory: File, private val beforeRename
     companion object {
         private const val LEGACY_MAGIC = 0x41433100
         private const val V2_MAGIC = 0x41433200
-        private const val MAGIC = 0x41433300
+        private const val V3_MAGIC = 0x41433300
+        private const val MAGIC = 0x41433400
     }
+}
+
+
+private fun checkAvailableAddress(state: CatalogSnapshot) {
+    val candidate = state.candidate ?: return
+    require(!candidate.legacy && candidate.id != candidate.credentialSlot && candidate.credentialSlot != state.legacySlot)
+    require(state.entries.none { it.storage.id == candidate.id || it.storage.credentialSlot == candidate.credentialSlot })
 }

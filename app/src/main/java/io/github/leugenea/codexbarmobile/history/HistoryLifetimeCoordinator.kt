@@ -87,6 +87,21 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         }
     }
 
+    /** Unlike installed restoration, Add requires the exact STAGED binding to become usable. */
+    fun activateAddition(generation: SessionGeneration, name: AccountDisplayName): HistoryPartition? = synchronized(io) {
+        if (!accepts(generation)) return@synchronized null
+        val partition = synchronized(admission) { staged } ?: return@synchronized null
+        val bound = storage.activate(partition) as? HistoryLifetimeOutcome.Bound ?: return@synchronized null
+        try {
+            if (bound.access.partition != partition || !storage.writeName(partition, name)) return@synchronized null
+            adopt(generation, bound)
+            if (capability(generation) !== bound.access || nameState?.name?.text != name.text) return@synchronized null
+            partition
+        } finally {
+            if (capability(generation) !== bound.access) bound.access.revoke()
+        }
+    }
+
     fun needsRestoration(candidate: SessionGeneration): Boolean = synchronized(admission) {
         accepts(candidate) && (availability in setOf(HistoryAvailability.UNAVAILABLE, HistoryAvailability.STORAGE_FAILURE)
             || accountName?.storageFailed == true)
