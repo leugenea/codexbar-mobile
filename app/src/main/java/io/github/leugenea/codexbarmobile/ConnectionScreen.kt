@@ -34,8 +34,9 @@ internal object NativeConnection {
     internal var rootFactory: ((Context) -> AccountRuntimeOwner)? = null
 
     @Synchronized fun get(context: Context): ConnectionController {
+        controller?.let { return it }
         if (factory === productionFactory) return processOwner(context.applicationContext).legacy()
-        return controller ?: factory(context.applicationContext).also { controller = it }
+        return factory(context.applicationContext).also { controller = it }
     }
 
     /** Instrumentation only: install a test factory, then drain the previous owner's durable work. */
