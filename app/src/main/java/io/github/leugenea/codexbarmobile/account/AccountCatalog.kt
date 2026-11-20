@@ -77,7 +77,7 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         confirmCommit()
         val address = AccountStorage.fresh()
         if (state.candidate != null || conflicts(address.id, type, name.text)) return null
-        commit(state.copy(candidate = address))
+        commit(state.copy(candidate = address), Uncertainty.ADDITION)
         return address
     }
 
@@ -86,7 +86,8 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         confirmCommit()
         if (state.candidate != entry.storage || conflicts(entry.storage.id, entry.type, entry.name)) return false
         check(entry.partition != null && entry.name != null && entry.nameAvailable)
-        commit(state.copy(entries = state.entries + entry, selected = entry.storage.id, candidate = null), readback = true)
+        commit(state.copy(entries = state.entries + entry, selected = entry.storage.id, candidate = null),
+            Uncertainty.ADDITION, readback = true)
         return true
     }
 
@@ -99,7 +100,7 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     @Synchronized fun discardAddition(address: AccountStorage): Boolean {
         confirmCommit()
         if (state.candidate != address) return false
-        commit(state.copy(candidate = null))
+        commit(state.copy(candidate = null), Uncertainty.ADDITION)
         return true
     }
 
@@ -143,7 +144,7 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         if (state.rename == null) { check(entry(id)?.name == pending.name); return }
         check(state.rename == pending)
         val entries = state.entries.map { if (it.storage.id == id) it.copy(name = pending.name, nameAvailable = true) else it }
-        commit(state.copy(entries = entries, rename = null))
+        commit(state.copy(entries = entries, rename = null), Uncertainty.OPTIONAL_RENAME)
     }
 
     @Synchronized fun beginDeletion(id: UUID? = legacyEntry()?.storage?.id,
@@ -216,10 +217,10 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         return pending.entry != id && owner.type == type && pending.name == name
     }
 
-    private fun commit(next: CatalogSnapshot, readback: Boolean = false) {
-        // Re-read after an uncertain rename/fsync outcome; never overwrite it from stale memory.
+    private fun commit(next: CatalogSnapshot, onFailure: Uncertainty = Uncertainty.REQUIRED_IDENTITY,
+        readback: Boolean = false) {
+        // Never overwrite an uncertain replacement from stale memory.
         check(uncertainty == Uncertainty.NONE)
-        val settlingRename = state.rename != null && next.rename == null && state.deletions == next.deletions
         try {
             file.write(next)
             if (readback) check(file.read() == next)
@@ -227,14 +228,11 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
             published.value = next
         }
         catch (failure: Exception) {
-            uncertainty = when {
-                readback -> Uncertainty.ADDITION
-                settlingRename -> Uncertainty.OPTIONAL_RENAME
-                else -> Uncertainty.REQUIRED_IDENTITY
-            }
+            uncertainty = onFailure
             try {
                 val observed = file.read()
-                if (!settlingRename && !readback) state = observed
+                // Peer-safe operations retain the last confirmed binding until durability is confirmed.
+                if (onFailure == Uncertainty.REQUIRED_IDENTITY) state = observed
             } catch (_: Exception) { /* Fenced until confirmed readback. */ }
             throw failure
         }
@@ -242,7 +240,7 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
 
     private fun confirmIdentity(peer: CatalogEntry?, partition: HistoryPartition?) {
         if (uncertainty == Uncertainty.OPTIONAL_RENAME) return
-        // Add only appends and selects; it cannot change an established peer binding.
+        // Reserve, admit and discard cannot change an established peer binding.
         // Keep using that binding, but reconcile() still confirms before any metadata write.
         if (uncertainty == Uncertainty.ADDITION && partition != null && peer?.partition == partition) return
         confirmCommit()

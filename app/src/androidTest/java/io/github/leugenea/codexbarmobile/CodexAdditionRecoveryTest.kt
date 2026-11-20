@@ -175,7 +175,6 @@ class CodexAdditionRecoveryTest {
         val peer = f.runtime(a)
         f.observe(peer)
         val session = f.ready(peer)
-        val history = requireNotNull(peer.historyCapability(session.generation))
         val enrollment = f.enrollment.toList()
 
         f.transport.heldPath = CodexAdditionFixture.EXCHANGE
@@ -186,20 +185,7 @@ class CodexAdditionRecoveryTest {
         call.reply()
         val raw = awaitReplacement(fault, address)
 
-        f.wait("A last foreground STOP completes") { observer.stop(); peer.commandsSettled() }
-        assertNull(peer.historyCapability(session.generation))
-        f.transport.advance(60_001L)
-        val next = f.wait("A lifecycle START rebind completes") {
-            NativeConnection.observeDashboard(f.context).also { peer.commandsSettled(); peer.historyRestorationSettled() }
-        }
-        try {
-            assertSame(session, f.ready(peer))
-            val rebound = requireNotNull(peer.historyCapability(session.generation))
-            assertNotSame(history, rebound)
-            assertEquals(history.partition, rebound.partition)
-            f.wait("fresh A quota succeeds after rebind while B is fenced") {
-                peer.state.first { (it.refresh.usage.successfulAtMillis ?: 0L) >= 60_001L && !it.refresh.refreshing }
-            }
+        withReboundPeer(observer, peer) {
             assertEquals(a, f.owner.dashboard().value?.id)
             assertSame(peer, f.owner.dashboard().value?.controller)
             assertEquals(enrollment, f.enrollment.toList())
@@ -216,6 +202,102 @@ class CodexAdditionRecoveryTest {
             assertEquals(AdditionResult.Added(address.id), f.result(handle))
             assertEquals(address.id, f.owner.dashboard().value?.id)
             assertSame(f.writes[address.credentialSlot], f.ready(f.runtime(address.id)).generation)
+            assertSame(session, f.ready(peer))
+        }
+    }
+
+    @Test fun selectedPeerRebindsWhileReplacedReservationIsFenced() = candidateOnlyReplacement(discard = false)
+
+    @Test fun selectedPeerRebindsWhileReplacedDiscardIsFenced() = candidateOnlyReplacement(discard = true)
+
+    private fun candidateOnlyReplacement(discard: Boolean) {
+        val fault = ReplacementFault()
+        f.catalog = fault.open(f.directory)
+        startEmpty()
+        val observer = f.wait("A lifecycle START") { NativeConnection.observeDashboard(f.context) }
+        val peer = f.owner.legacy()
+        peer.connect()
+        f.observe(peer)
+        val enrollment = f.enrollment.toList()
+        val raw = CatalogFile(File(f.directory, "account-catalog"))
+        val saved = raw.read().entries
+        val incumbent = saved.single()
+        val a = incumbent.storage.id
+        assertTrue(incumbent.storage.legacy)
+        assertEquals(BackgroundRefreshTarget(requireNotNull(incumbent.partition)), enrollment.last())
+        f.until("A is the selected saved account") { f.owner.dashboard().value?.id == a }
+        val address = if (discard) cancelWithDiscardFault(fault) else {
+            val requests = f.transport.requests.get()
+            fault.sync.set(true)
+            assertNull(f.begin("Synthetic failed reservation"))
+            assertEquals(requests, f.transport.requests.get())
+            requireNotNull(raw.read().candidate) // Replacement observed without supplying the missing sync.
+        }
+        assertTrue("catalog directory sync fault reached after candidate replacement", fault.syncHits.get() > 0)
+        val disk = raw.read()
+        assertEquals(if (discard) null else address, disk.candidate)
+        assertEquals(if (discard) address else null, f.catalog.snapshots.value.candidate)
+        assertEquals(saved, disk.entries)
+        assertEquals(a, disk.selected)
+        assertFalse(f.key(address.credentialSlot))
+        assertFalse(address.historyDirectory(f.directory).exists())
+
+        val requests = f.transport.requests.get()
+        withReboundPeer(observer, peer) {
+            assertEquals(a, f.owner.dashboard().value?.id)
+            assertSame(peer, f.owner.dashboard().value?.controller)
+            assertEquals(enrollment, f.enrollment.toList())
+            assertNull(f.owner.runtime(address.id))
+            assertFalse(f.wait("catalog selection stays fenced") { f.owner.select(a) })
+            assertFalse(f.wait("candidate cleanup remains fenced") { NativeConnection.recoverAddition(f.context) })
+            assertNull(f.begin("Synthetic blocked until recovery"))
+            assertEquals(disk, raw.read())
+            assertEquals(requests + 2, f.transport.requests.get()) // A's two reads, no candidate auth or quota.
+            fault.sync.set(false)
+            assertTrue(f.wait("explicit candidate recovery after directory sync resumes") { NativeConnection.recoverAddition(f.context) })
+            assertNull(raw.read().candidate)
+            assertEquals(saved, f.catalog.snapshots.value.entries)
+            assertEquals(a, f.catalog.snapshots.value.selected)
+            f.removed(address)
+            assertEquals(requests + 2, f.transport.requests.get())
+        }
+    }
+
+    private fun cancelWithDiscardFault(fault: ReplacementFault): AccountStorage {
+        f.transport.heldPath = CodexAdditionFixture.POLL
+        val handle = requireNotNull(f.begin("Synthetic cancelled before admission"))
+        val poll = f.held(CodexAdditionFixture.POLL)
+        val address = f.pending()
+        fault.sync.set(true)
+        assertTrue(f.wait("cancel B while poll is held") { handle.cancel() })
+        assertEquals(AdditionResult.Rejected.CANCELLED, f.result(handle))
+        assertTrue(poll.cancelled)
+        poll.reply()
+        return address
+    }
+
+    private fun withReboundPeer(observer: DashboardObserver, peer: ConnectionController, afterRebind: () -> Unit) {
+        val session = f.ready(peer)
+        val history = requireNotNull(peer.historyCapability(session.generation))
+        f.until("A has a durable history measurement before STOP") { f.append[history.partition] is HistoryAppendOutcome.Stored }
+        assertEquals(0, f.wait("no background lease can mask A's rebind") { peer.backgroundRefreshInterests() })
+        f.wait("A last foreground STOP completes") { observer.stop(); peer.commandsSettled() }
+        assertNull(peer.historyCapability(session.generation))
+        f.transport.advance(60_001L)
+        val next = f.wait("A lifecycle START") { NativeConnection.observeDashboard(f.context) }
+        try {
+            f.wait("A lifecycle START rebind completes") { peer.commandsSettled(); peer.historyRestorationSettled() }
+            assertSame(session, f.ready(peer))
+            val rebound = requireNotNull(peer.historyCapability(session.generation))
+            assertNotSame(history, rebound)
+            assertEquals(history.partition, rebound.partition)
+            val restored = rebound.read(HistoryReadQuery(history.partition, limit = 10)) as HistoryReadOutcome.Ready
+            assertEquals(HistoryContent.MEASUREMENTS, restored.snapshot.content)
+            f.wait("fresh A quota and inventory succeed after rebind while B is fenced") {
+                peer.state.first { (it.refresh.usage.successfulAtMillis ?: 0L) >= 60_001L &&
+                    (it.refresh.inventory.successfulAtMillis ?: 0L) >= 60_001L && !it.refresh.refreshing }
+            }
+            afterRebind()
             assertSame(session, f.ready(peer))
         } finally { f.wait("release resumed foreground observer") { next.stop() } }
     }

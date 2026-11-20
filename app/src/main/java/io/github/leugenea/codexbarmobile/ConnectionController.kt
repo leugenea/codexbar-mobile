@@ -296,6 +296,8 @@ internal class ConnectionController(
     /** A worker supplies its enrolled lifetime. It never retries auth as an explicit user action. */
     internal suspend fun refreshInBackground(expected: BackgroundRefreshTarget,
         minimumSuccessAgeMillis: Long = 0): BackgroundRefreshOutcome = withContext(mutationDispatcher) {
+        // An unconfirmed catalog provides no evidence that an enrolled lifetime is stale.
+        if (!storageReady) return@withContext BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STORAGE_UNAVAILABLE)
         val owner = revision
         if (mutableState.value.phase == ConnectionPhase.RESTORING) work?.join()
         val active = backgroundGeneration(owner, expected)
