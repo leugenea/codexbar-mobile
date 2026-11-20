@@ -21,6 +21,7 @@ import androidx.work.impl.background.greedy.GreedyScheduler
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.google.common.util.concurrent.ListenableFuture
+import io.github.leugenea.codexbarmobile.account.AccountCatalog
 import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.transport.*
@@ -30,11 +31,14 @@ import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
 import java.io.File
+import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Synthetic provider + real owner/Keystore/SQLite. OS dispatch and TestDriver proof are distinct. */
 @RunWith(AndroidJUnit4::class)
@@ -219,6 +223,72 @@ class PeriodicUsageRefreshTest {
         assertNotEquals(old, target()); val successorCount = transport.requests.get()
         assertEquals(ListenableWorker.Result.success(), run(old))
         assertEquals(successorCount, transport.requests.get())
+    }
+
+    @Test fun coldCatalogSyncFailureKeepsTheSameEnrolledWorkThroughRecovery() {
+        login(); detach()
+        val expected = target()
+        val enrolled = unique(expected).single()
+        val requests = transport.requests.get()
+        val periodic = PeriodicUsageRefresh(manager)
+        val disk = AccountCatalog.open(root, { error("saved catalog required") })
+        val saved = requireNotNull(disk.legacyEntry())
+        assertEquals(expected.partition, saved.partition)
+        assertEquals(saved.storage.id, disk.snapshot().selected)
+
+        val injected = NativeConnection.factory
+        val originalRoot = NativeConnection.rootFactory
+        val syncAttempts = AtomicInteger()
+        val blocked = AtomicBoolean(true)
+        NativeConnection.resetForTests()
+        NativeConnection.rootFactory = {
+            NativeConnection.createOwner(context, transport, transport.clock, transport::pause,
+                legacyEnrollment = periodic::entryEnrollment, openCatalog = {
+                    AccountCatalog.open(root, { error("saved catalog required") }, beforeDirectorySync = {
+                        syncAttempts.incrementAndGet()
+                        if (blocked.get()) throw IOException("cold catalog directory sync blocked")
+                    })
+                })
+        }
+        NativeConnection.factory = originalFactory
+        try {
+            assertEquals("worker must be the first cold ingress", 0, syncAttempts.get())
+            assertEquals(ListenableWorker.Result.success(), run(expected))
+            assertEquals("worker reached the cold-open barrier", 1, syncAttempts.get())
+            assertEquals(requests, transport.requests.get())
+            // The status query is queued on WorkManager's serial executor after any worker cancellation.
+            assertEquals(WorkInfo.State.ENQUEUED, info(enrolled.id).state)
+
+            blocked.set(false)
+            assertTrue(bounded("same-process catalog recovery") { NativeConnection.recoverAddition(context) })
+            phase(ConnectionPhase.RESTORED)
+            assertEquals(2, syncAttempts.get())
+            assertEquals(expected, target())
+            assertEquals(requests, transport.requests.get())
+            assertEquals(enrolled.id, unique(expected).single().id)
+
+            transport.advance(900_000)
+            assertEquals(ListenableWorker.Result.success(), run(expected))
+            assertEquals(requests + 2, transport.requests.get())
+            assertEquals(enrolled.id, unique(expected).single().id)
+            val restored = owner
+            restored.usageForeground(observer, true); settled()
+            await("worker added a durable measurement to the same legacy history") { recordedHistory(restored).points.size == 2 }
+            detach()
+
+            val stale = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
+            periodic.enrollment(stale)
+            val staleWork = unique(stale).single()
+            assertEquals(ListenableWorker.Result.success(), run(stale))
+            assertEquals(WorkInfo.State.CANCELLED, info(staleWork.id).state)
+            assertEquals(WorkInfo.State.ENQUEUED, info(enrolled.id).state)
+            assertEquals(requests + 2, transport.requests.get())
+        } finally {
+            try { NativeConnection.resetForTests() } finally {
+                NativeConnection.factory = injected
+                NativeConnection.rootFactory = originalRoot
+            }
+        }
     }
 
     @Test fun expectedOfflineErrorsAndRetryAfterFinishOpportunityWithoutWorkManagerRetryLoop() {

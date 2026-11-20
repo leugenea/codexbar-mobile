@@ -12,6 +12,8 @@ import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
 import io.github.leugenea.codexbarmobile.credentials.syncDirectory
 import io.github.leugenea.codexbarmobile.account.AccountCatalog
+import io.github.leugenea.codexbarmobile.account.AccountType
+import io.github.leugenea.codexbarmobile.history.HistoryPartition
 import io.github.leugenea.codexbarmobile.transport.HttpTransportAdapter
 import io.github.leugenea.codexbarmobile.transport.SystemTransportClock
 import io.github.leugenea.codexbarmobile.transport.TransportClock
@@ -31,8 +33,11 @@ internal object NativeConnection {
     @set:VisibleForTesting(otherwise = VisibleForTesting.NONE)
     internal var rootFactory: ((Context) -> AccountRuntimeOwner)? = null
 
-    @Synchronized fun get(context: Context): ConnectionController =
-        controller ?: factory(context.applicationContext).also { controller = it }
+    @Synchronized fun get(context: Context): ConnectionController {
+        controller?.let { return it }
+        if (factory === productionFactory) return processOwner(context.applicationContext).legacy()
+        return factory(context.applicationContext).also { controller = it }
+    }
 
     /** Instrumentation only: install a test factory, then drain the previous owner's durable work. */
     @VisibleForTesting(otherwise = VisibleForTesting.NONE)
@@ -70,11 +75,17 @@ internal object NativeConnection {
     @Synchronized private fun processOwner(context: Context): AccountRuntimeOwner {
         owner?.let { return it }
         rootFactory?.let { factory -> return factory(context).also { owner = it } }
-        val catalog = try { catalog(context) } catch (_: Exception) { null }
         val periodic = PeriodicUsageRefresh(androidx.work.WorkManager.getInstance(context.applicationContext))
-        return AccountRuntimeOwner(context, catalog, productionTransport(context), SystemTransportClock, { delay(it) },
-            periodic.entryEnrollment(catalog?.legacyEntry()?.partition)).also { owner = it }
+        return createOwner(context, productionTransport(context), SystemTransportClock, { delay(it) },
+            legacyEnrollment = periodic::entryEnrollment).also { owner = it }
     }
+
+    /** Internal additive ingress; no public account/name UI in this unit. */
+    internal suspend fun beginAddition(context: Context, name: String, type: AccountType): CodexAddition? =
+        processOwner(context.applicationContext).beginAddition(name, type)
+
+    internal suspend fun recoverAddition(context: Context): Boolean =
+        processOwner(context.applicationContext).recoverAddition()
 
     /** Internal entry ingress; no selected-dashboard or all-account scheduler policy. */
     @Synchronized internal fun entry(context: Context, id: UUID): ConnectionController? {
@@ -93,14 +104,14 @@ internal object NativeConnection {
 
     private fun createController(context: Context, suppliedTransport: AuthTransport?, clock: TransportClock,
         pause: suspend (Long) -> Unit, backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit): ConnectionController {
-        return createOwner(context, suppliedTransport ?: productionTransport(context), clock, pause, backgroundEnrollment).legacy()
+        return createOwner(context, suppliedTransport ?: productionTransport(context), clock, pause,
+            legacyEnrollment = { backgroundEnrollment }).legacy()
     }
 
     internal fun createOwner(context: Context, transport: AuthTransport, clock: TransportClock,
-        pause: suspend (Long) -> Unit, legacyEnrollment: (BackgroundRefreshTarget?) -> Unit = {}): AccountRuntimeOwner {
-        val catalog = try { catalog(context.applicationContext) } catch (_: Exception) { null }
-        return AccountRuntimeOwner(context, catalog, transport, clock, pause, legacyEnrollment)
-    }
+        pause: suspend (Long) -> Unit, legacyEnrollment: (HistoryPartition?) -> (BackgroundRefreshTarget?) -> Unit = { {} },
+        openCatalog: () -> AccountCatalog = { catalog(context.applicationContext) }): AccountRuntimeOwner =
+        AccountRuntimeOwner(context, null, transport, clock, pause, legacyEnrollment, openCatalog = openCatalog)
 
     private fun productionTransport(context: Context): AuthTransport {
         val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.1.0"

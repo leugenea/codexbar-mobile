@@ -12,7 +12,10 @@ internal class CatalogHistoryStorage(
         ?: if (address == null) catalog.legacyEntry() else null
     private fun pending() = catalog.snapshot().deletions.any { it.entry == (address?.id ?: entry()?.storage?.id) }
 
-    override fun activate(partition: HistoryPartition) = catalogued { storage.activate(partition) }
+    private fun pendingAddition() = address != null && catalog.snapshots.value.candidate == address
+
+    override fun activate(partition: HistoryPartition) = if (pendingAddition()) storage.activate(partition)
+        else catalogued { storage.activate(partition) }
     override fun restore() = if (pending()) HistoryLifetimeOutcome.RemovalRequired else catalogued(storage::restore)
 
     private fun catalogued(read: () -> HistoryLifetimeOutcome): HistoryLifetimeOutcome {
@@ -46,7 +49,7 @@ internal class CatalogHistoryStorage(
     }
 
     override fun readName(partition: HistoryPartition): AccountNameRead = try {
-        if (consistent(partition)) storage.readName(partition) else AccountNameRead.Unavailable
+        if (pendingAddition() || consistent(partition)) storage.readName(partition) else AccountNameRead.Unavailable
     } catch (_: Exception) { AccountNameRead.Unavailable }
 
     private fun consistent(partition: HistoryPartition): Boolean {
@@ -59,7 +62,8 @@ internal class CatalogHistoryStorage(
 
     override fun writeName(partition: HistoryPartition, name: AccountDisplayName?): Boolean = try {
         val entry = entry()
-        if (entry?.partition != partition || !recoverRename(entry)) false
+        if (pendingAddition()) storage.writeName(partition, name)
+        else if (entry?.partition != partition || !recoverRename(entry)) false
         else if (!catalog.reserveRename(entry.storage.id, name)) false
         else recoverRename(entry)
     } catch (_: Exception) { false }
