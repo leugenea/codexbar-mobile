@@ -36,6 +36,8 @@ interface HistoryRuntimeAccess : HistoryStore {
 internal sealed interface HistoryLifetimeOutcome {
     data class Bound(val access: HistoryRuntimeAccess) : HistoryLifetimeOutcome
     data object Unavailable : HistoryLifetimeOutcome
+    /** Saved enrollment identity only; native storage has not supplied a port. */
+    data class UnavailableWithConfirmedBinding(val partition: HistoryPartition) : HistoryLifetimeOutcome
     data object RemovalRequired : HistoryLifetimeOutcome
     data object CatalogUnavailable : HistoryLifetimeOutcome
 }
@@ -54,6 +56,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
     private var access: HistoryRuntimeAccess? = null
     private var staged: HistoryPartition? = null
     private var lifetime: HistoryPartition? = null
+    private var unavailableLifetime: HistoryPartition? = null
     private var removal: HistoryDeletion? = null
     private var runtimeAllowed = true
     private var accountName: AccountNameState? = null
@@ -87,6 +90,21 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         }
     }
 
+    /** Unlike installed restoration, Add requires the exact STAGED binding to become usable. */
+    fun activateAddition(generation: SessionGeneration, name: AccountDisplayName): HistoryPartition? = synchronized(io) {
+        if (!accepts(generation)) return@synchronized null
+        val partition = synchronized(admission) { staged } ?: return@synchronized null
+        val bound = storage.activate(partition) as? HistoryLifetimeOutcome.Bound ?: return@synchronized null
+        try {
+            if (bound.access.partition != partition || !storage.writeName(partition, name)) return@synchronized null
+            adopt(generation, bound)
+            if (capability(generation) !== bound.access || nameState?.name?.text != name.text) return@synchronized null
+            partition
+        } finally {
+            if (capability(generation) !== bound.access) bound.access.revoke()
+        }
+    }
+
     fun needsRestoration(candidate: SessionGeneration): Boolean = synchronized(admission) {
         accepts(candidate) && (availability in setOf(HistoryAvailability.UNAVAILABLE, HistoryAvailability.STORAGE_FAILURE)
             || accountName?.storageFailed == true)
@@ -110,6 +128,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
             else {
                 access?.revoke()
                 access = null
+                lifetime = null
                 accountName = null
                 availability = HistoryAvailability.STORAGE_FAILURE
             }
@@ -129,6 +148,11 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
             requiresRemoval = result == HistoryLifetimeOutcome.RemovalRequired
             catalogReady = result != HistoryLifetimeOutcome.CatalogUnavailable
             staged = null
+            unavailableLifetime = when (result) {
+                is HistoryLifetimeOutcome.UnavailableWithConfirmedBinding -> result.partition
+                HistoryLifetimeOutcome.Unavailable -> lifetime ?: unavailableLifetime
+                else -> null
+            }
             lifetime = bound?.partition
             adoptName(generation, bound?.partition, name)
             if (!runtimeAllowed) {
@@ -175,6 +199,11 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         lifetime.takeIf { accepts(generation) }
     }
 
+    /** A missing observation does not invalidate an exact enrollment, or authorize its reads. */
+    fun continues(generation: SessionGeneration, partition: HistoryPartition): Boolean = synchronized(admission) {
+        accepts(generation) && (lifetime ?: unavailableLifetime) == partition
+    }
+
     /** Last foreground observer left: retain lifetime/generation, revoke every held runtime port. */
     fun pauseRuntime() = synchronized(admission) {
         runtimeAllowed = false
@@ -191,6 +220,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         generation = null
         staged = null
         lifetime = null
+        unavailableLifetime = null
         accountName = null
         catalogReady = false
         availability = HistoryAvailability.UNAVAILABLE

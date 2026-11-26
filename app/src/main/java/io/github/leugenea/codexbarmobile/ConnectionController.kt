@@ -57,6 +57,7 @@ internal class ConnectionController(
     historyQueueCapacity: Int = 16,
     private val backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit = {},
     private val savedAccount: () -> Boolean = { false },
+    pendingAddition: Boolean = false,
 ) {
     internal val historyExportRequest = HistoryExportRequest()
     internal val historyImporterState = HistoryImporterState()
@@ -89,7 +90,40 @@ internal class ConnectionController(
     internal val historySnapshots = historyRecorder.state
     private val usageRefresh = UsageRefresh(ownerScope, refreshClock, ::refreshUsage, ::refreshChanged)
 
-    init { work = ownerScope.launch { restore() } }
+    init { if (!pendingAddition) work = ownerScope.launch { restore() } }
+
+    /** Called only by the owner's private candidate operation; no session or quota authority yet. */
+    internal suspend fun prepareAddition(name: AccountDisplayName,
+        report: (AuthState) -> Unit): PreparedAddition = coroutineScope {
+        val coordinator = requireNotNull(history)
+        val active = store.openSession().also { generation = it; coordinator.open(it) }
+        if (!withContext(storageDispatcher) { coordinator.stage(active) }) return@coroutineScope PreparedAddition.StorageFailure
+        val terminal = try { authenticateAddition(active, report) } finally { authenticator.cancel() }
+        if (terminal !is AuthState.Connected) return@coroutineScope PreparedAddition.AuthFailure
+        val credentials = withContext(storageDispatcher) { store.read(terminal.generation) }
+        if (credentials !is CredentialResult.Success) return@coroutineScope PreparedAddition.StorageFailure
+        val partition = withContext(storageDispatcher) { coordinator.activateAddition(active, name) }
+            ?: return@coroutineScope PreparedAddition.StorageFailure
+        PreparedAddition.Ready(terminal, credentials.value, partition)
+    }
+
+    private suspend fun CoroutineScope.authenticateAddition(active: SessionGeneration, report: (AuthState) -> Unit): AuthState {
+        authenticator.start(this, active)
+        return authenticator.state.first {
+            if (it !is AuthState.Connected) report(it)
+            it is AuthState.Connected || it is AuthState.Failed || it == AuthState.Cancelled
+        }
+    }
+
+    internal fun verificationForAddition(expected: AuthState.AwaitingUser): String? =
+        expected.verificationUrl.takeIf { authenticator.canCopyUserCode(expected) }
+
+    /** Called on the same owner lane after catalog durability, before exposing this controller. */
+    internal fun acceptAddition(prepared: PreparedAddition.Ready) {
+        session.adopt(prepared.envelope)
+        publishName()
+        publish(0, ConnectionState(ConnectionPhase.RESTORED, prepared.auth))
+    }
 
     private suspend fun restore() {
         if (!storageReady) { publish(0, storageFailure()); return }
@@ -262,13 +296,16 @@ internal class ConnectionController(
     /** A worker supplies its enrolled lifetime. It never retries auth as an explicit user action. */
     internal suspend fun refreshInBackground(expected: BackgroundRefreshTarget,
         minimumSuccessAgeMillis: Long = 0): BackgroundRefreshOutcome = withContext(mutationDispatcher) {
+        // An unconfirmed catalog provides no evidence that an enrolled lifetime is stale.
+        if (!storageReady) return@withContext BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STORAGE_UNAVAILABLE)
         val owner = revision
         if (mutableState.value.phase == ConnectionPhase.RESTORING) work?.join()
         val active = backgroundGeneration(owner, expected)
             ?: return@withContext BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME)
         if (usageRefresh.recentSuccess(minimumSuccessAgeMillis))
             return@withContext BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.RECENT_SUCCESS)
-        val interest = BackgroundRefreshInterest(usageRefresh.retainBackgroundFlight())
+        val interest = BackgroundRefreshInterest(
+            if (history?.lifetime(active) == expected.partition) usageRefresh.retainBackgroundFlight() else null)
         acquireBackgroundHistory(active)
         val settlement = ownerScope.async(start = CoroutineStart.UNDISPATCHED) {
             try { completeBackgroundRefresh(owner, active, expected, interest) }
@@ -286,6 +323,9 @@ internal class ConnectionController(
         historyRestore?.join()
         if (backgroundGeneration(owner, expected) !== active || !interest.attached)
             return BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME)
+        // A retained flight already owns its recording receipt, which may await a successor rebind.
+        if (interest.flight == null && historyCapability(active)?.partition != expected.partition)
+            return BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STORAGE_UNAVAILABLE)
         bindHistory(active)
         interest.flight = interest.flight ?: usageRefresh.background()
         val admitted = interest.flight ?: return deferredBackground()
@@ -300,7 +340,7 @@ internal class ConnectionController(
         if (!current(owner) || cleanupPending()) return null
         val ready = session.snapshot() as? SessionResult.Ready ?: return null
         val active = ready.envelope.generation
-        return active.takeIf { history?.lifetime(it) == expected.partition }
+        return active.takeIf { history?.continues(it, expected.partition) == true }
     }
 
     private fun acquireBackgroundHistory(active: SessionGeneration) {
@@ -638,18 +678,27 @@ internal class ConnectionController(
         usageRefresh.close()
         updateState(ConnectionState(ConnectionPhase.CANCELLED))
         ownerScope.launch {
-            // Do not clear a holder while an old deletion can still erase its successor.
-            deletion?.join()
-            session.awaitShutdown()
-            historyDeletion?.join()
-            historyRecorder.settled()
-            historyImport?.join()
-            nameWrite?.join()
-            // A cancelled stage/activation waiter can leave its process-owned child running.
-            history?.let { coordinator -> withContext(storageDispatcher) { coordinator.close() } }
-            stopped.complete(Unit)
-            ownerJob.cancel()
+            try {
+                drainStorage()
+                stopped.complete(Unit)
+            } catch (failure: Exception) {
+                stopped.completeExceptionally(failure)
+            } finally {
+                ownerJob.cancel()
+            }
         }
+    }
+
+    private suspend fun drainStorage() {
+        // Do not clear a holder while an old deletion can still erase its successor.
+        deletion?.join()
+        session.awaitShutdown()
+        historyDeletion?.join()
+        historyRecorder.settled()
+        historyImport?.join()
+        nameWrite?.join()
+        // A cancelled stage/activation waiter can leave its process-owned child running.
+        history?.let { coordinator -> withContext(storageDispatcher) { coordinator.close() } }
     }
 
     internal suspend fun commandsSettled() {
@@ -670,7 +719,6 @@ internal class ConnectionController(
 
     internal suspend fun shutdown() {
         close()
-        stopped.await()
-        ownerJob.join()
+        try { stopped.await() } finally { ownerJob.join() }
     }
 }

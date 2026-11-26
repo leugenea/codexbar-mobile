@@ -12,7 +12,10 @@ internal class CatalogHistoryStorage(
         ?: if (address == null) catalog.legacyEntry() else null
     private fun pending() = catalog.snapshot().deletions.any { it.entry == (address?.id ?: entry()?.storage?.id) }
 
-    override fun activate(partition: HistoryPartition) = catalogued { storage.activate(partition) }
+    private fun pendingAddition() = address != null && catalog.snapshots.value.candidate == address
+
+    override fun activate(partition: HistoryPartition) = if (pendingAddition()) storage.activate(partition)
+        else catalogued { storage.activate(partition) }
     override fun restore() = if (pending()) HistoryLifetimeOutcome.RemovalRequired else catalogued(storage::restore)
 
     private fun catalogued(read: () -> HistoryLifetimeOutcome): HistoryLifetimeOutcome {
@@ -20,8 +23,10 @@ internal class CatalogHistoryStorage(
         if (result == HistoryLifetimeOutcome.RemovalRequired) return result
         val bound = result as? HistoryLifetimeOutcome.Bound
         return try {
-            reconcile(bound?.access?.partition)
-            result
+            val entry = reconcile(bound?.access?.partition)
+            if (result == HistoryLifetimeOutcome.Unavailable && entry.partition != null)
+                HistoryLifetimeOutcome.UnavailableWithConfirmedBinding(entry.partition)
+            else result
         } catch (_: Exception) {
             bound?.access?.revoke()
             HistoryLifetimeOutcome.CatalogUnavailable
@@ -33,7 +38,7 @@ internal class CatalogHistoryStorage(
         true
     } catch (_: Exception) { false }
 
-    private fun reconcile(partition: HistoryPartition?) {
+    private fun reconcile(partition: HistoryPartition?): CatalogEntry {
         val saved = entry()
         if (partition != null && saved?.partition == null && saved?.nameAvailable == true) {
             check(storage.writeName(partition, saved.name?.let(AccountDisplayName::from)))
@@ -43,10 +48,11 @@ internal class CatalogHistoryStorage(
             else catalog.reconcile(address.id, partition, name)
         // Rename settlement is optional metadata; adoption/selection commits above still throw.
         recoverRename(entry)
+        return entry
     }
 
     override fun readName(partition: HistoryPartition): AccountNameRead = try {
-        if (consistent(partition)) storage.readName(partition) else AccountNameRead.Unavailable
+        if (pendingAddition() || consistent(partition)) storage.readName(partition) else AccountNameRead.Unavailable
     } catch (_: Exception) { AccountNameRead.Unavailable }
 
     private fun consistent(partition: HistoryPartition): Boolean {
@@ -59,7 +65,8 @@ internal class CatalogHistoryStorage(
 
     override fun writeName(partition: HistoryPartition, name: AccountDisplayName?): Boolean = try {
         val entry = entry()
-        if (entry?.partition != partition || !recoverRename(entry)) false
+        if (pendingAddition()) storage.writeName(partition, name)
+        else if (entry?.partition != partition || !recoverRename(entry)) false
         else if (!catalog.reserveRename(entry.storage.id, name)) false
         else recoverRename(entry)
     } catch (_: Exception) { false }

@@ -128,13 +128,15 @@ class AccountSelectionCatalogTest {
     @Test fun initialIdentityReadbackCannotBypassUnconfirmedDirectoryDurabilityOnRetry() {
         val root = temporary.newFolder()
         catalogAt(root)
-        var failSync = true; var writes = 0
+        var failSync = false; var writes = 0
         val catalog = AccountCatalog.open(root, { slot }, beforeRename = { writes++ },
             beforeDirectorySync = { if (failSync) throw IOException("initial identity sync") })
         val partition = HistoryPartition(UUID(0, 71))
         val name = AccountNameRead.Ready(AccountDisplayName.from("Synthetic initial"))
+        failSync = true // Challenge adoption, not the cold-open directory sync.
         assertThrows(IOException::class.java) { catalog.adopt(partition, name) }
-        val replaced = catalogAt(root).legacyEntry()!!
+        // Observe the replacement without syncing it through a second catalog open.
+        val replaced = CatalogFile(File(root, "account-catalog")).read().entries.single { it.storage.legacy }
         assertTrue(catalog.snapshots.value.entries.isEmpty())
         assertThrows(IOException::class.java) { catalog.adopt(partition, name) }
         assertTrue(catalog.snapshots.value.entries.isEmpty())

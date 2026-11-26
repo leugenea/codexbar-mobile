@@ -26,20 +26,22 @@ internal enum class CleanupDisposition { REMOVE, RETAIN }
 internal data class CatalogDeletion(val entry: UUID?, val operation: UUID,
     val disposition: CleanupDisposition = CleanupDisposition.REMOVE)
 internal data class CatalogSnapshot(val legacySlot: UUID, val entries: List<CatalogEntry> = emptyList(),
-    val selected: UUID? = null, val rename: CatalogRename? = null, val deletions: List<CatalogDeletion> = emptyList()) {
+    val selected: UUID? = null, val rename: CatalogRename? = null, val deletions: List<CatalogDeletion> = emptyList(),
+    val candidate: AccountStorage? = null) {
     override fun toString() = "CatalogSnapshot(redacted)"
 }
 
 /** One process-owner storage lane. A rename intent reserves both keys until sidecar settlement. */
 internal class AccountCatalog private constructor(private val file: CatalogFile, initial: CatalogSnapshot) {
     private var state = initial
-    private enum class Uncertainty { NONE, REQUIRED_IDENTITY, OPTIONAL_RENAME }
+    private enum class Uncertainty { NONE, REQUIRED_IDENTITY, OPTIONAL_RENAME, ADDITION }
     private var uncertainty = Uncertainty.NONE
     private val published = MutableStateFlow(initial)
     val snapshots: StateFlow<CatalogSnapshot> = published
     @Synchronized fun snapshot() = state.copy(entries = state.entries.toList())
 
     @Synchronized fun adopt(partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
+        confirmedAdditionPeer(legacyEntry(), partition)?.let { return it }
         confirmIdentity()
         check(state.deletions.none { it.entry == legacyEntry()?.storage?.id })
         val previous = legacyEntry()
@@ -71,9 +73,43 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         return previous.copy(name = ready.name?.text, nameAvailable = true)
     }
 
+    /** Reserve the exact address before creating any history or credential material. */
+    @Synchronized fun reserveAddition(name: AccountDisplayName, type: AccountType): AccountStorage? {
+        confirmCommit()
+        val address = AccountStorage.fresh()
+        if (state.candidate != null || conflicts(address.id, type, name.text)) return null
+        commit(state.copy(candidate = address), Uncertainty.ADDITION)
+        return address
+    }
+
+    /** One checked replacement, never insert followed by select. */
+    @Synchronized fun admitAddition(entry: CatalogEntry): Boolean {
+        confirmCommit()
+        if (state.candidate != entry.storage || conflicts(entry.storage.id, entry.type, entry.name)) return false
+        check(entry.partition != null && entry.name != null && entry.nameAvailable)
+        commit(state.copy(entries = state.entries + entry, selected = entry.storage.id, candidate = null),
+            Uncertainty.ADDITION, readback = true)
+        return true
+    }
+
+    @Synchronized fun confirmAddition(): CatalogSnapshot {
+        confirmCommit()
+        return state
+    }
+
+    /** Only used after checked physical cleanup of the captured pending address. */
+    @Synchronized fun discardAddition(address: AccountStorage): Boolean {
+        confirmCommit()
+        if (state.candidate != address) return false
+        commit(state.copy(candidate = null), Uncertainty.ADDITION)
+        return true
+    }
+
     /** Internal storage enrollment only; does not construct or activate another account runtime. */
     @Synchronized fun insert(entry: CatalogEntry): Boolean {
         confirmCommit()
+        val reserved = state.candidate
+        if (reserved?.id == entry.storage.id || reserved?.credentialSlot == entry.storage.credentialSlot) return false
         if (state.entries.any { it.storage.id == entry.storage.id || it.storage.credentialSlot == entry.storage.credentialSlot }) return false
         if (conflicts(entry.storage.id, entry.type, entry.name)) return false
         check(entry.name == null || AccountDisplayName.from(entry.name)?.text == entry.name)
@@ -86,6 +122,7 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     @Synchronized fun entry(id: UUID) = state.entries.singleOrNull { it.storage.id == id }
 
     @Synchronized fun reconcile(id: UUID, partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
+        confirmedAdditionPeer(entry(id), partition)?.let { return it }
         confirmIdentity()
         check(state.deletions.none { it.entry == id })
         return reconcile(requireNotNull(entry(id)), partition, name)
@@ -109,7 +146,7 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         if (state.rename == null) { check(entry(id)?.name == pending.name); return }
         check(state.rename == pending)
         val entries = state.entries.map { if (it.storage.id == id) it.copy(name = pending.name, nameAvailable = true) else it }
-        commit(state.copy(entries = entries, rename = null))
+        commit(state.copy(entries = entries, rename = null), Uncertainty.OPTIONAL_RENAME)
     }
 
     @Synchronized fun beginDeletion(id: UUID? = legacyEntry()?.storage?.id,
@@ -182,19 +219,32 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         return pending.entry != id && owner.type == type && pending.name == name
     }
 
-    private fun commit(next: CatalogSnapshot) {
-        // Re-read after an uncertain rename/fsync outcome; never overwrite it from stale memory.
+    private fun commit(next: CatalogSnapshot, onFailure: Uncertainty = Uncertainty.REQUIRED_IDENTITY,
+        readback: Boolean = false) {
+        // Never overwrite an uncertain replacement from stale memory.
         check(uncertainty == Uncertainty.NONE)
-        val settlingRename = state.rename != null && next.rename == null && state.deletions == next.deletions
-        try { file.write(next); state = next; published.value = next }
+        try {
+            file.write(next)
+            if (readback) check(file.read() == next)
+            state = next
+            published.value = next
+        }
         catch (failure: Exception) {
-            uncertainty = if (settlingRename) Uncertainty.OPTIONAL_RENAME else Uncertainty.REQUIRED_IDENTITY
+            uncertainty = onFailure
             try {
-                val readback = file.read()
-                if (!settlingRename) state = readback
+                val observed = file.read()
+                // Peer-safe operations retain the last confirmed binding until durability is confirmed.
+                if (onFailure == Uncertainty.REQUIRED_IDENTITY) state = observed
             } catch (_: Exception) { /* Fenced until confirmed readback. */ }
             throw failure
         }
+    }
+
+    /** Add cannot change a saved peer binding. Keep it, without publishing any new metadata. */
+    private fun confirmedAdditionPeer(peer: CatalogEntry?, observed: HistoryPartition?): CatalogEntry? {
+        if (uncertainty != Uncertainty.ADDITION || peer?.partition == null) return null
+        if (observed != null && observed != peer.partition) return null
+        return peer.takeUnless { state.deletions.any { deletion -> deletion.entry == it.storage.id } }
     }
 
     private fun confirmIdentity() {
@@ -216,7 +266,8 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
             beforeRename: () -> Unit = {}, beforeRead: () -> Unit = {}): AccountCatalog {
             // Resolve the application root alias, not a redirected catalog child.
             val file = CatalogFile(File(root.canonicalFile, "account-catalog"), beforeRename, beforeDirectorySync, beforeRead)
-            val initial = if (file.exists()) file.read() else CatalogSnapshot(legacySession()).also(file::write)
+            val initial = if (file.exists()) file.read().also { file.sync() }
+                else CatalogSnapshot(legacySession()).also(file::write)
             return AccountCatalog(file, initial)
         }
     }
