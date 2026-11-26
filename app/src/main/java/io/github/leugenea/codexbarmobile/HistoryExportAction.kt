@@ -23,14 +23,14 @@ internal data class HistoryExporter(val busy: Boolean, val start: () -> Unit)
 
 /** Register at the navigation root, even when recreation returns to the dashboard. */
 @Composable
-internal fun historyExporter(selection: DashboardSelection, transfers: HistoryTransfers): HistoryExporter {
+internal fun historyExporter(selection: DashboardSelection, transfers: HistoryTransfers, owner: HistoryPickerOwner): HistoryExporter {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     val controller = selection.controller
     val request = transfers.export
     val busy by request.busy.collectAsState()
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
-        request.finish(transfers.scope) { captured ->
+        request.finish(owner, transfers.scope) { captured ->
             if (uri != null) exportMessage(context, captured.label, writeHistoryDocument(context, uri, captured.text))
         }
     }
@@ -40,7 +40,7 @@ internal fun historyExporter(selection: DashboardSelection, transfers: HistoryTr
         val label = name?.name?.text ?: context.getString(
             if (name?.storageFailed == true) R.string.account_name_unavailable else R.string.account_name_fallback)
         val generation = (controller.session.snapshot() as? SessionResult.Ready)?.envelope?.generation
-        request.start(scope, prepare = {
+        request.start(owner, scope, prepare = {
             prepareHistoryDocument(context, controller) { selection.isCurrent() && it === generation }
                 ?.let { DetachedHistoryExport(it, label) }
         }, launch = { launcher.launch("codexbar-history-v1.json") }, failure = { exportMessage(context, label, false) })

@@ -133,7 +133,7 @@ private fun RouteContent(route: DashboardRoute, state: ConnectionState, controll
     browser: () -> Unit, openAccountSettings: () -> Unit, source: HistoryGraphSnapshot, authority: HistoryDisplayContext?, current: HistoryPresentationRequest.Current,
     navigation: HistoryNavigation, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter, kind: (HistoryNavigation) -> Unit, page: (ObservationId?) -> Unit) {
     when (route) {
-        DashboardRoute.DASHBOARD -> DashboardScreen(state, openAccountSettings, source, current, authority, observer)
+        DashboardRoute.DASHBOARD -> DashboardScreen(state, openAccountSettings, source, current, authority, observer, selection)
         DashboardRoute.LOCAL_HISTORY_DETAILS -> {
             val display = historyForDisplay(source, navigation.query, authority)
             SideEffect { observer?.projected(source, display, state.refresh.evaluatedAt) }

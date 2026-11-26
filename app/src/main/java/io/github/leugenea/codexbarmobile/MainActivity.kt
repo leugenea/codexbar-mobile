@@ -34,23 +34,24 @@ import androidx.compose.ui.Modifier
 
 class MainActivity : ComponentActivity() {
     private lateinit var dashboard: kotlinx.coroutines.flow.StateFlow<DashboardSelection?>
+    private val pickerOwner = HistoryPickerOwner()
+    private lateinit var transfers: HistoryTransfers
     internal val connection: ConnectionController get() = requireNotNull(dashboard.value).controller
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Activities observe the process owner; destruction never closes its work.
         dashboard = NativeConnection.dashboard(applicationContext)
+        transfers = NativeConnection.historyTransfers
+        restorePickerOwner()
         enableEdgeToEdge()
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
                 val selection by dashboard.collectAsState()
                 val root = requireNotNull(selection)
-                val connectionState by root.controller.state.collectAsState()
-                val displayedState = connectionState
                 // Each registry slot outlives the selected UI and drains its own delayed result.
-                val transfers = NativeConnection.historyTransfers
-                val exporter = historyExporter(root, transfers)
-                val importer = historyImporter(root, transfers)
+                val exporter = historyExporter(root, transfers, pickerOwner)
+                val importer = historyImporter(root, transfers, pickerOwner)
                 // Launch and recreation attach the same identity-tagged STARTED observer.
                 // Fresh restored owners remain dormant; already activated owners may resume reads.
                 ObserveUsageLifecycle(lifecycle) { NativeConnection.observeDashboard(applicationContext) }
@@ -58,7 +59,9 @@ class MainActivity : ComponentActivity() {
                     contentColor = MaterialTheme.colorScheme.onBackground) {
                     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                         key(root) {
-                            ConnectionScreen(connectionState, root.controller, {
+                            // A fresh collection starts at this controller's value, not the previous account's.
+                            val displayedState = root.controller.state.collectAsState().value
+                            ConnectionScreen(displayedState, root.controller, {
                                 openVerificationBrowser(root.controller, displayedState)
                             }, historyUiObserver, root, exporter, importer)
                         }
@@ -66,6 +69,20 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // Match the registry's configuration handoff without putting process permissions in saved state.
+    @Suppress("DEPRECATION")
+    private fun restorePickerOwner() {
+        (lastCustomNonConfigurationInstance as? HistoryPickerOwner)?.let { transfers.rebindPickers(it, pickerOwner) }
+    }
+
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun onRetainCustomNonConfigurationInstance(): Any = pickerOwner
+
+    override fun onDestroy() {
+        if (isFinishing) transfers.retirePickers(pickerOwner)
+        super.onDestroy()
     }
 
     internal fun openVerificationBrowser() {

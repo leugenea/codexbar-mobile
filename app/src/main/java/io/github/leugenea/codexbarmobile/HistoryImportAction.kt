@@ -22,7 +22,7 @@ internal data class HistoryImporter(val busy: Boolean, val start: () -> Unit)
 
 /** Unconditional root registration survives a picker returning to a recreated dashboard. */
 @Composable
-internal fun historyImporter(selection: DashboardSelection, transfers: HistoryTransfers): HistoryImporter {
+internal fun historyImporter(selection: DashboardSelection, transfers: HistoryTransfers, owner: HistoryPickerOwner): HistoryImporter {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     val controller = selection.controller
@@ -30,7 +30,7 @@ internal fun historyImporter(selection: DashboardSelection, transfers: HistoryTr
     val confirmation by transfers.confirmation.collectAsState()
     val importing by transfers.importing.collectAsState()
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        transfers.importPicker.finish(transfers.scope) { picker ->
+        transfers.importPicker.finish(owner, transfers.scope) { picker ->
             if (uri != null && picker.selection.isCurrent()) readImportSelection(context, transfers, picker, uri)
         }
     }
@@ -48,7 +48,7 @@ internal fun historyImporter(selection: DashboardSelection, transfers: HistoryTr
         if (!selection.isCurrent() || transfers.importing.value || transfers.confirmation.value != null) return@start
         val label = controller.accountName.value?.name?.text
         val generation = (controller.session.snapshot() as? SessionResult.Ready)?.envelope?.generation
-        transfers.importPicker.start(scope, prepare = {
+        transfers.importPicker.start(owner, scope, prepare = {
             controller.historyImportTarget { selection.isCurrent() && it === generation }
                 ?.takeIf { selection.isCurrent() }?.let { HistoryImportPicker(selection, it, label) }
         }, launch = { launcher.launch(arrayOf("application/json")) }, failure = {

@@ -66,6 +66,7 @@ internal fun StoredHistoryContent(navigation: HistoryNavigation, display: Histor
 internal interface HistoryUiObserver {
     fun snapshots(source: StateFlow<HistoryGraphSnapshot>): Flow<HistoryGraphSnapshot>
     fun projected(source: HistoryGraphSnapshot, display: HistoryGraphSnapshot, now: Instant?)
+    fun dashboardProjected(selection: DashboardSelection, live: PresentedUsage) = Unit
     fun projectedCurrent(source: HistoryGraphSnapshot, fiveHour: HistoryGraphSnapshot, weekly: HistoryGraphSnapshot, now: Instant?) {
         projected(source, fiveHour, now)
     }

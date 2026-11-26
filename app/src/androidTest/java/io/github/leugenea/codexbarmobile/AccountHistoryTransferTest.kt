@@ -7,6 +7,7 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
+import androidx.activity.result.ActivityResultRegistry
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -15,6 +16,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.leugenea.codexbarmobile.account.CatalogEntry
 import io.github.leugenea.codexbarmobile.credentials.CredentialEnvelope
 import io.github.leugenea.codexbarmobile.history.*
+import io.github.leugenea.codexbarmobile.transport.ReadOperation
+import kotlinx.coroutines.flow.StateFlow
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -37,6 +40,97 @@ class AccountHistoryTransferTest {
 
     @After fun cleanup() {
         try { if (::scenario.isInitialized) scenario.close() } finally { fixture.cleanup() }
+    }
+
+    @Test fun permanentlyFinishedActivityReleasesBothPickerSlotsForSameProcessRelaunch() {
+        launch()
+        settings(a)
+        val originalTransfers = transfers
+        val oldImport = startPicker("history-import", Intent.ACTION_OPEN_DOCUMENT)
+        val oldExport = startPicker("history-export", Intent.ACTION_CREATE_DOCUMENT)
+        lateinit var oldRegistry: ActivityResultRegistry
+        scenario.onActivity {
+            oldRegistry = it.activityResultRegistry
+            it.finish()
+        }
+        scenario.close()
+        awaitImportSlot()
+        assertFalse(transfers.export.busy.value)
+        assertNull(transfers.importPicker.pending)
+        assertNull(transfers.export.pending)
+
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        awaitConnectionScreen(compose, a)
+        assertSame(originalTransfers, transfers)
+        scenario.onActivity { assertNotSame(oldRegistry, it.activityResultRegistry) }
+        settings(a)
+        val newImport = startPicker("history-import", Intent.ACTION_OPEN_DOCUMENT)
+        val newExport = startPicker("history-export", Intent.ACTION_CREATE_DOCUMENT)
+        val pendingImport = requireNotNull(transfers.importPicker.pending)
+        val pendingExport = requireNotNull(transfers.export.pending)
+        val source = replacement()
+        val abandoned = File(fixture.directory, "abandoned-export.json")
+        compose.runOnIdle {
+            oldRegistry.dispatchResult(oldImport, Activity.RESULT_OK, Intent().setData(Uri.fromFile(source)))
+            oldRegistry.dispatchResult(oldExport, Activity.RESULT_OK, Intent().setData(Uri.fromFile(abandoned)))
+        }
+        assertSame(pendingImport, transfers.importPicker.pending)
+        assertSame(pendingExport, transfers.export.pending)
+        assertFalse(abandoned.exists())
+        val destination = File(fixture.directory, "relaunched-export.json")
+        deliver(newExport, destination)
+        compose.waitUntil(10_000) { !transfers.export.busy.value }
+        assertEquals(pendingExport.text, destination.readText())
+        deliver(newImport, source)
+        awaitConfirmation()
+        compose.onNodeWithTag("history-import-cancel").performClick()
+        awaitImportSlot()
+    }
+
+    @Test fun firstCommittedSuccessorDashboardDoesNotProjectPredecessorLiveQuotaOrReset() {
+        val activeA = AtomicReference<PresentedUsage>()
+        val firstB = AtomicReference<PresentedUsage>()
+        val activeB = AtomicReference<PresentedUsage>()
+        val previous = MainActivity.historyUiObserver
+        MainActivity.historyUiObserver = object : HistoryUiObserver {
+            override fun snapshots(source: StateFlow<HistoryGraphSnapshot>) = source
+            override fun projected(source: HistoryGraphSnapshot, display: HistoryGraphSnapshot, now: Instant?) = Unit
+            override fun dashboardProjected(selection: DashboardSelection, live: PresentedUsage) {
+                when (selection.id) {
+                    fixture.a.storage.id -> {
+                        if (live.observation != null) activeA.compareAndSet(null, live)
+                    }
+                    fixture.b.storage.id -> {
+                        firstB.compareAndSet(null, live)
+                        if (live.observation != null) activeB.set(live)
+                    }
+                }
+            }
+        }
+        try {
+            launch()
+            compose.waitUntil(10_000) { activeA.get() != null }
+            val predecessor = activeA.get().windows.first()
+            assertNotNull(predecessor.percent)
+            assertNotNull(predecessor.reset)
+            fixture.bTransport.heldPath = ReadOperation.USAGE.path
+            fixture.select(fixture.b)
+            fixture.await("B's first live quota request held") { fixture.bTransport.liveHeldCall(ReadOperation.USAGE.path) != null }
+            compose.waitUntil(10_000) { firstB.get() != null }
+            val first = firstB.get()
+            assertNull(first.observation) // Also the observation passed to the pace comparison.
+            assertTrue(first.windows.all { it.percent == null && it.reset == null })
+            assertNull(activeB.get())
+            fixture.bTransport.releaseHeld()
+            awaitSelected(fixture.b)
+            compose.waitUntil(10_000) { activeB.get() != null }
+            val successor = activeB.get().windows.first()
+            assertNotNull(successor.percent)
+            assertNotEquals(predecessor.percent, successor.percent)
+        } finally {
+            fixture.bTransport.releaseHeld()
+            MainActivity.historyUiObserver = previous
+        }
     }
 
     @Test fun delayedPickersCrossSelectionAndRecreationWithoutRetargetingOrReusingAnUndrainedSlot() {
