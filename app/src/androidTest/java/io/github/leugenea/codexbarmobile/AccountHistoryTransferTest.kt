@@ -52,6 +52,7 @@ class AccountHistoryTransferTest {
                 event.text.any { it.toString() == exportMessage }) toast.set(exportMessage)
         }
         try {
+            settings(a)
             val open = startPicker("history-import", Intent.ACTION_OPEN_DOCUMENT)
             val export = startPicker("history-export", Intent.ACTION_CREATE_DOCUMENT)
             val detached = requireNotNull(transfers.export.pending).text
@@ -154,6 +155,7 @@ class AccountHistoryTransferTest {
     @Test fun removalBeforeNativeWriteAdmissionRejectsImportAndStillAllowsDetachedExport() {
         val hold = holdReplacement(beforeAdmission = true)
         launch()
+        settings(a)
         val pendingExport = startPicker("history-export", Intent.ACTION_CREATE_DOCUMENT)
         val detached = requireNotNull(transfers.export.pending).text
         val initiating = a
