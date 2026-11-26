@@ -23,8 +23,10 @@ internal class CatalogHistoryStorage(
         if (result == HistoryLifetimeOutcome.RemovalRequired) return result
         val bound = result as? HistoryLifetimeOutcome.Bound
         return try {
-            reconcile(bound?.access?.partition)
-            result
+            val entry = reconcile(bound?.access?.partition)
+            if (result == HistoryLifetimeOutcome.Unavailable && entry.partition != null)
+                HistoryLifetimeOutcome.UnavailableWithConfirmedBinding(entry.partition)
+            else result
         } catch (_: Exception) {
             bound?.access?.revoke()
             HistoryLifetimeOutcome.CatalogUnavailable
@@ -36,7 +38,7 @@ internal class CatalogHistoryStorage(
         true
     } catch (_: Exception) { false }
 
-    private fun reconcile(partition: HistoryPartition?) {
+    private fun reconcile(partition: HistoryPartition?): CatalogEntry {
         val saved = entry()
         if (partition != null && saved?.partition == null && saved?.nameAvailable == true) {
             check(storage.writeName(partition, saved.name?.let(AccountDisplayName::from)))
@@ -46,6 +48,7 @@ internal class CatalogHistoryStorage(
             else catalog.reconcile(address.id, partition, name)
         // Rename settlement is optional metadata; adoption/selection commits above still throw.
         recoverRename(entry)
+        return entry
     }
 
     override fun readName(partition: HistoryPartition): AccountNameRead = try {

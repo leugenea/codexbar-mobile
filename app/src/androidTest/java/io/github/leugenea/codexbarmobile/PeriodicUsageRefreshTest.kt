@@ -22,6 +22,7 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.google.common.util.concurrent.ListenableFuture
 import io.github.leugenea.codexbarmobile.account.AccountCatalog
+import io.github.leugenea.codexbarmobile.account.AccountDisplayName
 import io.github.leugenea.codexbarmobile.account.AccountType
 import io.github.leugenea.codexbarmobile.account.CatalogFile
 import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
@@ -293,6 +294,82 @@ class PeriodicUsageRefreshTest {
         }
     }
 
+    @Test fun coldWorkerKeepsExactEnrollmentWhenFirstHistoryRestoreIsUnavailableDuringAddRecovery() {
+        login(); detach()
+        val expected = target()
+        val enrolled = unique(expected).single()
+        val requests = transport.requests.get()
+        val periodic = PeriodicUsageRefresh(manager)
+        val catalog = AccountCatalog.open(root, { error("saved catalog required") })
+        val saved = requireNotNull(catalog.legacyEntry())
+        assertEquals(expected.partition, saved.partition)
+        val address = requireNotNull(catalog.reserveAddition(
+            requireNotNull(AccountDisplayName.from("Synthetic pending B")), AccountType.CODEX))
+        val obstruction = File(address.historyDirectory(root), "unexpected-child")
+        assertTrue(obstruction.mkdirs())
+        val injected = NativeConnection.factory
+        val originalRoot = NativeConnection.rootFactory
+        val unavailable = AtomicInteger()
+        val raw = CatalogFile(File(root.canonicalFile, "account-catalog"))
+        NativeConnection.resetForTests()
+        NativeConnection.rootFactory = {
+            AccountRuntimeOwner(context, AccountCatalog.open(root, { error("saved catalog required") }),
+                transport, transport.clock, transport::pause, legacyEnrollment = periodic::entryEnrollment,
+                historyStorage = { directory ->
+                    val real = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(directory))
+                    object : HistoryLifetimeStorage by real {
+                        override fun restore() = real.restore().also {
+                            if (it == HistoryLifetimeOutcome.Unavailable) unavailable.incrementAndGet()
+                        }
+                    }
+                })
+        }
+        NativeConnection.factory = originalFactory
+        try {
+            transport.advance(900_000)
+            val session = HistoryFiles(saved.storage.historyDirectory(root), HistoryStorageLimits()).use { held ->
+                held.acquire()
+                assertEquals(0, unavailable.get()) // No connection ingress since reset.
+                assertEquals(ListenableWorker.Result.success(), run(expected, enrolled.id))
+                assertEquals("first native restore and exact worker recheck hit the held lane", 2, unavailable.get())
+                val restored = (owner.session.snapshot() as SessionResult.Ready).envelope
+                assertEquals(requests, transport.requests.get())
+                assertEquals(WorkInfo.State.ENQUEUED, info(enrolled.id).state)
+                assertNull(owner.historyCapability(restored.generation))
+                assertNull(bounded("confirmed catalog cannot mint an enrollment") { owner.backgroundRefreshTarget() })
+                assertFalse(bounded("B is still obstructed at actual recovery") { NativeConnection.recoverAddition(context) })
+                assertEquals(address, raw.read().candidate)
+
+                val stale = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
+                periodic.enrollment(stale)
+                val staleWork = unique(stale).single()
+                assertEquals(ListenableWorker.Result.success(), run(stale, staleWork.id))
+                assertEquals(WorkInfo.State.CANCELLED, info(staleWork.id).state)
+                assertEquals(2, unavailable.get())
+                assertEquals(requests, transport.requests.get())
+                restored
+            }
+            assertTrue(obstruction.delete())
+            assertTrue(bounded("recover B independently") { NativeConnection.recoverAddition(context) })
+            assertNull(raw.read().candidate)
+            assertEquals(saved, raw.read().entries.single())
+            assertEquals(ListenableWorker.Result.success(), run(expected, enrolled.id))
+            assertEquals(requests + 2, transport.requests.get())
+            assertEquals(enrolled.id, unique(expected).single().id)
+            assertEquals(WorkInfo.State.ENQUEUED, info(enrolled.id).state)
+            assertSame(session, (owner.session.snapshot() as SessionResult.Ready).envelope)
+            assertEquals(expected, target())
+            owner.usageForeground(observer, true); settled()
+            await("same worker recorded against A's original partition") { recordedHistory(owner).points.size == 2 }
+            detach()
+        } finally {
+            try { NativeConnection.resetForTests() } finally {
+                NativeConnection.factory = injected
+                NativeConnection.rootFactory = originalRoot
+            }
+        }
+    }
+
     @Test fun warmWorkerKeepsExactEnrollmentWhenHistoryIsUnavailableDuringUncertainAdd() {
         val blocked = AtomicBoolean()
         val syncHits = AtomicInteger()
@@ -534,13 +611,16 @@ class PeriodicUsageRefreshTest {
         return found
     }
     private fun info(id: UUID) = requireNotNull(futureResult("query work $id", manager.getWorkInfoById(id)))
-    private fun run(target: BackgroundRefreshTarget) = runData(workDataOf(PeriodicUsageRefresh.LIFETIME to target.partition.value.toString()))
-    private fun runData(input: Data) = futureResult("direct worker result", startData(input))
+    private fun run(target: BackgroundRefreshTarget, id: UUID? = null) =
+        runData(workDataOf(PeriodicUsageRefresh.LIFETIME to target.partition.value.toString()), id)
+    private fun runData(input: Data, id: UUID? = null) = futureResult("direct worker result", startData(input, id))
     private fun start(target: BackgroundRefreshTarget) = startData(workDataOf(PeriodicUsageRefresh.LIFETIME to target.partition.value.toString()))
-    private fun startData(input: Data): ListenableFuture<ListenableWorker.Result> {
+    private fun startData(input: Data, id: UUID? = null): ListenableFuture<ListenableWorker.Result> {
         lateinit var future: ListenableFuture<ListenableWorker.Result>
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            future = TestListenableWorkerBuilder<PeriodicUsageRefreshWorker>(context, input).build().startWork()
+            val builder = TestListenableWorkerBuilder<PeriodicUsageRefreshWorker>(context, input)
+            if (id != null) builder.setId(id)
+            future = builder.build().startWork()
         }
         return future
     }

@@ -36,6 +36,8 @@ interface HistoryRuntimeAccess : HistoryStore {
 internal sealed interface HistoryLifetimeOutcome {
     data class Bound(val access: HistoryRuntimeAccess) : HistoryLifetimeOutcome
     data object Unavailable : HistoryLifetimeOutcome
+    /** Saved enrollment identity only; native storage has not supplied a port. */
+    data class UnavailableWithConfirmedBinding(val partition: HistoryPartition) : HistoryLifetimeOutcome
     data object RemovalRequired : HistoryLifetimeOutcome
     data object CatalogUnavailable : HistoryLifetimeOutcome
 }
@@ -146,7 +148,11 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
             requiresRemoval = result == HistoryLifetimeOutcome.RemovalRequired
             catalogReady = result != HistoryLifetimeOutcome.CatalogUnavailable
             staged = null
-            unavailableLifetime = if (result == HistoryLifetimeOutcome.Unavailable) lifetime ?: unavailableLifetime else null
+            unavailableLifetime = when (result) {
+                is HistoryLifetimeOutcome.UnavailableWithConfirmedBinding -> result.partition
+                HistoryLifetimeOutcome.Unavailable -> lifetime ?: unavailableLifetime
+                else -> null
+            }
             lifetime = bound?.partition
             adoptName(generation, bound?.partition, name)
             if (!runtimeAllowed) {
