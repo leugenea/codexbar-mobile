@@ -135,6 +135,7 @@ class AccountHistoryTransferTest {
 
     @Test fun delayedPickersCrossSelectionAndRecreationWithoutRetargetingOrReusingAnUndrainedSlot() {
         launch()
+        assertReads(fixture.aTransport, 1L, "Initial A selection")
         val originalA = fixture.owner.dashboard().value!!
         val sourceA = access(a)
         val file = replacement()
@@ -162,6 +163,7 @@ class AccountHistoryTransferTest {
             val peer = fixture.ready(b)
             val bytesB = fixture.bytes(fixture.b)
             val requestsB = fixture.bTransport.counts()
+            assertReads(fixture.bTransport, 1L, "Initial B selection")
             scenario.recreate()
             awaitConnectionScreen(compose, b)
             settings(b)
@@ -172,7 +174,9 @@ class AccountHistoryTransferTest {
             assertEquals(detached, destination.readText(Charsets.UTF_8))
             compose.onNodeWithTag("history-export").assertIsEnabled()
 
-            select(fixture.a)
+            assertReads(fixture.aTransport, 1L, "Before returning to A")
+            reselectA()
+            assertReads(fixture.aTransport, 2L, "After returning to A")
             assertFalse(originalA.isCurrent())
             assertSame(a, fixture.owner.dashboard().value!!.controller)
             settings(a)
@@ -196,7 +200,7 @@ class AccountHistoryTransferTest {
             awaitImportSlot()
             assertEquals(before, fixture.bytes(fixture.a))
             assertPeer(peer, bytesB, requestsB)
-            assertEquals(4L, fixture.aTransport.requests.get()) // Only two explicit A selections.
+            assertReads(fixture.aTransport, 2L, "After picker delivery, recreation and cancellation")
         } finally { instrumentation.uiAutomation.setOnAccessibilityEventListener(null) }
     }
 
@@ -214,7 +218,7 @@ class AccountHistoryTransferTest {
         val unselectedBytes = fixture.bytes(fixture.b)
         compose.runOnIdle { oldConfirm(); oldCancel() }
         assertEquals(unselectedBytes, fixture.bytes(fixture.b))
-        select(fixture.a)
+        reselectA()
         val beforeA = fixture.bytes(fixture.a)
         compose.runOnIdle { oldConfirm() }
         assertEquals(beforeA, fixture.bytes(fixture.a))
@@ -312,6 +316,22 @@ class AccountHistoryTransferTest {
     }
 
     private fun select(entry: CatalogEntry) { fixture.select(entry); awaitSelected(entry) }
+
+    private fun reselectA() {
+        val transport = fixture.aTransport
+        transport.heldPath = ReadOperation.USAGE.path
+        try {
+            // Foreground transfer resumes activated A; the explicit selection joins the same flight.
+            fixture.select(fixture.a)
+            fixture.receipt("A foreground transfer and explicit selection settled", a) { a.commandsSettled() }
+            fixture.await("A reselection has a held quota request") { transport.liveHeldCall(ReadOperation.USAGE.path) != null }
+        } finally { transport.releaseHeld() }
+        awaitSelected(fixture.a)
+    }
+
+    private fun assertReads(transport: NavigationTransport, cycles: Long, step: String) {
+        assertEquals(step, mapOf(ReadOperation.USAGE.path to cycles, ReadOperation.RESET_INVENTORY.path to cycles), transport.counts())
+    }
 
     private fun awaitSelected(entry: CatalogEntry) {
         val controller = fixture.runtime(entry)
