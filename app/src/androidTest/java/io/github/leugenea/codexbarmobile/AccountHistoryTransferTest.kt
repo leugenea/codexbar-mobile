@@ -261,7 +261,7 @@ class AccountHistoryTransferTest {
         assertEquals(requests, fixture.bTransport.counts())
         val persisted = fixture.protectedReadback(fixture.b)
         assertArrayEquals(peer.accessToken.copyBytes(), persisted.accessToken.copyBytes())
-        assertArrayEquals(peer.refreshToken.copyBytes(), persisted.refreshToken.copyBytes())
+        assertArrayEquals(requireNotNull(peer.refreshToken).copyBytes(), requireNotNull(persisted.refreshToken).copyBytes())
     }
 
     // Intercept only the external UI; the real Compose contract launches and the real Activity
