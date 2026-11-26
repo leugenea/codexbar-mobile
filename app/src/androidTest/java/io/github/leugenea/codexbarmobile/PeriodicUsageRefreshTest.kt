@@ -22,6 +22,8 @@ import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.google.common.util.concurrent.ListenableFuture
 import io.github.leugenea.codexbarmobile.account.AccountCatalog
+import io.github.leugenea.codexbarmobile.account.AccountType
+import io.github.leugenea.codexbarmobile.account.CatalogFile
 import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.transport.*
@@ -283,6 +285,112 @@ class PeriodicUsageRefreshTest {
             assertEquals(WorkInfo.State.CANCELLED, info(staleWork.id).state)
             assertEquals(WorkInfo.State.ENQUEUED, info(enrolled.id).state)
             assertEquals(requests + 2, transport.requests.get())
+        } finally {
+            try { NativeConnection.resetForTests() } finally {
+                NativeConnection.factory = injected
+                NativeConnection.rootFactory = originalRoot
+            }
+        }
+    }
+
+    @Test fun warmWorkerKeepsExactEnrollmentWhenHistoryIsUnavailableDuringUncertainAdd() {
+        val blocked = AtomicBoolean()
+        val syncHits = AtomicInteger()
+        val unavailable = AtomicBoolean()
+        val restoreHits = AtomicInteger()
+        val catalog = AccountCatalog.open(root, UUID::randomUUID, beforeDirectorySync = {
+            if (blocked.get()) { syncHits.incrementAndGet(); throw IOException("B replacement not synced") }
+        })
+        val periodic = PeriodicUsageRefresh(manager)
+        val injected = NativeConnection.factory
+        val originalRoot = NativeConnection.rootFactory
+        NativeConnection.resetForTests()
+        NativeConnection.rootFactory = {
+            AccountRuntimeOwner(context, catalog, transport, transport.clock, transport::pause,
+                legacyEnrollment = periodic::entryEnrollment, historyStorage = { path ->
+                    val real = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(path))
+                    object : HistoryLifetimeStorage by real {
+                        override fun restore(): HistoryLifetimeOutcome {
+                            val result = real.restore()
+                            if (!unavailable.get()) return result
+                            (result as HistoryLifetimeOutcome.Bound).access.revoke()
+                            restoreHits.incrementAndGet()
+                            return HistoryLifetimeOutcome.Unavailable
+                        }
+                    }
+                })
+        }
+        NativeConnection.factory = originalFactory
+        try {
+            phase(ConnectionPhase.IDLE)
+            val first = bounded("A lifecycle START") { NativeConnection.observeDashboard(context) }
+            owner.connect(); phase(ConnectionPhase.OBSERVED)
+            await("A has a history measurement before STOP") { owner.historySnapshots.value.points.size == 1 }
+            val session = (owner.session.snapshot() as SessionResult.Ready).envelope
+            val expected = target()
+            val enrolled = unique(expected).single()
+            val saved = requireNotNull(catalog.legacyEntry())
+            assertEquals(expected.partition, saved.partition)
+            assertNotNull(owner.historyCapability(session.generation))
+            val requests = transport.requests.get()
+
+            blocked.set(true)
+            assertNull(bounded("B reservation replaced before sync") { NativeConnection.beginAddition(context, "Synthetic B", AccountType.CODEX) })
+            val raw = CatalogFile(File(root, "account-catalog"))
+            val address = requireNotNull(raw.read().candidate)
+            val bHits = syncHits.get()
+            assertTrue(bHits > 0)
+            assertNull(catalog.snapshots.value.candidate)
+            assertNull(NativeConnection.entry(context, address.id))
+            bounded("A lifecycle STOP revokes the old port") { first.stop(); owner.commandsSettled() }
+            assertNull(owner.historyCapability(session.generation))
+            transport.advance(900_000)
+            unavailable.set(true)
+
+            repeat(2) { round ->
+                // First: exact before rebind, unavailable afterwards. Second: known unavailable at ingress.
+                assertEquals(ListenableWorker.Result.success(), run(expected))
+                assertEquals("A's unavailable rebind reached on worker round $round", round + 1, restoreHits.get())
+                assertEquals(requests, transport.requests.get())
+                assertEquals(WorkInfo.State.ENQUEUED, info(enrolled.id).state)
+                assertNull(owner.historyCapability(session.generation))
+                assertSame(session, (owner.session.snapshot() as SessionResult.Ready).envelope)
+            }
+            val stale = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
+            periodic.enrollment(stale)
+            val staleWork = unique(stale).single()
+            assertEquals(ListenableWorker.Result.success(), run(stale))
+            assertEquals(WorkInfo.State.CANCELLED, info(staleWork.id).state)
+            assertEquals(2, restoreHits.get())
+            assertEquals(requests, transport.requests.get())
+
+            val second = bounded("A lifecycle START while history is unavailable") { NativeConnection.observeDashboard(context) }
+            try {
+                bounded("A settles foreground fallback and fresh quota") {
+                    owner.commandsSettled(); owner.historyRestorationSettled()
+                    owner.state.first { (it.refresh.usage.successfulAtMillis ?: 0L) >= 900_000L && !it.refresh.refreshing }
+                }
+                assertEquals(3, restoreHits.get())
+                assertEquals(HistoryAvailability.STORAGE_FAILURE, owner.historyAvailability)
+                assertSame(session, (owner.session.snapshot() as SessionResult.Ready).envelope)
+                assertNull(owner.historyCapability(session.generation))
+                assertNull(bounded("missing history cannot mint new enrollment") { owner.backgroundRefreshTarget() })
+                assertEquals(saved, raw.read().entries.single())
+                assertEquals(saved.storage.id, NativeConnection.dashboard(context).value?.id)
+                assertEquals(bHits, syncHits.get())
+
+                blocked.set(false)
+                assertTrue(bounded("explicitly confirm and clear B's reservation") { NativeConnection.recoverAddition(context) })
+                assertNull(raw.read().candidate)
+                unavailable.set(false)
+                transport.advance(900_000)
+                assertEquals(ListenableWorker.Result.success(), run(expected))
+                assertEquals(enrolled.id, unique(expected).single().id)
+                assertEquals(WorkInfo.State.ENQUEUED, info(enrolled.id).state)
+                assertEquals(requests + 4, transport.requests.get())
+                assertSame(session, (owner.session.snapshot() as SessionResult.Ready).envelope)
+                assertEquals(expected.partition, owner.historyCapability(session.generation)?.partition)
+            } finally { bounded("release A's returned observer") { second.stop() } }
         } finally {
             try { NativeConnection.resetForTests() } finally {
                 NativeConnection.factory = injected

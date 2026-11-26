@@ -54,6 +54,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
     private var access: HistoryRuntimeAccess? = null
     private var staged: HistoryPartition? = null
     private var lifetime: HistoryPartition? = null
+    private var unavailableLifetime: HistoryPartition? = null
     private var removal: HistoryDeletion? = null
     private var runtimeAllowed = true
     private var accountName: AccountNameState? = null
@@ -125,6 +126,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
             else {
                 access?.revoke()
                 access = null
+                lifetime = null
                 accountName = null
                 availability = HistoryAvailability.STORAGE_FAILURE
             }
@@ -144,6 +146,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
             requiresRemoval = result == HistoryLifetimeOutcome.RemovalRequired
             catalogReady = result != HistoryLifetimeOutcome.CatalogUnavailable
             staged = null
+            unavailableLifetime = if (result == HistoryLifetimeOutcome.Unavailable) lifetime ?: unavailableLifetime else null
             lifetime = bound?.partition
             adoptName(generation, bound?.partition, name)
             if (!runtimeAllowed) {
@@ -190,6 +193,11 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         lifetime.takeIf { accepts(generation) }
     }
 
+    /** A missing observation does not invalidate an exact enrollment, or authorize its reads. */
+    fun continues(generation: SessionGeneration, partition: HistoryPartition): Boolean = synchronized(admission) {
+        accepts(generation) && (lifetime ?: unavailableLifetime) == partition
+    }
+
     /** Last foreground observer left: retain lifetime/generation, revoke every held runtime port. */
     fun pauseRuntime() = synchronized(admission) {
         runtimeAllowed = false
@@ -206,6 +214,7 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         generation = null
         staged = null
         lifetime = null
+        unavailableLifetime = null
         accountName = null
         catalogReady = false
         availability = HistoryAvailability.UNAVAILABLE

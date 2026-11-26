@@ -41,7 +41,8 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     @Synchronized fun snapshot() = state.copy(entries = state.entries.toList())
 
     @Synchronized fun adopt(partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
-        confirmIdentity(legacyEntry(), partition)
+        confirmedAdditionPeer(legacyEntry(), partition)?.let { return it }
+        confirmIdentity()
         check(state.deletions.none { it.entry == legacyEntry()?.storage?.id })
         val previous = legacyEntry()
         if (previous != null) return reconcile(previous, partition, name)
@@ -121,7 +122,8 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     @Synchronized fun entry(id: UUID) = state.entries.singleOrNull { it.storage.id == id }
 
     @Synchronized fun reconcile(id: UUID, partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
-        confirmIdentity(entry(id), partition)
+        confirmedAdditionPeer(entry(id), partition)?.let { return it }
+        confirmIdentity()
         check(state.deletions.none { it.entry == id })
         return reconcile(requireNotNull(entry(id)), partition, name)
     }
@@ -238,12 +240,15 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         }
     }
 
-    private fun confirmIdentity(peer: CatalogEntry?, partition: HistoryPartition?) {
-        if (uncertainty == Uncertainty.OPTIONAL_RENAME) return
-        // Reserve, admit and discard cannot change an established peer binding.
-        // Keep using that binding, but reconcile() still confirms before any metadata write.
-        if (uncertainty == Uncertainty.ADDITION && partition != null && peer?.partition == partition) return
-        confirmCommit()
+    /** Add cannot change a saved peer binding. Keep it, without publishing any new metadata. */
+    private fun confirmedAdditionPeer(peer: CatalogEntry?, observed: HistoryPartition?): CatalogEntry? {
+        if (uncertainty != Uncertainty.ADDITION || peer?.partition == null) return null
+        if (observed != null && observed != peer.partition) return null
+        return peer.takeUnless { state.deletions.any { deletion -> deletion.entry == it.storage.id } }
+    }
+
+    private fun confirmIdentity() {
+        if (uncertainty != Uncertainty.OPTIONAL_RENAME) confirmCommit()
     }
 
     /** Never admit a write from stale RAM or publish an unsynced replacement. */

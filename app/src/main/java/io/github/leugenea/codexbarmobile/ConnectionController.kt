@@ -304,7 +304,8 @@ internal class ConnectionController(
             ?: return@withContext BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME)
         if (usageRefresh.recentSuccess(minimumSuccessAgeMillis))
             return@withContext BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.RECENT_SUCCESS)
-        val interest = BackgroundRefreshInterest(usageRefresh.retainBackgroundFlight())
+        val interest = BackgroundRefreshInterest(
+            if (history?.lifetime(active) == expected.partition) usageRefresh.retainBackgroundFlight() else null)
         acquireBackgroundHistory(active)
         val settlement = ownerScope.async(start = CoroutineStart.UNDISPATCHED) {
             try { completeBackgroundRefresh(owner, active, expected, interest) }
@@ -322,6 +323,8 @@ internal class ConnectionController(
         historyRestore?.join()
         if (backgroundGeneration(owner, expected) !== active || !interest.attached)
             return BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME)
+        if (historyCapability(active)?.partition != expected.partition)
+            return BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STORAGE_UNAVAILABLE)
         bindHistory(active)
         interest.flight = interest.flight ?: usageRefresh.background()
         val admitted = interest.flight ?: return deferredBackground()
@@ -336,7 +339,7 @@ internal class ConnectionController(
         if (!current(owner) || cleanupPending()) return null
         val ready = session.snapshot() as? SessionResult.Ready ?: return null
         val active = ready.envelope.generation
-        return active.takeIf { history?.lifetime(it) == expected.partition }
+        return active.takeIf { history?.continues(it, expected.partition) == true }
     }
 
     private fun acquireBackgroundHistory(active: SessionGeneration) {

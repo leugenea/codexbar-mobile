@@ -210,6 +210,78 @@ class CodexAdditionRecoveryTest {
 
     @Test fun selectedPeerRebindsWhileReplacedDiscardIsFenced() = candidateOnlyReplacement(discard = true)
 
+    @Test fun readablePeerNameWaitsForCatalogDurabilityWithoutLosingTheReboundHistory() {
+        val fault = ReplacementFault()
+        f.catalog = fault.open(f.directory)
+        val history = File(f.directory, "usage-history")
+        createHistoryCut(history, active = true)
+        val pendingName = File(history, "account-name.pending").apply { writeBytes(byteArrayOf(1)) }
+        protect(AccountStorage(f.legacy, f.legacy, legacy = true))
+        val readableName = AtomicInteger()
+        f.history = { path ->
+            val real = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(path))
+            object : HistoryLifetimeStorage by real {
+                override fun readName(partition: HistoryPartition): AccountNameRead = real.readName(partition).also {
+                    if ((it as? AccountNameRead.Ready)?.name?.text == "Synthetic interrupted") readableName.incrementAndGet()
+                }
+            }
+        }
+        f.start()
+        val peer = f.owner.legacy()
+        f.wait("real known partition with unavailable name restores") { peer.state.first { it.phase == ConnectionPhase.RESTORED } }
+        val saved = requireNotNull(f.catalog.legacyEntry())
+        val session = f.ready(peer)
+        assertFalse(saved.nameAvailable)
+        assertTrue(requireNotNull(peer.accountName.value).storageFailed)
+        assertEquals(0, readableName.get())
+        val first = startPeer(peer)
+        val port = requireNotNull(peer.historyCapability(session.generation))
+        peer.readUsage()
+        f.observe(peer)
+        val enrollment = f.enrollment.toList()
+        assertEquals(listOf(BackgroundRefreshTarget(port.partition)), enrollment)
+
+        val raw = CatalogFile(File(f.directory, "account-catalog"))
+        fault.sync.set(true)
+        assertNull(f.begin("Synthetic unsynced reservation"))
+        val address = requireNotNull(raw.read().candidate)
+        val syncHits = fault.syncHits.get()
+        assertTrue("B replacement reached failed sync", syncHits > 0)
+        stopPeer(first, peer)
+        assertNull(peer.historyCapability(session.generation))
+        assertTrue(pendingName.delete())
+        f.transport.advance(60_001L)
+
+        val second = startPeer(peer)
+        try {
+            assertTrue("A's real recovered sidecar was read", readableName.get() > 0)
+            val rebound = requireNotNull(peer.historyCapability(session.generation))
+            assertNotSame(port, rebound)
+            assertEquals(saved.partition, rebound.partition)
+            assertSame(session, f.ready(peer))
+            f.wait("A refreshes while its name waits") { peer.state.first { (it.refresh.usage.successfulAtMillis ?: 0L) >= 60_001L } }
+            assertEquals(enrollment, f.enrollment.toList())
+            assertNull(requireNotNull(peer.accountName.value).name)
+            assertTrue(requireNotNull(peer.accountName.value).storageFailed)
+            assertEquals(saved, raw.read().entries.single())
+            assertEquals(saved, f.catalog.snapshots.value.entries.single())
+            assertEquals(saved.storage.id, f.owner.dashboard().value?.id)
+            assertNull(f.owner.runtime(address.id))
+            assertEquals("A did not attempt a catalog write or confirmation", syncHits, fault.syncHits.get())
+            fault.sync.set(false)
+            assertTrue(f.wait("recover B without capturing A's readable name") { NativeConnection.recoverAddition(f.context) })
+            assertNull(raw.read().candidate)
+            assertEquals(saved, raw.read().entries.single())
+        } finally { stopPeer(second, peer) }
+
+        val recovered = startPeer(peer)
+        try {
+            assertSame(session, f.ready(peer))
+            assertEquals("Synthetic interrupted", peer.accountName.value?.name?.text)
+            assertEquals(saved.copy(nameAvailable = true, name = "Synthetic interrupted"), raw.read().entries.single())
+        } finally { stopPeer(recovered, peer) }
+    }
+
     private fun candidateOnlyReplacement(discard: Boolean) {
         val fault = ReplacementFault()
         f.catalog = fault.open(f.directory)
@@ -276,17 +348,25 @@ class CodexAdditionRecoveryTest {
         return address
     }
 
+    private fun startPeer(peer: ConnectionController): DashboardObserver {
+        val observer = f.wait("A lifecycle START") { NativeConnection.observeDashboard(f.context) }
+        f.wait("A lifecycle START rebind completes") { peer.commandsSettled(); peer.historyRestorationSettled() }
+        return observer
+    }
+
+    private fun stopPeer(observer: DashboardObserver, peer: ConnectionController) =
+        f.wait("A last foreground STOP completes") { observer.stop(); peer.commandsSettled() }
+
     private fun withReboundPeer(observer: DashboardObserver, peer: ConnectionController, afterRebind: () -> Unit) {
         val session = f.ready(peer)
         val history = requireNotNull(peer.historyCapability(session.generation))
         f.until("A has a durable history measurement before STOP") { f.append[history.partition] is HistoryAppendOutcome.Stored }
         assertEquals(0, f.wait("no background lease can mask A's rebind") { peer.backgroundRefreshInterests() })
-        f.wait("A last foreground STOP completes") { observer.stop(); peer.commandsSettled() }
+        stopPeer(observer, peer)
         assertNull(peer.historyCapability(session.generation))
         f.transport.advance(60_001L)
-        val next = f.wait("A lifecycle START") { NativeConnection.observeDashboard(f.context) }
+        val next = startPeer(peer)
         try {
-            f.wait("A lifecycle START rebind completes") { peer.commandsSettled(); peer.historyRestorationSettled() }
             assertSame(session, f.ready(peer))
             val rebound = requireNotNull(peer.historyCapability(session.generation))
             assertNotSame(history, rebound)
@@ -299,7 +379,7 @@ class CodexAdditionRecoveryTest {
             }
             afterRebind()
             assertSame(session, f.ready(peer))
-        } finally { f.wait("release resumed foreground observer") { next.stop() } }
+        } finally { stopPeer(next, peer) }
     }
 
     @Test fun coldOpenSyncFailureKeepsOwnedKeyPrivateUntilSameProcessExplicitRecovery() {
