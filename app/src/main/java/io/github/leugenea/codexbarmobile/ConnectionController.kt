@@ -323,7 +323,8 @@ internal class ConnectionController(
         historyRestore?.join()
         if (backgroundGeneration(owner, expected) !== active || !interest.attached)
             return BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME)
-        if (historyCapability(active)?.partition != expected.partition)
+        // A retained flight already owns its recording receipt, which may await a successor rebind.
+        if (interest.flight == null && historyCapability(active)?.partition != expected.partition)
             return BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STORAGE_UNAVAILABLE)
         bindHistory(active)
         interest.flight = interest.flight ?: usageRefresh.background()
