@@ -47,6 +47,10 @@ class MainActivity : ComponentActivity() {
                 val root = requireNotNull(selection)
                 val connectionState by root.controller.state.collectAsState()
                 val displayedState = connectionState
+                // Each registry slot outlives the selected UI and drains its own delayed result.
+                val transfers = NativeConnection.historyTransfers
+                val exporter = historyExporter(root, transfers)
+                val importer = historyImporter(root, transfers)
                 // Launch and recreation attach the same identity-tagged STARTED observer.
                 // Fresh restored owners remain dormant; already activated owners may resume reads.
                 ObserveUsageLifecycle(lifecycle) { NativeConnection.observeDashboard(applicationContext) }
@@ -56,7 +60,7 @@ class MainActivity : ComponentActivity() {
                         key(root) {
                             ConnectionScreen(connectionState, root.controller, {
                                 openVerificationBrowser(root.controller, displayedState)
-                            }, historyUiObserver, root)
+                            }, historyUiObserver, root, exporter, importer)
                         }
                     }
                 }

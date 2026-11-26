@@ -17,51 +17,56 @@ import io.github.leugenea.codexbarmobile.history.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.time.Instant
 
 internal data class HistoryImporter(val busy: Boolean, val start: () -> Unit)
 
 /** Unconditional root registration survives a picker returning to a recreated dashboard. */
 @Composable
-internal fun historyImporter(controller: ConnectionController): HistoryImporter {
+internal fun historyImporter(selection: DashboardSelection, transfers: HistoryTransfers): HistoryImporter {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
-    val state = controller.historyImporterState
-    val busy by state.picker.busy.collectAsState()
-    val selection by state.confirmation.collectAsState()
-    val importing by state.importing.collectAsState()
-    val result by state.result.collectAsState()
-    LaunchedEffect(result) {
-        result?.let { if (state.result.compareAndSet(it, null)) importMessage(context, it) }
-    }
+    val controller = selection.controller
+    val busy by transfers.importPicker.busy.collectAsState()
+    val confirmation by transfers.confirmation.collectAsState()
+    val importing by transfers.importing.collectAsState()
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        state.picker.finish(scope) { target ->
-            if (uri != null && target != null) {
-                try {
-                    val text = readHistoryDocument(context, uri)
-                    state.confirmation.value = HistoryImportSelection(target, text)
-                } catch (_: HistoryImportTooLarge) {
-                    importMessage(context, HistoryImportOutcome.TooLarge)
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    importMessage(context, HistoryImportOutcome.Invalid)
-                }
-            }
+        transfers.importPicker.finish(transfers.scope) { picker ->
+            if (uri != null && picker.selection.isCurrent()) readImportSelection(context, transfers, picker, uri)
         }
     }
-    selection?.let { chosen ->
-        HistoryImportConfirmation(onDismiss = { state.confirmation.value = null }, onConfirm = {
-            state.confirmation.value = null
-            state.picker.finish(scope) {
-                controller.importHistory(chosen.target, chosen.text, Instant.now())
-            }
+    val displayed = confirmation
+    LaunchedEffect(selection, displayed) {
+        if (displayed != null && !displayed.picker.selection.isCurrent())
+            transfers.confirmation.compareAndSet(displayed, null)
+    }
+    if (displayed != null && displayed.picker.selection === selection && selection.isCurrent()) {
+        HistoryImportConfirmation(displayed.picker.label,
+            onDismiss = { transfers.confirmation.compareAndSet(displayed, null) },
+            onConfirm = { transfers.confirm(displayed) { importMessage(context, it) } })
+    }
+    return HistoryImporter(busy || importing || confirmation != null) start@{
+        if (!selection.isCurrent() || transfers.importing.value || transfers.confirmation.value != null) return@start
+        val label = controller.accountName.value?.name?.text
+        val generation = (controller.session.snapshot() as? SessionResult.Ready)?.envelope?.generation
+        transfers.importPicker.start(scope, prepare = {
+            controller.historyImportTarget { selection.isCurrent() && it === generation }
+                ?.takeIf { selection.isCurrent() }?.let { HistoryImportPicker(selection, it, label) }
+        }, launch = { launcher.launch(arrayOf("application/json")) }, failure = {
+            if (selection.isCurrent()) importMessage(context, HistoryImportOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED))
         })
     }
-    return HistoryImporter(busy || importing || selection != null) {
-        state.picker.start(scope, prepare = { controller.historyImportTarget() },
-            launch = { launcher.launch(arrayOf("application/json")) },
-            failure = { importMessage(context, HistoryImportOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)) })
+}
+
+private suspend fun readImportSelection(context: Context, transfers: HistoryTransfers, picker: HistoryImportPicker, uri: Uri) {
+    try {
+        val text = readHistoryDocument(context, uri)
+        if (picker.selection.isCurrent()) transfers.confirmation.value = HistoryImportSelection(picker, text)
+    } catch (_: HistoryImportTooLarge) {
+        if (picker.selection.isCurrent()) importMessage(context, HistoryImportOutcome.TooLarge)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        if (picker.selection.isCurrent()) importMessage(context, HistoryImportOutcome.Invalid)
     }
 }
 
@@ -72,12 +77,13 @@ internal fun HistoryImportAction(importer: HistoryImporter, available: Boolean) 
 }
 
 @Composable
-private fun HistoryImportConfirmation(onDismiss: () -> Unit, onConfirm: () -> Unit) {
+private fun HistoryImportConfirmation(label: String?, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.history_import)) },
-        text = { Text(stringResource(R.string.history_import_confirmation)) },
-        confirmButton = { TextButton(onClick = onConfirm, modifier = Modifier.testTag("history-import-confirm")) {
+        text = { Text(if (label == null) stringResource(R.string.history_import_confirmation)
+            else stringResource(R.string.history_import_account_confirmation, label)) },
+        confirmButton = { TextButton(onClick = onConfirm, modifier = Modifier.testTag("history-import-confirm").observeAccountAction(onConfirm)) {
             Text(stringResource(R.string.history_import_replace))
-        } }, dismissButton = { TextButton(onClick = onDismiss, modifier = Modifier.testTag("history-import-cancel")) {
+        } }, dismissButton = { TextButton(onClick = onDismiss, modifier = Modifier.testTag("history-import-cancel").observeAccountAction(onDismiss)) {
             Text(stringResource(R.string.history_import_cancel))
         } })
 }

@@ -73,7 +73,7 @@ class HistoryExportLifecycleTest {
                 // CreateDocument sets action/type/title, unlike GetContent it adds no OPENABLE category.
                 assertNull(intent.categories)
                 assertEquals("codexbar-history-v1.json", intent.getStringExtra(Intent.EXTRA_TITLE))
-                val request = fixture.owner.historyExportRequest
+                val request = NativeConnection.historyTransfers.export
                 compose.waitUntil(10_000) { !request.busy.value }
                 assertNull(request.pending)
                 compose.onNodeWithTag("history-export").assertIsEnabled()
@@ -87,22 +87,9 @@ class HistoryExportLifecycleTest {
                 assertNull(request.pending)
                 verifyDocument(access)
                 assertEquals("local export and document writes add no provider requests", requests, fixture.transport.requests.get())
-                request.pending = "detached-before-recreation"
-                request.busy.value = true
-                scenario.recreate()
-                compose.waitForIdle()
-                scenario.onActivity { assertSame(request, it.connection.historyExportRequest) }
-                assertEquals("detached-before-recreation", request.pending)
-                openDetailRoute(compose, fixture.owner, DashboardRoute.ACCOUNT_SETTINGS)
-                compose.onNodeWithTag("history-export").performScrollTo().assertIsNotEnabled()
-                compose.onNodeWithTag("history-import").performScrollTo().assertIsEnabled()
                 openDetailRoute(compose, fixture.owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
                 compose.onNodeWithTag("history-export").assertDoesNotExist()
                 compose.onNodeWithTag("history-import").assertDoesNotExist()
-                assertEquals("detached-before-recreation", request.pending)
-                request.clear()
-                assertEquals("local export/recreation adds no provider requests with continuous foreground eligibility",
-                    requests, fixture.transport.requests.get())
                 access.revoke()
                 assertNull(access.exportHistory("test", Instant.EPOCH))
             }

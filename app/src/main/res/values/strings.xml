@@ -400,6 +400,7 @@
     <string name="dashboard_banked_stale">Inventory may be out of date</string>
     <string name="history_import">Import history</string>
     <string name="history_import_confirmation">This will replace all current local history with the selected file. Retention limits still apply. This cannot be undone.</string>
+    <string name="history_import_account_confirmation">This will replace all local history for %1$s with the selected file. Retention limits still apply. This cannot be undone.</string>
     <string name="history_import_replace">Replace history</string>
     <string name="history_import_cancel">Cancel</string>
     <string name="history_import_success">History imported</string>
@@ -408,8 +409,8 @@
     <string name="history_import_too_large">History file is too large. History was not changed.</string>
     <string name="history_import_unavailable">Could not import history. Please try again while signed in.</string>
     <string name="history_export">Export history</string>
-    <string name="history_export_success">History exported</string>
-    <string name="history_export_failure">Could not export history. Please try again.</string>
+    <string name="history_export_account_success">History exported for %1$s</string>
+    <string name="history_export_account_failure">Could not export history for %1$s. Please try again.</string>
     <string name="account_settings_title">Account settings</string>
     <string name="account_add">Add account</string>
     <string name="account_settings_required">Add an account in Account settings to view usage.</string>

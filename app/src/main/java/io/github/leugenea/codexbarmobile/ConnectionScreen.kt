@@ -27,6 +27,8 @@ internal object NativeConnection {
     private var owner: AccountRuntimeOwner? = null
     private var controller: ConnectionController? = null
     private var injectedDashboard: kotlinx.coroutines.flow.MutableStateFlow<DashboardSelection?>? = null
+    internal var historyTransfers = HistoryTransfers()
+        private set
     private val productionFactory: (Context) -> ConnectionController = ::create
     @set:VisibleForTesting(otherwise = VisibleForTesting.NONE)
     internal var factory: (Context) -> ConnectionController = productionFactory
@@ -52,6 +54,8 @@ internal object NativeConnection {
         owner = null
         controller = null
         injectedDashboard = null
+        historyTransfers.close()
+        historyTransfers = HistoryTransfers()
     }
 
     @Synchronized internal fun dashboard(context: Context): kotlinx.coroutines.flow.StateFlow<DashboardSelection?> {

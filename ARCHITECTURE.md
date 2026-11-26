@@ -266,20 +266,26 @@ A8 sign-in alone does not close parent #4.
 
 Account settings groups **Export history** and **Import history** under **Local usage history**,
 separate from sign-in credentials. The history detail route has no duplicate controls.
-The existing exporters/importers remain registered unconditionally at the navigation root;
-their pending state stays in process-owner memory across navigation and Activity recreation,
-never in a saved Bundle. Account settings retains Idle history-page interest: rendering
-these controls neither queries a history page nor activates dormant provider reads.
+Both document launchers register unconditionally above the selected dashboard subtree.
+Each launcher has one process-memory slot across navigation and Activity recreation;
+no document contents, account labels, or operation permissions enter saved state.
+Account settings retains Idle history-page interest: rendering these controls
+neither queries a history page nor activates dormant provider reads.
 Import availability still requires the current foreground history generation and partition,
 not a displayed page; export retains its existing busy-only UI gate and checked preparation.
 Export includes all retained entries plus coherent continuation
 state through SAF, off Main, without credentials/account metadata or the local
 partition UUID. The versioned production encoder/decoder, privacy boundary and
 forward-compatibility contract are documented in [history export v1](docs/history-export.md).
-Import uses JSON-only SAF OpenDocument, then explicit replace confirmation. A
-process-memory lifetime ticket cannot target a successor login. Bounded UTF-8 input
-is strictly validated and rebound to the current partition. The store's existing I/O
-lock spans one SQLite transaction replacing entries, high-water, reducer and retention
+Export writes the original detached snapshot and reports the initiating local account
+label. Import uses JSON-only SAF OpenDocument, then explicit replace confirmation
+for the captured entry/controller and its original generation and partition. Changing dashboard selection cancels an unconfirmed import, even if the
+original entry is selected again. An outstanding picker still drains its own late
+result before the slot is reused. Navigation and recreation do not change selection.
+An admitted import settles on the original entry under the existing lifetime fences.
+Bounded UTF-8 input is strictly validated and rebound to the captured partition.
+The store's existing I/O lock spans one SQLite transaction replacing entries,
+high-water, reducer and retention
 continuation; age/count/byte eviction is inside the transaction. Revoked capabilities
 fail before irreversible admission. The recorder barriers its admitted read/append
 pair and holds queued observations across replacement, preventing a pre-import N+1

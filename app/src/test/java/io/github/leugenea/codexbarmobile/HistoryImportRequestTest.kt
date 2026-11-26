@@ -12,28 +12,29 @@ import java.util.UUID
 @OptIn(ExperimentalCoroutinesApi::class)
 class HistoryImportRequestTest {
     @Test fun importPickerKeepsOriginalLifetimeAcrossRecreationAndDropsCancelledRead() = runTest {
-        val state = HistoryImporterState()
+        val request = HistoryDocumentRequest<HistoryImportTarget>()
         val target = HistoryImportTarget(SessionGeneration(LocalCredentialNamespace()), HistoryPartition(UUID(1, 2)))
         val old = CoroutineScope(Job() + StandardTestDispatcher(testScheduler))
-        state.picker.start(old, prepare = { target }, launch = {}, failure = { fail("No failure") })
+        request.start(old, prepare = { target }, launch = {}, failure = { fail("No failure") })
         old.cancel(); runCurrent()
-        assertSame(target, state.picker.pending)
-        assertTrue(state.picker.busy.value)
+        assertSame(target, request.pending)
+        assertTrue(request.busy.value)
         val recreated = CoroutineScope(Job() + StandardTestDispatcher(testScheduler))
-        state.picker.finish(recreated) { captured ->
+        var read = false
+        request.finish(recreated) { captured ->
             assertSame(target, captured)
             withContext(StandardTestDispatcher(testScheduler)) {
-                state.confirmation.value = HistoryImportSelection(requireNotNull(captured), "file")
+                read = true
             }
         }
         recreated.cancel(); runCurrent()
-        assertFalse(state.picker.busy.value)
-        assertNull(state.picker.pending)
-        assertNull(state.confirmation.value)
+        assertFalse(request.busy.value)
+        assertNull(request.pending)
+        assertFalse(read)
     }
 
     @Test fun importAdmissionCancelledBeforeDispatchCannotOpenPickerOrStrandBusy() = runTest {
-        val request = HistoryImporterState().picker
+        val request = HistoryDocumentRequest<HistoryImportTarget>()
         val scope = CoroutineScope(Job() + StandardTestDispatcher(testScheduler))
         request.start(scope, prepare = { withContext(StandardTestDispatcher(testScheduler)) { error("Cancelled preparation") } },
             launch = { fail("Cancelled picker") }, failure = { fail("Cancellation is not failure") })

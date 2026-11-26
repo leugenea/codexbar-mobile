@@ -8,7 +8,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class HistoryExportRequestTest {
     @Test fun startCancellationBeforeFirstDispatchReleasesBusyAndAllowsRetry() = runTest {
-        val request = HistoryExportRequest()
+        val request = HistoryDocumentRequest<String>()
         val scope = CoroutineScope(Job() + StandardTestDispatcher(testScheduler))
         val io = StandardTestDispatcher(testScheduler, "preparation")
         var preparations = 0
@@ -27,7 +27,7 @@ class HistoryExportRequestTest {
     }
 
     @Test fun resultCancellationBeforeFirstDispatchClearsConsumedSnapshotAndAllowsRetry() = runTest {
-        val request = HistoryExportRequest()
+        val request = HistoryDocumentRequest<String>()
         val scope = CoroutineScope(Job() + StandardTestDispatcher(testScheduler))
         val io = StandardTestDispatcher(testScheduler, "destination")
         var writes = 0
@@ -50,7 +50,7 @@ class HistoryExportRequestTest {
     }
 
     @Test fun pendingPickerSurvivesScopeCancellationAndDuplicateStartUntilNewScopeResult() = runTest {
-        val request = HistoryExportRequest()
+        val request = HistoryDocumentRequest<String>()
         val scope = CoroutineScope(Job() + StandardTestDispatcher(testScheduler))
         var launches = 0
         try {
@@ -70,7 +70,7 @@ class HistoryExportRequestTest {
     }
 
     @Test fun alreadyCancelledScopeCannotPrepareOrStrandConsumedResult() = runTest {
-        val request = HistoryExportRequest()
+        val request = HistoryDocumentRequest<String>()
         val scope = CoroutineScope(Job() + StandardTestDispatcher(testScheduler))
         scope.cancel()
         request.start(scope, prepare = { error("Cancelled scope must not prepare") },
@@ -82,7 +82,7 @@ class HistoryExportRequestTest {
     }
 
     @Test fun preparationAndPickerFailuresReleaseBusyWithoutRetainingSnapshot() = runTest {
-        val request = HistoryExportRequest()
+        val request = HistoryDocumentRequest<String>()
         var failures = 0
         request.start(backgroundScope, prepare = { null }, launch = { fail("No document") }, failure = { failures++ })
         assertEquals(1, failures)
@@ -93,7 +93,7 @@ class HistoryExportRequestTest {
         assertReusable(request)
     }
 
-    private fun TestScope.assertReusable(request: HistoryExportRequest) {
+    private fun TestScope.assertReusable(request: HistoryDocumentRequest<String>) {
         assertFalse(request.busy.value)
         assertNull(request.pending)
         request.start(backgroundScope, prepare = { "retry" }, launch = {}, failure = { fail("Retry failed") })

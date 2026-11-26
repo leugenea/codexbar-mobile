@@ -59,8 +59,6 @@ internal class ConnectionController(
     private val savedAccount: () -> Boolean = { false },
     pendingAddition: Boolean = false,
 ) {
-    internal val historyExportRequest = HistoryExportRequest()
-    internal val historyImporterState = HistoryImporterState()
     private val ownerJob = SupervisorJob(scope.coroutineContext[Job])
     private val ownerScope = CoroutineScope(scope.coroutineContext + ownerJob + mutationDispatcher)
     private val mutableAccountRemoval = MutableStateFlow(AccountRemoval())
@@ -427,33 +425,33 @@ internal class ConnectionController(
     }
 
     /** Prepare while foreground authority is live, before SAF temporarily backgrounds the app. */
-    internal suspend fun exportHistory(appVersion: String, exportedAt: java.time.Instant): String? = withContext(mutationDispatcher) {
-        val active = generation ?: return@withContext null
+    internal suspend fun exportHistory(appVersion: String, exportedAt: java.time.Instant,
+        canPrepare: (SessionGeneration) -> Boolean = { true }): String? = withContext(mutationDispatcher) {
+        val active = generation?.takeIf(canPrepare) ?: return@withContext null
         if (closed || cleanupPending() || !usageRefresh.hasForegroundObservers) return@withContext null
         val access = historyCapability(active) ?: return@withContext null
         val encoded = withContext(storageDispatcher) { access.exportHistory(appVersion, exportedAt) }
         encoded.takeIf { generation === active && historyCapability(active) === access && !closed }
     }
 
-    internal suspend fun historyImportTarget(): HistoryImportTarget? = withContext(mutationDispatcher) {
-        val active = generation ?: return@withContext null
+    internal suspend fun historyImportTarget(canPrepare: (SessionGeneration) -> Boolean = { true }): HistoryImportTarget? = withContext(mutationDispatcher) {
+        val active = generation?.takeIf(canPrepare) ?: return@withContext null
         if (closed || cleanupPending() || !usageRefresh.hasForegroundObservers) return@withContext null
         historyCapability(active)?.let { HistoryImportTarget(active, it.partition) }
     }
 
     /** SAF may retire runtime access, but must never redirect a predecessor file to a new login. */
-    internal suspend fun importHistory(target: HistoryImportTarget, text: String, now: java.time.Instant): HistoryImportOutcome =
-        withContext(mutationDispatcher) {
-            if (historyImport?.isActive == true) return@withContext HistoryImportOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE)
-            // Confirmation admits process-owned work; Activity cancellation only detaches its waiter.
-            ownerScope.async(start = CoroutineStart.UNDISPATCHED) {
-                ensureActive()
-                historyImporterState.importing.value = true
-                historyImporterState.result.value = null
-                try { performHistoryImport(target, text, now).also { historyImporterState.result.value = it } }
-                finally { historyImporterState.importing.value = false }
-            }.also { historyImport = it }.await()
-        }
+    internal suspend fun importHistory(target: HistoryImportTarget, text: String, now: java.time.Instant,
+        canAdmit: () -> Boolean = { true }): HistoryImportOutcome = withContext(mutationDispatcher) {
+        if (!canAdmit()) return@withContext HistoryImportOutcome.Unavailable(HistoryUnavailable.PARTITION_REVOKED)
+        if (historyImport?.isActive == true) return@withContext HistoryImportOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE)
+        // The selection check and admission share the owner lane. Once admitted, only
+        // the original controller's generation/partition and existing recorder fences apply.
+        ownerScope.async(start = CoroutineStart.UNDISPATCHED) {
+            ensureActive()
+            performHistoryImport(target, text, now)
+        }.also { historyImport = it }.await()
+    }
 
     private suspend fun performHistoryImport(target: HistoryImportTarget, text: String, now: java.time.Instant): HistoryImportOutcome {
         historyRestore?.join()
