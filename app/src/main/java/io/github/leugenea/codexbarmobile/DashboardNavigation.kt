@@ -96,7 +96,7 @@ private fun ConnectionRoute(state: ConnectionState, controller: ConnectionContro
             verticalArrangement = Arrangement.spacedBy(if (route == DashboardRoute.DASHBOARD) 4.dp else 20.dp)) {
             RouteHeader(route, openDrawer, back)
             RouteContent(route, state, controller, openBrowser, openAccountSettings, source, authority, current, navigation, observer, exporter, importer,
-                { kind = it.kind }, { after = it })
+                selection, { kind = it.kind }, { after = it })
         }
     }
 }
@@ -131,7 +131,8 @@ private fun RouteHeader(route: DashboardRoute, openDrawer: () -> Unit, back: () 
 @Composable
 private fun RouteContent(route: DashboardRoute, state: ConnectionState, controller: ConnectionController,
     browser: () -> Unit, openAccountSettings: () -> Unit, source: HistoryGraphSnapshot, authority: HistoryDisplayContext?, current: HistoryPresentationRequest.Current,
-    navigation: HistoryNavigation, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter, kind: (HistoryNavigation) -> Unit, page: (ObservationId?) -> Unit) {
+    navigation: HistoryNavigation, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter,
+    selection: DashboardSelection, kind: (HistoryNavigation) -> Unit, page: (ObservationId?) -> Unit) {
     when (route) {
         DashboardRoute.DASHBOARD -> DashboardScreen(state, openAccountSettings, source, current, authority, observer, selection)
         DashboardRoute.LOCAL_HISTORY_DETAILS -> {
