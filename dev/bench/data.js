@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795131328953,
+  "lastUpdate": 1795680919318,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -3661,6 +3661,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/1953f457f328feda4add748524cb83420ace4020"
         },
         "date": 1795131326417,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 0,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "80d7252f6cdb17d3700bebbdbcb32e7909ec9f47",
+          "message": "Durably admit and select added Codex accounts (#260)\n\n* feat: durably admit and select added Codex accounts\n\n* fix: preserve saved peers and retry Add recovery\n\n* test: inject catalog sync fault after opening\n\n* fix: retain cached injected connection controller\n\n* fix: preserve account sessions and work during Add recovery\n\n* fix: keep confirmed accounts usable during Add recovery\n\n* fix: allow retained quota flights to finish during history rebind\n\n* test: use canonical catalog root in worker fixture\n\n* fix: retain periodic work during first history restore\n\n* fix: preserve first quota request across Add projection updates",
+          "timestamp": "2026-11-26T11:14:38+03:00",
+          "tree_id": "8034bb826bfad90fa8ce95774c98c756271680b9",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/80d7252f6cdb17d3700bebbdbcb32e7909ec9f47"
+        },
+        "date": 1795680918540,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
