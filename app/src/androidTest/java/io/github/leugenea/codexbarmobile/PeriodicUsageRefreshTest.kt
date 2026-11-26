@@ -336,7 +336,7 @@ class PeriodicUsageRefreshTest {
 
             blocked.set(true)
             assertNull(bounded("B reservation replaced before sync") { NativeConnection.beginAddition(context, "Synthetic B", AccountType.CODEX) })
-            val raw = CatalogFile(File(root, "account-catalog"))
+            val raw = CatalogFile(File(root.canonicalFile, "account-catalog"))
             val address = requireNotNull(raw.read().candidate)
             val bHits = syncHits.get()
             assertTrue(bHits > 0)
