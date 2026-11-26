@@ -35,6 +35,7 @@ internal class CodexAdditionFixture {
     @Volatile var denyPoll = false
     var protect: (UUID) -> CredentialStore = { KeystoreCredentialStore(context, it) }
     var history: (File) -> HistoryLifetimeStorage = { SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(it)) }
+    var beforeAdditionDisplay: () -> Unit = {}
     lateinit var catalog: AccountCatalog
     lateinit var owner: AccountRuntimeOwner
     private var installed = false
@@ -53,7 +54,8 @@ internal class CodexAdditionFixture {
         }
         owner = if (openCatalog == null) {
             AccountRuntimeOwner(context, catalog, network, transport.clock, transport::pause, { { enrollment.add(it) } },
-                credentials = { _, slot -> track(slot) }, historyStorage = { observingHistory(it) })
+                credentials = { _, slot -> track(slot) }, historyStorage = { observingHistory(it) },
+                beforeAdditionDisplay = { beforeAdditionDisplay() })
         } else NativeConnection.createOwner(context, network, transport.clock, transport::pause, openCatalog = openCatalog)
         NativeConnection.rootFactory = { owner }
         installed = true

@@ -9,6 +9,7 @@ import io.github.leugenea.codexbarmobile.transport.ReadOperation
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -95,6 +96,78 @@ class CodexAdditionTest {
             assertEquals(1L, f.transport.counts()[ReadOperation.USAGE.path])
             assertEquals(1L, f.transport.counts()[ReadOperation.RESET_INVENTORY.path])
         } finally { withTimeout(12_000) { publication.cancelAndJoin() } }
+    }
+
+    @Test fun firstQuotaSurvivesPeerRenameBetweenAcceptedSnapshotAndDisplay() {
+        val gate = f.gate()
+        val renamed = "Synthetic renamed incumbent"
+        f.history = { path ->
+            val real = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(path))
+            object : HistoryLifetimeStorage by real {
+                override fun writeName(partition: HistoryPartition, name: AccountDisplayName?): Boolean =
+                    real.writeName(partition, name).also { if (it && name?.text == renamed) gate.pause("A sidecar written") }
+            }
+        }
+        val a = peer()
+        val aController = f.runtime(a.storage.id)
+        val aSession = f.ready(aController)
+        aController.renameAccount(requireNotNull(aController.accountName.value?.edit), renamed)
+        gate.await("A persisted name while its catalog rename is pending")
+        assertEquals(CatalogRename(a.storage.id, renamed), f.catalog.snapshots.value.rename)
+        val receipt = AtomicInteger()
+        f.beforeAdditionDisplay = {
+            val before = f.catalog.snapshots.value
+            val b = before.entries.single { it.storage != a.storage }
+            assertEquals(b.storage.id, before.selected)
+            assertEquals(CatalogRename(a.storage.id, renamed), before.rename)
+            assertNull(before.candidate)
+            gate.release()
+            f.until("A's rename publishes after B's snapshot capture") { f.catalog.snapshots.value.rename == null }
+            val after = CatalogFile(File(f.directory.canonicalFile, "account-catalog")).read()
+            assertNotSame(before, f.catalog.snapshots.value)
+            assertEquals(before.copy(entries = listOf(a.copy(name = renamed), b), rename = null), after)
+            assertEquals(2L, f.transport.gets.get())
+            receipt.incrementAndGet()
+        }
+        val id = (f.result(requireNotNull(f.begin("Synthetic admitted B"))) as AdditionResult.Added).id
+        assertEquals(1, receipt.get())
+        f.wait("current snapshot projects accepted B") { f.owner.dashboard().first { it?.id == id } }
+        val b = f.disk().entries.single { it.storage.id == id }
+        val controller = f.runtime(id)
+        observed(b)
+        assertEquals(id, f.disk().selected)
+        assertSame(controller, f.owner.dashboard().value?.controller)
+        assertSame(f.writes[b.storage.credentialSlot], f.ready(controller).generation)
+        assertEquals(1, f.constructed[b.storage.credentialSlot])
+        assertSame(aSession, f.ready(aController))
+        assertEquals(renamed, f.disk().entries.single { it.storage == a.storage }.name)
+        assertEquals(2L, f.transport.counts()[ReadOperation.USAGE.path])
+        assertEquals(2L, f.transport.counts()[ReadOperation.RESET_INVENTORY.path])
+    }
+
+    @Test fun laterConfirmedSelectionWinsOverAcceptedAddHandoff() {
+        val a = peer()
+        val receipt = AtomicInteger()
+        f.beforeAdditionDisplay = {
+            val before = f.catalog.snapshots.value
+            val b = before.entries.single { it.storage != a.storage }
+            assertEquals(b.storage.id, before.selected)
+            assertTrue(f.catalog.select(a.storage.id))
+            assertEquals(before.copy(selected = a.storage.id), f.catalog.snapshots.value)
+            receipt.incrementAndGet()
+        }
+        val id = (f.result(requireNotNull(f.begin("Synthetic superseded B"))) as AdditionResult.Added).id
+        assertEquals(1, receipt.get())
+        assertEquals(a.storage.id, f.disk().selected)
+        assertEquals(a.storage.id, f.owner.dashboard().value?.id)
+        val b = f.disk().entries.single { it.storage.id == id }
+        val controller = f.runtime(id)
+        assertSame(f.writes[b.storage.credentialSlot], f.ready(controller).generation)
+        assertEquals(ConnectionPhase.RESTORED, controller.state.value.phase)
+        assertEquals(2L, f.transport.gets.get())
+        assertTrue(f.wait("explicit selection may subsequently activate B") { f.owner.select(id) })
+        observed(b)
+        assertEquals(4L, f.transport.gets.get())
     }
 
     @Test fun pendingRenameDestinationRejectsFinalAdmissionWithoutChangingSelectionOrPeerArtifacts() {

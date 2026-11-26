@@ -8,6 +8,7 @@ import io.github.leugenea.codexbarmobile.AdditionResult.Rejected
 import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
 import io.github.leugenea.codexbarmobile.credentials.CredentialStore
 import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
+import io.github.leugenea.codexbarmobile.credentials.SessionGeneration
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.transport.TransportClock
 import kotlinx.coroutines.*
@@ -28,6 +29,7 @@ internal class AccountRuntimeOwner(
     private val credentials: (Context, UUID) -> CredentialStore = ::KeystoreCredentialStore,
     private val historyStorage: (File) -> HistoryLifetimeStorage = { SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(it)) },
     private val openCatalog: (() -> AccountCatalog)? = null,
+    private val beforeAdditionDisplay: () -> Unit = {},
 ) {
     // Retain only application-scoped context. Native fixtures supply a storage-isolating
     // ContextWrapper here, so preserve Context rather than casting it to Application.
@@ -47,6 +49,7 @@ internal class AccountRuntimeOwner(
     private val artifacts = AdditionArtifacts(applicationContext, root)
     private val recovery = Mutex()
     @Volatile private var addition: PendingAddition? = null
+    private var additionActivation: AdditionActivation? = null
 
     init {
         if (catalog?.snapshots?.value?.candidate != null) scope.launch(mutations) { recoverAddition() }
@@ -128,8 +131,10 @@ internal class AccountRuntimeOwner(
         pending.controller.acceptAddition(prepared)
         runtimes[pending.address.id] = pending.controller
         addition = null
-        display(catalog?.snapshots?.value)
-        selected.value?.takeIf { it.controller === pending.controller }?.let(::activate)
+        additionActivation = AdditionActivation(requireNotNull(pending.commit).entry, pending.controller, prepared.envelope.generation)
+        val snapshot = catalog?.snapshots?.value
+        beforeAdditionDisplay()
+        display(snapshot)
         pending.handle.complete(AdditionResult.Added(pending.address.id))
     }
 
@@ -212,6 +217,16 @@ internal class AccountRuntimeOwner(
 
     private class AdditionCommit(val entry: CatalogEntry, val prepared: PreparedAddition.Ready)
 
+    private class AdditionActivation(val entry: CatalogEntry, val controller: ConnectionController,
+        val generation: SessionGeneration) {
+        fun matches(snapshot: CatalogSnapshot?): Boolean {
+            snapshot ?: return false
+            val id = entry.storage.id
+            return snapshot.selected == id && snapshot.deletions.none { it.entry == id } &&
+                snapshot.entries.any { it.storage == entry.storage && it.partition == entry.partition }
+        }
+    }
+
     /** Dormant observation; the original compatibility ingress remains independent. */
     @Synchronized fun dashboard(): kotlinx.coroutines.flow.StateFlow<DashboardSelection?> {
         if (selectionWatch == null) {
@@ -237,8 +252,8 @@ internal class AccountRuntimeOwner(
         val committed = scope.async { catalog?.select(id) == true }
         if (!try { committed.await() } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { false }) return@async false
-        display(catalog?.snapshots?.value)
-        selected.value?.takeIf { it.id == id }?.let { activate(it).join() }
+        val activation = display(catalog?.snapshots?.value)
+        selected.value?.takeIf { it.id == id }?.let { (activation ?: activate(it)).join() }
         true
     }.await()
 
@@ -256,19 +271,37 @@ internal class AccountRuntimeOwner(
         } }
     }
 
-    @Synchronized private fun display(snapshot: CatalogSnapshot?) {
-        if (closing) return
+    @Synchronized private fun display(snapshot: CatalogSnapshot?): Job? {
+        if (closing) return null
         val id = snapshot?.selected
-        val controller = displayController(snapshot) ?: return
-        if (snapshot !== catalog?.snapshots?.value) return
+        val controller = displayController(snapshot) ?: return null
+        if (snapshot !== catalog?.snapshots?.value) return null
         val previous = selected.value
-        if (previous != null && previous.id == id && previous.controller === controller) return
-        // Capture actual-removal provenance before any asynchronous activation/restoration.
-        val removed = previous?.id != null && snapshot?.entries?.none { it.storage.id == previous.id } == true
+        if (previous != null && previous.id == id && previous.controller === controller)
+            return activateAddition(snapshot, previous)
         val next = DashboardSelection(id, controller, ::currentProjection)
         selected.value = next
         transferDisplay(previous?.controller, next)
-        if (removed && id != null) activate(next)
+        return activateAddition(snapshot, next) ?: activateAfterRemoval(snapshot, next, previous)
+    }
+
+    private fun activateAfterRemoval(snapshot: CatalogSnapshot?, next: DashboardSelection, previous: DashboardSelection?): Job? {
+        // Capture actual-removal provenance before any asynchronous activation/restoration.
+        val removed = previous?.id != null && snapshot?.entries?.none { it.storage.id == previous.id } == true
+        return if (removed && next.id != null) activate(next) else null
+    }
+
+    private fun activateAddition(snapshot: CatalogSnapshot?, next: DashboardSelection): Job? {
+        val pending = additionActivation ?: return null
+        // Only a current projection consumes the one shot; unrelated metadata may replace a snapshot.
+        additionActivation = null
+        if (next.controller !== pending.controller || !pending.matches(snapshot)) return null
+        return scope.launch(mutations) {
+            next.controller.requestSelectedUsage {
+                next.isCurrent() && pending.matches(catalog?.snapshots?.value) &&
+                    (next.controller.session.snapshot() as? SessionResult.Ready)?.envelope?.generation === pending.generation
+            }
+        }
     }
 
     private fun displayController(snapshot: CatalogSnapshot?): ConnectionController? {
