@@ -27,16 +27,20 @@ foreground service, polling timer or exact refresh alarm alive to enforce punctu
 - Removal, replacement cleanup and terminal reauthorization cancel only the unique
   lifetime captured by the existing deletion receipt, after credential/history deletion
   and durable catalog settlement. A cold worker with that exact pending receipt resumes
-  only its owner's cleanup, not provider reads. Unfinished cleanup leaves the same periodic
-  request available. A late confirmed-stale worker can also cancel only its own unique
-  name. Unavailable storage, ambiguous bindings and uncertain catalog state are not
-  evidence of staleness, and cannot start a fresh worker flight.
+  only its owner's cleanup, not provider reads. If a catalog confirmation failure prevented
+  the receipt from being written, the live exact controller can retry its failed cleanup
+  ticket for that same partition once the catalog is confirmed. Unfinished cleanup leaves
+  the same periodic request available. A late confirmed-stale worker can also cancel only
+  its own unique name. Unavailable storage, ambiguous bindings and uncertain catalog state
+  are not evidence of staleness, and cannot start a fresh worker flight.
   Logout fences old requests/history immediately even before asynchronous scheduler
   cancellation settles. Rotation keeps the same lifetime. Activity STOP, Cancel and
   clean process-owner shutdown do not pretend to remove the account/enrollment.
   Catalog settlement and WorkManager cancellation are not atomic. If cancellation
   is lost after a settled cleanup (for example, process death), a surviving UUID that
   can no longer be proved stale cannot authorize provider reads for another lifetime.
+  A nonlegacy address retained after cleanup has no continuing lifetime; unlike an unresolved
+  legacy binding, it does not make an unmatched UUID uncertain.
 - Foreground/manual/background overlap joins the same owner flight and recorder
   ticket. No second transport, session, history store or visible observer exists.
   Worker stop/cancellation releases only its interest; another consumer and accepted

@@ -51,6 +51,7 @@ class HistoryAccess internal constructor(
 class HistoryDeletion internal constructor(
     private val catalogSettlement: () -> Boolean = { true },
     private val cleanupDisposition: () -> CleanupDisposition = { CleanupDisposition.REMOVE },
+    internal val partition: HistoryPartition? = null,
     private val work: () -> HistoryDeleteOutcome,
 ) {
     @Volatile private var outcome: HistoryDeleteOutcome? = null

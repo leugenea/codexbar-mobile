@@ -299,17 +299,23 @@ internal class ConnectionController(
         history?.lifetime(ready.envelope.generation)?.let(::BackgroundRefreshTarget)
     }
 
-    /** The exact receipt authorizes cleanup, not a refresh. A failed attempt leaves work enrolled. */
-    internal suspend fun recoverBackgroundDeletion(disposition: CleanupDisposition, stillPending: () -> Boolean): Unit =
+    /** Only the exact receipt or this controller's failed ticket for the same partition can retry cleanup. */
+    internal suspend fun recoverBackgroundDeletion(expected: BackgroundRefreshTarget, receiptDisposition: CleanupDisposition?,
+        stillAddressed: () -> Boolean): Boolean =
         withContext(mutationDispatcher) {
-            if (closed || !stillPending()) return@withContext
-            retryBackgroundRestore()
-            if (mutableState.value.phase == ConnectionPhase.RESTORING) {
-                work?.join()
-                return@withContext
+            if (closed || !stillAddressed()) return@withContext false
+            val disposition = receiptDisposition ?: historyCleanup?.takeIf {
+                it.partition == expected.partition && it.failed()
+            }?.disposition ?: return@withContext false
+            if (receiptDisposition != null) {
+                retryBackgroundRestore()
+                if (mutableState.value.phase == ConnectionPhase.RESTORING) {
+                    work?.join()
+                    return@withContext true
+                }
             }
-            if (mutableState.value.phase != ConnectionPhase.FAILED || mutableState.value.problem != ConnectionProblem.STORAGE)
-                return@withContext
+            if (cleanupPending() || mutableState.value.phase != ConnectionPhase.FAILED ||
+                mutableState.value.problem != ConnectionProblem.STORAGE) return@withContext true
             val owner = revision
             retryFailedDeletion()
             removeCredentials(disposition)
@@ -318,6 +324,7 @@ internal class ConnectionController(
                 publish(owner, if (awaitDeletion()) ConnectionState(ConnectionPhase.REAUTH_REQUIRED) else storageFailure())
             }
             work?.join()
+            true
         }
 
     /** A worker supplies its enrolled lifetime. It never retries auth as an explicit user action. */

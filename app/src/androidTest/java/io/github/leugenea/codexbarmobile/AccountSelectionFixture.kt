@@ -48,6 +48,7 @@ internal class AccountSelectionFixture {
     data class AppendReceipt(val directory: File, val admission: HistoryAdmission, val result: HistoryAppendOutcome)
     val appends = java.util.concurrent.CopyOnWriteArrayList<AppendReceipt>()
     private val gates = mutableListOf<SelectionGate>()
+    private val additionalSlots = mutableListOf<UUID>()
     private val originalRootFactory = NativeConnection.rootFactory
     private var installed = false
     private val at = Instant.ofEpochSecond(1_800_000_000)
@@ -56,8 +57,15 @@ internal class AccountSelectionFixture {
         assertTrue(directory.mkdir())
         File(directory, "connection-session").writeText(slot.toString())
         catalog = AccountCatalog.open(directory, { slot })
-        a = seed(AccountStorage(UUID.randomUUID(), slot, true), "A", "12.375")
-        b = seed(AccountStorage.fresh(), "B", "62.5")
+        a = seed(AccountStorage(UUID.randomUUID(), slot, true), "A", "12.375").also { assertTrue(catalog.insert(it)) }
+        b = seed(AccountStorage.fresh(), "B", "62.5").also { assertTrue(catalog.insert(it)) }
+    }
+
+    fun seedAddressed(label: String): CatalogEntry {
+        val name = requireNotNull(AccountDisplayName.from("Synthetic $label"))
+        val address = requireNotNull(catalog.reserveAddition(name, AccountType.CODEX))
+        additionalSlots += address.credentialSlot
+        return seed(address, label, "37.5").also { assertTrue(catalog.admitAddition(it)) }
     }
 
     fun start(): AccountRuntimeOwner {
@@ -105,7 +113,7 @@ internal class AccountSelectionFixture {
             assertTrue(history.writeName(access.partition, AccountDisplayName.from("Synthetic $label")))
             access.partition
         }
-        return CatalogEntry(address, partition, "Synthetic $label", true).also { assertTrue(catalog.insert(it)) }
+        return CatalogEntry(address, partition, "Synthetic $label", true)
     }
 
     fun runtime(entry: CatalogEntry): ConnectionController = requireNotNull(owner.runtime(entry.storage.id))
@@ -218,7 +226,8 @@ internal class AccountSelectionFixture {
         } finally {
             if (installed) NativeConnection.rootFactory = originalRootFactory
             val keys = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-            listOf(a, b).forEach { keys.deleteEntry(KeystoreCredentialStore.alias(context, it.storage.credentialSlot)) }
+            (listOf(a.storage.credentialSlot, b.storage.credentialSlot) + additionalSlots)
+                .forEach { keys.deleteEntry(KeystoreCredentialStore.alias(context, it)) }
             check(directory.parentFile == application.noBackupFilesDir.canonicalFile && directory.name.startsWith("synthetic-selection-"))
             assertTrue(directory.deleteRecursively())
             assertFalse(directory.exists())

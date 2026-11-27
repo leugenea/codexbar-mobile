@@ -352,13 +352,17 @@ internal class AccountRuntimeOwner(
         val entry = matches.singleOrNull()
         if (entry == null && knownStaleUnmatched(snapshot)) return BackgroundRefreshOutcome.Rejected(STALE_LIFETIME)
         val controller = backgroundRuntime(snapshot, entry) ?: return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
-        val receipt = entry?.let { saved -> snapshot.deletions.singleOrNull { it.entry == saved.storage.id } }
-        if (receipt != null) {
-            controller.recoverBackgroundDeletion(receipt.disposition) {
-                !closing && metadata.backgroundSnapshot(target.partition)?.deletions?.contains(receipt) == true
+        if (entry != null) {
+            val receipt = snapshot.deletions.singleOrNull { it.entry == entry.storage.id }
+            val recovering = controller.recoverBackgroundDeletion(target, receipt?.disposition) {
+                when {
+                    closing -> false
+                    receipt == null -> backgroundBinding(metadata, target, entry.storage)
+                    else -> metadata.backgroundSnapshot(target.partition)?.deletions?.contains(receipt) == true
+                }
             }
-            // Only the durable settlement of the exact receipt may cancel this WorkSpec.
-            return BackgroundRefreshOutcome.Rejected(RETIRING)
+            // Only durable settlement can cancel when routing to this exact cleanup.
+            if (receipt != null || recovering) return BackgroundRefreshOutcome.Rejected(RETIRING)
         }
         val outcome = controller.refreshInBackground(target, minimumSuccessAgeMillis) {
             !closing && backgroundBinding(metadata, target, entry?.storage)
@@ -368,8 +372,10 @@ internal class AccountRuntimeOwner(
         return outcome
     }
 
+    // Only the legacy slot can have an unrepresented continuing lifetime. Addressed accounts
+    // enter with a partition and lose it only after RETAIN has settled their old lifetime.
     private fun knownStaleUnmatched(snapshot: CatalogSnapshot): Boolean =
-        snapshot.entries.all { it.partition != null } && snapshot.entries.any { it.storage.legacy }
+        snapshot.entries.any { it.storage.legacy && it.partition != null }
 
     private fun canCancel(metadata: AccountCatalog, target: BackgroundRefreshTarget, address: AccountStorage?): Boolean {
         val snapshot = metadata.backgroundSnapshot(target.partition) ?: return false
