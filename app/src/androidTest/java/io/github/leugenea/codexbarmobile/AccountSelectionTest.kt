@@ -314,9 +314,17 @@ class AccountSelectionTest {
             fixture.select(fixture.b); fixture.phase(b, ConnectionPhase.OBSERVED)
             fixture.await("old A inventory cancellation") { old.cancelled }
             val peer = b.state.value.refresh.inventory.success
-            fixture.aTransport.heldPath = null
             fixture.aTransport.inventoryBody = """{"available_count":3,"credits":[]}"""
-            fixture.select(fixture.a); fixture.phase(a, ConnectionPhase.OBSERVED)
+            // Keep the return flight open for both foreground resume and explicit selection.
+            val usagePath = ReadOperation.USAGE.path
+            fixture.aTransport.heldPath = usagePath
+            fixture.select(fixture.a)
+            fixture.receipt("A return foreground and selection commands", a) { a.commandsSettled() }
+            fixture.await("A return usage held") { fixture.aTransport.liveHeldCall(usagePath) != null }
+            val returnUsage = checkNotNull(fixture.aTransport.liveHeldCall(usagePath))
+            fixture.aTransport.heldPath = null
+            returnUsage.reply() // Leave the cancelled inventory callback held until fresh A is observed.
+            fixture.phase(a, ConnectionPhase.OBSERVED)
             val fresh = a.state.value.refresh.inventory.success
             assertEquals(3L, fresh!!.inventory!!.reportedAvailableCount.value)
             old.reply(); fixture.settle(a)
