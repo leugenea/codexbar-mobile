@@ -80,7 +80,7 @@ internal object NativeConnection {
         rootFactory?.let { factory -> return factory(context).also { owner = it } }
         val periodic = PeriodicUsageRefresh(androidx.work.WorkManager.getInstance(context.applicationContext))
         return createOwner(context, productionTransport(context), SystemTransportClock, { delay(it) },
-            enrollment = periodic::enrollment).also { owner = it }
+            enrollment = periodic::enrollment, cancelEnrollment = periodic::cancel).also { owner = it }
     }
 
     internal suspend fun refreshInBackground(context: Context, target: BackgroundRefreshTarget,
@@ -106,8 +106,10 @@ internal object NativeConnection {
 
     internal fun createOwner(context: Context, transport: AuthTransport, clock: TransportClock,
         pause: suspend (Long) -> Unit, enrollment: (BackgroundRefreshTarget, Boolean) -> Unit = { _, _ -> },
-        openCatalog: () -> AccountCatalog = { catalog(context.applicationContext) }): AccountRuntimeOwner =
-        AccountRuntimeOwner(context, null, transport, clock, pause, enrollment, openCatalog = openCatalog)
+        openCatalog: () -> AccountCatalog = { catalog(context.applicationContext) },
+        cancelEnrollment: (suspend (BackgroundRefreshTarget) -> Unit)? = null): AccountRuntimeOwner =
+        AccountRuntimeOwner(context, null, transport, clock, pause, enrollment,
+            openCatalog = openCatalog, cancelEnrollment = cancelEnrollment)
 
     private fun productionTransport(context: Context): AuthTransport {
         val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "0.1.0"

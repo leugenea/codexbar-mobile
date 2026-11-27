@@ -9,6 +9,7 @@ import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.await
 import androidx.work.workDataOf
 import io.github.leugenea.codexbarmobile.history.HistoryPartition
 import java.util.UUID
@@ -19,6 +20,10 @@ internal class PeriodicUsageRefresh(private val manager: WorkManager) {
     fun enrollment(target: BackgroundRefreshTarget, enrolled: Boolean) {
         if (enrolled) manager.enqueueUniquePeriodicWork(name(target), ExistingPeriodicWorkPolicy.KEEP, request(target))
         else manager.cancelUniqueWork(name(target))
+    }
+
+    suspend fun cancel(target: BackgroundRefreshTarget) {
+        manager.cancelUniqueWork(name(target)).await()
     }
 
     companion object {

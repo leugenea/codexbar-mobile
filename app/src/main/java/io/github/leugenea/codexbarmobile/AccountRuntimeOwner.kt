@@ -33,6 +33,8 @@ internal class AccountRuntimeOwner(
     private val historyStorage: (File) -> HistoryLifetimeStorage = { SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(it)) },
     private val openCatalog: (() -> AccountCatalog)? = null,
     private val beforeAdditionDisplay: () -> Unit = {},
+    // Compatibility fixtures without an acknowledged scheduler keep the original notification seam.
+    private val cancelEnrollment: (suspend (BackgroundRefreshTarget) -> Unit)? = null,
 ) {
     // Retain only application-scoped context. Native fixtures supply a storage-isolating
     // ContextWrapper here, so preserve Context rather than casting it to Application.
@@ -53,8 +55,10 @@ internal class AccountRuntimeOwner(
     private val recovery = Mutex()
     @Volatile private var addition: PendingAddition? = null
     private var additionActivation: AdditionActivation? = null
+    private val cancelling = mutableSetOf<UUID>() // process mutation lane
 
     init {
+        catalog?.let { recoverCancellations(it) }
         if (catalog?.snapshots?.value?.candidate != null) scope.launch(mutations) { recoverAddition() }
     }
 
@@ -176,6 +180,7 @@ internal class AccountRuntimeOwner(
         synchronized(this) {
             if (closing) return null
             catalog = confirmed
+            recoverCancellations(confirmed)
             if (observeDashboard) dashboard()
         }
         return confirmed
@@ -225,7 +230,7 @@ internal class AccountRuntimeOwner(
         fun matches(snapshot: CatalogSnapshot?): Boolean {
             snapshot ?: return false
             val id = entry.storage.id
-            return snapshot.selected == id && snapshot.deletions.none { it.entry == id } &&
+            return snapshot.selected == id && snapshot.physicalDeletions.none { it.entry == id } &&
                 snapshot.entries.any { it.storage == entry.storage && it.partition == entry.partition }
         }
     }
@@ -266,6 +271,7 @@ internal class AccountRuntimeOwner(
     suspend fun registerForeground(): DashboardObserver = withContext(mutations) {
         check(!closing)
         dashboard()
+        catalog?.let { recoverCancellations(it) }
         val token = Any()
         observers.add(token)
         selected.value?.controller?.usageForeground(token, true)
@@ -351,7 +357,13 @@ internal class AccountRuntimeOwner(
         if (matches.size > 1) return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
         val entry = matches.singleOrNull()
         val controller = if (entry == null) {
-            recoverUnmatchedSettlement(metadata, target)?.let { return it }
+            // A live originating ticket may still need to publish the resolved storage failure.
+            val recovered = recoverUnmatchedSettlement(metadata, target)
+            if (snapshot.deletions.any { it.cancelPartition == target.partition }) {
+                recoverCancellations(metadata, target.partition)
+                return recovered ?: BackgroundRefreshOutcome.Rejected(RETIRING)
+            }
+            if (recovered != null) return recovered
             when (unmatchedLegacy(metadata, snapshot, target.partition)) {
                 UnmatchedLegacy.RETIRED -> return BackgroundRefreshOutcome.Rejected(STALE_LIFETIME)
                 UnmatchedLegacy.UNKNOWN -> return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
@@ -361,7 +373,7 @@ internal class AccountRuntimeOwner(
         if (controller == null)
             return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
         if (entry != null) {
-            val receipt = snapshot.deletions.singleOrNull { it.entry == entry.storage.id }
+            val receipt = snapshot.physicalDeletions.singleOrNull { it.entry == entry.storage.id }
             val recovering = controller.recoverBackgroundDeletion(target, receipt?.disposition) {
                 when {
                     closing -> false
@@ -401,7 +413,7 @@ internal class AccountRuntimeOwner(
 
     private fun unmatchedLegacy(metadata: AccountCatalog, snapshot: CatalogSnapshot, partition: HistoryPartition): UnmatchedLegacy {
         val legacy = snapshot.entries.singleOrNull { it.storage.legacy }
-        if (snapshot.deletions.any { it.entry == null || it.entry == legacy?.storage?.id }) return UnmatchedLegacy.UNKNOWN
+        if (snapshot.physicalDeletions.any { it.entry == null || it.entry == legacy?.storage?.id }) return UnmatchedLegacy.UNKNOWN
         // Addressed entries enter with a partition and lose it only after settlement. A bound
         // legacy entry therefore completes the catalog's account of continuing lifetimes.
         val decision = if (legacy?.partition != null) UnmatchedLegacy.RETIRED else {
@@ -420,7 +432,7 @@ internal class AccountRuntimeOwner(
     private fun canCancel(metadata: AccountCatalog, target: BackgroundRefreshTarget, address: AccountStorage): Boolean {
         val snapshot = metadata.backgroundSnapshot(target.partition) ?: return false
         return snapshot.entries.none { it.partition == target.partition &&
-            (it.storage != address || snapshot.deletions.any { receipt -> receipt.entry == it.storage.id }) }
+            (it.storage != address || snapshot.physicalDeletions.any { receipt -> receipt.entry == it.storage.id }) }
     }
 
 
@@ -428,7 +440,34 @@ internal class AccountRuntimeOwner(
         val snapshot = metadata.backgroundSnapshot(target.partition) ?: return false
         val entry = snapshot.entries.singleOrNull { it.partition == target.partition } ?: return false
         return (if (address == null) entry.storage.legacy else entry.storage == address) &&
-            snapshot.deletions.none { it.entry == entry.storage.id } && addition?.address != entry.storage
+            snapshot.physicalDeletions.none { it.entry == entry.storage.id } && addition?.address != entry.storage
+    }
+
+    /** The process owns the ACK even if WorkManager stops the worker that found the receipt. */
+    private fun recoverCancellations(metadata: AccountCatalog, only: HistoryPartition? = null) {
+        val cancel = cancelEnrollment ?: return
+        scope.launch(mutations) {
+            if (closing) return@launch
+            val pending = try { metadata.pendingCancellations() } catch (_: Exception) { return@launch }
+            pending.forEach { receipt ->
+                val partition = requireNotNull(receipt.cancelPartition)
+                if ((only != null && partition != only) || !cancelling.add(receipt.operation)) return@forEach
+                launch cancelReceipt@{
+                    try {
+                        if (closing) return@cancelReceipt
+                        cancel(BackgroundRefreshTarget(partition))
+                        ensureActive()
+                        metadata.acknowledgeCancellation(receipt)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // Leave the receipt for process/foreground recovery or the next exact worker.
+                    } finally {
+                        cancelling.remove(receipt.operation)
+                    }
+                }
+            }
+        }
     }
 
     /** Compatibility ingress, including the empty installation before legacy adoption. */
@@ -454,8 +493,10 @@ internal class AccountRuntimeOwner(
         val store = credentials(applicationContext, slot)
         val directory = address?.historyDirectory(root) ?: File(root, "usage-history")
         val history = metadata?.let {
-            HistoryLifetimeCoordinator(CatalogHistoryStorage(historyStorage(directory), it, address) { partition ->
-                enrollment(BackgroundRefreshTarget(partition), false)
+            HistoryLifetimeCoordinator(CatalogHistoryStorage(historyStorage(directory), it, address,
+                retainCancellation = cancelEnrollment != null) { partition ->
+                if (cancelEnrollment == null) enrollment(BackgroundRefreshTarget(partition), false)
+                else recoverCancellations(it, partition)
             })
         }
         return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),

@@ -207,7 +207,9 @@ class PeriodicUsageRefreshTest {
         try {
             val removed = if (legacy) f.a else f.b
             val peer = if (legacy) f.b else f.a
-            f.enrollment = PeriodicUsageRefresh(manager)::enrollment
+            val periodic = PeriodicUsageRefresh(manager)
+            f.enrollment = periodic::enrollment
+            f.cancelEnrollment = periodic::cancel
             f.start()
             val target = BackgroundRefreshTarget(requireNotNull(removed.partition))
             val peerTarget = BackgroundRefreshTarget(requireNotNull(peer.partition))
@@ -254,6 +256,9 @@ class PeriodicUsageRefreshTest {
                 assertFalse(f.keyExists(removed))
                 assertFalse(File(removed.storage.historyDirectory(f.directory), "history.db").exists())
             } else f.assertRemoved(removed)
+            f.await("successful WorkManager cancellation and catalog ACK") {
+                info(work).state == WorkInfo.State.CANCELLED && raw.read().deletions.isEmpty()
+            }
             val settled = raw.read()
             assertTrue(settled.deletions.isEmpty())
             assertEquals(peer.storage.id, settled.selected)
@@ -520,6 +525,85 @@ class PeriodicUsageRefreshTest {
             assertEquals(legacyWork, unique(legacyTarget).single().id)
             assertEquals(settled, raw.read())
             assertEquals(legacyBytes, f.bytes(legacy))
+            assertTrue(constructed.isEmpty())
+            assertTrue(openedHistory.isEmpty())
+            assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())
+        } finally { f.cleanup() }
+    }
+
+    @Test fun originalAddressedJobRecoversRemovalWithoutABoundLegacyEntry() =
+        addressedCancellationCrashCut(afterWorkManagerAck = false)
+
+    @Test fun coldOwnerReclaimsAcknowledgedAddressedReceiptWithoutAWorker() =
+        addressedCancellationCrashCut(afterWorkManagerAck = true)
+
+    private fun addressedCancellationCrashCut(afterWorkManagerAck: Boolean) {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        try {
+            val removed = f.seedAddressed("C")
+            val target = BackgroundRefreshTarget(requireNotNull(removed.partition))
+            val targetB = BackgroundRefreshTarget(requireNotNull(f.b.partition))
+            val periodic = PeriodicUsageRefresh(manager)
+            val cut = CompletableDeferred<Unit>()
+            f.enrollment = periodic::enrollment
+            f.cancelEnrollment = { lifetime ->
+                if (lifetime == target) {
+                    if (afterWorkManagerAck) periodic.cancel(lifetime)
+                    cut.complete(Unit)
+                    awaitCancellation() // Process dies before submission or before the catalog ACK.
+                } else periodic.cancel(lifetime)
+            }
+            assertTrue(f.catalog.select(f.b.storage.id))
+            f.start(); f.installActivity()
+            val a = f.runtime(f.a)
+            f.phase(a, ConnectionPhase.RESTORED)
+            a.signOut()
+            f.phase(a, ConnectionPhase.SIGNED_OUT)
+            f.assertRemoved(f.a)
+            val raw = CatalogFile(File(f.directory, "account-catalog"))
+            f.await("A's cancellation receipt was acknowledged") { raw.read().deletions.isEmpty() }
+            assertTrue(raw.read().entries.none { it.storage.legacy })
+
+            val work = enrollSaved(f, removed)
+            val workB = enrollSaved(f, f.b)
+            val bInfo = info(workB)
+            val c = f.runtime(removed)
+            c.signOut()
+            f.phase(c, ConnectionPhase.SIGNED_OUT)
+            f.receipt("reach the exact addressed cancellation cut") { cut.await() }
+            val settled = raw.read()
+            assertEquals(listOf(f.b), settled.entries)
+            assertEquals(f.b.storage.id, settled.selected)
+            assertEquals(settled, f.catalog.snapshots.value)
+            assertEquals(removed.storage.id, settled.deletions.single().entry)
+            assertEquals(target.partition, settled.deletions.single().cancelPartition)
+            assertTrue(settled.physicalDeletions.isEmpty())
+            val originalState = if (afterWorkManagerAck) WorkInfo.State.CANCELLED else WorkInfo.State.ENQUEUED
+            assertEquals(originalState, info(work).state)
+            f.assertRemoved(removed)
+            f.receipt("discard the process while the catalog receipt is still durable") { f.owner.shutdown() }
+            val bBytes = f.bytes(f.b)
+
+            val constructed = CopyOnWriteArrayList<UUID>()
+            val openedHistory = CopyOnWriteArrayList<File>()
+            val requests = f.aTransport.requests.get() to f.bTransport.requests.get()
+            val cDirectory = removed.storage.historyDirectory(f.directory)
+            val cBinding = File(cDirectory, "binding").readBytes()
+            f.decorateCredential = { slot, store -> store.also { constructed += slot } }
+            f.decorateHistory = { path, storage -> storage.also { openedHistory += path } }
+            f.cancelEnrollment = periodic::cancel
+            f.catalog = AccountCatalog.open(f.directory, { error("settled catalog required") })
+            f.installActivity { f.start() }
+            if (afterWorkManagerAck) f.start() else dispatchOsJob(awaitJob(work), work)
+            f.await("original C job cancelled and its durable receipt acknowledged") {
+                info(work).state == WorkInfo.State.CANCELLED && raw.read().deletions.isEmpty()
+            }
+            assertEquals(settled.copy(deletions = emptyList()), raw.read())
+            assertEquals(workB, unique(targetB).single().id)
+            assertEquals(bInfo, info(workB))
+            assertEquals(bBytes, f.bytes(f.b))
+            assertArrayEquals(cBinding, File(cDirectory, "binding").readBytes())
             assertTrue(constructed.isEmpty())
             assertTrue(openedHistory.isEmpty())
             assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())

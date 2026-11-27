@@ -426,6 +426,68 @@ class AccountCatalogTest {
         assertEquals(listOf(b), catalog.snapshot().entries)
     }
 
+    @Test fun settledReceiptSurvivesRestartAndFailedAckWithoutBlockingRetainedSuccessor() {
+        for (disposition in CleanupDisposition.entries) {
+            val root = temporary.newFolder()
+            val catalog = open(root)
+            val a = catalog.adopt(partition, named("Synthetic A"))
+            val b = other("Synthetic B").also { assertTrue(catalog.insert(it)) }
+            val physical = catalog.beginDeletion(a.storage.id, disposition)
+            assertTrue(catalog.deletionSettlement(physical, retainCancellation = true)())
+            var failAck = false
+            val restored = open(root) { if (failAck) throw IOException("catalog ACK not installed") }
+            val receipt = physical.copy(cancelPartition = partition)
+            assertEquals(listOf(receipt), restored.pendingCancellations())
+            assertTrue(restored.snapshot().physicalDeletions.isEmpty())
+            assertFalse(restored.completeDeletion(receipt))
+            val successor = HistoryPartition(UUID(0, 24))
+            if (disposition == CleanupDisposition.RETAIN) {
+                assertEquals(a.copy(partition = null), restored.entry(a.storage.id))
+                assertEquals(successor, restored.adopt(successor, named("Synthetic A")).partition)
+            } else {
+                assertNull(restored.entry(a.storage.id))
+                assertEquals(successor, restored.adopt(successor, named("Synthetic successor")).partition)
+            }
+            val current = restored.snapshot()
+            restored.acknowledgeCancellation(receipt.copy(operation = UUID(0, 25)))
+            assertEquals(current, restored.snapshot())
+            failAck = true
+            assertThrows(IOException::class.java) { restored.acknowledgeCancellation(receipt) }
+            assertEquals(current, open(root).snapshot())
+            failAck = false
+            restored.acknowledgeCancellation(receipt)
+            assertEquals(current.copy(deletions = emptyList()), open(root).snapshot())
+            assertEquals(b, restored.entry(b.storage.id))
+        }
+    }
+
+    @Test fun v4PhysicalReceiptAndCandidateStillDecodeWithoutCancellationAuthority() {
+        val root = temporary.newFolder()
+        open(root)
+        val operation = UUID(0, 44)
+        val candidate = AccountStorage(UUID(0, 45), UUID(0, 46))
+        val payload = java.io.ByteArrayOutputStream()
+        java.io.DataOutputStream(payload).use { out ->
+            fun uuid(value: UUID) { out.writeLong(value.mostSignificantBits); out.writeLong(value.leastSignificantBits) }
+            out.writeInt(0x41433400); uuid(slot)
+            out.writeBoolean(false); out.writeInt(0) // selection and entries
+            out.writeBoolean(false); out.writeInt(1) // rename and one physical receipt
+            out.writeBoolean(false); uuid(operation); out.writeUTF("RETAIN")
+            out.writeBoolean(true); uuid(candidate.id); uuid(candidate.credentialSlot)
+        }
+        val bytes = payload.toByteArray()
+        java.io.DataOutputStream(File(root, "account-catalog/catalog").outputStream()).use {
+            it.write(bytes); it.writeLong(java.util.zip.CRC32().apply { update(bytes) }.value)
+        }
+        val restored = open(root)
+        val receipt = CatalogDeletion(null, operation, CleanupDisposition.RETAIN)
+        assertEquals(listOf(receipt), restored.snapshot().physicalDeletions)
+        assertEquals(candidate, restored.snapshot().candidate)
+        assertTrue(restored.pendingCancellations().isEmpty())
+        assertTrue(restored.discardAddition(candidate))
+        assertEquals(listOf(receipt), open(root).snapshot().physicalDeletions)
+    }
+
     @Test fun legacyV1ReceiptRetainsItsOperationAndOnlyItsLegacyEntry() {
         for (pending in listOf(false, true)) {
             val root = temporary.newFolder()

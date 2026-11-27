@@ -27,7 +27,7 @@ internal class CatalogFile(private val directory: File, private val beforeRename
         require(CRC32().apply { update(payload) }.value == checksum)
         return DataInputStream(ByteArrayInputStream(payload)).use { input ->
             val version = input.readInt()
-            require(version in listOf(MAGIC, V3_MAGIC, V2_MAGIC, LEGACY_MAGIC))
+            require(version in listOf(MAGIC, V4_MAGIC, V3_MAGIC, V2_MAGIC, LEGACY_MAGIC))
             val slot = input.uuid()
             val selected = if (input.readBoolean()) input.uuid() else null
             val count = input.readInt().also { require(it >= 0) }
@@ -35,7 +35,7 @@ internal class CatalogFile(private val directory: File, private val beforeRename
             repeat(count) { entries += input.entry() }
             val rename = if (input.readBoolean()) CatalogRename(input.uuid(), input.name()) else null
             val deletions = input.deletions(version, entries)
-            val candidate = if (version == MAGIC && input.readBoolean()) AccountStorage(input.uuid(), input.uuid()) else null
+            val candidate = if ((version == MAGIC || version == V4_MAGIC) && input.readBoolean()) AccountStorage(input.uuid(), input.uuid()) else null
             require(input.read() == -1)
             CatalogSnapshot(slot, entries, selected, rename, deletions, candidate).also(::validate)
         }
@@ -58,6 +58,8 @@ internal class CatalogFile(private val directory: File, private val beforeRename
                 output.writeBoolean(receipt.entry != null); receipt.entry?.let { output.uuid(it) }
                 output.uuid(receipt.operation)
                 output.writeUTF(receipt.disposition.name)
+                output.writeBoolean(receipt.cancelPartition != null)
+                receipt.cancelPartition?.let { output.uuid(it.value) }
             }
             output.writeBoolean(state.candidate != null)
             state.candidate?.let { output.uuid(it.id); output.uuid(it.credentialSlot) }
@@ -94,9 +96,15 @@ internal class CatalogFile(private val directory: File, private val beforeRename
         checkAvailableAddress(state)
         require(state.selected == null || state.entries.any { it.storage.id == state.selected })
         state.rename?.let { validateRename(it, state.entries) }
-        require(state.deletions.map { it.entry }.distinct().size == state.deletions.size)
+        val physical = state.physicalDeletions
+        require(physical.map { it.entry }.distinct().size == physical.size)
         require(state.deletions.map { it.operation }.distinct().size == state.deletions.size)
-        require(state.deletions.all { it.entry == null || state.entries.any { entry -> entry.storage.id == it.entry } })
+        require(physical.all { it.entry == null || state.entries.any { entry -> entry.storage.id == it.entry } })
+        val settled = state.deletions.filter { it.cancelPartition != null }
+        require(settled.all { it.entry != null })
+        val cancellations = settled.mapNotNull { it.cancelPartition }.toSet()
+        require(cancellations.size == settled.size)
+        require(state.entries.none { it.partition?.let(cancellations::contains) == true })
     }
 
     private fun validateEntry(entry: CatalogEntry, slot: UUID) {
@@ -118,12 +126,16 @@ internal class CatalogFile(private val directory: File, private val beforeRename
             if (!readBoolean()) return emptyList()
             return listOf(CatalogDeletion(entries.singleOrNull { it.storage.legacy }?.storage?.id, uuid()))
         }
-        val count = readInt().also { require(it in 0..entries.size + 1) }
+        val count = readInt()
+        // A settled receipt can outlive its entry; bound allocation by the remaining payload.
+        require(count in 0..(if (version == MAGIC) available() / MIN_V5_RECEIPT_BYTES else entries.size + 1))
         return List(count) {
             val entry = if (readBoolean()) uuid() else null
             val operation = uuid()
-            val disposition = if (version == MAGIC || version == V3_MAGIC) CleanupDisposition.valueOf(readUTF()) else CleanupDisposition.REMOVE
-            CatalogDeletion(entry, operation, disposition)
+            val disposition = if (version == MAGIC || version == V4_MAGIC || version == V3_MAGIC)
+                CleanupDisposition.valueOf(readUTF()) else CleanupDisposition.REMOVE
+            val cancellation = if (version == MAGIC && readBoolean()) HistoryPartition(uuid()) else null
+            CatalogDeletion(entry, operation, disposition, cancellation)
         }
     }
 
@@ -147,7 +159,9 @@ internal class CatalogFile(private val directory: File, private val beforeRename
         private const val LEGACY_MAGIC = 0x41433100
         private const val V2_MAGIC = 0x41433200
         private const val V3_MAGIC = 0x41433300
-        private const val MAGIC = 0x41433400
+        private const val V4_MAGIC = 0x41433400
+        private const val MAGIC = 0x41433500
+        private const val MIN_V5_RECEIPT_BYTES = 1 + 16 + 2 + 6 + 1 // flags, operation, UTF length + REMOVE/RETAIN
     }
 }
 
