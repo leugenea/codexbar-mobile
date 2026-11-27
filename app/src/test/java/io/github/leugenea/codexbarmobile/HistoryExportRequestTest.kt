@@ -101,7 +101,7 @@ class HistoryExportRequestTest {
         val destination = CompletableDeferred<Unit>()
         var written: String? = null
         request.start(owner, backgroundScope, prepare = { "old" }, launch = {}, failure = { fail("Old launch") })
-        owner.retire()
+        owner.detach()
         request.retire(owner)
         assertFalse(request.busy.value)
         request.start(successor, backgroundScope, prepare = { "new" }, launch = {}, failure = { fail("New launch") })
@@ -112,7 +112,7 @@ class HistoryExportRequestTest {
             destination.await()
             written = it
         }
-        successor.retire()
+        successor.detach()
         request.retire(successor)
         assertTrue(request.busy.value)
         assertNull(request.pending)

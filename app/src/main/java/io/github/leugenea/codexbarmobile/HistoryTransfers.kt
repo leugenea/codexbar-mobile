@@ -38,16 +38,17 @@ internal class HistoryTransfers {
         }
     }
 
-    fun rebindPickers(previous: HistoryPickerOwner, successor: HistoryPickerOwner) {
-        export.rebind(previous, successor)
-        importPicker.rebind(previous, successor)
-        previous.retire()
+    fun rebindPickers(restoredId: String, successor: HistoryPickerOwner) {
+        export.rebind(restoredId, successor)
+        importPicker.rebind(restoredId, successor)
     }
 
-    fun retirePickers(owner: HistoryPickerOwner) {
-        owner.retire()
-        export.retire(owner)
-        importPicker.retire(owner)
+    fun detachPickers(owner: HistoryPickerOwner, finishing: Boolean) {
+        owner.detach()
+        if (finishing) {
+            export.retire(owner)
+            importPicker.retire(owner)
+        }
     }
 
     fun close() = scope.cancel()

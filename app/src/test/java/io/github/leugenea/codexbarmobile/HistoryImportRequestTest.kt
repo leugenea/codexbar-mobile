@@ -23,7 +23,14 @@ class HistoryImportRequestTest {
         assertTrue(request.busy.value)
         val recreated = CoroutineScope(Job() + StandardTestDispatcher(testScheduler))
         val successor = HistoryPickerOwner()
-        request.rebind(owner, successor)
+        val restoredId = owner.savedId
+        val unrelated = HistoryPickerOwner()
+        request.rebind(restoredId, unrelated) // A live owner cannot be displaced.
+        request.finish(unrelated, recreated) { fail("Live picker was displaced") }
+        owner.detach()
+        request.rebind(unrelated.savedId, successor)
+        request.finish(successor, recreated) { fail("Unrelated saved state claimed the picker") }
+        request.rebind(restoredId, successor)
         request.retire(owner)
         request.finish(owner, recreated) { fail("Old registry must not consume the rebound request") }
         assertSame(target, request.pending)

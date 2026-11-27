@@ -43,7 +43,9 @@ class MainActivity : ComponentActivity() {
         // Activities observe the process owner; destruction never closes its work.
         dashboard = NativeConnection.dashboard(applicationContext)
         transfers = NativeConnection.historyTransfers
-        restorePickerOwner()
+        // The registry and Compose launcher keys restore from saved state, even without NonConfig.
+        // This opaque ID only correlates the immediately preceding, detached in-memory owner.
+        savedInstanceState?.getString(HISTORY_PICKER_OWNER)?.let { transfers.rebindPickers(it, pickerOwner) }
         enableEdgeToEdge()
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
@@ -71,17 +73,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Match the registry's configuration handoff without putting process permissions in saved state.
-    @Suppress("DEPRECATION")
-    private fun restorePickerOwner() {
-        (lastCustomNonConfigurationInstance as? HistoryPickerOwner)?.let { transfers.rebindPickers(it, pickerOwner) }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(HISTORY_PICKER_OWNER, pickerOwner.savedId)
     }
 
-    @Suppress("OVERRIDE_DEPRECATION")
-    override fun onRetainCustomNonConfigurationInstance(): Any = pickerOwner
-
     override fun onDestroy() {
-        if (isFinishing) transfers.retirePickers(pickerOwner)
+        transfers.detachPickers(pickerOwner, isFinishing)
         super.onDestroy()
     }
 
@@ -108,6 +106,8 @@ class MainActivity : ComponentActivity() {
     }
 
     internal companion object {
+        private const val HISTORY_PICKER_OWNER = "io.github.leugenea.codexbarmobile.historyPickerOwner"
+
         @set:androidx.annotation.VisibleForTesting(otherwise = androidx.annotation.VisibleForTesting.NONE)
         internal var historyUiObserver: HistoryUiObserver? = null
         var browserLauncher: (MainActivity, Intent) -> Unit = { activity, intent -> activity.startActivity(intent) }

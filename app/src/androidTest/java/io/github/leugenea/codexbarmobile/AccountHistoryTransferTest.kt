@@ -164,8 +164,11 @@ class AccountHistoryTransferTest {
             val bytesB = fixture.bytes(fixture.b)
             val requestsB = fixture.bTransport.counts()
             assertReads(fixture.bTransport, 1L, "Initial B selection")
+            val beforeRecreation = outstandingCodes()
+            assertEquals(setOf(open, export), beforeRecreation)
             scenario.recreate()
             awaitConnectionScreen(compose, b)
+            assertRestoredWithoutCustomNonConfig(beforeRecreation)
             settings(b)
             compose.onNodeWithTag("history-import").performScrollTo().assertIsNotEnabled()
             compose.onNodeWithTag("history-export").performScrollTo().assertIsNotEnabled()
@@ -191,6 +194,7 @@ class AccountHistoryTransferTest {
             returnDashboard(compose, a)
             scenario.recreate()
             awaitConnectionScreen(compose, a)
+            assertRestoredWithoutCustomNonConfig(setOf(successor))
             deliver(successor, file)
             awaitConfirmation()
             compose.onNodeWithTag("account-settings").assertDoesNotExist()
@@ -394,6 +398,14 @@ class AccountHistoryTransferTest {
             compose.waitUntil(10_000) { monitor.hits == 1 }
             return (outstandingCodes() - before).single()
         } finally { instrumentation.removeMonitor(monitor) }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun assertRestoredWithoutCustomNonConfig(expected: Set<Int>) {
+        // Configuration relaunch, not OS reclamation: the production picker handoff has only
+        // saved state available, and the original request codes must belong to the new registry.
+        scenario.onActivity { assertNull(it.lastCustomNonConfigurationInstance) }
+        assertEquals(expected, outstandingCodes())
     }
 
     private fun outstandingCodes(): Set<Int> {
