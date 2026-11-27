@@ -15,12 +15,15 @@ import io.github.leugenea.codexbarmobile.usage.UsageObservation
 
 @Composable
 internal fun DashboardScreen(state: ConnectionState, openAccountSettings: () -> Unit,
-    source: HistoryGraphSnapshot, current: HistoryPresentationRequest.Current, authority: HistoryDisplayContext?, observer: HistoryUiObserver?) {
+    source: HistoryGraphSnapshot, current: HistoryPresentationRequest.Current, authority: HistoryDisplayContext?, observer: HistoryUiObserver?, selection: DashboardSelection) {
     val time = phoneTimeConfiguration()
     val usage = UsagePresentation.present(state, time.zone, time.locale)
     val five = currentHistoryForDisplay(source, current, WindowKind.FIVE_HOUR, authority)
     val weekly = currentHistoryForDisplay(source, current, WindowKind.WEEKLY, authority)
-    SideEffect { observer?.projectedCurrent(source, five, weekly, state.refresh.evaluatedAt) }
+    SideEffect {
+        observer?.dashboardProjected(selection, usage)
+        observer?.projectedCurrent(source, five, weekly, state.refresh.evaluatedAt)
+    }
     Column(Modifier.fillMaxWidth().testTag("dashboard"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         DashboardStatus(state, usage, time)
         if (DashboardPresentation.loginVisible(state.phase)) AccountSettingsLink(openAccountSettings)

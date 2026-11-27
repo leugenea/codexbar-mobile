@@ -75,34 +75,33 @@ class HistoryImportLifecycleTest {
                     it.request == HistoryPresentationRequest.Idle && it.storage == null && it.currentPages == null && it.partition != null
                 } && fixture.owner.currentHistoryDisplayContext()?.generation != null }
                 compose.onNodeWithTag("history-import").performScrollTo().assertIsEnabled().performClick()
-                await("cancelled SAF picker busy reset") { captured.get() != null && !fixture.owner.historyImporterState.picker.busy.value }
-                assertNull(fixture.owner.historyImporterState.picker.pending)
-                assertNull(fixture.owner.historyImporterState.confirmation.value)
+                await("cancelled SAF picker busy reset") { captured.get() != null && !NativeConnection.historyTransfers.importPicker.busy.value }
+                assertNull(NativeConnection.historyTransfers.importPicker.pending)
+                assertNull(NativeConnection.historyTransfers.confirmation.value)
                 assertNull(snapshot(access).lastAdmitted)
                 compose.onNodeWithTag("history-import").assertIsEnabled().performClick()
-                await("SAF result read") { fixture.owner.historyImporterState.confirmation.value != null }
+                await("SAF result read") { NativeConnection.historyTransfers.confirmation.value != null }
                 assertEquals("*/*", captured.get().type)
                 assertArrayEquals(arrayOf("application/json"), captured.get().getStringArrayExtra(Intent.EXTRA_MIME_TYPES))
                 compose.onNodeWithText(fixture.context.getString(R.string.history_import_confirmation)).assertIsDisplayed()
                 assertNull(snapshot(access).lastAdmitted)
-                val pending = fixture.owner.historyImporterState
+                val pending = NativeConnection.historyTransfers
                 val selection = requireNotNull(pending.confirmation.value)
                 compose.onNodeWithTag("history-import").assertIsNotEnabled()
                 scenario.recreate()
                 awaitConnectionScreen(compose, fixture.owner)
-                scenario.onActivity { assertSame(pending, it.connection.historyImporterState) }
                 assertSame(selection, pending.confirmation.value)
                 compose.onNodeWithTag("account-settings").assertDoesNotExist()
                 compose.onNodeWithTag("history-import-cancel").assertIsDisplayed()
                 compose.onNodeWithTag("history-import-cancel").performClick()
-                await("confirmation cancellation settled") { pending.confirmation.value == null && !pending.picker.busy.value }
+                await("confirmation cancellation settled") { pending.confirmation.value == null && !pending.importPicker.busy.value }
                 assertNull(snapshot(access).lastAdmitted)
                 openDetailRoute(compose, fixture.owner, DashboardRoute.ACCOUNT_SETTINGS)
                 compose.onNodeWithTag("history-import").performScrollTo().performClick()
-                await("second confirmation") { fixture.owner.historyImporterState.confirmation.value != null }
+                await("second confirmation") { NativeConnection.historyTransfers.confirmation.value != null }
                 compose.onNodeWithTag("history-import-confirm").performClick()
                 await("import result toast without a history page") { toast.get() == message && !pending.importing.value &&
-                    !pending.picker.busy.value && snapshot(access).lastAdmitted == ObservationId(35) }
+                    !pending.importPicker.busy.value && snapshot(access).lastAdmitted == ObservationId(35) }
                 compose.onNodeWithTag("history-import").assertIsEnabled()
                 openDetailRoute(compose, fixture.owner, DashboardRoute.LOCAL_HISTORY_DETAILS)
                 await("imported history published on explicit navigation") {
@@ -126,7 +125,7 @@ class HistoryImportLifecycleTest {
     private fun verifyPendingImportCannotTargetSuccessor(toast: AtomicReference<String>, unavailable: String) {
         openDetailRoute(compose, fixture.owner, DashboardRoute.ACCOUNT_SETTINGS)
         compose.onNodeWithTag("history-import").performScrollTo().performClick()
-        val pending = fixture.owner.historyImporterState
+        val pending = NativeConnection.historyTransfers
         await("predecessor confirmation selected") { pending.confirmation.value != null }
         val selection = requireNotNull(pending.confirmation.value)
         fixture.owner.signOut()
@@ -140,15 +139,15 @@ class HistoryImportLifecycleTest {
         val ready = fixture.owner.session.snapshot() as SessionResult.Ready
         val successor = requireNotNull(fixture.owner.historyCapability(ready.envelope.generation))
         await("successor records ordinal one independently") { snapshot(successor).lastAdmitted == ObservationId(1) }
-        assertNotSame(selection.target.generation, ready.envelope.generation)
-        assertNotEquals(selection.target.partition, successor.partition)
+        assertNotSame(selection.picker.target.generation, ready.envelope.generation)
+        assertNotEquals(selection.picker.target.partition, successor.partition)
         val before = requireNotNull(successor.exportHistory("native", Instant.EPOCH))
         val requests = fixture.transport.requests.get()
         assertEquals("Only explicit successor sign-in admits its five requests", signedOutRequests + 5, requests)
         toast.set(null)
         compose.onNodeWithTag("history-import-confirm").performClick()
         await("stale confirmation rejected and reported at owner boundary") { toast.get() == unavailable &&
-            pending.confirmation.value == null && !pending.importing.value && !pending.picker.busy.value }
+            pending.confirmation.value == null && !pending.importing.value && !pending.importPicker.busy.value }
         assertEquals("A predecessor file cannot replace successor history", before, successor.exportHistory("native", Instant.EPOCH))
         compose.onNodeWithTag("history-import").assertIsEnabled()
         assertEquals("Rejecting a stale local import adds no provider requests", requests, fixture.transport.requests.get())

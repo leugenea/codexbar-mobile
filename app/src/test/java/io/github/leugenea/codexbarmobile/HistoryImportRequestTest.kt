@@ -11,31 +11,46 @@ import java.util.UUID
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HistoryImportRequestTest {
+    private val owner = HistoryPickerOwner()
+
     @Test fun importPickerKeepsOriginalLifetimeAcrossRecreationAndDropsCancelledRead() = runTest {
-        val state = HistoryImporterState()
+        val request = HistoryDocumentRequest<HistoryImportTarget>()
         val target = HistoryImportTarget(SessionGeneration(LocalCredentialNamespace()), HistoryPartition(UUID(1, 2)))
         val old = CoroutineScope(Job() + StandardTestDispatcher(testScheduler))
-        state.picker.start(old, prepare = { target }, launch = {}, failure = { fail("No failure") })
+        request.start(owner, old, prepare = { target }, launch = {}, failure = { fail("No failure") })
         old.cancel(); runCurrent()
-        assertSame(target, state.picker.pending)
-        assertTrue(state.picker.busy.value)
+        assertSame(target, request.pending)
+        assertTrue(request.busy.value)
         val recreated = CoroutineScope(Job() + StandardTestDispatcher(testScheduler))
-        state.picker.finish(recreated) { captured ->
+        val successor = HistoryPickerOwner()
+        val restoredId = owner.savedId
+        val unrelated = HistoryPickerOwner()
+        request.rebind(restoredId, unrelated) // A live owner cannot be displaced.
+        request.finish(unrelated, recreated) { fail("Live picker was displaced") }
+        owner.detach()
+        request.rebind(unrelated.savedId, successor)
+        request.finish(successor, recreated) { fail("Unrelated saved state claimed the picker") }
+        request.rebind(restoredId, successor)
+        request.retire(owner)
+        request.finish(owner, recreated) { fail("Old registry must not consume the rebound request") }
+        assertSame(target, request.pending)
+        var read = false
+        request.finish(successor, recreated) { captured ->
             assertSame(target, captured)
             withContext(StandardTestDispatcher(testScheduler)) {
-                state.confirmation.value = HistoryImportSelection(requireNotNull(captured), "file")
+                read = true
             }
         }
         recreated.cancel(); runCurrent()
-        assertFalse(state.picker.busy.value)
-        assertNull(state.picker.pending)
-        assertNull(state.confirmation.value)
+        assertFalse(request.busy.value)
+        assertNull(request.pending)
+        assertFalse(read)
     }
 
     @Test fun importAdmissionCancelledBeforeDispatchCannotOpenPickerOrStrandBusy() = runTest {
-        val request = HistoryImporterState().picker
+        val request = HistoryDocumentRequest<HistoryImportTarget>()
         val scope = CoroutineScope(Job() + StandardTestDispatcher(testScheduler))
-        request.start(scope, prepare = { withContext(StandardTestDispatcher(testScheduler)) { error("Cancelled preparation") } },
+        request.start(owner, scope, prepare = { withContext(StandardTestDispatcher(testScheduler)) { error("Cancelled preparation") } },
             launch = { fail("Cancelled picker") }, failure = { fail("Cancellation is not failure") })
         scope.cancel(); runCurrent()
         assertFalse(request.busy.value)

@@ -41,14 +41,12 @@ internal fun allowedDashboardRoute(requested: DashboardRoute, diagnosticsEnabled
 /** Only ephemeral presentation choices; no saved account, payload, cursor or capability. */
 @Composable
 internal fun ConnectionScreen(state: ConnectionState, controller: ConnectionController, openBrowser: () -> Unit,
-    observer: HistoryUiObserver? = null, selection: DashboardSelection? = null) {
+    observer: HistoryUiObserver?, selection: DashboardSelection, exporter: HistoryExporter, importer: HistoryImporter) {
     var selectedRoute by remember(controller) { mutableStateOf(DashboardRoute.DASHBOARD) }
     // Normalize before Back, history interest, header and content; never render a denied route.
     val route = allowedDashboardRoute(selectedRoute, BuildConfig.DEBUG)
     val drawer = remember(controller) { DrawerState(DrawerValue.Closed) }
     val scope = rememberCoroutineScope()
-    val exporter = historyExporter(controller)
-    val importer = historyImporter(controller)
     BackHandler(drawer.isOpen || route != DashboardRoute.DASHBOARD) {
         if (drawer.isOpen) scope.launch { drawer.close() } else selectedRoute = DashboardRoute.DASHBOARD
     }
@@ -81,10 +79,10 @@ private fun DetailDrawer(route: DashboardRoute, select: (DashboardRoute) -> Unit
 
 @Composable
 private fun ConnectionRoute(state: ConnectionState, controller: ConnectionController, route: DashboardRoute,
-    openBrowser: () -> Unit, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter, selection: DashboardSelection?, openDrawer: () -> Unit, back: () -> Unit, openAccountSettings: () -> Unit) {
+    openBrowser: () -> Unit, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter, selection: DashboardSelection, openDrawer: () -> Unit, back: () -> Unit, openAccountSettings: () -> Unit) {
     val source = collectedHistory(controller, observer)
     // Collection triggers a pass; this actual volatile slot is the permission on that pass.
-    val authority = if (selection == null) controller.currentHistoryDisplayContext() else selection.historyContext()
+    val authority = selection.historyContext()
     val periods = authority?.periods ?: CurrentHistoryPeriods()
     var kind by remember(controller, source.generation) { mutableStateOf(WindowKind.FIVE_HOUR) }
     var after by remember(controller, source.generation, route) { mutableStateOf<ObservationId?>(null) }
@@ -98,7 +96,7 @@ private fun ConnectionRoute(state: ConnectionState, controller: ConnectionContro
             verticalArrangement = Arrangement.spacedBy(if (route == DashboardRoute.DASHBOARD) 4.dp else 20.dp)) {
             RouteHeader(route, openDrawer, back)
             RouteContent(route, state, controller, openBrowser, openAccountSettings, source, authority, current, navigation, observer, exporter, importer,
-                { kind = it.kind }, { after = it })
+                selection, { kind = it.kind }, { after = it })
         }
     }
 }
@@ -133,9 +131,10 @@ private fun RouteHeader(route: DashboardRoute, openDrawer: () -> Unit, back: () 
 @Composable
 private fun RouteContent(route: DashboardRoute, state: ConnectionState, controller: ConnectionController,
     browser: () -> Unit, openAccountSettings: () -> Unit, source: HistoryGraphSnapshot, authority: HistoryDisplayContext?, current: HistoryPresentationRequest.Current,
-    navigation: HistoryNavigation, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter, kind: (HistoryNavigation) -> Unit, page: (ObservationId?) -> Unit) {
+    navigation: HistoryNavigation, observer: HistoryUiObserver?, exporter: HistoryExporter, importer: HistoryImporter,
+    selection: DashboardSelection, kind: (HistoryNavigation) -> Unit, page: (ObservationId?) -> Unit) {
     when (route) {
-        DashboardRoute.DASHBOARD -> DashboardScreen(state, openAccountSettings, source, current, authority, observer)
+        DashboardRoute.DASHBOARD -> DashboardScreen(state, openAccountSettings, source, current, authority, observer, selection)
         DashboardRoute.LOCAL_HISTORY_DETAILS -> {
             val display = historyForDisplay(source, navigation.query, authority)
             SideEffect { observer?.projected(source, display, state.refresh.evaluatedAt) }

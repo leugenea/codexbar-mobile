@@ -34,19 +34,26 @@ import androidx.compose.ui.Modifier
 
 class MainActivity : ComponentActivity() {
     private lateinit var dashboard: kotlinx.coroutines.flow.StateFlow<DashboardSelection?>
+    private val pickerOwner = HistoryPickerOwner()
+    private lateinit var transfers: HistoryTransfers
     internal val connection: ConnectionController get() = requireNotNull(dashboard.value).controller
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Activities observe the process owner; destruction never closes its work.
         dashboard = NativeConnection.dashboard(applicationContext)
+        transfers = NativeConnection.historyTransfers
+        // The registry and Compose launcher keys restore from saved state, even without NonConfig.
+        // This opaque ID only correlates the immediately preceding, detached in-memory owner.
+        savedInstanceState?.getString(HISTORY_PICKER_OWNER)?.let { transfers.rebindPickers(it, pickerOwner) }
         enableEdgeToEdge()
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
                 val selection by dashboard.collectAsState()
                 val root = requireNotNull(selection)
-                val connectionState by root.controller.state.collectAsState()
-                val displayedState = connectionState
+                // Each registry slot outlives the selected UI and drains its own delayed result.
+                val exporter = historyExporter(root, transfers, pickerOwner)
+                val importer = historyImporter(root, transfers, pickerOwner)
                 // Launch and recreation attach the same identity-tagged STARTED observer.
                 // Fresh restored owners remain dormant; already activated owners may resume reads.
                 ObserveUsageLifecycle(lifecycle) { NativeConnection.observeDashboard(applicationContext) }
@@ -54,14 +61,26 @@ class MainActivity : ComponentActivity() {
                     contentColor = MaterialTheme.colorScheme.onBackground) {
                     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                         key(root) {
-                            ConnectionScreen(connectionState, root.controller, {
+                            // A fresh collection starts at this controller's value, not the previous account's.
+                            val displayedState = root.controller.state.collectAsState().value
+                            ConnectionScreen(displayedState, root.controller, {
                                 openVerificationBrowser(root.controller, displayedState)
-                            }, historyUiObserver, root)
+                            }, historyUiObserver, root, exporter, importer)
                         }
                     }
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(HISTORY_PICKER_OWNER, pickerOwner.savedId)
+    }
+
+    override fun onDestroy() {
+        transfers.detachPickers(pickerOwner, isFinishing)
+        super.onDestroy()
     }
 
     internal fun openVerificationBrowser() {
@@ -87,6 +106,8 @@ class MainActivity : ComponentActivity() {
     }
 
     internal companion object {
+        private const val HISTORY_PICKER_OWNER = "io.github.leugenea.codexbarmobile.historyPickerOwner"
+
         @set:androidx.annotation.VisibleForTesting(otherwise = androidx.annotation.VisibleForTesting.NONE)
         internal var historyUiObserver: HistoryUiObserver? = null
         var browserLauncher: (MainActivity, Intent) -> Unit = { activity, intent -> activity.startActivity(intent) }

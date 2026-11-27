@@ -10,7 +10,7 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HistoryImportControllerTest {
-    @Test fun cancelledActivityWaiterKeepsProcessImportBusyResultAndRefreshedPresentation() = runTest {
+    @Test fun cancelledWaiterKeepsProcessImportAndRefreshedPresentation() = runTest {
         val memory = ImportMemoryStorage().seed(2)
         val journal = LifetimeJournal()
         val storage = object : HistoryLifetimeStorage by journal.storage() {
@@ -27,13 +27,9 @@ class HistoryImportControllerTest {
             val waiter = backgroundScope.async { fixture.owner.importHistory(target, text, SyntheticHistory.at) }
             runCurrent()
             assertTrue("Process work reached the held storage dispatcher", fixture.storage.pending > 0)
-            assertTrue(fixture.owner.historyImporterState.importing.value)
             waiter.cancel(); runCurrent()
-            assertTrue(fixture.owner.historyImporterState.importing.value)
-            assertNull(fixture.owner.historyImporterState.result.value)
+            assertEquals(2L, memory.state.cursor.lastOrdinal)
             fixture.storage.release(); runCurrent()
-            assertFalse(fixture.owner.historyImporterState.importing.value)
-            assertEquals(HistoryImportOutcome.Imported, fixture.owner.historyImporterState.result.value)
             assertEquals(5L, memory.state.cursor.lastOrdinal)
             assertEquals(ObservationId(5), fixture.snapshot.storage!!.lastAdmitted)
             assertEquals(0L, fixture.snapshot.lostSamples)
