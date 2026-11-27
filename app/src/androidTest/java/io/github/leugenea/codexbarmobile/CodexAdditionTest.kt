@@ -337,6 +337,7 @@ class CodexAdditionTest {
         assertEqualTokens(session, f.protected(a.storage))
         assertTrue(f.key(a.storage.credentialSlot))
         assertEquals(2L, f.transport.gets.get())
-        assertTrue(f.enrollment.none { it != null })
+        assertEquals("only the admitted peer may have an enrollment change",
+            listOf(BackgroundRefreshTarget(requireNotNull(a.partition))), f.enrollment.toList())
     }
 }
