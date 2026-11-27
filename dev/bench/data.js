@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795758539263,
+  "lastUpdate": 1795758543880,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -7437,6 +7437,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/80d7252f6cdb17d3700bebbdbcb32e7909ec9f47"
         },
         "date": 1795680922501,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5e82d868e9428e95f8b1bfbb09dbf923f29d2a48",
+          "message": "Keep history transfers bound to the initiating account (#263)\n\n* fix: keep history transfers bound to the initiating account\n\n* fix: require refresh tokens in history transfer test fixture\n\n* test: open account settings before launching history pickers\n\n* fix: isolate picker and dashboard lifetimes\n\n* fix: bind dashboard selection at route content\n\n* test: isolate picker checks from account reselection reads\n\n* fix: restore history picker ownership with the result registry",
+          "timestamp": "2026-11-27T08:48:23+03:00",
+          "tree_id": "6317779b157278af2c6dbc7e7b4b33a7d38a20fa",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/5e82d868e9428e95f8b1bfbb09dbf923f29d2a48"
+        },
+        "date": 1795758543434,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
