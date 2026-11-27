@@ -495,12 +495,13 @@ compilation alone does not establish runtime or coverage acceptance.
 ## Internal dashboard account selection
 
 The [local catalog](docs/account-catalog.md) and existing `AccountRuntimeOwner` retain
-entry-owned stacks. MainActivity collects a fresh identity-bearing selected projection,
-while the compatibility worker getter remains the original exact legacy controller.
+entry-owned stacks. MainActivity collects a fresh identity-bearing selected projection.
+Periodic workers address the same retained runtimes independently of that projection.
 Internal selection commits before display/network authority and immediately requests
 quotas, including dormant entries; actual removal selects the first remaining catalog
-entry and applies the same request policy. Reauthorization instead retains that saved
-entry and current selection, with no usable credential or old history-partition authority.
+entry and requests quotas without creating a first enrollment. Reauthorization instead
+retains that saved entry and current selection, with no usable credential or old
+history-partition authority.
 The existing captured cleanup receipt now persists this retain/remove disposition in v3;
 old pending v1/v2 receipts keep removal semantics.
 
@@ -511,7 +512,7 @@ hides delivered history while accepted rotation/native storage settles under its
 entry. Root checks precede recorder/request/cache use, so A → B → equal-query A cannot
 re-authorize an already-delivered predecessor. Settings handles remain independently
 addressed and dormant. No new public list, dropdown, authentication/removal workflow,
-SAF policy or all-account scheduler is introduced by this internal selection boundary.
+or SAF policy is introduced by this internal selection boundary.
 
 ## Local account display name
 
@@ -848,21 +849,28 @@ lint, JVM/native/coverage and independent review remain acceptance gates. Fresh-
 restoration is not process-death/reboot proof; OS scheduling, force-stop limits and physical
 device battery/periodicity acceptance belong to #195 and parent #193.
 
-## Ordinary periodic background work (issue 195)
+## Ordinary periodic background work (issues 195 and 245)
 
 `PeriodicUsageRefresh` is a minimal WorkManager 2.12.0 adapter, not another owner.
-Successful explicit sign-in or manual read enrolls a unique KEEP periodic request
-named for the existing opaque history lifetime. Its only input is that canonical
+Successful explicit sign-in, a durably admitted Add, explicit dashboard selection or
+a manual read can enroll a checked lifetime in unique KEEP periodic work. The work
+name and its only input use the existing opaque history lifetime's canonical
 UUID, never the credential-slot selector, token, provider identity or display name.
 WorkManager alone persists enrollment; there is no parallel preference/registry/store.
-Repeated activation preserves the request ID and timing. Removal and terminal cleanup
-cancel the refresh tag; a stale cold worker cancels only its own lifetime's unique
-name. Cancel/Activity STOP/holder shutdown do not delete a clean continuing enrollment.
+Repeated activation preserves the request ID and timing, including after deselection.
+Removal, replacement cleanup and terminal reauthorization cancel only the captured
+lifetime's unique name. Confirmed stale work can cancel only its own name; unavailable,
+unresolved or ambiguous bindings do not prove staleness. Cancel/Activity STOP/holder
+shutdown do not delete a clean continuing enrollment.
 
 The ordinary interval and initial delay are 15 minutes, with connected-network and
 battery-not-low constraints, but no charging/idle requirement. There is no expedited
 work, foreground service, exact refresh alarm, exemption or persistent process timer.
-`PeriodicUsageRefreshWorker` obtains the same singleton NativeConnection and awaits
+`PeriodicUsageRefreshWorker` uses the singleton process owner to resolve one confirmed
+catalog entry and rechecks its exact continuing lifetime after protected restoration
+and any native history rebind. It never selects a dashboard or activates a peer.
+Existing UUID-only requests can adopt the original legacy binding before any Activity
+starts, without replacing the WorkSpec or adding a metadata format. The worker awaits
 issue 194's exact-target endpoint/durable-history receipt. Coroutine cancellation
 escapes unchanged and releases only its own interest. It neither creates another
 controller nor registers a fake UI observer or retries auth as a user.
@@ -876,8 +884,8 @@ and wait for the next period, never WorkManager's default short `Result.retry()`
 The existing bounded A2 retries still apply inside one endpoint operation. Scheduler
 `Result.success()` acknowledges only the opportunity, not endpoint or history success.
 
-Seven mandatory JVM admission cases and nine native `PeriodicUsageRefreshTest` cases
-extend, rather than replace, issue 194's isolation/receipt/rotation regressions. The
+JVM admission cases and native `PeriodicUsageRefreshTest` cases extend, rather than
+replace, issue 194's isolation/receipt/rotation regressions. The
 native contract distinguishes TestDriver constraint/time control and direct worker
 mapping/cancellation from actual minimized real-WorkManager/JobService execution:
 the latter disables only that ID's Greedy delayed tracker, ages its test enqueue

@@ -1,10 +1,14 @@
 package io.github.leugenea.codexbarmobile
 
+import io.github.leugenea.codexbarmobile.BackgroundRefreshRejection.RECENT_SUCCESS
+import io.github.leugenea.codexbarmobile.BackgroundRefreshRejection.STALE_LIFETIME
+import io.github.leugenea.codexbarmobile.BackgroundRefreshRejection.STORAGE_UNAVAILABLE
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
 import io.github.leugenea.codexbarmobile.credentials.*
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.account.*
+
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,7 +59,8 @@ internal class ConnectionController(
     refreshClock: io.github.leugenea.codexbarmobile.transport.TransportClock = reader.clock,
     private val history: HistoryLifetimeCoordinator? = null,
     historyQueueCapacity: Int = 16,
-    private val backgroundEnrollment: (BackgroundRefreshTarget?) -> Unit = {},
+    initialBackgroundPartition: HistoryPartition? = null,
+    private val backgroundEnrollment: (BackgroundRefreshTarget, Boolean) -> Unit = { _, _ -> },
     private val savedAccount: () -> Boolean = { false },
     pendingAddition: Boolean = false,
 ) {
@@ -82,6 +87,8 @@ internal class ConnectionController(
     private var historyImport: Deferred<HistoryImportOutcome>? = null
     private var backgroundHistoryInterests = 0
     private var backgroundSession: SessionGeneration? = null
+    private var backgroundPartition = initialBackgroundPartition
+    private var retryRestoreAt: Long? = null
     private var closed = false
     private val stopped = CompletableDeferred<Unit>()
     private val historyRecorder = UsageHistoryRecorder(ownerScope, storageDispatcher, historyQueueCapacity)
@@ -121,36 +128,38 @@ internal class ConnectionController(
         session.adopt(prepared.envelope)
         publishName()
         publish(0, ConnectionState(ConnectionPhase.RESTORED, prepared.auth))
+        enrollBackground(prepared.envelope.generation)
     }
 
-    private suspend fun restore() {
-        if (!storageReady) { publish(0, storageFailure()); return }
+    private suspend fun restore(owner: Long = 0) {
+        retryRestoreAt = null
+        if (!storageReady) { publish(owner, storageFailure()); return }
         val restoredGeneration = store.openSession().also { generation = it }
         val restored = ownerScope.async(storageDispatcher) { store.read(restoredGeneration) }.await()
-        if (revision != 0L || closed) return
+        if (!current(owner)) return
         when (restored) {
             is CredentialResult.Success -> {
                 restoreHistory(restoredGeneration)
-                if (!completeHistoryRestoration(0, restoredGeneration)) return
+                if (!completeHistoryRestoration(owner, restoredGeneration)) return
                 session.adopt(restored.value)
                 publishName()
-                publish(0, ConnectionState(ConnectionPhase.RESTORED))
+                publish(owner, ConnectionState(ConnectionPhase.RESTORED))
                 if (usageRefresh.hasForegroundObservers) resumeHistory()
             }
-            is CredentialResult.Failure -> restoreFailure(restored)
+            is CredentialResult.Failure -> restoreFailure(owner, restored)
         }
     }
 
-    private suspend fun restoreFailure(result: CredentialResult.Failure) {
+    private suspend fun restoreFailure(owner: Long, result: CredentialResult.Failure) {
         val phase = when (result.category) {
             CredentialFailure.MISSING -> missingCredentials()
             CredentialFailure.KEY_LOST, CredentialFailure.CORRUPT -> {
                 removeCredentials()
                 if (awaitDeletion()) ConnectionPhase.REAUTH_REQUIRED else ConnectionPhase.FAILED
             }
-            else -> ConnectionPhase.FAILED
+            else -> { retryRestoreAt = owner; ConnectionPhase.FAILED }
         }
-        publish(0, ConnectionState(phase, problem = if (phase == ConnectionPhase.IDLE) null else ConnectionProblem.STORAGE))
+        publish(owner, ConnectionState(phase, problem = if (phase == ConnectionPhase.IDLE) null else ConnectionProblem.STORAGE))
     }
 
     private suspend fun restoreHistory(active: SessionGeneration) {
@@ -167,10 +176,14 @@ internal class ConnectionController(
             // A failed required catalog commit also closes an already-adopted session.
             // Retirement preserves settled storage; existing uncertain-rotation quarantine remains.
             val failedOwner = if (session.snapshot() is SessionResult.Ready) retire() else owner
+            retryRestoreAt = failedOwner
             publish(failedOwner, storageFailure())
             return false
         }
-        if (history?.requiresRemoval != true) return true
+        if (history?.requiresRemoval != true) {
+            history?.confirmedLifetime(active)?.let { backgroundPartition = it }
+            return true
+        }
         usageRefresh.reset()
         removeCredentials()
         publish(owner, if (awaitDeletion()) ConnectionState(ConnectionPhase.REAUTH_REQUIRED) else storageFailure())
@@ -192,7 +205,8 @@ internal class ConnectionController(
         get() = history?.availability ?: HistoryAvailability.UNAVAILABLE
 
     private fun removeHistory(disposition: CleanupDisposition = CleanupDisposition.RETAIN) {
-        backgroundEnrollment(null)
+        backgroundPartition?.let { backgroundEnrollment(BackgroundRefreshTarget(it), false) }
+        backgroundPartition = null
         mutableAccountRemoval.value = AccountRemoval()
         mutableName.value = null
         backgroundSession = null
@@ -272,14 +286,16 @@ internal class ConnectionController(
 
     fun readUsage(refreshSession: Boolean = false) = command { requestUsage(refreshSession) }
 
-    private fun requestUsage(refreshSession: Boolean, selection: Boolean = false) {
+    private fun requestUsage(refreshSession: Boolean, selection: Boolean = false, enroll: Boolean = true) {
         if (cleanupPending() || session.snapshot() !is SessionResult.Ready) return
-        generation?.let(::enrollBackground)
+        if (enroll) generation?.let(::enrollBackground)
         usageRefresh.request(refreshSession, explicit = true, selection = selection)
     }
 
     private fun enrollBackground(active: SessionGeneration) {
-        history?.lifetime(active)?.let { backgroundEnrollment(BackgroundRefreshTarget(it)) }
+        val partition = history?.lifetime(active) ?: return
+        backgroundPartition = partition
+        backgroundEnrollment(BackgroundRefreshTarget(partition), true)
     }
 
     /** Capture for enrollment only after protected restoration; construction/launch stays dormant. */
@@ -292,21 +308,23 @@ internal class ConnectionController(
     }
 
     /** A worker supplies its enrolled lifetime. It never retries auth as an explicit user action. */
-    internal suspend fun refreshInBackground(expected: BackgroundRefreshTarget,
-        minimumSuccessAgeMillis: Long = 0): BackgroundRefreshOutcome = withContext(mutationDispatcher) {
+    internal suspend fun refreshInBackground(expected: BackgroundRefreshTarget, minimumSuccessAgeMillis: Long = 0,
+        stillAddressed: () -> Boolean = { true }): BackgroundRefreshOutcome = withContext(mutationDispatcher) {
         // An unconfirmed catalog provides no evidence that an enrolled lifetime is stale.
-        if (!storageReady) return@withContext BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STORAGE_UNAVAILABLE)
+        if (!storageReady) return@withContext BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+        retryBackgroundRestore()
         val owner = revision
         if (mutableState.value.phase == ConnectionPhase.RESTORING) work?.join()
-        val active = backgroundGeneration(owner, expected)
-            ?: return@withContext BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME)
+        val active = resolveBackgroundGeneration(owner, expected)
+            ?: return@withContext backgroundRejection(owner, expected)
+        if (!stillAddressed()) return@withContext BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
         if (usageRefresh.recentSuccess(minimumSuccessAgeMillis))
-            return@withContext BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.RECENT_SUCCESS)
+            return@withContext BackgroundRefreshOutcome.Rejected(RECENT_SUCCESS)
         val interest = BackgroundRefreshInterest(
             if (history?.lifetime(active) == expected.partition) usageRefresh.retainBackgroundFlight() else null)
         acquireBackgroundHistory(active)
         val settlement = ownerScope.async(start = CoroutineStart.UNDISPATCHED) {
-            try { completeBackgroundRefresh(owner, active, expected, interest) }
+            try { completeBackgroundRefresh(owner, active, expected, interest, stillAddressed) }
             finally { historyRecorder.settled(); releaseBackgroundHistory(active) }
         }
         try { settlement.await() }
@@ -316,29 +334,65 @@ internal class ConnectionController(
         }
     }
 
+    private fun retryBackgroundRestore() {
+        // A failed quarantine/cleanup is never a reason to open a fresh generation.
+        if (closed || retryRestoreAt != revision || historyDeletion != null || cleanupPending()) return
+        val owner = revision
+        retryRestoreAt = null
+        publish(owner, ConnectionState(ConnectionPhase.RESTORING))
+        work = ownerScope.launch { restore(owner) }
+    }
+
+    private suspend fun resolveBackgroundGeneration(owner: Long, expected: BackgroundRefreshTarget): SessionGeneration? {
+        val active = protectedBackgroundGeneration(owner) ?: return null
+        // Legacy metadata may not yet identify a lifetime. Recheck storage without
+        // acquiring network/recorder interest or treating an unknown binding as stale.
+        if (history?.confirmedLifetime(active) == null) {
+            resumeHistory()
+            try { historyRestore?.join() } finally {
+                if (!usageRefresh.hasForegroundObservers && backgroundHistoryInterests == 0) history?.pauseRuntime()
+            }
+        }
+        return backgroundGeneration(owner, expected)
+    }
+
     private suspend fun completeBackgroundRefresh(owner: Long, active: SessionGeneration,
-        expected: BackgroundRefreshTarget, interest: BackgroundRefreshInterest): BackgroundRefreshOutcome {
+        expected: BackgroundRefreshTarget, interest: BackgroundRefreshInterest, stillAddressed: () -> Boolean): BackgroundRefreshOutcome {
         historyRestore?.join()
-        if (backgroundGeneration(owner, expected) !== active || !interest.attached)
-            return BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME)
+        if (backgroundGeneration(owner, expected) !== active) return backgroundRejection(owner, expected)
+        if (!interest.attached || !stillAddressed()) return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
         // A retained flight already owns its recording receipt, which may await a successor rebind.
         if (interest.flight == null && historyCapability(active)?.partition != expected.partition)
-            return BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STORAGE_UNAVAILABLE)
+            return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
         bindHistory(active)
         interest.flight = interest.flight ?: usageRefresh.background()
         val admitted = interest.flight ?: return deferredBackground()
-        val result = admitted.result.await()
-        val recorded = result?.recording?.await()
-        return if (backgroundGeneration(owner, expected) !== active || result == null || recorded == null)
-            BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME)
+        val result = admitted.result.await() ?: return backgroundRejection(owner, expected)
+        return settledBackgroundRefresh(owner, active, expected, result)
+    }
+
+    private suspend fun settledBackgroundRefresh(owner: Long, active: SessionGeneration, expected: BackgroundRefreshTarget,
+        result: RefreshReadCompletion): BackgroundRefreshOutcome {
+        val recorded = result.recording.await()
+        return if (backgroundGeneration(owner, expected) !== active)
+            backgroundRejection(owner, expected)
         else BackgroundRefreshOutcome.Completed(result.observations, recorded)
     }
 
-    private fun backgroundGeneration(owner: Long, expected: BackgroundRefreshTarget): SessionGeneration? {
+    private fun protectedBackgroundGeneration(owner: Long): SessionGeneration? {
         if (!current(owner) || cleanupPending()) return null
         val ready = session.snapshot() as? SessionResult.Ready ?: return null
-        val active = ready.envelope.generation
-        return active.takeIf { history?.continues(it, expected.partition) == true }
+        return ready.envelope.generation.takeIf(store::isActive)
+    }
+
+    private fun backgroundGeneration(owner: Long, expected: BackgroundRefreshTarget) =
+        protectedBackgroundGeneration(owner)?.takeIf { history?.confirmedLifetime(it) == expected.partition }
+
+    private fun backgroundRejection(owner: Long, expected: BackgroundRefreshTarget): BackgroundRefreshOutcome.Rejected {
+        val confirmed = protectedBackgroundGeneration(owner)?.let { history?.confirmedLifetime(it) }
+        val ended = current(owner) && mutableState.value.phase in setOf(ConnectionPhase.IDLE, ConnectionPhase.SIGNED_OUT, ConnectionPhase.REAUTH_REQUIRED)
+        return BackgroundRefreshOutcome.Rejected(if (ended || (confirmed != null && confirmed != expected.partition))
+            STALE_LIFETIME else STORAGE_UNAVAILABLE)
     }
 
     private fun acquireBackgroundHistory(active: SessionGeneration) {
@@ -381,9 +435,9 @@ internal class ConnectionController(
     }
 
     /** Selection is explicit activation, but still bound to its root after restoration suspends. */
-    internal suspend fun requestSelectedUsage(current: () -> Boolean) = withContext(mutationDispatcher) {
+    internal suspend fun requestSelectedUsage(enroll: Boolean, current: () -> Boolean) = withContext(mutationDispatcher) {
         if (mutableState.value.phase == ConnectionPhase.RESTORING) work?.join()
-        if (current()) requestUsage(false, selection = true)
+        if (current()) requestUsage(false, selection = true, enroll = enroll)
     }
 
     /** Observer identities keep one Activity from cancelling another visible Activity. */

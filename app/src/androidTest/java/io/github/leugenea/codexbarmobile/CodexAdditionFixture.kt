@@ -53,7 +53,8 @@ internal class CodexAdditionFixture {
             } else transport.execute(request, deadline, terminal)
         }
         owner = if (openCatalog == null) {
-            AccountRuntimeOwner(context, catalog, network, transport.clock, transport::pause, { { enrollment.add(it) } },
+            AccountRuntimeOwner(context, catalog, network, transport.clock, transport::pause,
+                { target, enabled -> enrollment.add(target.takeIf { enabled }) },
                 credentials = { _, slot -> track(slot) }, historyStorage = { observingHistory(it) },
                 beforeAdditionDisplay = { beforeAdditionDisplay() })
         } else NativeConnection.createOwner(context, network, transport.clock, transport::pause, openCatalog = openCatalog)

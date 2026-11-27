@@ -3,10 +3,10 @@
 The catalog provides durable **local** entry addressing. The single process holder retains
 concrete entry-owned controller/session/credential/history/recorder stacks behind an internal
 exact-entry ingress. Construction and restoration are dormant. The Activity observes the internal
-persisted dashboard selection; the production worker keeps its original exact compatibility
-runtime. There is no new account list, sign-in path, dropdown or scheduler policy.
-Account settings navigation does not select an account. The later dashboard dropdown
-and all-enrolled-account scheduling are separate integration work.
+persisted dashboard selection; [periodic workers](background-refresh.md) use the same
+retained runtimes but address an exact enrolled lifetime independently of selection.
+Account settings navigation does not select or enroll an account. A public account
+list and dashboard dropdown remain separate integration work.
 
 ## Identity and locations
 
@@ -122,8 +122,8 @@ installation. Dismissal sends no removal command, and the existing modal-open st
 an already captured confirmation after the modal was closed. Confirmation uses the original combined
 protected/history/catalog barriers and RETAIN-then-REMOVE escalation; it does not reinterpret
 an old ticket. Nonselected removal does not activate a peer. Selected removal applies the
-stable immediate-request fallback below, including a dormant peer. No Add, public account
-list/dropdown or all-account scheduler is supplied by these management controls.
+stable immediate-request fallback below, including a dormant peer. These controls
+do not provide a public Add, account list or dropdown.
 
 The existing Connect, Cancel, browser and removal-confirm controls expose their exact
 application callback through one internal non-action semantics property. Each control
@@ -169,10 +169,12 @@ root. Root shutdown closes admission before draining all retained stacks. Addres
 never retires, adopts or activates a session; accepted rotation stays with its original
 store and generation after a network waiter detaches.
 
-The compatibility scheduler callback cancels only its captured continuing lifetime.
-Nonlegacy runtime ingress has no production enrollment callback in this intermediate unit;
-all-enrolled resolution and scheduling remain the scheduler integration's responsibility.
-There is no selected-only worker routing or new public control.
+Each saved runtime supplies checked enrollment and exact-lifetime cancellation. Worker
+ingress uses the catalog rather than selection; a same-package legacy worker can run
+existing adoption before any dashboard is observed. WorkManager alone persists which
+lifetimes were enrolled. A pending Add or an unavailable history binding cannot create
+a new enrollment. Confirmed-but-unavailable bindings preserve an existing WorkSpec
+without supplying network/recorder authority.
 
 ## Dashboard selection and display authority
 
@@ -180,8 +182,9 @@ There is no selected-only worker routing or new public control.
 replaced and directory-synced before the process owner publishes successor display or
 network authority. Idempotent selection keeps the same `DashboardSelection` identity
 but still requests quotas as an explicit action. Actual selected-entry removal uses the
-same immediate request policy, including a previously dormant remaining entry. Passive
-construction, cold restoration and settings/history navigation never activate quotas.
+same immediate request policy, including a previously dormant remaining entry, but does
+not create its first periodic enrollment. Passive construction, cold restoration and
+settings/history navigation never activate quotas.
 `settings(id)` returns an independent addressed controller handle, without selecting it.
 
 After a failed replacement or fsync, the catalog re-reads the actual file and fences the

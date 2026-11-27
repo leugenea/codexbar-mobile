@@ -40,6 +40,7 @@ class CodexAdditionTest {
         assertNull(f.begin("Synthetic parallel"))
         assertSame(aController, f.owner.dashboard().value?.controller)
         assertEquals(2L, f.transport.gets.get())
+        assertEquals(enrollment, f.enrollment.toList())
         f.transport.heldPath = ReadOperation.USAGE.path
         poll.reply()
         val b = accepted(handle)
@@ -47,7 +48,7 @@ class CodexAdditionTest {
         assertFalse(f.wait("cancel after admission") { handle.cancel() })
         assertFalse(usage.cancelled)
         assertEquals(candidate, b.storage)
-        assertEquals(f.enrollment.toList(), enrollment)
+        assertEquals(enrollment + BackgroundRefreshTarget(requireNotNull(b.partition)), f.enrollment.toList())
         assertSame(aSession, f.ready(aController))
         assertEquals(peer, f.bytes(a.storage))
         usage.reply()
@@ -242,7 +243,7 @@ class CodexAdditionTest {
         val target = requireNotNull(f.enrollment.filterNotNull().lastOrNull())
         val enrollment = f.enrollment.toList()
         f.transport.heldPath = ReadOperation.USAGE.path
-        val worker = async(Dispatchers.Default) { legacy.refreshInBackground(target) }
+        val worker = async(Dispatchers.Default) { f.owner.refreshInBackground(target, 0) }
         try {
             val request = f.held(ReadOperation.USAGE.path)
             val bytes = f.bytes(a.storage)
@@ -251,6 +252,7 @@ class CodexAdditionTest {
             val poll = f.held(CodexAdditionFixture.POLL)
             assertTrue(f.wait("cancel B while worker A is held") { cancelled.cancel() })
             assertEquals(AdditionResult.Rejected.CANCELLED, f.result(cancelled))
+            assertEquals(enrollment, f.enrollment.toList())
             poll.reply()
             assertFalse(request.cancelled)
             assertEquals(bytes, f.bytes(a.storage))
@@ -259,13 +261,13 @@ class CodexAdditionTest {
             request.reply()
             gate.await("real A append admitted before B selection")
             f.transport.heldPath = null
-            addAndObserve("Synthetic worker successor")
+            val successor = addAndObserve("Synthetic worker successor")
             assertFalse(worker.isCompleted)
             assertSame(original, f.ready(legacy))
-            assertEquals(enrollment, f.enrollment.toList())
+            assertEquals(enrollment + BackgroundRefreshTarget(requireNotNull(successor.partition)), f.enrollment.toList())
             gate.release()
             val completed = f.wait("original worker completion after successor selection") { worker.await() }
-            assertTrue(completed is BackgroundRefreshOutcome.Completed)
+            assertTrue((completed as BackgroundRefreshOutcome.Completed).history is HistoryRecordingOutcome.Stored)
             assertEqualTokens(original, f.protected(a.storage))
         } finally {
             gate.release()

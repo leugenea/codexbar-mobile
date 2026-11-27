@@ -1,10 +1,13 @@
 package io.github.leugenea.codexbarmobile
 
 import android.content.Context
+import io.github.leugenea.codexbarmobile.AdditionResult.Rejected
+import io.github.leugenea.codexbarmobile.BackgroundRefreshRejection.RETIRING
+import io.github.leugenea.codexbarmobile.BackgroundRefreshRejection.STALE_LIFETIME
+import io.github.leugenea.codexbarmobile.BackgroundRefreshRejection.STORAGE_UNAVAILABLE
 import io.github.leugenea.codexbarmobile.account.*
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
-import io.github.leugenea.codexbarmobile.AdditionResult.Rejected
 import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
 import io.github.leugenea.codexbarmobile.credentials.CredentialStore
 import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
@@ -25,7 +28,7 @@ internal class AccountRuntimeOwner(
     private val transport: AuthTransport,
     private val clock: TransportClock,
     private val pause: suspend (Long) -> Unit,
-    private val legacyEnrollment: (HistoryPartition?) -> (BackgroundRefreshTarget?) -> Unit = { {} },
+    private val enrollment: (BackgroundRefreshTarget, Boolean) -> Unit = { _, _ -> },
     private val credentials: (Context, UUID) -> CredentialStore = ::KeystoreCredentialStore,
     private val historyStorage: (File) -> HistoryLifetimeStorage = { SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(it)) },
     private val openCatalog: (() -> AccountCatalog)? = null,
@@ -128,9 +131,9 @@ internal class AccountRuntimeOwner(
     }
 
     @Synchronized private fun acceptAddition(pending: PendingAddition, prepared: PreparedAddition.Ready) {
-        pending.controller.acceptAddition(prepared)
         runtimes[pending.address.id] = pending.controller
         addition = null
+        pending.controller.acceptAddition(prepared)
         additionActivation = AdditionActivation(requireNotNull(pending.commit).entry, pending.controller, prepared.envelope.generation)
         val snapshot = catalog?.snapshots?.value
         beforeAdditionDisplay()
@@ -167,13 +170,13 @@ internal class AccountRuntimeOwner(
         return try { openCatalog?.invoke() } catch (_: Exception) { null }
     }
 
-    /** Retry on the Add recovery lane; publish through the same dashboard and observer set. */
-    private fun recoverCatalog(): AccountCatalog? {
+    /** A scheduled recovery can publish storage without opening a dashboard or peer runtime. */
+    private fun recoverCatalog(observeDashboard: Boolean = true): AccountCatalog? {
         val confirmed = tryOpenCatalog() ?: return null
         synchronized(this) {
             if (closing) return null
             catalog = confirmed
-            dashboard()
+            if (observeDashboard) dashboard()
         }
         return confirmed
     }
@@ -288,7 +291,7 @@ internal class AccountRuntimeOwner(
     private fun activateAfterRemoval(snapshot: CatalogSnapshot?, next: DashboardSelection, previous: DashboardSelection?): Job? {
         // Capture actual-removal provenance before any asynchronous activation/restoration.
         val removed = previous?.id != null && snapshot?.entries?.none { it.storage.id == previous.id } == true
-        return if (removed && next.id != null) activate(next) else null
+        return if (removed && next.id != null) activate(next, enroll = false) else null
     }
 
     private fun activateAddition(snapshot: CatalogSnapshot?, next: DashboardSelection): Job? {
@@ -297,7 +300,7 @@ internal class AccountRuntimeOwner(
         additionActivation = null
         if (next.controller !== pending.controller || !pending.matches(snapshot)) return null
         return scope.launch(mutations) {
-            next.controller.requestSelectedUsage {
+            next.controller.requestSelectedUsage(enroll = false) {
                 next.isCurrent() && pending.matches(catalog?.snapshots?.value) &&
                     (next.controller.session.snapshot() as? SessionResult.Ready)?.envelope?.generation === pending.generation
             }
@@ -325,8 +328,61 @@ internal class AccountRuntimeOwner(
 
     private fun currentProjection() = selected.value.takeUnless { closing }
 
-    private fun activate(target: DashboardSelection): Job =
-        scope.launch(mutations) { target.controller.requestSelectedUsage(target::isCurrent) }
+    private fun activate(target: DashboardSelection, enroll: Boolean = true): Job =
+        scope.launch(mutations) { target.controller.requestSelectedUsage(enroll, target::isCurrent) }
+
+    /** Resolve from the catalog, never from display. Old WorkSpecs have only the partition UUID. */
+    suspend fun refreshInBackground(target: BackgroundRefreshTarget, minimumSuccessAgeMillis: Long): BackgroundRefreshOutcome =
+        withContext(mutations) {
+            if (closing) return@withContext BackgroundRefreshOutcome.Rejected(RETIRING)
+            val metadata = catalog ?: recoverCatalog(observeDashboard = false)
+                ?: return@withContext BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+            try { metadata.confirmBackgroundIdentity() } catch (_: Exception) {
+                return@withContext BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+            }
+            val snapshot = metadata.backgroundSnapshot(target.partition)
+                ?: return@withContext BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+            refreshFromSnapshot(metadata, snapshot, target, minimumSuccessAgeMillis)
+        }
+
+    private suspend fun refreshFromSnapshot(metadata: AccountCatalog, snapshot: CatalogSnapshot,
+        target: BackgroundRefreshTarget, minimumSuccessAgeMillis: Long): BackgroundRefreshOutcome {
+        val matches = snapshot.entries.filter { it.partition == target.partition }
+        if (matches.size > 1) return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+        val entry = matches.singleOrNull()
+        if (staleBackgroundAddress(snapshot, entry)) return BackgroundRefreshOutcome.Rejected(STALE_LIFETIME)
+        val controller = backgroundRuntime(snapshot, entry) ?: return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+        val outcome = controller.refreshInBackground(target, minimumSuccessAgeMillis) {
+            !closing && backgroundBinding(metadata, target, entry?.storage)
+        }
+        if (outcome == BackgroundRefreshOutcome.Rejected(STALE_LIFETIME) && !canCancel(metadata, target, entry?.storage))
+            return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+        return outcome
+    }
+
+    private fun canCancel(metadata: AccountCatalog, target: BackgroundRefreshTarget, address: AccountStorage?): Boolean =
+        metadata.backgroundSnapshot(target.partition)?.entries?.none { it.partition == target.partition && it.storage != address } == true
+
+    private fun staleBackgroundAddress(snapshot: CatalogSnapshot, entry: CatalogEntry?): Boolean =
+        if (entry != null) snapshot.deletions.any { it.entry == entry.storage.id }
+        else snapshot.entries.none { it.partition == null } && snapshot.entries.any { it.storage.legacy }
+
+    @Synchronized private fun backgroundRuntime(snapshot: CatalogSnapshot, entry: CatalogEntry?): ConnectionController? {
+        if (closing) return null
+        if (entry != null) return runtime(entry.storage.id)
+        if (snapshot.entries.any { !it.storage.legacy && it.partition == null })
+            return null
+        // Worker-first upgrade: only the compatibility slot can acquire an unrepresented
+        // historical binding. Restore/adopt it without displaying or activating any account.
+        return legacy()
+    }
+
+    private fun backgroundBinding(metadata: AccountCatalog, target: BackgroundRefreshTarget, address: AccountStorage?): Boolean {
+        val snapshot = metadata.backgroundSnapshot(target.partition) ?: return false
+        val entry = snapshot.entries.singleOrNull { it.partition == target.partition } ?: return false
+        return (if (address == null) entry.storage.legacy else entry.storage == address) &&
+            snapshot.deletions.none { it.entry == entry.storage.id } && addition?.address != entry.storage
+    }
 
     /** Compatibility ingress, including the empty installation before legacy adoption. */
     @Synchronized fun legacy(): ConnectionController {
@@ -351,19 +407,20 @@ internal class AccountRuntimeOwner(
         val store = credentials(applicationContext, slot)
         val directory = address?.historyDirectory(root) ?: File(root, "usage-history")
         val history = metadata?.let { HistoryLifetimeCoordinator(CatalogHistoryStorage(historyStorage(directory), it, address)) }
-        // Production scheduling still consumes only the compatibility ingress. Multi-entry
-        // consumers must supply exact entry/lifetime admission in the scheduler integration.
-        val enrollment = enrollment(address, metadata)
+        val saved = metadata?.snapshots?.value?.entries?.singleOrNull {
+            if (address == null) it.storage.legacy else it.storage == address
+        }
         return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),
             NativeFeasibilityReader(transport, clock, pause), scope, storageReady = knownSlot != null,
             mutationDispatcher = mutations, refreshClock = clock,
-            history = history, backgroundEnrollment = enrollment,
+            history = history, initialBackgroundPartition = saved?.partition,
+            backgroundEnrollment = { target, enabled ->
+                if ((!enabled || !closing) && metadata != null && backgroundBinding(metadata, target, address)) enrollment(target, enabled)
+            },
             savedAccount = { if (address == null) metadata?.legacyEntry() != null else metadata?.entry(address.id) != null },
             pendingAddition = pendingAddition).also { slots.add(slot) }
     }
 
-    private fun enrollment(address: AccountStorage?, metadata: AccountCatalog?): (BackgroundRefreshTarget?) -> Unit =
-        if (address == null && metadata != null) legacyEnrollment(metadata.legacyEntry()?.partition) else { _ -> }
 
     suspend fun shutdown() {
         val pending = withContext(mutations) {

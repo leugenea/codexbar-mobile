@@ -287,10 +287,36 @@ class BackgroundRefreshTest {
         try {
             fixture.settle()
             assertNull(fixture.owner.backgroundRefreshTarget())
-            val outcome = fixture.owner.refreshInBackground(BackgroundRefreshTarget(fixture.journal.partition))
-            assertTrue(outcome is BackgroundRefreshOutcome.Rejected)
+            val expected = BackgroundRefreshTarget(fixture.journal.partition)
+            val outcome = fixture.owner.refreshInBackground(expected)
+            assertEquals(BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STORAGE_UNAVAILABLE), outcome)
             assertTrue(fixture.gets.isEmpty())
             assertTrue(fixture.journal.admissions.isEmpty())
+            fixture.journal.failRestore = false
+            val recovered = fixture.owner.refreshInBackground(expected) as BackgroundRefreshOutcome.Completed
+            assertTrue(recovered.history is HistoryRecordingOutcome.Stored)
+            assertEquals(2, fixture.gets.size)
+        } finally { fixture.finish() }
+    }
+
+    @Test fun uncertainBindingRetriesProtectedRestorationWithoutReEnrollment() = runTest {
+        val journal = LifetimeJournal()
+        val storage = journal.storage()
+        var blocked = true
+        val fixture = RecordingFixture(this, lifetimeStorage = object : HistoryLifetimeStorage by storage {
+            override fun restore() = if (blocked) HistoryLifetimeOutcome.CatalogUnavailable else storage.restore()
+        }, enrollment = { _, _ -> fail("Worker cannot create or cancel enrollment from uncertain storage") })
+        try {
+            fixture.settle()
+            val expected = BackgroundRefreshTarget(journal.partition)
+            assertEquals(ConnectionPhase.FAILED, fixture.owner.state.value.phase)
+            assertEquals(BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STORAGE_UNAVAILABLE),
+                fixture.owner.refreshInBackground(expected))
+            assertTrue(fixture.gets.isEmpty()); assertTrue(journal.admissions.isEmpty())
+            blocked = false
+            val result = fixture.owner.refreshInBackground(expected) as BackgroundRefreshOutcome.Completed
+            assertTrue(result.history is HistoryRecordingOutcome.Stored)
+            assertEquals(2, fixture.gets.size)
         } finally { fixture.finish() }
     }
 

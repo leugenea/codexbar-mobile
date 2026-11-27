@@ -200,8 +200,8 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
     }
 
     /** A missing observation does not invalidate an exact enrollment, or authorize its reads. */
-    fun continues(generation: SessionGeneration, partition: HistoryPartition): Boolean = synchronized(admission) {
-        accepts(generation) && (lifetime ?: unavailableLifetime) == partition
+    fun confirmedLifetime(generation: SessionGeneration): HistoryPartition? = synchronized(admission) {
+        (lifetime ?: unavailableLifetime).takeIf { accepts(generation) && catalogReady }
     }
 
     /** Last foreground observer left: retain lifetime/generation, revoke every held runtime port. */

@@ -40,6 +40,17 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     val snapshots: StateFlow<CatalogSnapshot> = published
     @Synchronized fun snapshot() = state.copy(entries = state.entries.toList())
 
+    /** An uncertain Add can neither change a confirmed peer binding nor prove a target absent. */
+    @Synchronized fun backgroundSnapshot(partition: HistoryPartition): CatalogSnapshot? = when (uncertainty) {
+        Uncertainty.REQUIRED_IDENTITY -> null
+        Uncertainty.ADDITION -> state.takeIf { it.entries.any { entry -> entry.partition == partition } }
+        else -> state
+    }
+
+    @Synchronized fun confirmBackgroundIdentity() {
+        if (uncertainty == Uncertainty.REQUIRED_IDENTITY) confirmCommit()
+    }
+
     @Synchronized fun adopt(partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
         confirmedAdditionPeer(legacyEntry(), partition)?.let { return it }
         confirmIdentity()

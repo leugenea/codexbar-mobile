@@ -42,6 +42,7 @@ internal class AccountSelectionFixture {
     lateinit var b: CatalogEntry
     lateinit var owner: AccountRuntimeOwner
     var decorateCredential: (UUID, CredentialStore) -> CredentialStore = { _, store -> store }
+    var enrollment: (BackgroundRefreshTarget, Boolean) -> Unit = { _, _ -> }
     var hooks: (File) -> HistoryStorageHooks = { object : HistoryStorageHooks {} }
     var decorateHistory: (File, HistoryLifetimeStorage) -> HistoryLifetimeStorage = { _, storage -> storage }
     data class AppendReceipt(val directory: File, val admission: HistoryAdmission, val result: HistoryAppendOutcome)
@@ -61,6 +62,7 @@ internal class AccountSelectionFixture {
 
     fun start(): AccountRuntimeOwner {
         owner = AccountRuntimeOwner(context, catalog, transport, aTransport.clock, aTransport::pause,
+            enrollment = enrollment,
             credentials = { app, id -> decorateCredential(id, KeystoreCredentialStore(app, id)) },
             historyStorage = { path ->
                 val storage = decorateHistory(path, SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(path, hooks = hooks(path))))
@@ -82,8 +84,8 @@ internal class AccountSelectionFixture {
         })
     }
 
-    fun installActivity() {
-        NativeConnection.rootFactory = { owner }
+    fun installActivity(factory: () -> AccountRuntimeOwner = { owner }) {
+        NativeConnection.rootFactory = { factory() }
         installed = true
         NativeConnection.resetForTests()
     }

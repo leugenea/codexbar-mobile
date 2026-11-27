@@ -121,16 +121,24 @@ class AccountSelectionTest {
         a.readUsage(refreshSession = true)
         fixture.await("A refresh dispatched") { fixture.aTransport.liveHeldCall("/oauth/token") != null }
         val rotation = fixture.aTransport.liveHeldCall("/oauth/token")!!
+        val target = BackgroundRefreshTarget(requireNotNull(fixture.a.partition))
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val worker = scope.async { root.refreshInBackground(target, 0) }
         var peerBytes: Map<String, List<Byte>>? = null
         try {
+            fixture.await("A worker joins the already-sent rotation's usage flight") {
+                fixture.receipt("A worker interest", a) { a.backgroundRefreshNetworkInterests() == 1 }
+            }
             fixture.select(fixture.b); fixture.phase(b, ConnectionPhase.OBSERVED)
             fixture.await("B original admission completed") { fixture.appends.any { it.admission.partition == fixture.b.partition } }
             peerBytes = fixture.bytes(fixture.b); val peerEnvelope = fixture.ready(b)
+            fixture.receipt("worker releases only A's flight interest", a) { worker.cancelAndJoin() }
+            assertFalse(rotation.cancelled)
             rotation.reply(); write.await("A protected token persistence")
             assertSame(original, fixture.ready(a))
             assertSame(peerEnvelope, fixture.ready(b)); assertEquals(peerBytes, fixture.bytes(fixture.b))
             assertEquals(fixture.b.storage.id, root.dashboard().value!!.id)
-        } finally { rotation.reply(); write.release() }
+        } finally { rotation.reply(); write.release(); scope.cancel() }
         fixture.await("A rotation independent owner settlement") { (a.session.snapshot() as? SessionResult.Ready)?.envelope !== original }
         assertSame(original.generation, fixture.ready(a).generation)
         assertEquals(peerBytes, fixture.bytes(fixture.b))
@@ -204,7 +212,7 @@ class AccountSelectionTest {
         val target = fixture.receipt("exact enrolled A target", a) { a.backgroundRefreshTarget() }!!
         fixture.aTransport.heldPath = ReadOperation.USAGE.path
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        val work = scope.async { a.refreshInBackground(target) }
+        val work = scope.async { root.refreshInBackground(target, 0) }
         try {
             fixture.await("worker A dispatched") { fixture.aTransport.liveHeldCall(ReadOperation.USAGE.path) != null }
             val call = fixture.aTransport.liveHeldCall(ReadOperation.USAGE.path)!!
@@ -213,7 +221,7 @@ class AccountSelectionTest {
             if (bFirst) fixture.phase(b, ConnectionPhase.OBSERVED)
             else fixture.await("B independent foreground dispatch") { fixture.bTransport.liveHeldCall(ReadOperation.USAGE.path) != null }
             assertFalse(call.cancelled)
-            assertSame(a, root.legacy()) // Compatibility worker retains its original ingress.
+            assertSame(a, root.runtime(fixture.a.storage.id))
             call.reply()
             val outcome = fixture.receipt("original worker A endpoint and recording outcome", a) { work.await() } as BackgroundRefreshOutcome.Completed
             assertEquals(HistoryRecordingOutcome.Stored(ObservationId(5)), outcome.history)
@@ -236,6 +244,8 @@ class AccountSelectionTest {
     }
 
     @Test fun reauthorizationRetainsCurrentSavedAAndActualRemovalActivatesDormantB() {
+        val enrollment = java.util.concurrent.CopyOnWriteArrayList<Pair<BackgroundRefreshTarget, Boolean>>()
+        fixture.enrollment = { target, enabled -> enrollment += (target to enabled) }
         val root = fixture.start(); val selection = root.dashboard()
         val a = fixture.runtime(fixture.a); val b = fixture.runtime(fixture.b)
         fixture.phase(a, ConnectionPhase.RESTORED); fixture.phase(b, ConnectionPhase.RESTORED)
@@ -258,6 +268,8 @@ class AccountSelectionTest {
         assertNull(fixture.catalog.entry(fixture.a.storage.id))
         assertEquals(fixture.b.storage.id, fixture.catalog.snapshot().selected)
         assertCounts(fixture.bTransport, 1, 1)
+        val targetA = BackgroundRefreshTarget(requireNotNull(fixture.a.partition))
+        assertEquals(listOf(targetA to true, targetA to false), enrollment.toList())
         fixture.stop(observer)
     }
 

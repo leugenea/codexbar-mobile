@@ -16,19 +16,9 @@ import java.util.concurrent.TimeUnit
 
 /** Only WorkManager persists enrollment; its input contains one opaque local lifetime, no secrets. */
 internal class PeriodicUsageRefresh(private val manager: WorkManager) {
-    fun enrollment(target: BackgroundRefreshTarget?) {
-        if (target == null) manager.cancelAllWorkByTag(TAG)
-        else manager.enqueueUniquePeriodicWork(name(target), ExistingPeriodicWorkPolicy.KEEP, request(target))
-    }
-
-    /** Compatibility runtime boundary: removal never cancels a peer's unique work. */
-    fun entryEnrollment(initial: HistoryPartition?): (BackgroundRefreshTarget?) -> Unit {
-        var continuing = initial?.let(::BackgroundRefreshTarget)
-        return { target ->
-            if (target == null) continuing?.let { manager.cancelUniqueWork(name(it)) }
-            else enrollment(target)
-            continuing = target
-        }
+    fun enrollment(target: BackgroundRefreshTarget, enrolled: Boolean) {
+        if (enrolled) manager.enqueueUniquePeriodicWork(name(target), ExistingPeriodicWorkPolicy.KEEP, request(target))
+        else manager.cancelUniqueWork(name(target))
     }
 
     companion object {
@@ -61,7 +51,7 @@ class PeriodicUsageRefreshWorker(context: Context, parameters: WorkerParameters)
     override suspend fun doWork(): Result {
         val target = PeriodicUsageRefresh.target(inputData.getString(PeriodicUsageRefresh.LIFETIME))
             ?: return Result.failure()
-        val outcome = NativeConnection.get(applicationContext).refreshInBackground(
+        val outcome = NativeConnection.refreshInBackground(applicationContext,
             target, minimumSuccessAgeMillis = PeriodicUsageRefresh.RECENT_SUCCESS_MILLIS)
         if (outcome is BackgroundRefreshOutcome.Rejected && outcome.reason == BackgroundRefreshRejection.STALE_LIFETIME) {
             WorkManager.getInstance(applicationContext).cancelUniqueWork(PeriodicUsageRefresh.name(target))
