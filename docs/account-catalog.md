@@ -70,30 +70,39 @@ runtime as FAILED/STORAGE, preventing further reads or stale name publication. S
 credentials/history remain available to a fresh holder; the existing unfinished-token-
 rotation quarantine and deletion policy is unchanged.
 
-Deletion writes an entry-and-operation-tagged catalog receipt before erasing history.
+Deletion writes an entry-and-operation-tagged physical cleanup receipt before erasing history.
 Independent terminal cleanups may overlap while their protected I/O is suspended, so the
-same journal retains one receipt per entry. Each existing deletion ticket captures its own receipt;
-each controller waiter captures that ticket and its deletion jobs before suspending.
-Completion never looks up whichever operation is current afterward. Catalog v3 adds a captured
-`RETAIN`/`REMOVE` disposition to each exact entry/operation receipt. It reads v1 and v2
-receipts as `REMOVE`, preserving their original semantics and operation UUID; it never
-guesses unavailable historical intent from the current phase or selection. A v1 receipt
-targets only the legacy association (or the pre-adoption empty legacy slot). Every new
-write uses v3; older applications cannot read this format.
+same journal retains one physical cleanup receipt per entry. Each deletion ticket captures
+its own receipt; each controller waiter captures that ticket and its jobs before suspending.
+Completion never looks up whichever operation is current afterward. Catalog v5 reads v1–v4
+and writes only v5; older readers cannot read v5. V1 and v2 receipts decode as `REMOVE`,
+preserving their original semantics and operation UUID rather than guessing from the current
+phase or selection. A v1 receipt targets only the legacy association (or the pre-adoption
+empty legacy slot). V3 and v4 preserve the captured `RETAIN`/`REMOVE` disposition, and v4
+also preserves the pending Add candidate. None of v1–v4 encodes a cancellation-only receipt.
 
-That receipt survives even if history is already physically gone while credentials remain readable. Restart requires
-combined removal, not restoration. Only the process owner's successful credential AND
-history deletion barrier settles its captured disposition and clears the receipt.
+The physical receipt survives even if history is already gone while credentials remain
+readable. Restart requires combined cleanup, not restoration. Only after both credential
+and history deletion barriers succeed does the process owner durably settle the captured
+disposition and clear the physical receipt.
 `RETAIN` invalidates credentials/history and clears the old partition association, but keeps
 the immutable address, valid local name and dashboard selection. Reauthorization is not a
 request to choose a healthier peer. The old partition never authorizes the invalidated entry;
 a later checked fresh adoption may bind a new partition and restore the retained local name
 to its sidecar. `REMOVE` deletes the entry and, if selected, chooses the first remaining entry
 in stable catalog order (or null when empty), without sorting labels or inspecting health.
+When the retiring entry has a uniquely bound lifetime, production commits the disposition
+and a cancellation-only receipt in the same atomic catalog replacement, publishing only
+after directory sync and readback. That receipt preserves the entry ID, operation UUID and
+disposition, and records the exact retired partition UUID. It authorizes only cancellation of
+that lifetime's work, not storage cleanup or refresh, and does not block a successor lifetime.
+The [process owner](background-refresh.md#ownership-and-admission) clears only that exact
+receipt after WorkManager acknowledges cancellation.
+
 A failed or interrupted barrier remains pending. Each ticket retains its own applied
-finalization provenance in memory: if its exact receipt was present when completion
-attempted replacement and readback confirms its removal after a directory-sync failure,
-that same ticket retries directory durability. It never rewrites its old snapshot or
+finalization provenance in memory: if its exact physical receipt was present at replacement
+and readback finds it gone after a directory-sync failure, that same ticket retries
+directory durability. It never rewrites its old snapshot or
 accepts an unrelated absent receipt; newer peer and successor changes remain untouched.
 Failure remains a storage error until sync succeeds, without another persisted journal.
 The existing controller removal path consumes this primitive. Captured management of saved
