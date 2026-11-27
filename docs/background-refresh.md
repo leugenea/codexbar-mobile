@@ -43,12 +43,13 @@ foreground service, polling timer or exact refresh alarm alive to enforce punctu
   Catalog settlement and WorkManager cancellation are not atomic. After process loss,
   a confirmed snapshot without a legacy entry or legacy deletion receipt is not itself
   proof of retirement. The existing legacy history fence, however, preserves the exact
-  retired UUID in `EMPTY` after physical deletion. A cold unmatched worker can use that
-  positive, read-only proof to cancel its original work after final legacy removal, even
-  if the only remaining entry is an unbound peer. It does not open either account runtime,
-  repair history, or add a journal. An active legacy fence is not retirement proof;
-  missing, unreadable, conflicting or nonmatching data does not authorize cancellation
-  through this path. Worker-first legacy adoption retains its existing behavior.
+  retired UUID in `EMPTY` after physical deletion. When that UUID matches and the
+  original credential slot is also clear, a cold unmatched worker can cancel only
+  that work without opening either runtime, even if a remaining peer is unbound.
+  An exact `ACTIVE` fence permits worker-first restoration only of the legacy slot;
+  protected restoration and the exact catalog binding still gate provider reads.
+  Missing, unreadable, conflicting or nonmatching legacy evidence does not open
+  a runtime, repair history, or cancel work.
 - Foreground/manual/background overlap joins the same owner flight and recorder
   ticket. No second transport, session, history store or visible observer exists.
   Worker stop/cancellation releases only its interest; another consumer and accepted

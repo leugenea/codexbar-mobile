@@ -41,6 +41,13 @@ class KeystoreCredentialStore(context: Context, localSessionId: UUID) : Credenti
     internal companion object {
         fun file(context: Context, session: UUID): File = File(context.noBackupFilesDir.canonicalFile, "credentials/$session/value.bin")
         fun alias(context: Context, session: UUID): String = "${context.packageName}.credentials.$session"
+
+        /** A legacy history tombstone may predate the credential deletion barrier. */
+        fun confirmsDeletion(context: Context, session: UUID): Boolean = try {
+            val slot = requireNotNull(file(context, session).parentFile)
+            slot.canonicalFile == slot.absoluteFile && slot.list()?.isEmpty() == true &&
+                !AndroidCredentialCipher(alias(context, session)).containsKey()
+        } catch (_: Exception) { false }
     }
 }
 

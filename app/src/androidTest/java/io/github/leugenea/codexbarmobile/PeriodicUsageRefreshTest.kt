@@ -526,7 +526,11 @@ class PeriodicUsageRefreshTest {
         } finally { f.cleanup() }
     }
 
-    @Test fun coldUnmatchedWorkerProvesRemovedLegacyWithOnlyRetainedAddressWithoutOpeningEitherRuntime() {
+    @Test fun coldUnmatchedWorkerProvesRemovedLegacyWithRetainedUnboundPeer() = removedLegacyWorker(retainUnbound = true)
+
+    @Test fun coldUnmatchedWorkerProvesRemovedLegacyWithBoundPeer() = removedLegacyWorker(retainUnbound = false)
+
+    private fun removedLegacyWorker(retainUnbound: Boolean) {
         val f = AccountSelectionFixture()
         f.prepare()
         try {
@@ -542,22 +546,26 @@ class PeriodicUsageRefreshTest {
             f.start(); f.installActivity()
             val workA = enrollSaved(f, f.a)
             val workB = enrollSaved(f, f.b)
-            f.aTransport.advance(900_000)
-            f.bTransport.usageStatus = 401
-            f.aTransport.tokenResponse = TransportResult.Response.bounded(400, """{"error":"invalid_grant"}""".toByteArray())
-            assertEquals(ListenableWorker.Result.success(), run(targetB, workB))
-            f.phase(f.runtime(f.b), ConnectionPhase.REAUTH_REQUIRED)
+            if (retainUnbound) {
+                f.aTransport.advance(900_000)
+                f.bTransport.usageStatus = 401
+                f.aTransport.tokenResponse = TransportResult.Response.bounded(400, """{"error":"invalid_grant"}""".toByteArray())
+                assertEquals(ListenableWorker.Result.success(), run(targetB, workB))
+                f.phase(f.runtime(f.b), ConnectionPhase.REAUTH_REQUIRED)
+            }
 
             val a = f.runtime(f.a)
             a.signOut()
             f.phase(a, ConnectionPhase.SIGNED_OUT)
-            assertEquals(listOf(targetB, targetA), interrupted.toList())
-            val raw = CatalogFile(File(f.directory, "account-catalog"))
+            assertEquals(if (retainUnbound) listOf(targetB, targetA) else listOf(targetA), interrupted.toList())
+            val catalogPath = File(f.directory, "account-catalog")
+            val raw = CatalogFile(catalogPath)
             val settled = raw.read()
-            assertEquals(listOf(f.b.copy(partition = null)), settled.entries)
+            assertEquals(listOf(if (retainUnbound) f.b.copy(partition = null) else f.b), settled.entries)
             assertEquals(f.b.storage.id, settled.selected)
             assertTrue(settled.deletions.isEmpty())
-            assertEquals(WorkInfo.State.ENQUEUED, info(workA).state)
+            val aInfo = info(workA)
+            assertEquals(WorkInfo.State.ENQUEUED, aInfo.state)
             val bInfo = info(workB)
             assertEquals(WorkInfo.State.ENQUEUED, bInfo.state)
             f.assertRemoved(f.a)
@@ -567,8 +575,12 @@ class PeriodicUsageRefreshTest {
             assertTrue(File(aHistory, "binding").isFile)
             assertEquals(HistoryBinding(HistoryBindingPhase.EMPTY, targetA.partition),
                 HistoryFiles(aHistory, HistoryStorageLimits()).readBinding())
+            fun artifacts(path: File) = requireNotNull(path.listFiles()).associate { it.name to it.readBytes().toList() }
+            val aBytes = artifacts(aHistory)
             val bHistory = f.b.storage.historyDirectory(f.directory)
-            val bBinding = File(bHistory, "binding").readBytes()
+            val bBytes = artifacts(bHistory)
+            val bProtected = if (retainUnbound) null else f.bytes(f.b)
+            val catalogBytes = File(catalogPath, "catalog").readBytes()
             val requests = f.aTransport.requests.get() to f.bTransport.requests.get()
             val constructed = CopyOnWriteArrayList<UUID>()
             val openedHistory = CopyOnWriteArrayList<File>()
@@ -578,25 +590,48 @@ class PeriodicUsageRefreshTest {
             f.catalog = AccountCatalog.open(f.directory, { error("settled catalog required") })
             f.installActivity { f.start() }
 
-            // An intact EMPTY fence for A does not prove retirement for another UUID.
-            assertEquals(ListenableWorker.Result.success(), run(targetB, workB))
-            assertEquals(bInfo, info(workB))
-
             // A conflicting pending binding makes the exact EMPTY proof unavailable, not absent.
             val pending = File(aHistory, "binding.pending")
-            assertTrue(pending.createNewFile())
+            val pendingBytes = byteArrayOf(1, 2, 3)
+            pending.writeBytes(pendingBytes)
             assertEquals(ListenableWorker.Result.success(), run(targetA, workA))
-            assertEquals(workA, unique(targetA).single().id)
-            assertEquals(WorkInfo.State.ENQUEUED, info(workA).state)
-            assertTrue("cold proof may not repair history", pending.isFile)
+            assertEquals(aInfo, unique(targetA).single())
+            assertEquals(aBytes + (pending.name to pendingBytes.toList()), artifacts(aHistory))
+            assertArrayEquals(catalogBytes, File(catalogPath, "catalog").readBytes())
+            assertTrue(constructed.isEmpty())
+            assertTrue(openedHistory.isEmpty())
             assertTrue(pending.delete())
+
+            // An intact EMPTY fence for A does not prove retirement for another unmatched UUID.
+            val wrong = if (retainUnbound) targetB else BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
+            if (!retainUnbound) periodic.enrollment(wrong, true)
+            val wrongWork = unique(wrong).single()
+            assertEquals(ListenableWorker.Result.success(), run(wrong, wrongWork.id))
+            assertEquals(wrongWork, unique(wrong).single())
+
+            if (!retainUnbound) {
+                // A pre-catalog cleanup could leave EMPTY before the protected barrier settled.
+                val quarantine = File(KeystoreCredentialStore.file(f.context, f.a.storage.credentialSlot).parentFile,
+                    "rotation-pending")
+                quarantine.writeBytes(pendingBytes)
+                assertEquals(ListenableWorker.Result.success(), run(targetA, workA))
+                assertEquals(aInfo, unique(targetA).single())
+                assertArrayEquals(pendingBytes, quarantine.readBytes())
+                assertTrue(quarantine.delete())
+            }
 
             dispatchOsJob(awaitJob(workA), workA)
             f.await("the original A WorkSpec was cancelled from the fresh owner") { info(workA).state == WorkInfo.State.CANCELLED }
             assertEquals(workB, unique(targetB).single().id)
             assertEquals(bInfo, info(workB))
-            assertArrayEquals(bBinding, File(bHistory, "binding").readBytes())
+            assertEquals(aBytes, artifacts(aHistory))
+            assertEquals(bBytes, artifacts(bHistory))
+            if (bProtected != null) {
+                assertEquals(bProtected, f.bytes(f.b))
+                assertTrue(f.keyExists(f.b))
+            }
             assertEquals(settled, raw.read())
+            assertArrayEquals(catalogBytes, File(catalogPath, "catalog").readBytes())
             assertTrue(constructed.isEmpty())
             assertTrue(openedHistory.isEmpty())
             assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())

@@ -51,18 +51,24 @@ internal class HistoryFiles(val directory: File, private val limits: HistoryStor
         return decodeBinding()
     }
 
-    /** Read-only proof for unmatched legacy work. Missing or unreadable data is not retirement. */
-    fun confirmsRetirement(partition: HistoryPartition): Boolean = try {
-        // Zero is the uninitialized/corrupt-cleanup sentinel, never a retired lifetime.
-        partition.value != UUID(0, 0) && directory.canonicalFile == directory.absoluteFile &&
-            hasRetiredBinding(partition)
-    } catch (_: Exception) { false }
+    /** A read-only probe: never creates the lane or initializes/repairs the history fence. */
+    fun confirmedPhase(partition: HistoryPartition): HistoryBindingPhase? = try {
+        if (partition.value == UUID(0, 0) || directory.canonicalFile != directory.absoluteFile) null
+        else exactPhase(partition)
+    } catch (_: Exception) { null }
 
-    private fun hasRetiredBinding(partition: HistoryPartition): Boolean {
-        // Require a successful directory listing, not File.exists() as evidence of absence.
+    private fun exactPhase(partition: HistoryPartition): HistoryBindingPhase? {
         val artifacts = checkBudget()
-        return artifacts.any { it.name == control.name } && artifacts.all { it.name == control.name || it.name == "lane" } &&
-            decodeBinding() == HistoryBinding(HistoryBindingPhase.EMPTY, partition)
+        if (artifacts.none { it.name == control.name } || artifacts.any { it.name == pending.name }) return null
+        val binding = decodeBinding()
+        if (binding.partition != partition) return null
+        return when (binding.phase) {
+            HistoryBindingPhase.ACTIVE -> HistoryBindingPhase.ACTIVE
+            HistoryBindingPhase.EMPTY -> HistoryBindingPhase.EMPTY.takeIf {
+                artifacts.all { it.name == control.name || it.name == "lane" }
+            }
+            else -> null
+        }
     }
 
     private fun decodeBinding(): HistoryBinding {
