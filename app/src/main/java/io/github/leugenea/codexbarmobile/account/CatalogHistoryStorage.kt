@@ -7,6 +7,7 @@ internal class CatalogHistoryStorage(
     private val storage: HistoryLifetimeStorage,
     private val catalog: AccountCatalog,
     private val address: AccountStorage? = null,
+    private val onDeletionSettled: (HistoryPartition) -> Unit = {},
 ) : HistoryLifetimeStorage by storage {
     private fun entry() = address?.let { catalog.entry(it.id)?.also { entry -> check(entry.storage == it) } }
         ?: if (address == null) catalog.legacyEntry() else null
@@ -93,7 +94,7 @@ internal class CatalogHistoryStorage(
             try {
                 val receipt = catalog.beginDeletion(id, disposition)
                 capturedDisposition = receipt.disposition
-                settlement = catalog.deletionSettlement(receipt)
+                settlement = catalog.deletionSettlement(receipt, onDeletionSettled)
                 ticket.complete()
             } catch (_: Exception) { HistoryDeleteOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE) }
         }

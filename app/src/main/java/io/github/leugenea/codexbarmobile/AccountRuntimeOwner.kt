@@ -350,8 +350,16 @@ internal class AccountRuntimeOwner(
         val matches = snapshot.entries.filter { it.partition == target.partition }
         if (matches.size > 1) return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
         val entry = matches.singleOrNull()
-        if (staleBackgroundAddress(snapshot, entry)) return BackgroundRefreshOutcome.Rejected(STALE_LIFETIME)
+        if (entry == null && knownStaleUnmatched(snapshot)) return BackgroundRefreshOutcome.Rejected(STALE_LIFETIME)
         val controller = backgroundRuntime(snapshot, entry) ?: return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+        val receipt = entry?.let { saved -> snapshot.deletions.singleOrNull { it.entry == saved.storage.id } }
+        if (receipt != null) {
+            controller.recoverBackgroundDeletion(receipt.disposition) {
+                !closing && metadata.backgroundSnapshot(target.partition)?.deletions?.contains(receipt) == true
+            }
+            // Only the durable settlement of the exact receipt may cancel this WorkSpec.
+            return BackgroundRefreshOutcome.Rejected(RETIRING)
+        }
         val outcome = controller.refreshInBackground(target, minimumSuccessAgeMillis) {
             !closing && backgroundBinding(metadata, target, entry?.storage)
         }
@@ -360,12 +368,14 @@ internal class AccountRuntimeOwner(
         return outcome
     }
 
-    private fun canCancel(metadata: AccountCatalog, target: BackgroundRefreshTarget, address: AccountStorage?): Boolean =
-        metadata.backgroundSnapshot(target.partition)?.entries?.none { it.partition == target.partition && it.storage != address } == true
+    private fun knownStaleUnmatched(snapshot: CatalogSnapshot): Boolean =
+        snapshot.entries.all { it.partition != null } && snapshot.entries.any { it.storage.legacy }
 
-    private fun staleBackgroundAddress(snapshot: CatalogSnapshot, entry: CatalogEntry?): Boolean =
-        if (entry != null) snapshot.deletions.any { it.entry == entry.storage.id }
-        else snapshot.entries.none { it.partition == null } && snapshot.entries.any { it.storage.legacy }
+    private fun canCancel(metadata: AccountCatalog, target: BackgroundRefreshTarget, address: AccountStorage?): Boolean {
+        val snapshot = metadata.backgroundSnapshot(target.partition) ?: return false
+        return snapshot.entries.none { it.partition == target.partition &&
+            (it.storage != address || snapshot.deletions.any { receipt -> receipt.entry == it.storage.id }) }
+    }
 
     @Synchronized private fun backgroundRuntime(snapshot: CatalogSnapshot, entry: CatalogEntry?): ConnectionController? {
         if (closing) return null
@@ -406,16 +416,17 @@ internal class AccountRuntimeOwner(
         check(slot !in slots) { "Credential slot already owned" }
         val store = credentials(applicationContext, slot)
         val directory = address?.historyDirectory(root) ?: File(root, "usage-history")
-        val history = metadata?.let { HistoryLifetimeCoordinator(CatalogHistoryStorage(historyStorage(directory), it, address)) }
-        val saved = metadata?.snapshots?.value?.entries?.singleOrNull {
-            if (address == null) it.storage.legacy else it.storage == address
+        val history = metadata?.let {
+            HistoryLifetimeCoordinator(CatalogHistoryStorage(historyStorage(directory), it, address) { partition ->
+                enrollment(BackgroundRefreshTarget(partition), false)
+            })
         }
         return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),
             NativeFeasibilityReader(transport, clock, pause), scope, storageReady = knownSlot != null,
             mutationDispatcher = mutations, refreshClock = clock,
-            history = history, initialBackgroundPartition = saved?.partition,
-            backgroundEnrollment = { target, enabled ->
-                if ((!enabled || !closing) && metadata != null && backgroundBinding(metadata, target, address)) enrollment(target, enabled)
+            history = history,
+            backgroundEnrollment = { target ->
+                if (!closing && metadata != null && backgroundBinding(metadata, target, address)) enrollment(target, true)
             },
             savedAccount = { if (address == null) metadata?.legacyEntry() != null else metadata?.entry(address.id) != null },
             pendingAddition = pendingAddition).also { slots.add(slot) }

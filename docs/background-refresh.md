@@ -24,13 +24,19 @@ foreground service, polling timer or exact refresh alarm alive to enforce punctu
   confirmed lifetime without replacing the existing WorkSpec.
 - Passive construction/launch/restoration, settings navigation, deselection, an
   unadmitted Add and automatic selection after removal do not create enrollment.
-- Removal, replacement cleanup and terminal reauthorization cancel only the captured
-  lifetime's work. A late confirmed-stale worker can also cancel only its own unique
+- Removal, replacement cleanup and terminal reauthorization cancel only the unique
+  lifetime captured by the existing deletion receipt, after credential/history deletion
+  and durable catalog settlement. A cold worker with that exact pending receipt resumes
+  only its owner's cleanup, not provider reads. Unfinished cleanup leaves the same periodic
+  request available. A late confirmed-stale worker can also cancel only its own unique
   name. Unavailable storage, ambiguous bindings and uncertain catalog state are not
   evidence of staleness, and cannot start a fresh worker flight.
   Logout fences old requests/history immediately even before asynchronous scheduler
   cancellation settles. Rotation keeps the same lifetime. Activity STOP, Cancel and
   clean process-owner shutdown do not pretend to remove the account/enrollment.
+  Catalog settlement and WorkManager cancellation are not atomic. If cancellation
+  is lost after a settled cleanup (for example, process death), a surviving UUID that
+  can no longer be proved stale cannot authorize provider reads for another lifetime.
 - Foreground/manual/background overlap joins the same owner flight and recorder
   ticket. No second transport, session, history store or visible observer exists.
   Worker stop/cancellation releases only its interest; another consumer and accepted

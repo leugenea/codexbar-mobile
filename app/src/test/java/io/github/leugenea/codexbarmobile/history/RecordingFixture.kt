@@ -12,7 +12,7 @@ import java.time.Instant
 /** Original synthetic integrated owner/reader/reducer fixture, with no Android stub execution. */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class RecordingFixture(val test: TestScope, capacity: Int = 16, lifetimeStorage: HistoryLifetimeStorage? = null,
-    enrollment: (BackgroundRefreshTarget, Boolean) -> Unit = { _, _ -> }) {
+    enrollment: (BackgroundRefreshTarget) -> Unit = {}) {
     private val dispatcher = StandardTestDispatcher(test.testScheduler)
     val storage = RecordingDispatcher(dispatcher)
     val journal = LifetimeJournal()

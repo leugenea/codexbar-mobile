@@ -171,24 +171,35 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     }
 
     /** Retained by one history ticket; only its own attempted removal can authorize a sync retry. */
-    fun deletionSettlement(receipt: CatalogDeletion): () -> Boolean {
+    fun deletionSettlement(receipt: CatalogDeletion, onSettled: (HistoryPartition) -> Unit = {}): () -> Boolean {
         var attempted = false
         var applied = false
+        var retiredPartition: HistoryPartition? = null
         return {
             synchronized(this) {
                 try { confirmCommit() } catch (_: Exception) { return@synchronized false }
-                if (applied || (attempted && receipt !in state.deletions)) syncDeletion()
+                val settled = if (applied || (attempted && receipt !in state.deletions)) syncDeletion()
                 else {
                     val pending = receipt in state.deletions
                     attempted = pending
+                    if (pending) retiredPartition = uniqueDeletionPartition(receipt)
                     val complete = completeDeletion(receipt)
                     // commit re-reads an uncertain replacement before returning failure.
                     applied = pending && receipt !in state.deletions
                     complete
                 }
+                // Only this ticket consumed the exact binding; a failed sync keeps its intent.
+                if (settled) retiredPartition?.also { partition ->
+                    retiredPartition = null
+                    if (state.entries.none { it.partition == partition }) onSettled(partition)
+                }
+                settled
             }
         }
     }
+
+    private fun uniqueDeletionPartition(receipt: CatalogDeletion): HistoryPartition? =
+        receipt.entry?.let(::entry)?.partition?.takeIf { partition -> state.entries.count { it.partition == partition } == 1 }
 
     private fun syncDeletion(): Boolean = try { file.sync(); true } catch (_: Exception) { false }
 

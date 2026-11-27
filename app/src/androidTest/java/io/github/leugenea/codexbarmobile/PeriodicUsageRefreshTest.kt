@@ -25,7 +25,9 @@ import io.github.leugenea.codexbarmobile.account.AccountCatalog
 import io.github.leugenea.codexbarmobile.account.AccountDisplayName
 import io.github.leugenea.codexbarmobile.account.AccountStorage
 import io.github.leugenea.codexbarmobile.account.AccountType
+import io.github.leugenea.codexbarmobile.account.CatalogEntry
 import io.github.leugenea.codexbarmobile.account.CatalogFile
+import io.github.leugenea.codexbarmobile.account.CleanupDisposition
 import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.transport.*
@@ -187,6 +189,158 @@ class PeriodicUsageRefreshTest {
             assertEquals(0L, f.aTransport.requests.get() + f.bTransport.requests.get())
             assertEquals(WorkInfo.State.ENQUEUED, info(work).state)
         } finally { f.cleanup() }
+    }
+
+    @Test fun coldLegacyWorkerSettlesInterruptedRemovalBeforeCancellingItsWork() =
+        recoverDurableWorkerDeletion(legacy = true, disposition = CleanupDisposition.REMOVE)
+
+    @Test fun coldAddressedWorkerRetriesInterruptedReauthorizationBeforeCancellingItsWork() =
+        recoverDurableWorkerDeletion(legacy = false, disposition = CleanupDisposition.RETAIN)
+
+    private fun recoverDurableWorkerDeletion(legacy: Boolean, disposition: CleanupDisposition) {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        try {
+            val removed = if (legacy) f.a else f.b
+            val peer = if (legacy) f.b else f.a
+            f.enrollment = PeriodicUsageRefresh(manager)::enrollment
+            f.start()
+            val target = BackgroundRefreshTarget(requireNotNull(removed.partition))
+            val peerTarget = BackgroundRefreshTarget(requireNotNull(peer.partition))
+            val work = enrollSaved(f, removed)
+            val peerWork = enrollSaved(f, peer)
+            assertTrue(f.catalog.select(peer.storage.id))
+            f.receipt("stop before reconstructing interrupted cleanup") { f.owner.shutdown() }
+            val requests = f.aTransport.requests.get() to f.bTransport.requests.get()
+            val peerBytes = f.bytes(peer)
+
+            // Crash cut after the real catalog receipt commit, before either protected store is deleted.
+            val receipt = f.catalog.beginDeletion(removed.storage.id, disposition)
+            val raw = CatalogFile(File(f.directory, "account-catalog"))
+            assertEquals(listOf(receipt), raw.read().deletions)
+            assertTrue(f.keyExists(removed))
+            f.catalog = AccountCatalog.open(f.directory, { error("saved catalog required") })
+            val constructed = CopyOnWriteArrayList<UUID>()
+            f.decorateCredential = { slot, store -> store.also { constructed += slot } }
+            val held = f.gate()
+            val failFirst = AtomicBoolean(!legacy)
+            f.hooks = { path -> object : HistoryStorageHooks {
+                override fun afterTombstone() {
+                    if (path != removed.storage.historyDirectory(f.directory)) return
+                    held.pause("exact history tombstone before physical cleanup")
+                    if (failFirst.getAndSet(false)) throw IOException("interrupted history deletion")
+                }
+            } }
+            f.installActivity { f.start() }
+            dispatchOsJob(awaitJob(work), work)
+            held.await("worker reached the exact durable receipt")
+            assertEquals(listOf(receipt), raw.read().deletions)
+            assertEquals(WorkInfo.State.RUNNING, info(work).state)
+            assertEquals(listOf(removed.storage.credentialSlot), constructed.toList())
+            assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())
+            held.release()
+            val firstResult = if (legacy) WorkInfo.State.CANCELLED else WorkInfo.State.ENQUEUED
+            f.await("first scheduled cleanup opportunity finished with $firstResult") { info(work).state == firstResult }
+
+            if (!legacy) {
+                assertEquals(listOf(receipt), raw.read().deletions)
+                assertEquals("failed physical cleanup must preserve the original opportunity", WorkInfo.State.ENQUEUED, info(work).state)
+                assertEquals(ListenableWorker.Result.success(), run(target, work))
+                assertEquals(removed.copy(partition = null), f.catalog.entry(removed.storage.id))
+                assertFalse(f.keyExists(removed))
+                assertFalse(File(removed.storage.historyDirectory(f.directory), "history.db").exists())
+            } else f.assertRemoved(removed)
+            val settled = raw.read()
+            assertTrue(settled.deletions.isEmpty())
+            assertEquals(peer.storage.id, settled.selected)
+            assertEquals(WorkInfo.State.CANCELLED, info(work).state)
+            assertEquals(peerWork, unique(peerTarget).single().id)
+            assertEquals(peerBytes, f.bytes(peer))
+            assertEquals(listOf(removed.storage.credentialSlot), constructed.toList())
+            assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())
+        } finally { f.cleanup() }
+    }
+
+    @Test fun terminalAddressedWorkerCancelsOriginalWorkAfterUnrelatedSelectionFenceSettles() {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        val failing = AtomicBoolean()
+        try {
+            // The fixture's B is nonlegacy (the invalidated A in the reported interleaving).
+            val removed = f.b; val peer = f.a
+            val raw = CatalogFile(File(f.directory, "account-catalog"))
+            f.catalog = AccountCatalog.open(f.directory, { error("saved catalog required") }, beforeDirectorySync = {
+                if (failing.get()) throw IOException("unrelated selection directory sync")
+            })
+            assertTrue(f.catalog.select(removed.storage.id))
+            f.enrollment = PeriodicUsageRefresh(manager)::enrollment
+            val reservation = f.gate()
+            val tombstone = f.gate()
+            val directory = removed.storage.historyDirectory(f.directory)
+            f.decorateHistory = { path, storage ->
+                if (path != directory) storage else object : HistoryLifetimeStorage by storage {
+                    override fun reserveDeletion(disposition: CleanupDisposition): HistoryDeletion {
+                        reservation.pause("terminal invalidation before the catalog deletion reservation")
+                        return storage.reserveDeletion(disposition)
+                    }
+                }
+            }
+            f.hooks = { path -> object : HistoryStorageHooks {
+                override fun afterTombstone() { if (path == directory) tombstone.pause("terminal cleanup after durable receipt") }
+            } }
+            f.start(); f.installActivity()
+            val target = BackgroundRefreshTarget(requireNotNull(removed.partition))
+            val peerTarget = BackgroundRefreshTarget(requireNotNull(peer.partition))
+            val work = enrollSaved(f, removed)
+            val peerWork = enrollSaved(f, peer)
+            val peerCredential = f.protectedReadback(peer)
+            val peerBytes = f.bytes(peer)
+            val peerGets = f.aTransport.gets.get()
+            f.aTransport.advance(900_000)
+            f.bTransport.heldPath = ReadOperation.USAGE.path
+            f.bTransport.usageStatus = 401
+            f.aTransport.tokenResponse = TransportResult.Response.bounded(400, """{"error":"invalid_grant"}""".toByteArray())
+            dispatchOsJob(awaitJob(work), work)
+            f.await("original scheduled worker has in-flight usage") {
+                info(work).state == WorkInfo.State.RUNNING && f.bTransport.liveHeldCall(ReadOperation.USAGE.path) != null
+            }
+            failing.set(true)
+            assertThrows(IOException::class.java) { f.catalog.select(peer.storage.id) }
+            assertNull(f.catalog.backgroundSnapshot(target.partition))
+            f.bTransport.releaseHeld()
+            reservation.await("terminal refresh reached account cleanup while selection was still fenced")
+            assertNull(f.catalog.backgroundSnapshot(target.partition))
+            assertFalse(info(work).state.isFinished)
+            failing.set(false)
+            reservation.release()
+            tombstone.await("history cleanup reached the now-durable exact receipt")
+            assertEquals(removed.storage.id, raw.read().deletions.single().entry)
+            f.await("worker acknowledged opportunity while cleanup was still held") { info(work).state == WorkInfo.State.ENQUEUED }
+            tombstone.release()
+
+            f.phase(f.runtime(removed), ConnectionPhase.REAUTH_REQUIRED)
+            val settled = raw.read()
+            assertEquals(removed.copy(partition = null), settled.entries.single { it.storage == removed.storage })
+            assertTrue(settled.deletions.isEmpty())
+            assertEquals(peer.storage.id, settled.selected)
+            assertEquals(WorkInfo.State.CANCELLED, info(work).state)
+            assertEquals(peerWork, unique(peerTarget).single().id)
+            assertEquals(peerGets, f.aTransport.gets.get()) // The synthetic router sends the refresh POST to A.
+            assertEquals(1L, f.aTransport.counts()["/oauth/token"] ?: 0L)
+            assertArrayEquals(peerCredential.accessToken.copyBytes(), f.protectedReadback(peer).accessToken.copyBytes())
+            assertEquals(peerBytes, f.bytes(peer))
+        } finally {
+            failing.set(false)
+            f.cleanup()
+        }
+    }
+
+    private fun enrollSaved(f: AccountSelectionFixture, entry: CatalogEntry): UUID {
+        val controller = f.runtime(entry)
+        f.phase(controller, ConnectionPhase.RESTORED)
+        controller.readUsage()
+        f.phase(controller, ConnectionPhase.OBSERVED)
+        return unique(BackgroundRefreshTarget(requireNotNull(entry.partition))).single().id
     }
 
     @Test fun workerFirstLegacyUpgradeAdoptsAnInitiallyUnresolvedLifetimeWithoutReplacingWork() {

@@ -109,6 +109,7 @@ internal class NavigationTransport : AuthTransport {
     val clock = TransportClock { TransportTime(Instant.ofEpochSecond(1_800_000_000).plusMillis(millis.get()), millis.get()) }
     @Volatile var usageStatus = 200
     @Volatile var inventoryStatus = 200
+    @Volatile var tokenResponse = body("""{"access_token":"synthetic-navigation-access","refresh_token":"synthetic-navigation-refresh"}""")
     fun advance(value: Long) { millis.addAndGet(value) }
     suspend fun pause(value: Long) { require(value >= 0) }
     fun counts(): Map<String, Long> = routes.mapValues { it.value.get() }
@@ -135,7 +136,7 @@ internal class NavigationTransport : AuthTransport {
         ReadOperation.RESET_INVENTORY.path -> body(inventoryBody, inventoryStatus)
         "/api/accounts/deviceauth/usercode" -> body("""{"device_auth_id":"synthetic-navigation","user_code":"SYNTHETIC-NAVIGATION"}""")
         "/api/accounts/deviceauth/token" -> body("""{"authorization_code":"synthetic-navigation-code","code_verifier":"synthetic-navigation-verifier"}""")
-        "/oauth/token" -> body("""{"access_token":"synthetic-navigation-access","refresh_token":"synthetic-navigation-refresh"}""")
+        "/oauth/token" -> tokenResponse
         else -> throw AssertionError("Unexpected synthetic navigation route")
     }
 

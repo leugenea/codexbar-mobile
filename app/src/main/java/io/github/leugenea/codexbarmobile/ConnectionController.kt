@@ -59,8 +59,7 @@ internal class ConnectionController(
     refreshClock: io.github.leugenea.codexbarmobile.transport.TransportClock = reader.clock,
     private val history: HistoryLifetimeCoordinator? = null,
     historyQueueCapacity: Int = 16,
-    initialBackgroundPartition: HistoryPartition? = null,
-    private val backgroundEnrollment: (BackgroundRefreshTarget, Boolean) -> Unit = { _, _ -> },
+    private val backgroundEnrollment: (BackgroundRefreshTarget) -> Unit = {},
     private val savedAccount: () -> Boolean = { false },
     pendingAddition: Boolean = false,
 ) {
@@ -87,7 +86,6 @@ internal class ConnectionController(
     private var historyImport: Deferred<HistoryImportOutcome>? = null
     private var backgroundHistoryInterests = 0
     private var backgroundSession: SessionGeneration? = null
-    private var backgroundPartition = initialBackgroundPartition
     private var retryRestoreAt: Long? = null
     private var closed = false
     private val stopped = CompletableDeferred<Unit>()
@@ -180,10 +178,7 @@ internal class ConnectionController(
             publish(failedOwner, storageFailure())
             return false
         }
-        if (history?.requiresRemoval != true) {
-            history?.confirmedLifetime(active)?.let { backgroundPartition = it }
-            return true
-        }
+        if (history?.requiresRemoval != true) return true
         usageRefresh.reset()
         removeCredentials()
         publish(owner, if (awaitDeletion()) ConnectionState(ConnectionPhase.REAUTH_REQUIRED) else storageFailure())
@@ -205,8 +200,6 @@ internal class ConnectionController(
         get() = history?.availability ?: HistoryAvailability.UNAVAILABLE
 
     private fun removeHistory(disposition: CleanupDisposition = CleanupDisposition.RETAIN) {
-        backgroundPartition?.let { backgroundEnrollment(BackgroundRefreshTarget(it), false) }
-        backgroundPartition = null
         mutableAccountRemoval.value = AccountRemoval()
         mutableName.value = null
         backgroundSession = null
@@ -294,8 +287,7 @@ internal class ConnectionController(
 
     private fun enrollBackground(active: SessionGeneration) {
         val partition = history?.lifetime(active) ?: return
-        backgroundPartition = partition
-        backgroundEnrollment(BackgroundRefreshTarget(partition), true)
+        backgroundEnrollment(BackgroundRefreshTarget(partition))
     }
 
     /** Capture for enrollment only after protected restoration; construction/launch stays dormant. */
@@ -306,6 +298,27 @@ internal class ConnectionController(
         val ready = session.snapshot() as? SessionResult.Ready ?: return@withContext null
         history?.lifetime(ready.envelope.generation)?.let(::BackgroundRefreshTarget)
     }
+
+    /** The exact receipt authorizes cleanup, not a refresh. A failed attempt leaves work enrolled. */
+    internal suspend fun recoverBackgroundDeletion(disposition: CleanupDisposition, stillPending: () -> Boolean): Unit =
+        withContext(mutationDispatcher) {
+            if (closed || !stillPending()) return@withContext
+            retryBackgroundRestore()
+            if (mutableState.value.phase == ConnectionPhase.RESTORING) {
+                work?.join()
+                return@withContext
+            }
+            if (mutableState.value.phase != ConnectionPhase.FAILED || mutableState.value.problem != ConnectionProblem.STORAGE)
+                return@withContext
+            val owner = revision
+            retryFailedDeletion()
+            removeCredentials(disposition)
+            publish(owner, ConnectionState(ConnectionPhase.SIGNING_OUT))
+            work = ownerScope.launch {
+                publish(owner, if (awaitDeletion()) ConnectionState(ConnectionPhase.REAUTH_REQUIRED) else storageFailure())
+            }
+            work?.join()
+        }
 
     /** A worker supplies its enrolled lifetime. It never retries auth as an explicit user action. */
     internal suspend fun refreshInBackground(expected: BackgroundRefreshTarget, minimumSuccessAgeMillis: Long = 0,

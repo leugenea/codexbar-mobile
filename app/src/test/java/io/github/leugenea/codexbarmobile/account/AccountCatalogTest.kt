@@ -368,7 +368,8 @@ class AccountCatalogTest {
         val a = catalog.adopt(partition, named("Synthetic A"))
         val b = other("Synthetic B").also { assertTrue(catalog.insert(it)) }
         val receipt = catalog.beginDeletion(a.storage.id)
-        val finish = catalog.deletionSettlement(receipt)
+        val retired = mutableListOf<HistoryPartition>()
+        val finish = catalog.deletionSettlement(receipt) { retired += it }
         failSync = true
         assertFalse(finish())
         assertNull(catalog.entry(a.storage.id))
@@ -377,6 +378,7 @@ class AccountCatalogTest {
         val failedSyncs = syncs
         val appliedReplacements = replacements
         assertFalse(finish()) // Still unavailable, not an acknowledgement based on absence.
+        assertTrue(retired.isEmpty())
         assertEquals(failedSyncs + 1, syncs)
         assertEquals(appliedReplacements, replacements)
 
@@ -404,8 +406,18 @@ class AccountCatalogTest {
         assertTrue(finish())
         assertEquals(listOf(peerReceipt), open(root).snapshot().deletions)
         assertEquals(listOf(b), open(root).snapshot().entries)
+        assertEquals(listOf(partition), retired)
         assertTrue(catalog.completeDeletion(peerReceipt))
         assertTrue(open(root).snapshot().entries.isEmpty())
+    }
+
+    @Test fun deletionOfAnAmbiguousLifetimeDoesNotAuthorizeCancellation() {
+        val catalog = open(temporary.newFolder())
+        val a = catalog.adopt(partition, named("Synthetic A"))
+        val b = other("Synthetic B").copy(partition = partition).also { assertTrue(catalog.insert(it)) }
+        val receipt = catalog.beginDeletion(a.storage.id)
+        assertTrue(catalog.deletionSettlement(receipt) { fail("Cannot cancel a shared binding") }())
+        assertEquals(listOf(b), catalog.snapshot().entries)
     }
 
     @Test fun legacyV1ReceiptRetainsItsOperationAndOnlyItsLegacyEntry() {

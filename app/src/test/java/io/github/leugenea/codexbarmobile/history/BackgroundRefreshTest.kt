@@ -305,7 +305,7 @@ class BackgroundRefreshTest {
         var blocked = true
         val fixture = RecordingFixture(this, lifetimeStorage = object : HistoryLifetimeStorage by storage {
             override fun restore() = if (blocked) HistoryLifetimeOutcome.CatalogUnavailable else storage.restore()
-        }, enrollment = { _, _ -> fail("Worker cannot create or cancel enrollment from uncertain storage") })
+        }, enrollment = { fail("Worker cannot enroll from uncertain storage") })
         try {
             fixture.settle()
             val expected = BackgroundRefreshTarget(journal.partition)
