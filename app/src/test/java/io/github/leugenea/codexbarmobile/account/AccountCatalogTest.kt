@@ -370,8 +370,10 @@ class AccountCatalogTest {
         val receipt = catalog.beginDeletion(a.storage.id)
         val retired = mutableListOf<HistoryPartition>()
         val finish = catalog.deletionSettlement(receipt) { retired += it }
+        assertNull(finish.pendingPartition)
         failSync = true
         assertFalse(finish())
+        assertEquals(partition, finish.pendingPartition)
         assertNull(catalog.entry(a.storage.id))
         assertEquals(listOf(b), open(root).snapshot().entries)
         assertTrue(open(root).snapshot().deletions.isEmpty())
@@ -393,10 +395,14 @@ class AccountCatalogTest {
         val beforeSyncs = syncs
         val beforeReplacements = replacements
         assertFalse(catalog.completeDeletion(receipt))
-        assertFalse(catalog.deletionSettlement(receipt)()) // A new callback has no applied provenance.
+        val fresh = catalog.deletionSettlement(receipt) { fail("No applied provenance") }
+        assertFalse(fresh())
+        assertNull(fresh.pendingPartition)
         assertFalse(catalog.deletionSettlement(successorReceipt.copy(operation = receipt.operation))())
         assertEquals(beforeSyncs, syncs)
+        assertEquals(partition, finish.pendingPartition)
         assertTrue(finish()) // Original callback retries only current directory durability.
+        assertNull(finish.pendingPartition)
         assertEquals(beforeSyncs + 1, syncs)
         assertEquals(beforeReplacements, replacements)
         assertEquals(before, open(root).snapshot())

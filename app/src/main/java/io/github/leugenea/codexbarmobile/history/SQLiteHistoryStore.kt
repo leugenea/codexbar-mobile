@@ -50,6 +50,7 @@ class HistoryAccess internal constructor(
 /** Exactly one settlement per ticket. Failure is truthful; explicit administration may retry cleanup. */
 class HistoryDeletion internal constructor(
     private val catalogSettlement: () -> Boolean = { true },
+    private val catalogPartition: () -> HistoryPartition? = { null },
     private val cleanupDisposition: () -> CleanupDisposition = { CleanupDisposition.REMOVE },
     internal val partition: HistoryPartition? = null,
     private val work: () -> HistoryDeleteOutcome,
@@ -58,6 +59,9 @@ class HistoryDeletion internal constructor(
     @Synchronized fun complete(): HistoryDeleteOutcome = outcome ?: work().also { outcome = it }
     @Volatile private var catalogComplete = false
     internal val catalogSettled: Boolean get() = catalogComplete
+    // The volatile physical result publishes the adapter's captured settlement callback.
+    internal val pendingCatalogPartition: HistoryPartition?
+        get() = if (outcome?.successful() == true && !catalogComplete) catalogPartition() else null
     internal val disposition: CleanupDisposition get() = cleanupDisposition()
     /** The controller calls this exact ticket only after both protected deletion barriers. */
     @Synchronized internal fun completeCatalog(): Boolean {

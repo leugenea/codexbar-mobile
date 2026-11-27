@@ -29,18 +29,26 @@ foreground service, polling timer or exact refresh alarm alive to enforce punctu
   and durable catalog settlement. A cold worker with that exact pending receipt resumes
   only its owner's cleanup, not provider reads. If a catalog confirmation failure prevented
   the receipt from being written, the live exact controller can retry its failed cleanup
-  ticket for that same partition once the catalog is confirmed. Unfinished cleanup leaves
-  the same periodic request available. A late confirmed-stale worker can also cancel only
+  ticket for that same partition once the catalog is confirmed. If both physical barriers
+  succeeded but final catalog sync failed, confirmation may remove the entry and receipt
+  from lookup. The same process can still resume catalog settlement through the one
+  retained ticket whose original callback captured that exact unique partition. It does
+  not repeat physical deletion, restore a runtime, or start provider requests. Unfinished
+  cleanup leaves the same periodic request available. A late confirmed-stale worker can also cancel only
   its own unique name. Unavailable storage, ambiguous bindings and uncertain catalog state
   are not evidence of staleness, and cannot start a fresh worker flight.
   Logout fences old requests/history immediately even before asynchronous scheduler
   cancellation settles. Rotation keeps the same lifetime. Activity STOP, Cancel and
   clean process-owner shutdown do not pretend to remove the account/enrollment.
-  Catalog settlement and WorkManager cancellation are not atomic. If cancellation
-  is lost after a settled cleanup (for example, process death), a surviving UUID that
-  can no longer be proved stale cannot authorize provider reads for another lifetime.
-  A nonlegacy address retained after cleanup has no continuing lifetime; unlike an unresolved
-  legacy binding, it does not make an unmatched UUID uncertain.
+  Catalog settlement and WorkManager cancellation are not atomic. After process loss,
+  a confirmed snapshot without a legacy entry or legacy deletion receipt is not itself
+  proof of retirement. The existing legacy history fence, however, preserves the exact
+  retired UUID in `EMPTY` after physical deletion. A cold unmatched worker can use that
+  positive, read-only proof to cancel its original work after final legacy removal, even
+  if the only remaining entry is an unbound peer. It does not open either account runtime,
+  repair history, or add a journal. An active legacy fence is not retirement proof;
+  missing, unreadable, conflicting or nonmatching data does not authorize cancellation
+  through this path. Worker-first legacy adoption retains its existing behavior.
 - Foreground/manual/background overlap joins the same owner flight and recorder
   ticket. No second transport, session, history store or visible observer exists.
   Worker stop/cancellation releases only its interest; another consumer and accepted

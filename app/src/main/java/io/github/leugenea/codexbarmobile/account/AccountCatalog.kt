@@ -171,30 +171,34 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     }
 
     /** Retained by one history ticket; only its own attempted removal can authorize a sync retry. */
-    fun deletionSettlement(receipt: CatalogDeletion, onSettled: (HistoryPartition) -> Unit = {}): () -> Boolean {
-        var attempted = false
-        var applied = false
-        var retiredPartition: HistoryPartition? = null
-        return {
-            synchronized(this) {
-                try { confirmCommit() } catch (_: Exception) { return@synchronized false }
-                val settled = if (applied || (attempted && receipt !in state.deletions)) syncDeletion()
-                else {
-                    val pending = receipt in state.deletions
-                    attempted = pending
-                    if (pending) retiredPartition = uniqueDeletionPartition(receipt)
-                    val complete = completeDeletion(receipt)
-                    // commit re-reads an uncertain replacement before returning failure.
-                    applied = pending && receipt !in state.deletions
-                    complete
-                }
-                // Only this ticket consumed the exact binding; a failed sync keeps its intent.
-                if (settled) retiredPartition?.also { partition ->
-                    retiredPartition = null
-                    if (state.entries.none { it.partition == partition }) onSettled(partition)
-                }
-                settled
+    fun deletionSettlement(receipt: CatalogDeletion, onSettled: (HistoryPartition) -> Unit = {}) =
+        DeletionSettlement(receipt, onSettled)
+
+    internal inner class DeletionSettlement(private val receipt: CatalogDeletion,
+        private val onSettled: (HistoryPartition) -> Unit) {
+        private var attempted = false
+        private var applied = false
+        @Volatile var pendingPartition: HistoryPartition? = null
+            private set
+
+        operator fun invoke(): Boolean = synchronized(this@AccountCatalog) {
+            try { confirmCommit() } catch (_: Exception) { return@synchronized false }
+            val settled = if (applied || (attempted && receipt !in state.deletions)) syncDeletion()
+            else {
+                val pending = receipt in state.deletions
+                attempted = pending
+                if (pending) pendingPartition = uniqueDeletionPartition(receipt)
+                val complete = completeDeletion(receipt)
+                // commit re-reads an uncertain replacement before returning failure.
+                applied = pending && receipt !in state.deletions
+                complete
             }
+            // Only this ticket consumed the exact binding; a failed sync keeps its intent.
+            if (settled) pendingPartition?.also { partition ->
+                pendingPartition = null
+                if (state.entries.none { it.partition == partition }) onSettled(partition)
+            }
+            settled
         }
     }
 

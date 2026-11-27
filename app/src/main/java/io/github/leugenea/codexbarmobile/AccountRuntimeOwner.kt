@@ -350,7 +350,11 @@ internal class AccountRuntimeOwner(
         val matches = snapshot.entries.filter { it.partition == target.partition }
         if (matches.size > 1) return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
         val entry = matches.singleOrNull()
-        if (entry == null && knownStaleUnmatched(snapshot)) return BackgroundRefreshOutcome.Rejected(STALE_LIFETIME)
+        if (entry == null) {
+            recoverUnmatchedSettlement(metadata, target)?.let { return it }
+            if (knownStaleUnmatched(snapshot) || retiredLegacyBinding(metadata, snapshot, target.partition))
+                return BackgroundRefreshOutcome.Rejected(STALE_LIFETIME)
+        }
         val controller = backgroundRuntime(snapshot, entry) ?: return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
         if (entry != null) {
             val receipt = snapshot.deletions.singleOrNull { it.entry == entry.storage.id }
@@ -372,10 +376,34 @@ internal class AccountRuntimeOwner(
         return outcome
     }
 
+    /** The entry/receipt can disappear on confirmation, but its originating controller is retained. */
+    private suspend fun recoverUnmatchedSettlement(metadata: AccountCatalog, target: BackgroundRefreshTarget): BackgroundRefreshOutcome? {
+        val controllers = synchronized(this) { (runtimes.values + listOfNotNull(legacyController)).distinct() }
+        val matches = controllers.mapNotNull { controller ->
+            controller.pendingCatalogSettlement(target.partition)?.let { controller to it }
+        }
+        if (matches.isEmpty()) return null
+        val (controller, ticket) = matches.singleOrNull() ?: return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+        if (closing || metadata.backgroundSnapshot(target.partition)?.entries?.none { it.partition == target.partition } != true)
+            return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+        controller.resumeCatalogSettlement(ticket)
+        // Even here only the original callback, not the worker's ordinary stale path, may cancel.
+        return BackgroundRefreshOutcome.Rejected(RETIRING)
+    }
+
     // Only the legacy slot can have an unrepresented continuing lifetime. Addressed accounts
     // enter with a partition and lose it only after RETAIN has settled their old lifetime.
     private fun knownStaleUnmatched(snapshot: CatalogSnapshot): Boolean =
         snapshot.entries.any { it.storage.legacy && it.partition != null }
+
+    private fun retiredLegacyBinding(metadata: AccountCatalog, snapshot: CatalogSnapshot, partition: HistoryPartition): Boolean {
+        // Only probe the unrepresented compatibility slot, never an unresolved saved peer.
+        if (snapshot.entries.any { it.storage.legacy } || snapshot.deletions.any { it.entry == null }) return false
+        val files = HistoryFiles(File(root, "usage-history"), HistoryStorageLimits())
+        // Physical deletion preserves the old UUID in EMPTY. Require the same confirmed
+        // catalog after the probe; the history fence alone does not confirm catalog settlement.
+        return files.confirmsRetirement(partition) && metadata.backgroundSnapshot(partition) == snapshot
+    }
 
     private fun canCancel(metadata: AccountCatalog, target: BackgroundRefreshTarget, address: AccountStorage?): Boolean {
         val snapshot = metadata.backgroundSnapshot(target.partition) ?: return false

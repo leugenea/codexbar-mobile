@@ -28,6 +28,8 @@ import io.github.leugenea.codexbarmobile.account.AccountType
 import io.github.leugenea.codexbarmobile.account.CatalogEntry
 import io.github.leugenea.codexbarmobile.account.CatalogFile
 import io.github.leugenea.codexbarmobile.account.CleanupDisposition
+import io.github.leugenea.codexbarmobile.credentials.CredentialDeletion
+import io.github.leugenea.codexbarmobile.credentials.CredentialResult
 import io.github.leugenea.codexbarmobile.credentials.CredentialStore
 import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
 import io.github.leugenea.codexbarmobile.credentials.SessionGeneration
@@ -365,6 +367,108 @@ class PeriodicUsageRefreshTest {
         }
     }
 
+    @Test fun liveUnmatchedWorkerRetriesOnlyCatalogSettlementForRemovedLegacyWithRetainedPeer() {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        val fail = AtomicBoolean()
+        try {
+            val targetA = BackgroundRefreshTarget(requireNotNull(f.a.partition))
+            val targetB = BackgroundRefreshTarget(requireNotNull(f.b.partition))
+            val raw = CatalogFile(File(f.directory, "account-catalog"))
+            val failures = AtomicInteger()
+            f.catalog = AccountCatalog.open(f.directory, { error("saved catalog required") }, beforeDirectorySync = {
+                if (fail.get() && raw.read().entries.none { it.storage == f.a.storage }) {
+                    failures.incrementAndGet()
+                    throw IOException("A final replacement installed but its directory sync failed")
+                }
+            })
+            assertTrue(f.catalog.select(f.b.storage.id))
+            val enrollment = CopyOnWriteArrayList<Pair<BackgroundRefreshTarget, Boolean>>()
+            val periodic = PeriodicUsageRefresh(manager)
+            f.enrollment = { target, enrolled ->
+                enrollment += target to enrolled
+                periodic.enrollment(target, enrolled)
+            }
+            val aHistory = f.a.storage.historyDirectory(f.directory)
+            val bHistory = f.b.storage.historyDirectory(f.directory)
+            val opened = CopyOnWriteArrayList<UUID>()
+            val reads = CopyOnWriteArrayList<UUID>()
+            val credentialDeletes = CopyOnWriteArrayList<UUID>()
+            val historyDeletes = CopyOnWriteArrayList<File>()
+            f.decorateCredential = { slot, store ->
+                opened += slot
+                object : CredentialStore by store {
+                    override fun read(generation: SessionGeneration) = store.read(generation).also { reads += slot }
+                    override fun admitDeletion(generation: SessionGeneration): CredentialResult<CredentialDeletion> {
+                        val admitted = store.admitDeletion(generation)
+                        if (admitted !is CredentialResult.Success) return admitted
+                        return CredentialResult.Success(object : CredentialDeletion {
+                            override fun complete() = admitted.value.complete().also { credentialDeletes += slot }
+                        })
+                    }
+                }
+            }
+            f.hooks = { path -> object : HistoryStorageHooks {
+                override fun afterTombstone() { historyDeletes += path }
+            } }
+
+            f.start(); f.installActivity()
+            val workA = enrollSaved(f, f.a)
+            val workB = enrollSaved(f, f.b)
+            val a = f.runtime(f.a); val b = f.runtime(f.b)
+            f.aTransport.advance(900_000)
+            f.bTransport.usageStatus = 401
+            f.aTransport.tokenResponse = TransportResult.Response.bounded(400, """{"error":"invalid_grant"}""".toByteArray())
+            assertEquals(ListenableWorker.Result.success(), run(targetB, workB))
+            val bState = f.phase(b, ConnectionPhase.REAUTH_REQUIRED)
+            val bInfo = info(workB)
+            assertEquals(WorkInfo.State.CANCELLED, bInfo.state)
+            val bBinding = File(bHistory, "binding").readBytes()
+            val requests = f.aTransport.requests.get() to f.bTransport.requests.get()
+            val priorReads = reads.toList()
+            val priorEnrollment = enrollment.toList()
+
+            fail.set(true)
+            a.signOut()
+            assertEquals(ConnectionProblem.STORAGE, f.phase(a, ConnectionPhase.FAILED).problem)
+            assertTrue("actual final catalog directory sync failed", failures.get() > 0)
+            val replacement = raw.read()
+            assertEquals(listOf(f.b.copy(partition = null)), replacement.entries)
+            assertEquals(f.b.storage.id, replacement.selected)
+            assertTrue(replacement.deletions.isEmpty())
+            assertEquals(f.a, f.catalog.snapshots.value.entries.single { it.storage == f.a.storage })
+            assertFalse(f.keyExists(f.a))
+            assertFalse(File(aHistory, "history.db").exists())
+            assertEquals(listOf(f.b.storage.credentialSlot, f.a.storage.credentialSlot), credentialDeletes.toList())
+            assertEquals(listOf(bHistory, aHistory), historyDeletes.toList())
+
+            assertEquals(ListenableWorker.Result.success(), run(targetA, workA))
+            assertNull(f.catalog.backgroundSnapshot(targetA.partition))
+            assertEquals(workA, unique(targetA).single().id)
+            assertEquals(WorkInfo.State.ENQUEUED, info(workA).state)
+            assertEquals(priorEnrollment, enrollment.toList())
+
+            fail.set(false)
+            assertEquals(ListenableWorker.Result.success(), run(targetA, workA))
+            assertEquals(WorkInfo.State.CANCELLED, info(workA).state)
+            f.phase(a, ConnectionPhase.SIGNED_OUT)
+            assertEquals(priorEnrollment + (targetA to false), enrollment.toList())
+            assertEquals(replacement, f.catalog.snapshots.value)
+            assertEquals(replacement, raw.read())
+            assertEquals(listOf(f.b.storage.credentialSlot, f.a.storage.credentialSlot), credentialDeletes.toList())
+            assertEquals(listOf(bHistory, aHistory), historyDeletes.toList())
+            assertEquals(listOf(f.a.storage.credentialSlot, f.b.storage.credentialSlot), opened.toList())
+            assertEquals(priorReads, reads.toList())
+            assertSame(bState, b.state.value)
+            assertEquals(bInfo, info(workB))
+            assertArrayEquals(bBinding, File(bHistory, "binding").readBytes())
+            assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())
+        } finally {
+            fail.set(false)
+            f.cleanup()
+        }
+    }
+
     @Test fun coldUnmatchedWorkerCancelsOriginalWorkAfterRemovalWithResolvedLegacyAndRetainedAddress() {
         val f = AccountSelectionFixture()
         f.prepare()
@@ -416,6 +520,83 @@ class PeriodicUsageRefreshTest {
             assertEquals(legacyWork, unique(legacyTarget).single().id)
             assertEquals(settled, raw.read())
             assertEquals(legacyBytes, f.bytes(legacy))
+            assertTrue(constructed.isEmpty())
+            assertTrue(openedHistory.isEmpty())
+            assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())
+        } finally { f.cleanup() }
+    }
+
+    @Test fun coldUnmatchedWorkerProvesRemovedLegacyWithOnlyRetainedAddressWithoutOpeningEitherRuntime() {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        try {
+            val targetA = BackgroundRefreshTarget(requireNotNull(f.a.partition))
+            val targetB = BackgroundRefreshTarget(requireNotNull(f.b.partition))
+            val periodic = PeriodicUsageRefresh(manager)
+            val interrupted = CopyOnWriteArrayList<BackgroundRefreshTarget>()
+            // Leave both original WorkSpecs alive so an unintended peer cancellation is observable.
+            f.enrollment = { target, enrolled ->
+                if (enrolled) periodic.enrollment(target, true) else interrupted += target
+            }
+            assertTrue(f.catalog.select(f.b.storage.id))
+            f.start(); f.installActivity()
+            val workA = enrollSaved(f, f.a)
+            val workB = enrollSaved(f, f.b)
+            f.aTransport.advance(900_000)
+            f.bTransport.usageStatus = 401
+            f.aTransport.tokenResponse = TransportResult.Response.bounded(400, """{"error":"invalid_grant"}""".toByteArray())
+            assertEquals(ListenableWorker.Result.success(), run(targetB, workB))
+            f.phase(f.runtime(f.b), ConnectionPhase.REAUTH_REQUIRED)
+
+            val a = f.runtime(f.a)
+            a.signOut()
+            f.phase(a, ConnectionPhase.SIGNED_OUT)
+            assertEquals(listOf(targetB, targetA), interrupted.toList())
+            val raw = CatalogFile(File(f.directory, "account-catalog"))
+            val settled = raw.read()
+            assertEquals(listOf(f.b.copy(partition = null)), settled.entries)
+            assertEquals(f.b.storage.id, settled.selected)
+            assertTrue(settled.deletions.isEmpty())
+            assertEquals(WorkInfo.State.ENQUEUED, info(workA).state)
+            val bInfo = info(workB)
+            assertEquals(WorkInfo.State.ENQUEUED, bInfo.state)
+            f.assertRemoved(f.a)
+            f.receipt("drop process owner after final catalog settlement but before exact cancel") { f.owner.shutdown() }
+
+            val aHistory = f.a.storage.historyDirectory(f.directory)
+            assertTrue(File(aHistory, "binding").isFile)
+            assertEquals(HistoryBinding(HistoryBindingPhase.EMPTY, targetA.partition),
+                HistoryFiles(aHistory, HistoryStorageLimits()).readBinding())
+            val bHistory = f.b.storage.historyDirectory(f.directory)
+            val bBinding = File(bHistory, "binding").readBytes()
+            val requests = f.aTransport.requests.get() to f.bTransport.requests.get()
+            val constructed = CopyOnWriteArrayList<UUID>()
+            val openedHistory = CopyOnWriteArrayList<File>()
+            f.decorateCredential = { slot, store -> store.also { constructed += slot } }
+            f.decorateHistory = { path, storage -> storage.also { openedHistory += path } }
+            f.enrollment = periodic::enrollment
+            f.catalog = AccountCatalog.open(f.directory, { error("settled catalog required") })
+            f.installActivity { f.start() }
+
+            // An intact EMPTY fence for A does not prove retirement for another UUID.
+            assertEquals(ListenableWorker.Result.success(), run(targetB, workB))
+            assertEquals(bInfo, info(workB))
+
+            // A conflicting pending binding makes the exact EMPTY proof unavailable, not absent.
+            val pending = File(aHistory, "binding.pending")
+            assertTrue(pending.createNewFile())
+            assertEquals(ListenableWorker.Result.success(), run(targetA, workA))
+            assertEquals(workA, unique(targetA).single().id)
+            assertEquals(WorkInfo.State.ENQUEUED, info(workA).state)
+            assertTrue("cold proof may not repair history", pending.isFile)
+            assertTrue(pending.delete())
+
+            dispatchOsJob(awaitJob(workA), workA)
+            f.await("the original A WorkSpec was cancelled from the fresh owner") { info(workA).state == WorkInfo.State.CANCELLED }
+            assertEquals(workB, unique(targetB).single().id)
+            assertEquals(bInfo, info(workB))
+            assertArrayEquals(bBinding, File(bHistory, "binding").readBytes())
+            assertEquals(settled, raw.read())
             assertTrue(constructed.isEmpty())
             assertTrue(openedHistory.isEmpty())
             assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())

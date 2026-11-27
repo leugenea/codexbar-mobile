@@ -299,6 +299,25 @@ internal class ConnectionController(
         history?.lifetime(ready.envelope.generation)?.let(::BackgroundRefreshTarget)
     }
 
+    /** Read only on the process mutation lane; this is not a physical-deletion failure. */
+    internal fun pendingCatalogSettlement(partition: HistoryPartition): HistoryDeletion? =
+        historyCleanup?.takeIf { !closed && it.pendingCatalogPartition == partition }
+
+    /** The exact ticket already passed both physical barriers when it attempted catalog settlement. */
+    internal suspend fun resumeCatalogSettlement(ticket: HistoryDeletion) {
+        if (closed || historyCleanup !== ticket || ticket.pendingCatalogPartition == null) return
+        val owner = revision
+        val settlement = ownerScope.async {
+            if (!settleDeletionCatalog(ticket)) return@async
+            val state = mutableState.value
+            if (historyCleanup === ticket && state.phase == ConnectionPhase.FAILED && state.problem == ConnectionProblem.STORAGE) {
+                val phase = if (ticket.disposition == CleanupDisposition.REMOVE) ConnectionPhase.SIGNED_OUT else ConnectionPhase.REAUTH_REQUIRED
+                publish(owner, ConnectionState(phase))
+            }
+        }
+        withTimeoutOrNull(storageWaitMillis) { settlement.await() }
+    }
+
     /** Only the exact receipt or this controller's failed ticket for the same partition can retry cleanup. */
     internal suspend fun recoverBackgroundDeletion(expected: BackgroundRefreshTarget, receiptDisposition: CleanupDisposition?,
         stillAddressed: () -> Boolean): Boolean =
@@ -715,9 +734,12 @@ internal class ConnectionController(
             val credentialsRemoved = credentialRemoval?.await() !is CredentialResult.Failure
             val historyRemoved = historyRemoval?.await()?.successful() != false
             if (!sessionRemoved || !credentialsRemoved || !historyRemoved) false
-            else ownerScope.async(storageDispatcher) { cleanup?.completeCatalog() != false }.await()
+            else settleDeletionCatalog(cleanup) || cleanup?.catalogSettled == true
         } ?: false
     }
+
+    private suspend fun settleDeletionCatalog(ticket: HistoryDeletion?): Boolean =
+        ownerScope.async(storageDispatcher) { ticket?.completeCatalog() != false }.await()
 
     private fun cleanupPending() = deletion?.isCompleted == false || historyDeletion?.isCompleted == false || session.removalPending()
 

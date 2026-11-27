@@ -89,9 +89,10 @@ internal class CatalogHistoryStorage(
         // Selection can be unconfirmed here. Capture only this address's last published binding.
         val partition = catalog.snapshots.value.entries.singleOrNull { it.storage.id == id }?.partition
         val ticket = storage.reserveDeletion()
-        var settlement: (() -> Boolean)? = null
+        var settlement: AccountCatalog.DeletionSettlement? = null
         var capturedDisposition = disposition
         return HistoryDeletion(catalogSettlement = { requireNotNull(settlement).invoke() },
+            catalogPartition = { settlement?.pendingPartition },
             cleanupDisposition = { capturedDisposition }, partition = partition) {
             try {
                 val receipt = catalog.beginDeletion(id, disposition)

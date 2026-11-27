@@ -48,6 +48,24 @@ internal class HistoryFiles(val directory: File, private val limits: HistoryStor
             writeBinding(empty)
             return empty
         }
+        return decodeBinding()
+    }
+
+    /** Read-only proof for unmatched legacy work. Missing or unreadable data is not retirement. */
+    fun confirmsRetirement(partition: HistoryPartition): Boolean = try {
+        // Zero is the uninitialized/corrupt-cleanup sentinel, never a retired lifetime.
+        partition.value != UUID(0, 0) && directory.canonicalFile == directory.absoluteFile &&
+            hasRetiredBinding(partition)
+    } catch (_: Exception) { false }
+
+    private fun hasRetiredBinding(partition: HistoryPartition): Boolean {
+        // Require a successful directory listing, not File.exists() as evidence of absence.
+        val artifacts = checkBudget()
+        return artifacts.any { it.name == control.name } && artifacts.all { it.name == control.name || it.name == "lane" } &&
+            decodeBinding() == HistoryBinding(HistoryBindingPhase.EMPTY, partition)
+    }
+
+    private fun decodeBinding(): HistoryBinding {
         if (control.length() != 32L) throw HistoryCorruption()
         val payload = ByteArray(32)
         DataInputStream(FileInputStream(control)).use { it.readFully(payload); if (it.read() != -1) throw HistoryCorruption() }
@@ -92,11 +110,12 @@ internal class HistoryFiles(val directory: File, private val limits: HistoryStor
 
     fun containsDatabaseArtifacts(): Boolean = databaseArtifacts.any { File(directory, it).exists() }
 
-    fun checkBudget(extra: Long = 0) {
+    fun checkBudget(extra: Long = 0): Array<File> {
         val files = directory.listFiles() ?: throw IOException()
         if (files.any { !it.isFile || it.canonicalFile != it.absoluteFile }) throw HistoryCorruption()
         if (files.any { it.name !in allowedArtifacts }) throw HistoryCorruption()
         if (files.sumOf { it.length() } + extra > limits.bytes) throw HistoryStorageException(HistoryUnavailable.STORAGE_FULL)
+        return files
     }
 
     internal fun syncDirectory() {
