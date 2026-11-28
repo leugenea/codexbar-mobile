@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795852038960,
+  "lastUpdate": 1795852043107,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -7505,6 +7505,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/5e82d868e9428e95f8b1bfbb09dbf923f29d2a48"
         },
         "date": 1795758543434,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dc59612a5ab74be649291483dde9794453a36480",
+          "message": "Scope periodic refresh to enrolled account lifetimes (#264)\n\nRefs #245. Preserve existing WorkManager policy while routing and cancelling work by exact enrolled lifetime. Keep durable deletion receipts until exact WorkManager cancellation is acknowledged.",
+          "timestamp": "2026-11-28T10:46:44+03:00",
+          "tree_id": "28ba118d0269c32cf973e8185996ea25efd960a2",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/dc59612a5ab74be649291483dde9794453a36480"
+        },
+        "date": 1795852042683,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
