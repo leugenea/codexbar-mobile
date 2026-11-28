@@ -476,8 +476,17 @@ internal class ConnectionController(
     /** Selection is explicit activation, but still bound to its root after restoration suspends. */
     internal suspend fun requestSelectedUsage(enroll: Boolean, current: () -> Boolean) = withContext(mutationDispatcher) {
         if (mutableState.value.phase == ConnectionPhase.RESTORING) work?.join()
-        if (current()) requestUsage(false, selection = true, enroll = enroll)
+        val admitted = current()
+        traceReselection { "explicit selection command rootCurrent=$admitted" }
+        if (admitted) requestUsage(false, selection = true, enroll = enroll)
     }
+
+    @androidx.annotation.VisibleForTesting(otherwise = androidx.annotation.VisibleForTesting.NONE)
+    internal suspend fun observeReselection(trace: (String) -> Unit) = withContext(mutationDispatcher) {
+        usageRefresh.reselectionTrace = trace
+    }
+
+    internal fun traceReselection(event: () -> String) { usageRefresh.reselectionTrace?.invoke(event()) }
 
     /** Observer identities keep one Activity from cancelling another visible Activity. */
     fun usageForeground(observer: Any, foreground: Boolean, retainStorage: Boolean = false) = command(UsageForegroundCommand(observer, foreground)) {

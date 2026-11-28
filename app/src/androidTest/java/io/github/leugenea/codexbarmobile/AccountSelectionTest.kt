@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class AccountSelectionTest {
     private lateinit var fixture: AccountSelectionFixture
     @Before fun prepare() { fixture = AccountSelectionFixture(); fixture.prepare() }
-    @After fun cleanup() { fixture.cleanup() }
+    @After fun cleanup() { try { fixture.dumpReselection() } finally { fixture.cleanup() } }
 
     @Test fun passiveRestorationSettingsAndObserversAreDormantWhileExplicitSelectionRequestsBothEndpoints() {
         val root = fixture.start()
@@ -69,6 +69,7 @@ class AccountSelectionTest {
         val root = fixture.start(); val selected = root.dashboard()
         val a = fixture.runtime(fixture.a); val b = fixture.runtime(fixture.b)
         fixture.phase(a, ConnectionPhase.RESTORED); fixture.phase(b, ConnectionPhase.RESTORED)
+        fixture.observeReselection("old-usage-ABA", a, b)
         val observer = fixture.observer(); fixture.settle(a)
         val original = fixture.ready(a)
         fixture.aTransport.heldPath = ReadOperation.USAGE.path
@@ -79,12 +80,14 @@ class AccountSelectionTest {
         try {
             fixture.select(fixture.b); fixture.phase(b, ConnectionPhase.OBSERVED)
             fixture.await("original A flight cancelled") { old.cancelled }
+            fixture.markReselection("A", "old usage transport cancelled")
             assertFalse(initialRoot.isCurrent())
             fixture.aTransport.heldPath = null
             fixture.aTransport.usageBody = NavigationTransport.USAGE.replace("12.375", "23.125")
             fixture.select(fixture.a); fixture.phase(a, ConnectionPhase.OBSERVED)
             fixture.await("fresh A exact observation") { fixture.appends.any { it.admission.partition == fixture.a.partition && it.admission.id == ObservationId(5) } }
             val beforeLate = a.state.value.refresh.usage.success
+            fixture.markReselection("A", "reply to cancelled old usage callback")
             old.reply()
             fixture.settle(a)
             assertSame(beforeLate, a.state.value.refresh.usage.success)

@@ -274,7 +274,10 @@ internal class AccountRuntimeOwner(
         catalog?.let { recoverCancellations(it) }
         val token = Any()
         observers.add(token)
-        selected.value?.controller?.usageForeground(token, true)
+        selected.value?.controller?.let {
+            it.traceReselection { "STARTED registration queued" }
+            it.usageForeground(token, true)
+        }
         DashboardObserver { withContext(mutations) {
             if (observers.remove(token)) selected.value?.controller?.usageForeground(token, false)
         } }
@@ -329,7 +332,10 @@ internal class AccountRuntimeOwner(
             old.dashboardHidden()
         }
         next.controller.dashboardDisplay(next::isCurrent)
-        if (changed) observers.forEach { next.controller.usageForeground(it, true) }
+        if (changed) {
+            next.controller.traceReselection { "display transfer queued observers=${observers.size}" }
+            observers.forEach { next.controller.usageForeground(it, true) }
+        }
     }
 
     private fun currentProjection() = selected.value.takeUnless { closing }

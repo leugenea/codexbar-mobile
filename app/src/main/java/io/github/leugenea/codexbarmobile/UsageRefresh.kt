@@ -67,6 +67,9 @@ internal class UsageRefresh(
     internal val backgroundInterests get() = flight?.background ?: 0
     internal val deferredUntilMillis get() = notBeforeMillis.takeIf { clock.now().monotonicMillis < it }
 
+    // Temporary hosted #261 probe, installed only by the two instrumented fixtures.
+    var reselectionTrace: ((String) -> Unit)? = null
+
     /** Both endpoints must be recent; failures and clock rollback never masquerade as freshness. */
     internal fun recentSuccess(ageMillis: Long): Boolean {
         if (state.refreshing || ageMillis <= 0) return false
@@ -81,6 +84,7 @@ internal class UsageRefresh(
         val wasVisible = visible
         lifecycleManaged = true
         if (foreground) observers.add(observer) else observers.remove(observer)
+        reselectionTrace?.invoke("foreground command add=$foreground visible=$wasVisible->$visible activated=$activated")
         if (visible == wasVisible) return
         if (visible) {
             flight?.foreground = true
@@ -103,6 +107,7 @@ internal class UsageRefresh(
 
     /** Duplicate triggers during a healthy flight are consumed, not queued as another read. */
     fun request(refreshSession: Boolean = false, explicit: Boolean = false, selection: Boolean = false) {
+        reselectionTrace?.invoke("request explicit=$explicit selection=$selection flight=${flight != null} active=${flight?.job?.isActive == true}")
         activated = true
         if (visible && ticks == null) startTicks()
         if (flight?.job?.isActive == true) { flight?.foreground = eligible; return }
@@ -164,6 +169,7 @@ internal class UsageRefresh(
         }
         current.job = job
         flight = current
+        reselectionTrace?.invoke("flight started explicit=$explicit foreground=$foreground")
         // Completion also runs for cancellation before the coroutine body ever entered.
         job.invokeOnCompletion { current.result.complete(null); scope.launch { finished(current, owner) } }
         update(state.copy(refreshing = true))
@@ -173,6 +179,7 @@ internal class UsageRefresh(
 
     private fun finished(current: UsageRefreshFlight, owner: Long) {
         if (flight !== current) return
+        reselectionTrace?.invoke("flight settled cancelled=${current.job.isCancelled}")
         flight = null
         if (epoch == owner) update(state.copy(refreshing = false))
         drain()
@@ -199,6 +206,7 @@ internal class UsageRefresh(
         poll = scope.launch {
             delay((at - clock.now().monotonicMillis).coerceAtLeast(0))
             poll = null
+            reselectionTrace?.invoke("scheduled wake")
             request()
         }
     }
