@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795857032618,
+  "lastUpdate": 1795857036043,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -7573,6 +7573,40 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/leugenea/codexbar-mobile/commit/dc59612a5ab74be649291483dde9794453a36480"
         },
         "date": 1795852042683,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Duplication",
+            "value": 0,
+            "unit": "%"
+          },
+          {
+            "name": "Duplication clones",
+            "value": 0,
+            "unit": "clones"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4bd982f34dc1103e587579dff28aaa772bf47c6b",
+          "message": "Keep Android tool version advisories out of blocking lint (#266)\n\nRefs #265. Keep toolchain pins and verification unchanged; exclude only the update advisory.",
+          "timestamp": "2026-11-28T12:10:01+03:00",
+          "tree_id": "acd34f043a9f3079e159c1c31992c0a59e8eeee2",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/4bd982f34dc1103e587579dff28aaa772bf47c6b"
+        },
+        "date": 1795857035578,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
