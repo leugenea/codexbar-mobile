@@ -7,10 +7,12 @@ internal class CatalogHistoryStorage(
     private val storage: HistoryLifetimeStorage,
     private val catalog: AccountCatalog,
     private val address: AccountStorage? = null,
+    private val retainCancellation: Boolean = false,
+    private val onDeletionSettled: (HistoryPartition) -> Unit = {},
 ) : HistoryLifetimeStorage by storage {
     private fun entry() = address?.let { catalog.entry(it.id)?.also { entry -> check(entry.storage == it) } }
         ?: if (address == null) catalog.legacyEntry() else null
-    private fun pending() = catalog.snapshot().deletions.any { it.entry == (address?.id ?: entry()?.storage?.id) }
+    private fun pending() = catalog.snapshot().physicalDeletions.any { it.entry == (address?.id ?: entry()?.storage?.id) }
 
     private fun pendingAddition() = address != null && catalog.snapshots.value.candidate == address
 
@@ -85,15 +87,18 @@ internal class CatalogHistoryStorage(
 
     override fun reserveDeletion(disposition: CleanupDisposition): HistoryDeletion {
         val id = address?.id ?: entry()?.storage?.id
+        // Selection can be unconfirmed here. Capture only this address's last published binding.
+        val partition = catalog.snapshots.value.entries.singleOrNull { it.storage.id == id }?.partition
         val ticket = storage.reserveDeletion()
-        var settlement: (() -> Boolean)? = null
+        var settlement: AccountCatalog.DeletionSettlement? = null
         var capturedDisposition = disposition
         return HistoryDeletion(catalogSettlement = { requireNotNull(settlement).invoke() },
-            cleanupDisposition = { capturedDisposition }) {
+            catalogPartition = { settlement?.pendingPartition },
+            cleanupDisposition = { capturedDisposition }, partition = partition) {
             try {
                 val receipt = catalog.beginDeletion(id, disposition)
                 capturedDisposition = receipt.disposition
-                settlement = catalog.deletionSettlement(receipt)
+                settlement = catalog.deletionSettlement(receipt, retainCancellation, onDeletionSettled)
                 ticket.complete()
             } catch (_: Exception) { HistoryDeleteOutcome.Unavailable(HistoryUnavailable.WRITE_FAILURE) }
         }

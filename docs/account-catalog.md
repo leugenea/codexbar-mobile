@@ -3,10 +3,10 @@
 The catalog provides durable **local** entry addressing. The single process holder retains
 concrete entry-owned controller/session/credential/history/recorder stacks behind an internal
 exact-entry ingress. Construction and restoration are dormant. The Activity observes the internal
-persisted dashboard selection; the production worker keeps its original exact compatibility
-runtime. There is no new account list, sign-in path, dropdown or scheduler policy.
-Account settings navigation does not select an account. The later dashboard dropdown
-and all-enrolled-account scheduling are separate integration work.
+persisted dashboard selection; [periodic workers](background-refresh.md) use the same
+retained runtimes but address an exact enrolled lifetime independently of selection.
+Account settings navigation does not select or enroll an account. A public account
+list and dashboard dropdown remain separate integration work.
 
 ## Identity and locations
 
@@ -70,30 +70,39 @@ runtime as FAILED/STORAGE, preventing further reads or stale name publication. S
 credentials/history remain available to a fresh holder; the existing unfinished-token-
 rotation quarantine and deletion policy is unchanged.
 
-Deletion writes an entry-and-operation-tagged catalog receipt before erasing history.
+Deletion writes an entry-and-operation-tagged physical cleanup receipt before erasing history.
 Independent terminal cleanups may overlap while their protected I/O is suspended, so the
-same journal retains one receipt per entry. Each existing deletion ticket captures its own receipt;
-each controller waiter captures that ticket and its deletion jobs before suspending.
-Completion never looks up whichever operation is current afterward. Catalog v3 adds a captured
-`RETAIN`/`REMOVE` disposition to each exact entry/operation receipt. It reads v1 and v2
-receipts as `REMOVE`, preserving their original semantics and operation UUID; it never
-guesses unavailable historical intent from the current phase or selection. A v1 receipt
-targets only the legacy association (or the pre-adoption empty legacy slot). Every new
-write uses v3; older applications cannot read this format.
+same journal retains one physical cleanup receipt per entry. Each deletion ticket captures
+its own receipt; each controller waiter captures that ticket and its jobs before suspending.
+Completion never looks up whichever operation is current afterward. Catalog v5 reads v1–v4
+and writes only v5; older readers cannot read v5. V1 and v2 receipts decode as `REMOVE`,
+preserving their original semantics and operation UUID rather than guessing from the current
+phase or selection. A v1 receipt targets only the legacy association (or the pre-adoption
+empty legacy slot). V3 and v4 preserve the captured `RETAIN`/`REMOVE` disposition, and v4
+also preserves the pending Add candidate. None of v1–v4 encodes a cancellation-only receipt.
 
-That receipt survives even if history is already physically gone while credentials remain readable. Restart requires
-combined removal, not restoration. Only the process owner's successful credential AND
-history deletion barrier settles its captured disposition and clears the receipt.
+The physical receipt survives even if history is already gone while credentials remain
+readable. Restart requires combined cleanup, not restoration. Only after both credential
+and history deletion barriers succeed does the process owner durably settle the captured
+disposition and clear the physical receipt.
 `RETAIN` invalidates credentials/history and clears the old partition association, but keeps
 the immutable address, valid local name and dashboard selection. Reauthorization is not a
 request to choose a healthier peer. The old partition never authorizes the invalidated entry;
 a later checked fresh adoption may bind a new partition and restore the retained local name
 to its sidecar. `REMOVE` deletes the entry and, if selected, chooses the first remaining entry
 in stable catalog order (or null when empty), without sorting labels or inspecting health.
+When the retiring entry has a uniquely bound lifetime, production commits the disposition
+and a cancellation-only receipt in the same atomic catalog replacement, publishing only
+after directory sync and readback. That receipt preserves the entry ID, operation UUID and
+disposition, and records the exact retired partition UUID. It authorizes only cancellation of
+that lifetime's work, not storage cleanup or refresh, and does not block a successor lifetime.
+The [process owner](background-refresh.md#ownership-and-admission) clears only that exact
+receipt after WorkManager acknowledges cancellation.
+
 A failed or interrupted barrier remains pending. Each ticket retains its own applied
-finalization provenance in memory: if its exact receipt was present when completion
-attempted replacement and readback confirms its removal after a directory-sync failure,
-that same ticket retries directory durability. It never rewrites its old snapshot or
+finalization provenance in memory: if its exact physical receipt was present at replacement
+and readback finds it gone after a directory-sync failure, that same ticket retries
+directory durability. It never rewrites its old snapshot or
 accepts an unrelated absent receipt; newer peer and successor changes remain untouched.
 Failure remains a storage error until sync succeeds, without another persisted journal.
 The existing controller removal path consumes this primitive. Captured management of saved
@@ -122,8 +131,8 @@ installation. Dismissal sends no removal command, and the existing modal-open st
 an already captured confirmation after the modal was closed. Confirmation uses the original combined
 protected/history/catalog barriers and RETAIN-then-REMOVE escalation; it does not reinterpret
 an old ticket. Nonselected removal does not activate a peer. Selected removal applies the
-stable immediate-request fallback below, including a dormant peer. No Add, public account
-list/dropdown or all-account scheduler is supplied by these management controls.
+stable immediate-request fallback below, including a dormant peer. These controls
+do not provide a public Add, account list or dropdown.
 
 The existing Connect, Cancel, browser and removal-confirm controls expose their exact
 application callback through one internal non-action semantics property. Each control
@@ -169,10 +178,12 @@ root. Root shutdown closes admission before draining all retained stacks. Addres
 never retires, adopts or activates a session; accepted rotation stays with its original
 store and generation after a network waiter detaches.
 
-The compatibility scheduler callback cancels only its captured continuing lifetime.
-Nonlegacy runtime ingress has no production enrollment callback in this intermediate unit;
-all-enrolled resolution and scheduling remain the scheduler integration's responsibility.
-There is no selected-only worker routing or new public control.
+Each saved runtime supplies checked enrollment and exact-lifetime cancellation. Worker
+ingress uses the catalog rather than selection; a same-package legacy worker can run
+existing adoption before any dashboard is observed. WorkManager alone persists which
+lifetimes were enrolled. A pending Add or an unavailable history binding cannot create
+a new enrollment. Confirmed-but-unavailable bindings preserve an existing WorkSpec
+without supplying network/recorder authority.
 
 ## Dashboard selection and display authority
 
@@ -180,8 +191,9 @@ There is no selected-only worker routing or new public control.
 replaced and directory-synced before the process owner publishes successor display or
 network authority. Idempotent selection keeps the same `DashboardSelection` identity
 but still requests quotas as an explicit action. Actual selected-entry removal uses the
-same immediate request policy, including a previously dormant remaining entry. Passive
-construction, cold restoration and settings/history navigation never activate quotas.
+same immediate request policy, including a previously dormant remaining entry, but does
+not create its first periodic enrollment. Passive construction, cold restoration and
+settings/history navigation never activate quotas.
 `settings(id)` returns an independent addressed controller handle, without selecting it.
 
 After a failed replacement or fsync, the catalog re-reads the actual file and fences the

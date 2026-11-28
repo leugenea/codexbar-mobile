@@ -1,7 +1,8 @@
 # Ordinary background usage refresh
 
-After explicit sign-in or a manual read of restored credentials, the app enrolls
-ordinary WorkManager periodic work for that **continuing local credential lifetime**.
+Successful explicit sign-in, durably committed Add, a manual read or explicit dashboard
+selection can enroll ordinary WorkManager periodic work for the checked **continuing local
+credential lifetime**. All eligible enrolled saved accounts retain their work when deselected.
 The target interval and initial delay are **15 minutes**, not an execution deadline.
 Connected network and battery-not-low constraints cooperate with Android; charging,
 device idle, unmetered network and battery-optimization exemptions are not required.
@@ -16,14 +17,49 @@ foreground service, polling timer or exact refresh alarm alive to enforce punctu
 - Work input contains only that canonical local UUID. It contains no token, account
   name, provider identity, raw response or credential-slot selector. WorkManager's
   no-backup database is the only enrollment persistence; no parallel registry is added.
-- A cold worker obtains the existing `NativeConnection.get(applicationContext)`
-  singleton and waits for protected restoration. Only an exact enrolled continuing
-  lifetime can admit I/O. Ordinary construction/launch/restoration stays dormant.
-- Removal, replacement cleanup and terminal reauthorization cancel enrolled work.
-  A late stale worker can cancel only its own unique name, never a successor.
+- A cold worker uses the same `NativeConnection` process owner to resolve exactly one
+  saved lifetime, independently of dashboard selection. It waits for protected
+  restoration and a matching history binding; it never opens a peer's runtime to
+  refresh it. Worker-first upgrade uses the original legacy slot and adopts its
+  confirmed lifetime without replacing the existing WorkSpec.
+- Passive construction/launch/restoration, settings navigation, deselection, an
+  unadmitted Add and automatic selection after removal do not create enrollment.
+- Removal, replacement cleanup and terminal reauthorization cancel only the captured
+  lifetime's unique work, after both physical deletion barriers and durable catalog
+  settlement. A cold worker with a matching physical cleanup receipt resumes only its
+  owner's cleanup, not provider reads. If a catalog confirmation failure prevented
+  the receipt from being written, the live exact controller can retry its failed cleanup
+  ticket for that same partition once the catalog is confirmed. If both physical barriers
+  succeeded but final catalog sync failed, confirmation may show that the physical receipt
+  is gone and the entry was removed or unbound. The same process can still resume catalog
+  settlement through the retained ticket that captured that exact unique partition, without
+  repeating physical deletion or starting provider requests. Unfinished physical cleanup
+  leaves the same periodic request available.
   Logout fences old requests/history immediately even before asynchronous scheduler
   cancellation settles. Rotation keeps the same lifetime. Activity STOP, Cancel and
   clean process-owner shutdown do not pretend to remove the account/enrollment.
+- For a uniquely bound retired lifetime, catalog v5 publishes the `REMOVE` or `RETAIN`
+  result together with an exact cancellation-only receipt. The process owner awaits
+  WorkManager's `cancelUniqueWork` operation, then durably acknowledges that receipt by
+  removing only it. The acknowledgement belongs to the owner, not the worker that may
+  be stopped by cancellation. Catalog and WorkManager commits are not atomic with each
+  other. An exact worker can trigger replay without opening any account runtime or
+  starting provider reads. Opening or recovering the catalog in a cold owner also
+  replays pending cancellation, even if WorkManager already cancelled the job and no
+  worker remains to trigger it. Foreground registration can retry pending receipts.
+- Separately, a confirmed-stale worker can request best-effort cancellation of only
+  its own unique work, without the v5 receipt acknowledgement protocol. In the legacy
+  `EMPTY` fallback for an unmatched worker, absence of the legacy entry and its physical
+  cleanup receipt is not enough: the legacy history fence must preserve the exact retired
+  UUID in `EMPTY` and the original credential slot must be confirmed clear. This
+  authorizes best-effort cancellation without opening either
+  runtime, even if a remaining peer is unbound; it is not proof for addressed entries.
+  An exact `ACTIVE` fence permits worker-first restoration only of the legacy slot;
+  protected restoration and the exact catalog binding still gate provider reads.
+  Missing, unreadable, conflicting or nonmatching legacy evidence does not authorize
+  restoration, repair or cancellation through the legacy fence. Unavailable storage,
+  ambiguous bindings and uncertain catalog state do not prove staleness or authorize
+  a fresh worker flight.
 - Foreground/manual/background overlap joins the same owner flight and recorder
   ticket. No second transport, session, history store or visible observer exists.
   Worker stop/cancellation releases only its interest; another consumer and accepted
@@ -118,8 +154,11 @@ No standalone SQLite native engine or test-only library is asserted to ship.
   endpoint counts, durable completion and fresh-holder local-history reread. It
   does not directly call `doWork()` as purported OS execution, change the configured
   15-minute interval/constraints, or establish natural 15-minute cadence.
-- Direct worker-builder cases verify result mapping, cold exact-lifetime rejection,
-  cancellation, removal/reauth and bounded errors; they are labeled separately.
+- Native scheduled-work coverage also exercises a cold nonselected account and a
+  worker-first legacy binding on the original WorkInfo ID through the real JobService.
+  Direct worker-builder cases isolate temporary unavailability, stale/ambiguous targets,
+  cross-account cancellation, removal/reauthorization and bounded errors. They do not
+  establish OS dispatch timing.
 - These authored contracts require exact-head hosted compilation, lint, JVM/native
   execution, unchanged whole-handwritten >=90% INSTRUCTION union and independent
   review. Source/quick tooling/compilation alone establish none of those results.

@@ -200,8 +200,8 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
     }
 
     /** A missing observation does not invalidate an exact enrollment, or authorize its reads. */
-    fun continues(generation: SessionGeneration, partition: HistoryPartition): Boolean = synchronized(admission) {
-        accepts(generation) && (lifetime ?: unavailableLifetime) == partition
+    fun confirmedLifetime(generation: SessionGeneration): HistoryPartition? = synchronized(admission) {
+        (lifetime ?: unavailableLifetime).takeIf { accepts(generation) && catalogReady }
     }
 
     /** Last foreground observer left: retain lifetime/generation, revoke every held runtime port. */
@@ -232,7 +232,8 @@ internal class HistoryLifetimeCoordinator(private val storage: HistoryLifetimeSt
         availability = HistoryAvailability.REMOVAL_PENDING
         removal ?: storage.reserveDeletion(disposition).let { reserved ->
             HistoryDeletion(catalogSettlement = { synchronized(io) { reserved.completeCatalog() } },
-                cleanupDisposition = { reserved.disposition }) {
+                catalogPartition = { reserved.pendingCatalogPartition },
+                cleanupDisposition = { reserved.disposition }, partition = reserved.partition) {
                 synchronized(io) { settle(reserved.complete()) }
             }.also { removal = it }
         }

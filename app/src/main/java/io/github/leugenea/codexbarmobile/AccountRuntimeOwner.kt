@@ -1,10 +1,13 @@
 package io.github.leugenea.codexbarmobile
 
 import android.content.Context
+import io.github.leugenea.codexbarmobile.AdditionResult.Rejected
+import io.github.leugenea.codexbarmobile.BackgroundRefreshRejection.RETIRING
+import io.github.leugenea.codexbarmobile.BackgroundRefreshRejection.STALE_LIFETIME
+import io.github.leugenea.codexbarmobile.BackgroundRefreshRejection.STORAGE_UNAVAILABLE
 import io.github.leugenea.codexbarmobile.account.*
 import io.github.leugenea.codexbarmobile.auth.AuthState
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
-import io.github.leugenea.codexbarmobile.AdditionResult.Rejected
 import io.github.leugenea.codexbarmobile.auth.DeviceCodeAuthenticator
 import io.github.leugenea.codexbarmobile.credentials.CredentialStore
 import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
@@ -25,11 +28,13 @@ internal class AccountRuntimeOwner(
     private val transport: AuthTransport,
     private val clock: TransportClock,
     private val pause: suspend (Long) -> Unit,
-    private val legacyEnrollment: (HistoryPartition?) -> (BackgroundRefreshTarget?) -> Unit = { {} },
+    private val enrollment: (BackgroundRefreshTarget, Boolean) -> Unit = { _, _ -> },
     private val credentials: (Context, UUID) -> CredentialStore = ::KeystoreCredentialStore,
     private val historyStorage: (File) -> HistoryLifetimeStorage = { SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(it)) },
     private val openCatalog: (() -> AccountCatalog)? = null,
     private val beforeAdditionDisplay: () -> Unit = {},
+    // Compatibility fixtures without an acknowledged scheduler keep the original notification seam.
+    private val cancelEnrollment: (suspend (BackgroundRefreshTarget) -> Unit)? = null,
 ) {
     // Retain only application-scoped context. Native fixtures supply a storage-isolating
     // ContextWrapper here, so preserve Context rather than casting it to Application.
@@ -50,8 +55,10 @@ internal class AccountRuntimeOwner(
     private val recovery = Mutex()
     @Volatile private var addition: PendingAddition? = null
     private var additionActivation: AdditionActivation? = null
+    private val cancelling = mutableSetOf<UUID>() // process mutation lane
 
     init {
+        catalog?.let { recoverCancellations(it) }
         if (catalog?.snapshots?.value?.candidate != null) scope.launch(mutations) { recoverAddition() }
     }
 
@@ -128,9 +135,9 @@ internal class AccountRuntimeOwner(
     }
 
     @Synchronized private fun acceptAddition(pending: PendingAddition, prepared: PreparedAddition.Ready) {
-        pending.controller.acceptAddition(prepared)
         runtimes[pending.address.id] = pending.controller
         addition = null
+        pending.controller.acceptAddition(prepared)
         additionActivation = AdditionActivation(requireNotNull(pending.commit).entry, pending.controller, prepared.envelope.generation)
         val snapshot = catalog?.snapshots?.value
         beforeAdditionDisplay()
@@ -167,13 +174,14 @@ internal class AccountRuntimeOwner(
         return try { openCatalog?.invoke() } catch (_: Exception) { null }
     }
 
-    /** Retry on the Add recovery lane; publish through the same dashboard and observer set. */
-    private fun recoverCatalog(): AccountCatalog? {
+    /** A scheduled recovery can publish storage without opening a dashboard or peer runtime. */
+    private fun recoverCatalog(observeDashboard: Boolean = true): AccountCatalog? {
         val confirmed = tryOpenCatalog() ?: return null
         synchronized(this) {
             if (closing) return null
             catalog = confirmed
-            dashboard()
+            recoverCancellations(confirmed)
+            if (observeDashboard) dashboard()
         }
         return confirmed
     }
@@ -222,7 +230,7 @@ internal class AccountRuntimeOwner(
         fun matches(snapshot: CatalogSnapshot?): Boolean {
             snapshot ?: return false
             val id = entry.storage.id
-            return snapshot.selected == id && snapshot.deletions.none { it.entry == id } &&
+            return snapshot.selected == id && snapshot.physicalDeletions.none { it.entry == id } &&
                 snapshot.entries.any { it.storage == entry.storage && it.partition == entry.partition }
         }
     }
@@ -263,6 +271,7 @@ internal class AccountRuntimeOwner(
     suspend fun registerForeground(): DashboardObserver = withContext(mutations) {
         check(!closing)
         dashboard()
+        catalog?.let { recoverCancellations(it) }
         val token = Any()
         observers.add(token)
         selected.value?.controller?.usageForeground(token, true)
@@ -288,7 +297,7 @@ internal class AccountRuntimeOwner(
     private fun activateAfterRemoval(snapshot: CatalogSnapshot?, next: DashboardSelection, previous: DashboardSelection?): Job? {
         // Capture actual-removal provenance before any asynchronous activation/restoration.
         val removed = previous?.id != null && snapshot?.entries?.none { it.storage.id == previous.id } == true
-        return if (removed && next.id != null) activate(next) else null
+        return if (removed && next.id != null) activate(next, enroll = false) else null
     }
 
     private fun activateAddition(snapshot: CatalogSnapshot?, next: DashboardSelection): Job? {
@@ -297,7 +306,7 @@ internal class AccountRuntimeOwner(
         additionActivation = null
         if (next.controller !== pending.controller || !pending.matches(snapshot)) return null
         return scope.launch(mutations) {
-            next.controller.requestSelectedUsage {
+            next.controller.requestSelectedUsage(enroll = false) {
                 next.isCurrent() && pending.matches(catalog?.snapshots?.value) &&
                     (next.controller.session.snapshot() as? SessionResult.Ready)?.envelope?.generation === pending.generation
             }
@@ -325,8 +334,141 @@ internal class AccountRuntimeOwner(
 
     private fun currentProjection() = selected.value.takeUnless { closing }
 
-    private fun activate(target: DashboardSelection): Job =
-        scope.launch(mutations) { target.controller.requestSelectedUsage(target::isCurrent) }
+    private fun activate(target: DashboardSelection, enroll: Boolean = true): Job =
+        scope.launch(mutations) { target.controller.requestSelectedUsage(enroll, target::isCurrent) }
+
+    /** Resolve from the catalog, never from display. Old WorkSpecs have only the partition UUID. */
+    suspend fun refreshInBackground(target: BackgroundRefreshTarget, minimumSuccessAgeMillis: Long): BackgroundRefreshOutcome =
+        withContext(mutations) {
+            if (closing) return@withContext BackgroundRefreshOutcome.Rejected(RETIRING)
+            val metadata = catalog ?: recoverCatalog(observeDashboard = false)
+                ?: return@withContext BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+            try { metadata.confirmBackgroundIdentity() } catch (_: Exception) {
+                return@withContext BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+            }
+            val snapshot = metadata.backgroundSnapshot(target.partition)
+                ?: return@withContext BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+            refreshFromSnapshot(metadata, snapshot, target, minimumSuccessAgeMillis)
+        }
+
+    private suspend fun refreshFromSnapshot(metadata: AccountCatalog, snapshot: CatalogSnapshot,
+        target: BackgroundRefreshTarget, minimumSuccessAgeMillis: Long): BackgroundRefreshOutcome {
+        val matches = snapshot.entries.filter { it.partition == target.partition }
+        if (matches.size > 1) return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+        val entry = matches.singleOrNull()
+        val controller = if (entry == null) {
+            // A live originating ticket may still need to publish the resolved storage failure.
+            val recovered = recoverUnmatchedSettlement(metadata, target)
+            if (snapshot.deletions.any { it.cancelPartition == target.partition }) {
+                recoverCancellations(metadata, target.partition)
+                return recovered ?: BackgroundRefreshOutcome.Rejected(RETIRING)
+            }
+            if (recovered != null) return recovered
+            when (unmatchedLegacy(metadata, snapshot, target.partition)) {
+                UnmatchedLegacy.RETIRED -> return BackgroundRefreshOutcome.Rejected(STALE_LIFETIME)
+                UnmatchedLegacy.UNKNOWN -> return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+                UnmatchedLegacy.CONTINUING -> synchronized(this) { if (closing) null else legacy() }
+            }
+        } else synchronized(this) { if (closing) null else runtime(entry.storage.id) }
+        if (controller == null)
+            return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+        if (entry != null) {
+            val receipt = snapshot.physicalDeletions.singleOrNull { it.entry == entry.storage.id }
+            val recovering = controller.recoverBackgroundDeletion(target, receipt?.disposition) {
+                when {
+                    closing -> false
+                    receipt == null -> backgroundBinding(metadata, target, entry.storage)
+                    else -> metadata.backgroundSnapshot(target.partition)?.deletions?.contains(receipt) == true
+                }
+            }
+            // Only durable settlement can cancel when routing to this exact cleanup.
+            if (receipt != null || recovering) return BackgroundRefreshOutcome.Rejected(RETIRING)
+        }
+        val outcome = controller.refreshInBackground(target, minimumSuccessAgeMillis) {
+            !closing && backgroundBinding(metadata, target, entry?.storage)
+        }
+        // IDLE or a different restored lifetime does not prove retirement for unmatched work.
+        if (outcome == BackgroundRefreshOutcome.Rejected(STALE_LIFETIME) &&
+            (entry == null || !canCancel(metadata, target, entry.storage)))
+            return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+        return outcome
+    }
+
+    /** The entry/receipt can disappear on confirmation, but its originating controller is retained. */
+    private suspend fun recoverUnmatchedSettlement(metadata: AccountCatalog, target: BackgroundRefreshTarget): BackgroundRefreshOutcome? {
+        val controllers = synchronized(this) { (runtimes.values + listOfNotNull(legacyController)).distinct() }
+        val matches = controllers.mapNotNull { controller ->
+            controller.pendingCatalogSettlement(target.partition)?.let { controller to it }
+        }
+        if (matches.isEmpty()) return null
+        val (controller, ticket) = matches.singleOrNull() ?: return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+        if (closing || metadata.backgroundSnapshot(target.partition)?.entries?.none { it.partition == target.partition } != true)
+            return BackgroundRefreshOutcome.Rejected(STORAGE_UNAVAILABLE)
+        controller.resumeCatalogSettlement(ticket)
+        // Even here only the original callback, not the worker's ordinary stale path, may cancel.
+        return BackgroundRefreshOutcome.Rejected(RETIRING)
+    }
+
+    private enum class UnmatchedLegacy { RETIRED, CONTINUING, UNKNOWN }
+
+    private fun unmatchedLegacy(metadata: AccountCatalog, snapshot: CatalogSnapshot, partition: HistoryPartition): UnmatchedLegacy {
+        val legacy = snapshot.entries.singleOrNull { it.storage.legacy }
+        if (snapshot.physicalDeletions.any { it.entry == null || it.entry == legacy?.storage?.id }) return UnmatchedLegacy.UNKNOWN
+        // Addressed entries enter with a partition and lose it only after settlement. A bound
+        // legacy entry therefore completes the catalog's account of continuing lifetimes.
+        val decision = if (legacy?.partition != null) UnmatchedLegacy.RETIRED else {
+            val files = HistoryFiles(File(root, "usage-history"), HistoryStorageLimits())
+            when (files.confirmedPhase(partition)) {
+                HistoryBindingPhase.ACTIVE -> UnmatchedLegacy.CONTINUING
+                HistoryBindingPhase.EMPTY -> if (legacy == null &&
+                    KeystoreCredentialStore.confirmsDeletion(applicationContext, snapshot.legacySlot)) UnmatchedLegacy.RETIRED
+                    else UnmatchedLegacy.UNKNOWN
+                else -> UnmatchedLegacy.UNKNOWN
+            }
+        }
+        return decision.takeIf { metadata.backgroundSnapshot(partition) == snapshot } ?: UnmatchedLegacy.UNKNOWN
+    }
+
+    private fun canCancel(metadata: AccountCatalog, target: BackgroundRefreshTarget, address: AccountStorage): Boolean {
+        val snapshot = metadata.backgroundSnapshot(target.partition) ?: return false
+        return snapshot.entries.none { it.partition == target.partition &&
+            (it.storage != address || snapshot.physicalDeletions.any { receipt -> receipt.entry == it.storage.id }) }
+    }
+
+
+    private fun backgroundBinding(metadata: AccountCatalog, target: BackgroundRefreshTarget, address: AccountStorage?): Boolean {
+        val snapshot = metadata.backgroundSnapshot(target.partition) ?: return false
+        val entry = snapshot.entries.singleOrNull { it.partition == target.partition } ?: return false
+        return (if (address == null) entry.storage.legacy else entry.storage == address) &&
+            snapshot.physicalDeletions.none { it.entry == entry.storage.id } && addition?.address != entry.storage
+    }
+
+    /** The process owns the ACK even if WorkManager stops the worker that found the receipt. */
+    private fun recoverCancellations(metadata: AccountCatalog, only: HistoryPartition? = null) {
+        val cancel = cancelEnrollment ?: return
+        scope.launch(mutations) {
+            if (closing) return@launch
+            val pending = try { metadata.pendingCancellations() } catch (_: Exception) { return@launch }
+            pending.forEach { receipt ->
+                val partition = requireNotNull(receipt.cancelPartition)
+                if ((only != null && partition != only) || !cancelling.add(receipt.operation)) return@forEach
+                launch cancelReceipt@{
+                    try {
+                        if (closing) return@cancelReceipt
+                        cancel(BackgroundRefreshTarget(partition))
+                        ensureActive()
+                        metadata.acknowledgeCancellation(receipt)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // Leave the receipt for process/foreground recovery or the next exact worker.
+                    } finally {
+                        cancelling.remove(receipt.operation)
+                    }
+                }
+            }
+        }
+    }
 
     /** Compatibility ingress, including the empty installation before legacy adoption. */
     @Synchronized fun legacy(): ConnectionController {
@@ -350,20 +492,24 @@ internal class AccountRuntimeOwner(
         check(slot !in slots) { "Credential slot already owned" }
         val store = credentials(applicationContext, slot)
         val directory = address?.historyDirectory(root) ?: File(root, "usage-history")
-        val history = metadata?.let { HistoryLifetimeCoordinator(CatalogHistoryStorage(historyStorage(directory), it, address)) }
-        // Production scheduling still consumes only the compatibility ingress. Multi-entry
-        // consumers must supply exact entry/lifetime admission in the scheduler integration.
-        val enrollment = enrollment(address, metadata)
+        val history = metadata?.let {
+            HistoryLifetimeCoordinator(CatalogHistoryStorage(historyStorage(directory), it, address,
+                retainCancellation = cancelEnrollment != null) { partition ->
+                if (cancelEnrollment == null) enrollment(BackgroundRefreshTarget(partition), false)
+                else recoverCancellations(it, partition)
+            })
+        }
         return ConnectionController(store, DeviceCodeAuthenticator(transport, store, clock, pause),
             NativeFeasibilityReader(transport, clock, pause), scope, storageReady = knownSlot != null,
             mutationDispatcher = mutations, refreshClock = clock,
-            history = history, backgroundEnrollment = enrollment,
+            history = history,
+            backgroundEnrollment = { target ->
+                if (!closing && metadata != null && backgroundBinding(metadata, target, address)) enrollment(target, true)
+            },
             savedAccount = { if (address == null) metadata?.legacyEntry() != null else metadata?.entry(address.id) != null },
             pendingAddition = pendingAddition).also { slots.add(slot) }
     }
 
-    private fun enrollment(address: AccountStorage?, metadata: AccountCatalog?): (BackgroundRefreshTarget?) -> Unit =
-        if (address == null && metadata != null) legacyEnrollment(metadata.legacyEntry()?.partition) else { _ -> }
 
     suspend fun shutdown() {
         val pending = withContext(mutations) {

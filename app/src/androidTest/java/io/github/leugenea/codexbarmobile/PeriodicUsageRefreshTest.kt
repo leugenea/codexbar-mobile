@@ -23,9 +23,16 @@ import androidx.work.testing.WorkManagerTestInitHelper
 import com.google.common.util.concurrent.ListenableFuture
 import io.github.leugenea.codexbarmobile.account.AccountCatalog
 import io.github.leugenea.codexbarmobile.account.AccountDisplayName
+import io.github.leugenea.codexbarmobile.account.AccountStorage
 import io.github.leugenea.codexbarmobile.account.AccountType
+import io.github.leugenea.codexbarmobile.account.CatalogEntry
 import io.github.leugenea.codexbarmobile.account.CatalogFile
+import io.github.leugenea.codexbarmobile.account.CleanupDisposition
+import io.github.leugenea.codexbarmobile.credentials.CredentialDeletion
+import io.github.leugenea.codexbarmobile.credentials.CredentialResult
+import io.github.leugenea.codexbarmobile.credentials.CredentialStore
 import io.github.leugenea.codexbarmobile.credentials.KeystoreCredentialStore
+import io.github.leugenea.codexbarmobile.credentials.SessionGeneration
 import io.github.leugenea.codexbarmobile.history.*
 import io.github.leugenea.codexbarmobile.transport.*
 import kotlinx.coroutines.*
@@ -36,6 +43,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.io.IOException
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Future
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
@@ -48,7 +56,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class PeriodicUsageRefreshTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val app = ApplicationProvider.getApplicationContext<Context>()
-    private val originalFactory = NativeConnection.factory
+    private val originalRootFactory = NativeConnection.rootFactory
     private val transport = SyntheticSamplingTransport()
     private lateinit var context: Context
     private lateinit var root: File
@@ -64,9 +72,9 @@ class PeriodicUsageRefreshTest {
             override fun getApplicationContext(): Context = this
             override fun getNoBackupFilesDir(): File = root
         }
-        NativeConnection.factory = {
-            NativeConnection.create(context, transport, transport.clock, transport::pause,
-                PeriodicUsageRefresh(manager)::enrollment)
+        NativeConnection.rootFactory = {
+            NativeConnection.createOwner(context, transport, transport.clock, transport::pause,
+                enrollment = PeriodicUsageRefresh(manager)::enrollment)
         }
         NativeConnection.resetForTests()
     }
@@ -75,7 +83,7 @@ class PeriodicUsageRefreshTest {
         cancelEnrolledWork()
         try { NativeConnection.resetForTests() }
         finally {
-            NativeConnection.factory = originalFactory
+            NativeConnection.rootFactory = originalRootFactory
             val credentials = KeystoreCredentialStore(context, NativeConnection.session(context))
             credentials.delete(credentials.openSession())
             root.deleteRecursively()
@@ -104,22 +112,660 @@ class PeriodicUsageRefreshTest {
         assertEquals(mapOf(PeriodicUsageRefresh.LIFETIME to target.partition.value.toString()), input)
     }
 
-    @Test fun capturedEntryEnrollmentCancelsOnlyItsOwnContinuingWorkAcrossCallbackReconstruction() {
-        val a = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
-        val b = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
-        val periodic = PeriodicUsageRefresh(manager)
-        val first = periodic.entryEnrollment(null)
-        first(a); periodic.enrollment(b)
-        val aWork = unique(a).single(); val bWork = unique(b).single()
-        first(a)
-        assertEquals(aWork.id, unique(a).single().id)
-        val reconstructed = periodic.entryEnrollment(a.partition)
-        reconstructed(null); reconstructed(null)
-        await("only captured A work cancelled") { info(aWork.id).state == WorkInfo.State.CANCELLED }
-        assertEquals(bWork.id, unique(b).single().id)
-        assertFalse(info(bWork.id).state.isFinished)
-        assertEquals(1, activeWork().size)
-        assertEquals(0L, transport.requests.get())
+
+    @Test fun coldSystemJobUsesOnlyNonselectedEnrolledAccountAndNeverBorrowsSelection() {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        try {
+            val periodic = PeriodicUsageRefresh(manager)
+            f.enrollment = periodic::enrollment
+            f.start()
+            val a = f.runtime(f.a); val b = f.runtime(f.b)
+            val targetA = BackgroundRefreshTarget(requireNotNull(f.a.partition))
+            val targetB = BackgroundRefreshTarget(requireNotNull(f.b.partition))
+            f.phase(a, ConnectionPhase.RESTORED); f.phase(b, ConnectionPhase.RESTORED)
+            val observer = f.observer()
+            assertSame(b, f.owner.settings(f.b.storage.id)?.controller)
+            assertTrue(activeWork().isEmpty())
+            f.select(f.b); f.phase(b, ConnectionPhase.OBSERVED)
+            val workB = unique(targetB).single().id
+            f.select(f.a); f.phase(a, ConnectionPhase.OBSERVED)
+            val workA = unique(targetA).single().id
+            f.select(f.b); f.phase(b, ConnectionPhase.OBSERVED)
+            assertEquals(workB, unique(targetB).single().id)
+            f.select(f.a); f.phase(a, ConnectionPhase.OBSERVED)
+            assertEquals(workA, unique(targetA).single().id)
+            f.stop(observer)
+            f.receipt("drain initial process owner") { f.owner.shutdown() }
+
+            val constructed = CopyOnWriteArrayList<UUID>()
+            f.decorateCredential = { slot, store -> store.also { constructed += slot } }
+            f.catalog = AccountCatalog.open(f.directory, { error("existing two-account catalog") })
+            f.installActivity { f.start() }
+            val aCount = f.aTransport.requests.get(); val bCount = f.bTransport.requests.get()
+            assertTrue(constructed.isEmpty())
+            f.aTransport.advance(900_000); f.bTransport.advance(900_000)
+            f.bTransport.heldPath = ReadOperation.USAGE.path
+            dispatchOsJob(awaitJob(workB), workB)
+            f.await("cold B worker admitted with A still selected") {
+                f.bTransport.liveHeldCall(ReadOperation.USAGE.path) != null && info(workB).state == WorkInfo.State.RUNNING
+            }
+            val coldB = f.runtime(f.b)
+            assertEquals(listOf(f.b.storage.credentialSlot), constructed.toList())
+            assertNull(coldB.currentHistoryDisplayContext())
+            assertEquals(f.a.storage.id, f.catalog.snapshot().selected)
+            assertEquals(aCount, f.aTransport.requests.get())
+            f.bTransport.releaseHeld()
+            f.await("B recorded before real OS worker completed") {
+                info(workB).state == WorkInfo.State.ENQUEUED && f.appends.any {
+                    it.admission.partition == targetB.partition && it.admission.event is HistoryEvent.Observed &&
+                        (it.admission.clock.monotonicMillis ?: -1L) >= 900_000 && it.result is HistoryAppendOutcome.Stored
+                }
+            }
+            assertEquals(bCount + 2, f.bTransport.requests.get())
+            val stale = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
+            periodic.enrollment(stale, true)
+            val staleId = unique(stale).single().id
+            assertEquals(ListenableWorker.Result.success(), run(stale, staleId))
+            assertEquals(WorkInfo.State.CANCELLED, info(staleId).state)
+            assertEquals("unknown worker must not instantiate the selected runtime",
+                listOf(f.b.storage.credentialSlot), constructed.toList())
+            assertEquals(aCount, f.aTransport.requests.get())
+            assertEquals(bCount + 2, f.bTransport.requests.get())
+            assertEquals(workA, unique(targetA).single().id)
+            assertEquals(workB, unique(targetB).single().id)
+        } finally { f.cleanup() }
+    }
+
+    @Test fun ambiguousSavedLifetimeNeverConstructsEitherRuntimeOrCancelsWork() {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        try {
+            assertTrue(f.catalog.insert(f.b.copy(storage = AccountStorage.fresh(), name = "Synthetic duplicate binding")))
+            val target = BackgroundRefreshTarget(requireNotNull(f.b.partition))
+            PeriodicUsageRefresh(manager).enrollment(target, true)
+            val work = unique(target).single().id
+            val constructed = AtomicInteger()
+            f.decorateCredential = { _, store -> store.also { constructed.incrementAndGet() } }
+            f.installActivity { f.start() }
+            assertEquals(ListenableWorker.Result.success(), run(target, work))
+            assertEquals(0, constructed.get())
+            assertEquals(0L, f.aTransport.requests.get() + f.bTransport.requests.get())
+            assertEquals(WorkInfo.State.ENQUEUED, info(work).state)
+        } finally { f.cleanup() }
+    }
+
+    @Test fun coldLegacyWorkerSettlesInterruptedRemovalBeforeCancellingItsWork() =
+        recoverDurableWorkerDeletion(legacy = true, disposition = CleanupDisposition.REMOVE)
+
+    @Test fun coldAddressedWorkerRetriesInterruptedReauthorizationBeforeCancellingItsWork() =
+        recoverDurableWorkerDeletion(legacy = false, disposition = CleanupDisposition.RETAIN)
+
+    private fun recoverDurableWorkerDeletion(legacy: Boolean, disposition: CleanupDisposition) {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        try {
+            val removed = if (legacy) f.a else f.b
+            val peer = if (legacy) f.b else f.a
+            val periodic = PeriodicUsageRefresh(manager)
+            f.enrollment = periodic::enrollment
+            f.cancelEnrollment = periodic::cancel
+            f.start()
+            val target = BackgroundRefreshTarget(requireNotNull(removed.partition))
+            val peerTarget = BackgroundRefreshTarget(requireNotNull(peer.partition))
+            val work = enrollSaved(f, removed)
+            val peerWork = enrollSaved(f, peer)
+            assertTrue(f.catalog.select(peer.storage.id))
+            f.receipt("stop before reconstructing interrupted cleanup") { f.owner.shutdown() }
+            val requests = f.aTransport.requests.get() to f.bTransport.requests.get()
+            val peerBytes = f.bytes(peer)
+
+            // Crash cut after the real catalog receipt commit, before either protected store is deleted.
+            val receipt = f.catalog.beginDeletion(removed.storage.id, disposition)
+            val raw = CatalogFile(File(f.directory, "account-catalog"))
+            assertEquals(listOf(receipt), raw.read().deletions)
+            assertTrue(f.keyExists(removed))
+            f.catalog = AccountCatalog.open(f.directory, { error("saved catalog required") })
+            val constructed = CopyOnWriteArrayList<UUID>()
+            f.decorateCredential = { slot, store -> store.also { constructed += slot } }
+            val held = f.gate()
+            val failFirst = AtomicBoolean(!legacy)
+            f.hooks = { path -> object : HistoryStorageHooks {
+                override fun afterTombstone() {
+                    if (path != removed.storage.historyDirectory(f.directory)) return
+                    held.pause("exact history tombstone before physical cleanup")
+                    if (failFirst.getAndSet(false)) throw IOException("interrupted history deletion")
+                }
+            } }
+            f.installActivity { f.start() }
+            dispatchOsJob(awaitJob(work), work)
+            held.await("worker reached the exact durable receipt")
+            assertEquals(listOf(receipt), raw.read().deletions)
+            assertEquals(WorkInfo.State.RUNNING, info(work).state)
+            assertEquals(listOf(removed.storage.credentialSlot), constructed.toList())
+            assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())
+            held.release()
+            val firstResult = if (legacy) WorkInfo.State.CANCELLED else WorkInfo.State.ENQUEUED
+            f.await("first scheduled cleanup opportunity finished with $firstResult") { info(work).state == firstResult }
+
+            if (!legacy) {
+                assertEquals(listOf(receipt), raw.read().deletions)
+                assertEquals("failed physical cleanup must preserve the original opportunity", WorkInfo.State.ENQUEUED, info(work).state)
+                assertEquals(ListenableWorker.Result.success(), run(target, work))
+                assertEquals(removed.copy(partition = null), f.catalog.entry(removed.storage.id))
+                assertFalse(f.keyExists(removed))
+                assertFalse(File(removed.storage.historyDirectory(f.directory), "history.db").exists())
+            } else f.assertRemoved(removed)
+            f.await("successful WorkManager cancellation and catalog ACK") {
+                info(work).state == WorkInfo.State.CANCELLED && raw.read().deletions.isEmpty()
+            }
+            val settled = raw.read()
+            assertTrue(settled.deletions.isEmpty())
+            assertEquals(peer.storage.id, settled.selected)
+            assertEquals(WorkInfo.State.CANCELLED, info(work).state)
+            assertEquals(peerWork, unique(peerTarget).single().id)
+            assertEquals(peerBytes, f.bytes(peer))
+            assertEquals(listOf(removed.storage.credentialSlot), constructed.toList())
+            assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())
+        } finally { f.cleanup() }
+    }
+
+    @Test fun nextExactWorkerResumesFailedTerminalCleanupWithoutADurableReceipt() {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        val failing = AtomicBoolean()
+        try {
+            // The fixture's B is nonlegacy (the invalidated A in the reported interleaving).
+            val removed = f.b; val peer = f.a
+            val raw = CatalogFile(File(f.directory, "account-catalog"))
+            f.catalog = AccountCatalog.open(f.directory, { error("saved catalog required") }, beforeDirectorySync = {
+                if (failing.get()) throw IOException("unrelated selection directory sync")
+            })
+            assertTrue(f.catalog.select(removed.storage.id))
+            f.enrollment = PeriodicUsageRefresh(manager)::enrollment
+            val reservation = f.gate()
+            val tombstone = f.gate()
+            val directory = removed.storage.historyDirectory(f.directory)
+            val peerReads = AtomicInteger()
+            f.decorateCredential = { slot, store ->
+                if (slot != peer.storage.credentialSlot) store else object : CredentialStore by store {
+                    override fun read(generation: SessionGeneration) = store.read(generation).also { peerReads.incrementAndGet() }
+                }
+            }
+            f.decorateHistory = { path, storage ->
+                if (path != directory) storage else object : HistoryLifetimeStorage by storage {
+                    override fun reserveDeletion(disposition: CleanupDisposition): HistoryDeletion {
+                        reservation.pause("terminal invalidation before the catalog deletion reservation")
+                        return storage.reserveDeletion(disposition)
+                    }
+                }
+            }
+            f.hooks = { path -> object : HistoryStorageHooks {
+                override fun afterTombstone() { if (path == directory) tombstone.pause("terminal cleanup after durable receipt") }
+            } }
+            f.start(); f.installActivity()
+            val target = BackgroundRefreshTarget(requireNotNull(removed.partition))
+            val peerTarget = BackgroundRefreshTarget(requireNotNull(peer.partition))
+            val work = enrollSaved(f, removed)
+            val controller = f.runtime(removed)
+            val peerWork = enrollSaved(f, peer)
+            val peerCredential = f.protectedReadback(peer)
+            val peerBytes = f.bytes(peer)
+            val peerGets = f.aTransport.gets.get()
+            val peerReadsBefore = peerReads.get()
+            assertTrue(peerReadsBefore > 0)
+            f.aTransport.advance(900_000)
+            f.bTransport.heldPath = ReadOperation.USAGE.path
+            f.bTransport.usageStatus = 401
+            f.aTransport.tokenResponse = TransportResult.Response.bounded(400, """{"error":"invalid_grant"}""".toByteArray())
+            dispatchOsJob(awaitJob(work), work)
+            f.await("original scheduled worker has in-flight usage") {
+                info(work).state == WorkInfo.State.RUNNING && f.bTransport.liveHeldCall(ReadOperation.USAGE.path) != null
+            }
+            failing.set(true)
+            assertThrows(IOException::class.java) { f.catalog.select(peer.storage.id) }
+            assertNull(f.catalog.backgroundSnapshot(target.partition))
+            f.bTransport.releaseHeld()
+            reservation.await("terminal refresh reached account cleanup while selection was still fenced")
+            assertNull(f.catalog.backgroundSnapshot(target.partition))
+            assertFalse(info(work).state.isFinished)
+            reservation.release()
+            assertEquals(ConnectionProblem.STORAGE, f.phase(controller, ConnectionPhase.FAILED).problem)
+            assertEquals(HistoryAvailability.STORAGE_FAILURE, controller.historyAvailability)
+            assertNull(f.catalog.backgroundSnapshot(target.partition))
+            val failed = raw.read()
+            assertTrue("Selection confirmation failed before a deletion receipt was written", failed.deletions.isEmpty())
+            assertEquals(removed, failed.entries.single { it.storage == removed.storage })
+            assertEquals(peer.storage.id, failed.selected)
+            f.await("original work survives the observed pre-receipt cleanup failure") { info(work).state == WorkInfo.State.ENQUEUED }
+
+            val requests = f.aTransport.requests.get() to f.bTransport.requests.get()
+            failing.set(false)
+            val next = start(target, work)
+            try {
+                tombstone.await("next exact worker resumed cleanup and reached the durable receipt")
+                val receipt = raw.read().deletions.single()
+                assertEquals(removed.storage.id, receipt.entry)
+                assertEquals(CleanupDisposition.RETAIN, receipt.disposition)
+                assertEquals(WorkInfo.State.ENQUEUED, info(work).state)
+                tombstone.release()
+                assertEquals(ListenableWorker.Result.success(), futureResult("exact cleanup opportunity", next))
+            } finally { tombstone.release(); next.cancel(true) }
+            f.phase(controller, ConnectionPhase.REAUTH_REQUIRED)
+            val settled = raw.read()
+            assertEquals(removed.copy(partition = null), settled.entries.single { it.storage == removed.storage })
+            assertTrue(settled.deletions.isEmpty())
+            assertEquals(peer.storage.id, settled.selected)
+            assertFalse(f.keyExists(removed))
+            assertFalse(File(directory, "history.db").exists())
+            assertEquals(WorkInfo.State.CANCELLED, info(work).state)
+            assertEquals(peerWork, unique(peerTarget).single().id)
+            assertEquals(peerReadsBefore, peerReads.get())
+            assertEquals(peerGets, f.aTransport.gets.get()) // The synthetic router sends the refresh POST to A.
+            assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())
+            assertEquals(1L, f.aTransport.counts()["/oauth/token"] ?: 0L)
+            assertArrayEquals(peerCredential.accessToken.copyBytes(), f.protectedReadback(peer).accessToken.copyBytes())
+            assertEquals(peerBytes, f.bytes(peer))
+        } finally {
+            failing.set(false)
+            f.cleanup()
+        }
+    }
+
+    @Test fun liveUnmatchedWorkerRetriesOnlyCatalogSettlementForRemovedLegacyWithRetainedPeer() {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        val fail = AtomicBoolean()
+        try {
+            val targetA = BackgroundRefreshTarget(requireNotNull(f.a.partition))
+            val targetB = BackgroundRefreshTarget(requireNotNull(f.b.partition))
+            val raw = CatalogFile(File(f.directory, "account-catalog"))
+            val failures = AtomicInteger()
+            f.catalog = AccountCatalog.open(f.directory, { error("saved catalog required") }, beforeDirectorySync = {
+                if (fail.get() && raw.read().entries.none { it.storage == f.a.storage }) {
+                    failures.incrementAndGet()
+                    throw IOException("A final replacement installed but its directory sync failed")
+                }
+            })
+            assertTrue(f.catalog.select(f.b.storage.id))
+            val enrollment = CopyOnWriteArrayList<Pair<BackgroundRefreshTarget, Boolean>>()
+            val periodic = PeriodicUsageRefresh(manager)
+            f.enrollment = { target, enrolled ->
+                enrollment += target to enrolled
+                periodic.enrollment(target, enrolled)
+            }
+            val aHistory = f.a.storage.historyDirectory(f.directory)
+            val bHistory = f.b.storage.historyDirectory(f.directory)
+            val opened = CopyOnWriteArrayList<UUID>()
+            val reads = CopyOnWriteArrayList<UUID>()
+            val credentialDeletes = CopyOnWriteArrayList<UUID>()
+            val historyDeletes = CopyOnWriteArrayList<File>()
+            f.decorateCredential = { slot, store ->
+                opened += slot
+                object : CredentialStore by store {
+                    override fun read(generation: SessionGeneration) = store.read(generation).also { reads += slot }
+                    override fun admitDeletion(generation: SessionGeneration): CredentialResult<CredentialDeletion> {
+                        val admitted = store.admitDeletion(generation)
+                        if (admitted !is CredentialResult.Success) return admitted
+                        return CredentialResult.Success(object : CredentialDeletion {
+                            override fun complete() = admitted.value.complete().also { credentialDeletes += slot }
+                        })
+                    }
+                }
+            }
+            f.hooks = { path -> object : HistoryStorageHooks {
+                override fun afterTombstone() { historyDeletes += path }
+            } }
+
+            f.start(); f.installActivity()
+            val workA = enrollSaved(f, f.a)
+            val workB = enrollSaved(f, f.b)
+            val a = f.runtime(f.a); val b = f.runtime(f.b)
+            f.aTransport.advance(900_000)
+            f.bTransport.usageStatus = 401
+            f.aTransport.tokenResponse = TransportResult.Response.bounded(400, """{"error":"invalid_grant"}""".toByteArray())
+            assertEquals(ListenableWorker.Result.success(), run(targetB, workB))
+            val bState = f.phase(b, ConnectionPhase.REAUTH_REQUIRED)
+            val bInfo = info(workB)
+            assertEquals(WorkInfo.State.CANCELLED, bInfo.state)
+            val bBinding = File(bHistory, "binding").readBytes()
+            val requests = f.aTransport.requests.get() to f.bTransport.requests.get()
+            val priorReads = reads.toList()
+            val priorEnrollment = enrollment.toList()
+
+            fail.set(true)
+            a.signOut()
+            assertEquals(ConnectionProblem.STORAGE, f.phase(a, ConnectionPhase.FAILED).problem)
+            assertTrue("actual final catalog directory sync failed", failures.get() > 0)
+            val replacement = raw.read()
+            assertEquals(listOf(f.b.copy(partition = null)), replacement.entries)
+            assertEquals(f.b.storage.id, replacement.selected)
+            assertTrue(replacement.deletions.isEmpty())
+            assertEquals(f.a, f.catalog.snapshots.value.entries.single { it.storage == f.a.storage })
+            assertFalse(f.keyExists(f.a))
+            assertFalse(File(aHistory, "history.db").exists())
+            assertEquals(listOf(f.b.storage.credentialSlot, f.a.storage.credentialSlot), credentialDeletes.toList())
+            assertEquals(listOf(bHistory, aHistory), historyDeletes.toList())
+
+            assertEquals(ListenableWorker.Result.success(), run(targetA, workA))
+            assertNull(f.catalog.backgroundSnapshot(targetA.partition))
+            assertEquals(workA, unique(targetA).single().id)
+            assertEquals(WorkInfo.State.ENQUEUED, info(workA).state)
+            assertEquals(priorEnrollment, enrollment.toList())
+
+            fail.set(false)
+            assertEquals(ListenableWorker.Result.success(), run(targetA, workA))
+            assertEquals(WorkInfo.State.CANCELLED, info(workA).state)
+            f.phase(a, ConnectionPhase.SIGNED_OUT)
+            assertEquals(priorEnrollment + (targetA to false), enrollment.toList())
+            assertEquals(replacement, f.catalog.snapshots.value)
+            assertEquals(replacement, raw.read())
+            assertEquals(listOf(f.b.storage.credentialSlot, f.a.storage.credentialSlot), credentialDeletes.toList())
+            assertEquals(listOf(bHistory, aHistory), historyDeletes.toList())
+            assertEquals(listOf(f.a.storage.credentialSlot, f.b.storage.credentialSlot), opened.toList())
+            assertEquals(priorReads, reads.toList())
+            assertSame(bState, b.state.value)
+            assertEquals(bInfo, info(workB))
+            assertArrayEquals(bBinding, File(bHistory, "binding").readBytes())
+            assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())
+        } finally {
+            fail.set(false)
+            f.cleanup()
+        }
+    }
+
+    @Test fun coldUnmatchedWorkerCancelsOriginalWorkAfterRemovalWithResolvedLegacyAndRetainedAddress() {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        try {
+            val legacy = f.a; val retained = f.b; val removed = f.seedAddressed("C")
+            val target = BackgroundRefreshTarget(requireNotNull(removed.partition))
+            val legacyTarget = BackgroundRefreshTarget(requireNotNull(legacy.partition))
+            val retainedTarget = BackgroundRefreshTarget(requireNotNull(retained.partition))
+            val periodic = PeriodicUsageRefresh(manager)
+            val cut = CopyOnWriteArrayList<BackgroundRefreshTarget>()
+            f.enrollment = { lifetime, enrolled ->
+                // Simulate death after durable settlement, before WorkManager sees cancellation.
+                if (lifetime == target && !enrolled) cut += lifetime else periodic.enrollment(lifetime, enrolled)
+            }
+            f.start(); f.installActivity()
+            val work = enrollSaved(f, removed)
+            val legacyWork = enrollSaved(f, legacy)
+            val retainedWork = enrollSaved(f, retained)
+            f.aTransport.advance(900_000)
+            f.bTransport.usageStatus = 401
+            f.aTransport.tokenResponse = TransportResult.Response.bounded(400, """{"error":"invalid_grant"}""".toByteArray())
+            assertEquals(ListenableWorker.Result.success(), run(retainedTarget, retainedWork))
+            f.phase(f.runtime(retained), ConnectionPhase.REAUTH_REQUIRED)
+            assertEquals(WorkInfo.State.CANCELLED, info(retainedWork).state)
+
+            val controller = f.runtime(removed)
+            controller.signOut()
+            f.phase(controller, ConnectionPhase.SIGNED_OUT)
+            val raw = CatalogFile(File(f.directory, "account-catalog"))
+            val settled = raw.read()
+            assertEquals(listOf(legacy, retained.copy(partition = null)), settled.entries)
+            assertTrue(settled.deletions.isEmpty())
+            assertEquals(listOf(target), cut.toList())
+            assertEquals(WorkInfo.State.ENQUEUED, info(work).state)
+            f.assertRemoved(removed)
+            f.receipt("shut down owner at the durable-catalog, enqueued-work cut") { f.owner.shutdown() }
+
+            val constructed = CopyOnWriteArrayList<UUID>()
+            val openedHistory = CopyOnWriteArrayList<File>()
+            val requests = f.aTransport.requests.get() to f.bTransport.requests.get()
+            val legacyBytes = f.bytes(legacy)
+            f.decorateCredential = { slot, store -> store.also { constructed += slot } }
+            f.decorateHistory = { path, storage -> storage.also { openedHistory += path } }
+            f.enrollment = periodic::enrollment
+            f.catalog = AccountCatalog.open(f.directory, { error("settled catalog required") })
+            f.installActivity { f.start() }
+            assertEquals(ListenableWorker.Result.success(), run(target, work))
+            assertEquals(WorkInfo.State.CANCELLED, info(work).state)
+            assertEquals(legacyWork, unique(legacyTarget).single().id)
+            assertEquals(settled, raw.read())
+            assertEquals(legacyBytes, f.bytes(legacy))
+            assertTrue(constructed.isEmpty())
+            assertTrue(openedHistory.isEmpty())
+            assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())
+        } finally { f.cleanup() }
+    }
+
+    @Test fun originalAddressedJobRecoversRemovalWithoutABoundLegacyEntry() =
+        addressedCancellationCrashCut(afterWorkManagerAck = false)
+
+    @Test fun coldOwnerReclaimsAcknowledgedAddressedReceiptWithoutAWorker() =
+        addressedCancellationCrashCut(afterWorkManagerAck = true)
+
+    private fun addressedCancellationCrashCut(afterWorkManagerAck: Boolean) {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        try {
+            val removed = f.seedAddressed("C")
+            val target = BackgroundRefreshTarget(requireNotNull(removed.partition))
+            val targetB = BackgroundRefreshTarget(requireNotNull(f.b.partition))
+            val periodic = PeriodicUsageRefresh(manager)
+            val cut = CompletableDeferred<Unit>()
+            f.enrollment = periodic::enrollment
+            f.cancelEnrollment = { lifetime ->
+                if (lifetime == target) {
+                    if (afterWorkManagerAck) periodic.cancel(lifetime)
+                    cut.complete(Unit)
+                    awaitCancellation() // Process dies before submission or before the catalog ACK.
+                } else periodic.cancel(lifetime)
+            }
+            assertTrue(f.catalog.select(f.b.storage.id))
+            f.start(); f.installActivity()
+            val a = f.runtime(f.a)
+            f.phase(a, ConnectionPhase.RESTORED)
+            a.signOut()
+            f.phase(a, ConnectionPhase.SIGNED_OUT)
+            f.assertRemoved(f.a)
+            val raw = CatalogFile(File(f.directory, "account-catalog"))
+            f.await("A's cancellation receipt was acknowledged") { raw.read().deletions.isEmpty() }
+            assertTrue(raw.read().entries.none { it.storage.legacy })
+
+            val work = enrollSaved(f, removed)
+            val workB = enrollSaved(f, f.b)
+            val bInfo = info(workB)
+            val c = f.runtime(removed)
+            c.signOut()
+            f.phase(c, ConnectionPhase.SIGNED_OUT)
+            f.receipt("reach the exact addressed cancellation cut") { cut.await() }
+            val settled = raw.read()
+            assertEquals(listOf(f.b), settled.entries)
+            assertEquals(f.b.storage.id, settled.selected)
+            assertEquals(settled, f.catalog.snapshots.value)
+            assertEquals(removed.storage.id, settled.deletions.single().entry)
+            assertEquals(target.partition, settled.deletions.single().cancelPartition)
+            assertTrue(settled.physicalDeletions.isEmpty())
+            val originalState = if (afterWorkManagerAck) WorkInfo.State.CANCELLED else WorkInfo.State.ENQUEUED
+            assertEquals(originalState, info(work).state)
+            f.assertRemoved(removed)
+            f.receipt("discard the process while the catalog receipt is still durable") { f.owner.shutdown() }
+            val bBytes = f.bytes(f.b)
+
+            val constructed = CopyOnWriteArrayList<UUID>()
+            val openedHistory = CopyOnWriteArrayList<File>()
+            val requests = f.aTransport.requests.get() to f.bTransport.requests.get()
+            val cDirectory = removed.storage.historyDirectory(f.directory)
+            val cBinding = File(cDirectory, "binding").readBytes()
+            f.decorateCredential = { slot, store -> store.also { constructed += slot } }
+            f.decorateHistory = { path, storage -> storage.also { openedHistory += path } }
+            f.cancelEnrollment = periodic::cancel
+            f.catalog = AccountCatalog.open(f.directory, { error("settled catalog required") })
+            f.installActivity { f.start() }
+            if (afterWorkManagerAck) f.start() else dispatchOsJob(awaitJob(work), work)
+            f.await("original C job cancelled and its durable receipt acknowledged") {
+                info(work).state == WorkInfo.State.CANCELLED && raw.read().deletions.isEmpty()
+            }
+            assertEquals(settled.copy(deletions = emptyList()), raw.read())
+            assertEquals(workB, unique(targetB).single().id)
+            assertEquals(bInfo, info(workB))
+            assertEquals(bBytes, f.bytes(f.b))
+            assertArrayEquals(cBinding, File(cDirectory, "binding").readBytes())
+            assertTrue(constructed.isEmpty())
+            assertTrue(openedHistory.isEmpty())
+            assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())
+        } finally { f.cleanup() }
+    }
+
+    @Test fun coldUnmatchedWorkerProvesRemovedLegacyWithRetainedUnboundPeer() = removedLegacyWorker(retainUnbound = true)
+
+    @Test fun coldUnmatchedWorkerProvesRemovedLegacyWithBoundPeer() = removedLegacyWorker(retainUnbound = false)
+
+    private fun removedLegacyWorker(retainUnbound: Boolean) {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        try {
+            val targetA = BackgroundRefreshTarget(requireNotNull(f.a.partition))
+            val targetB = BackgroundRefreshTarget(requireNotNull(f.b.partition))
+            val periodic = PeriodicUsageRefresh(manager)
+            val interrupted = CopyOnWriteArrayList<BackgroundRefreshTarget>()
+            // Leave both original WorkSpecs alive so an unintended peer cancellation is observable.
+            f.enrollment = { target, enrolled ->
+                if (enrolled) periodic.enrollment(target, true) else interrupted += target
+            }
+            assertTrue(f.catalog.select(f.b.storage.id))
+            f.start(); f.installActivity()
+            val workA = enrollSaved(f, f.a)
+            val workB = enrollSaved(f, f.b)
+            if (retainUnbound) {
+                f.aTransport.advance(900_000)
+                f.bTransport.usageStatus = 401
+                f.aTransport.tokenResponse = TransportResult.Response.bounded(400, """{"error":"invalid_grant"}""".toByteArray())
+                assertEquals(ListenableWorker.Result.success(), run(targetB, workB))
+                f.phase(f.runtime(f.b), ConnectionPhase.REAUTH_REQUIRED)
+            }
+
+            val a = f.runtime(f.a)
+            a.signOut()
+            f.phase(a, ConnectionPhase.SIGNED_OUT)
+            assertEquals(if (retainUnbound) listOf(targetB, targetA) else listOf(targetA), interrupted.toList())
+            val catalogPath = File(f.directory, "account-catalog")
+            val raw = CatalogFile(catalogPath)
+            val settled = raw.read()
+            assertEquals(listOf(if (retainUnbound) f.b.copy(partition = null) else f.b), settled.entries)
+            assertEquals(f.b.storage.id, settled.selected)
+            assertTrue(settled.deletions.isEmpty())
+            val aInfo = info(workA)
+            assertEquals(WorkInfo.State.ENQUEUED, aInfo.state)
+            val bInfo = info(workB)
+            assertEquals(WorkInfo.State.ENQUEUED, bInfo.state)
+            f.assertRemoved(f.a)
+            f.receipt("drop process owner after final catalog settlement but before exact cancel") { f.owner.shutdown() }
+
+            val aHistory = f.a.storage.historyDirectory(f.directory)
+            assertTrue(File(aHistory, "binding").isFile)
+            assertEquals(HistoryBinding(HistoryBindingPhase.EMPTY, targetA.partition),
+                HistoryFiles(aHistory, HistoryStorageLimits()).readBinding())
+            fun artifacts(path: File) = requireNotNull(path.listFiles()).associate { it.name to it.readBytes().toList() }
+            val aBytes = artifacts(aHistory)
+            val bHistory = f.b.storage.historyDirectory(f.directory)
+            val bBytes = artifacts(bHistory)
+            val bProtected = if (retainUnbound) null else f.bytes(f.b)
+            val catalogBytes = File(catalogPath, "catalog").readBytes()
+            val requests = f.aTransport.requests.get() to f.bTransport.requests.get()
+            val constructed = CopyOnWriteArrayList<UUID>()
+            val openedHistory = CopyOnWriteArrayList<File>()
+            f.decorateCredential = { slot, store -> store.also { constructed += slot } }
+            f.decorateHistory = { path, storage -> storage.also { openedHistory += path } }
+            f.enrollment = periodic::enrollment
+            f.catalog = AccountCatalog.open(f.directory, { error("settled catalog required") })
+            f.installActivity { f.start() }
+
+            // A conflicting pending binding makes the exact EMPTY proof unavailable, not absent.
+            val pending = File(aHistory, "binding.pending")
+            val pendingBytes = byteArrayOf(1, 2, 3)
+            pending.writeBytes(pendingBytes)
+            assertEquals(ListenableWorker.Result.success(), run(targetA, workA))
+            assertEquals(aInfo, unique(targetA).single())
+            assertEquals(aBytes + (pending.name to pendingBytes.toList()), artifacts(aHistory))
+            assertArrayEquals(catalogBytes, File(catalogPath, "catalog").readBytes())
+            assertTrue(constructed.isEmpty())
+            assertTrue(openedHistory.isEmpty())
+            assertTrue(pending.delete())
+
+            // An intact EMPTY fence for A does not prove retirement for another unmatched UUID.
+            val wrong = if (retainUnbound) targetB else BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
+            if (!retainUnbound) periodic.enrollment(wrong, true)
+            val wrongWork = unique(wrong).single()
+            assertEquals(ListenableWorker.Result.success(), run(wrong, wrongWork.id))
+            assertEquals(wrongWork, unique(wrong).single())
+
+            if (!retainUnbound) {
+                // A pre-catalog cleanup could leave EMPTY before the protected barrier settled.
+                val quarantine = File(KeystoreCredentialStore.file(f.context, f.a.storage.credentialSlot).parentFile,
+                    "rotation-pending")
+                quarantine.writeBytes(pendingBytes)
+                assertEquals(ListenableWorker.Result.success(), run(targetA, workA))
+                assertEquals(aInfo, unique(targetA).single())
+                assertArrayEquals(pendingBytes, quarantine.readBytes())
+                assertTrue(quarantine.delete())
+            }
+
+            dispatchOsJob(awaitJob(workA), workA)
+            f.await("the original A WorkSpec was cancelled from the fresh owner") { info(workA).state == WorkInfo.State.CANCELLED }
+            assertEquals(workB, unique(targetB).single().id)
+            assertEquals(bInfo, info(workB))
+            assertEquals(aBytes, artifacts(aHistory))
+            assertEquals(bBytes, artifacts(bHistory))
+            if (bProtected != null) {
+                assertEquals(bProtected, f.bytes(f.b))
+                assertTrue(f.keyExists(f.b))
+            }
+            assertEquals(settled, raw.read())
+            assertArrayEquals(catalogBytes, File(catalogPath, "catalog").readBytes())
+            assertTrue(constructed.isEmpty())
+            assertTrue(openedHistory.isEmpty())
+            assertEquals(requests, f.aTransport.requests.get() to f.bTransport.requests.get())
+        } finally { f.cleanup() }
+    }
+
+    private fun enrollSaved(f: AccountSelectionFixture, entry: CatalogEntry): UUID {
+        val controller = f.runtime(entry)
+        f.phase(controller, ConnectionPhase.RESTORED)
+        controller.readUsage()
+        f.phase(controller, ConnectionPhase.OBSERVED)
+        return unique(BackgroundRefreshTarget(requireNotNull(entry.partition))).single().id
+    }
+
+    @Test fun workerFirstLegacyUpgradeAdoptsAnInitiallyUnresolvedLifetimeWithoutReplacingWork() {
+        login(); detach()
+        val expected = target()
+        val work = unique(expected).single().id
+        val count = transport.requests.get()
+        NativeConnection.resetForTests()
+        val catalog = File(root.canonicalFile, "account-catalog")
+        assertTrue("emulate the pre-catalog installation without touching credentials, history or WorkSpec",
+            File(catalog, "catalog").delete())
+        val raw = CatalogFile(catalog)
+        HistoryFiles(File(root.canonicalFile, "usage-history"), HistoryStorageLimits()).use { held ->
+            held.acquire()
+            assertEquals(ListenableWorker.Result.success(), run(expected, work))
+            val unresolved = raw.read()
+            assertEquals(unresolved.selected, unresolved.entries.single().storage.id)
+            assertTrue(unresolved.entries.single().storage.legacy)
+            assertNull(unresolved.entries.single().partition)
+            assertEquals(count, transport.requests.get())
+            assertEquals(WorkInfo.State.ENQUEUED, info(work).state)
+        }
+        val adoptedAddress = raw.read().entries.single().storage
+        transport.advance(900_000)
+        transport.heldPath = ReadOperation.USAGE.path
+        dispatchOsJob(awaitJob(work), work)
+        val held = transport.awaitHeld("original UUID-only OS job entered after storage recovered")
+        assertEquals(WorkInfo.State.RUNNING, info(work).state)
+        val adopted = raw.read().entries.single()
+        assertEquals(expected.partition, adopted.partition)
+        assertEquals(adoptedAddress, adopted.storage)
+        transport.heldPath = null; held.reply(transport.usage)
+        await("original OS job finished and released its exact history lease") {
+            info(work).state == WorkInfo.State.ENQUEUED && owner.historyAvailability == HistoryAvailability.UNAVAILABLE
+        }
+        assertEquals(count + 2, transport.requests.get())
+        assertEquals(work, unique(expected).single().id)
+        reopenWithPoints(2)
     }
 
     @Test fun minimizedAppRunsThroughRealSystemJobServiceAndDurableHistorySurvivesReopen() {
@@ -139,10 +785,7 @@ class PeriodicUsageRefreshTest {
             assertEquals("androidx.work.impl.background.systemjob.SystemJobService", job.service.className)
             if (Build.VERSION.SDK_INT >= 28) assertNotNull(job.requiredNetwork)
             if (Build.VERSION.SDK_INT >= 31) assertFalse(job.isExpedited)
-            makeDueForOsDispatch(work.id)
-            val namespace = if (Build.VERSION.SDK_INT >= 34) "--namespace androidx.work.systemjobscheduler " else ""
-            val dispatch = shell("cmd jobscheduler run -f $namespace${app.packageName} ${job.id}")
-            assertTrue("forced OS dispatch: $dispatch", dispatch.contains("Running job"))
+            dispatchOsJob(job, work.id)
             val held = transport.awaitHeld("real JobService entered owner usage request while Activity stopped")
             await("actual scheduled worker is RUNNING") { info(work.id).state == WorkInfo.State.RUNNING }
             assertEquals(1, bounded("scheduled owner interest") { owner.backgroundRefreshInterests() })
@@ -239,39 +882,32 @@ class PeriodicUsageRefreshTest {
         assertEquals(expected.partition, saved.partition)
         assertEquals(saved.storage.id, disk.snapshot().selected)
 
-        val injected = NativeConnection.factory
         val originalRoot = NativeConnection.rootFactory
         val syncAttempts = AtomicInteger()
         val blocked = AtomicBoolean(true)
         NativeConnection.resetForTests()
         NativeConnection.rootFactory = {
             NativeConnection.createOwner(context, transport, transport.clock, transport::pause,
-                legacyEnrollment = periodic::entryEnrollment, openCatalog = {
+                enrollment = periodic::enrollment, openCatalog = {
                     AccountCatalog.open(root, { error("saved catalog required") }, beforeDirectorySync = {
                         syncAttempts.incrementAndGet()
                         if (blocked.get()) throw IOException("cold catalog directory sync blocked")
                     })
                 })
         }
-        NativeConnection.factory = originalFactory
         try {
             assertEquals("worker must be the first cold ingress", 0, syncAttempts.get())
             assertEquals(ListenableWorker.Result.success(), run(expected))
-            assertEquals("worker reached the cold-open barrier", 1, syncAttempts.get())
+            assertEquals("worker reached initial open and its checked retry", 2, syncAttempts.get())
             assertEquals(requests, transport.requests.get())
             // The status query is queued on WorkManager's serial executor after any worker cancellation.
             assertEquals(WorkInfo.State.ENQUEUED, info(enrolled.id).state)
 
             blocked.set(false)
-            assertTrue(bounded("same-process catalog recovery") { NativeConnection.recoverAddition(context) })
-            phase(ConnectionPhase.RESTORED)
-            assertEquals(2, syncAttempts.get())
-            assertEquals(expected, target())
-            assertEquals(requests, transport.requests.get())
-            assertEquals(enrolled.id, unique(expected).single().id)
-
             transport.advance(900_000)
-            assertEquals(ListenableWorker.Result.success(), run(expected))
+            assertEquals(ListenableWorker.Result.success(), run(expected, enrolled.id))
+            assertEquals(3, syncAttempts.get())
+            assertEquals(expected, target())
             assertEquals(requests + 2, transport.requests.get())
             assertEquals(enrolled.id, unique(expected).single().id)
             val restored = owner
@@ -280,7 +916,7 @@ class PeriodicUsageRefreshTest {
             detach()
 
             val stale = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
-            periodic.enrollment(stale)
+            periodic.enrollment(stale, true)
             val staleWork = unique(stale).single()
             assertEquals(ListenableWorker.Result.success(), run(stale))
             assertEquals(WorkInfo.State.CANCELLED, info(staleWork.id).state)
@@ -288,7 +924,6 @@ class PeriodicUsageRefreshTest {
             assertEquals(requests + 2, transport.requests.get())
         } finally {
             try { NativeConnection.resetForTests() } finally {
-                NativeConnection.factory = injected
                 NativeConnection.rootFactory = originalRoot
             }
         }
@@ -307,14 +942,13 @@ class PeriodicUsageRefreshTest {
             requireNotNull(AccountDisplayName.from("Synthetic pending B")), AccountType.CODEX))
         val obstruction = File(address.historyDirectory(root), "unexpected-child")
         assertTrue(obstruction.mkdirs())
-        val injected = NativeConnection.factory
         val originalRoot = NativeConnection.rootFactory
         val unavailable = AtomicInteger()
         val raw = CatalogFile(File(root.canonicalFile, "account-catalog"))
         NativeConnection.resetForTests()
         NativeConnection.rootFactory = {
             AccountRuntimeOwner(context, AccountCatalog.open(root, { error("saved catalog required") }),
-                transport, transport.clock, transport::pause, legacyEnrollment = periodic::entryEnrollment,
+                transport, transport.clock, transport::pause, enrollment = periodic::enrollment,
                 historyStorage = { directory ->
                     val real = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(directory))
                     object : HistoryLifetimeStorage by real {
@@ -324,7 +958,6 @@ class PeriodicUsageRefreshTest {
                     }
                 })
         }
-        NativeConnection.factory = originalFactory
         try {
             transport.advance(900_000)
             val session = HistoryFiles(saved.storage.historyDirectory(root), HistoryStorageLimits()).use { held ->
@@ -341,7 +974,7 @@ class PeriodicUsageRefreshTest {
                 assertEquals(address, raw.read().candidate)
 
                 val stale = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
-                periodic.enrollment(stale)
+                periodic.enrollment(stale, true)
                 val staleWork = unique(stale).single()
                 assertEquals(ListenableWorker.Result.success(), run(stale, staleWork.id))
                 assertEquals(WorkInfo.State.CANCELLED, info(staleWork.id).state)
@@ -364,7 +997,6 @@ class PeriodicUsageRefreshTest {
             detach()
         } finally {
             try { NativeConnection.resetForTests() } finally {
-                NativeConnection.factory = injected
                 NativeConnection.rootFactory = originalRoot
             }
         }
@@ -379,12 +1011,11 @@ class PeriodicUsageRefreshTest {
             if (blocked.get()) { syncHits.incrementAndGet(); throw IOException("B replacement not synced") }
         })
         val periodic = PeriodicUsageRefresh(manager)
-        val injected = NativeConnection.factory
         val originalRoot = NativeConnection.rootFactory
         NativeConnection.resetForTests()
         NativeConnection.rootFactory = {
             AccountRuntimeOwner(context, catalog, transport, transport.clock, transport::pause,
-                legacyEnrollment = periodic::entryEnrollment, historyStorage = { path ->
+                enrollment = periodic::enrollment, historyStorage = { path ->
                     val real = SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(path))
                     object : HistoryLifetimeStorage by real {
                         override fun restore(): HistoryLifetimeOutcome {
@@ -397,7 +1028,6 @@ class PeriodicUsageRefreshTest {
                     }
                 })
         }
-        NativeConnection.factory = originalFactory
         try {
             phase(ConnectionPhase.IDLE)
             val first = bounded("A lifecycle START") { NativeConnection.observeDashboard(context) }
@@ -434,10 +1064,10 @@ class PeriodicUsageRefreshTest {
                 assertSame(session, (owner.session.snapshot() as SessionResult.Ready).envelope)
             }
             val stale = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
-            periodic.enrollment(stale)
+            periodic.enrollment(stale, true)
             val staleWork = unique(stale).single()
             assertEquals(ListenableWorker.Result.success(), run(stale))
-            assertEquals(WorkInfo.State.CANCELLED, info(staleWork.id).state)
+            assertEquals("uncertain Add cannot prove another target stale", WorkInfo.State.ENQUEUED, info(staleWork.id).state)
             assertEquals(2, restoreHits.get())
             assertEquals(requests, transport.requests.get())
 
@@ -459,6 +1089,8 @@ class PeriodicUsageRefreshTest {
                 blocked.set(false)
                 assertTrue(bounded("explicitly confirm and clear B's reservation") { NativeConnection.recoverAddition(context) })
                 assertNull(raw.read().candidate)
+                assertEquals(ListenableWorker.Result.success(), run(stale, staleWork.id))
+                assertEquals(WorkInfo.State.CANCELLED, info(staleWork.id).state)
                 unavailable.set(false)
                 transport.advance(900_000)
                 assertEquals(ListenableWorker.Result.success(), run(expected))
@@ -470,7 +1102,6 @@ class PeriodicUsageRefreshTest {
             } finally { bounded("release A's returned observer") { second.stop() } }
         } finally {
             try { NativeConnection.resetForTests() } finally {
-                NativeConnection.factory = injected
                 NativeConnection.rootFactory = originalRoot
             }
         }
@@ -536,20 +1167,131 @@ class PeriodicUsageRefreshTest {
         }
     }
 
-    @Test fun removalAndTerminalReauthorizationCancelEnrolledWorkWithoutSuccessorReads() {
-        login(); detach(); val old = target()
-        owner.signOut(); phase(ConnectionPhase.SIGNED_OUT)
-        await("removal cancels all enrolled work") { activeWork().isEmpty() }
-        val count = transport.requests.get()
-        assertEquals(ListenableWorker.Result.success(), run(old))
-        assertEquals(count, transport.requests.get())
-        owner.usageForeground(observer, true); owner.connect(); phase(ConnectionPhase.OBSERVED); detach()
-        transport.advance(900_000)
-        transport.usage = TransportResult.Response.bounded(401, "{}".toByteArray())
-        transport.tokens = TransportResult.Response.bounded(400, """{"error":"invalid_grant"}""".toByteArray())
-        assertEquals(ListenableWorker.Result.success(), run(target()))
-        phase(ConnectionPhase.REAUTH_REQUIRED)
-        await("terminal reauthorization cancels enrolled work") { activeWork().isEmpty() }
+    @Test fun foregroundAndWorkerShareOnlyTheirAccountInBothOrdersAndReleaseIsIsolated() {
+        val f = AccountSelectionFixture()
+        f.prepare()
+        try {
+            val periodic = PeriodicUsageRefresh(manager)
+            f.enrollment = periodic::enrollment
+            f.start(); f.installActivity()
+            val a = f.runtime(f.a); val b = f.runtime(f.b)
+            f.phase(a, ConnectionPhase.RESTORED); f.phase(b, ConnectionPhase.RESTORED)
+            val observer = f.observer()
+            f.settle(a)
+            val targetA = BackgroundRefreshTarget(requireNotNull(f.a.partition))
+            val targetB = BackgroundRefreshTarget(requireNotNull(f.b.partition))
+            periodic.enrollment(targetB, true) // Previously enrolled, currently nonselected.
+            val workB = unique(targetB).single().id
+            val path = ReadOperation.USAGE.path
+            for ((round, workerFirst) in listOf(true, false).withIndex()) {
+                f.aTransport.advance(900_000); f.bTransport.advance(900_000)
+                f.aTransport.heldPath = path; f.bTransport.heldPath = path
+                if (workerFirst) periodic.enrollment(targetA, true) else a.readUsage()
+                val workA = unique(targetA).single().id
+                if (!workerFirst) f.await("A foreground request precedes worker") { f.aTransport.liveHeldCall(path) != null }
+                val workerA = start(targetA, workA)
+                val workerB = start(targetB, workB)
+                try {
+                    val heldA = awaitWorkerLease(f, a, f.aTransport)
+                    val heldB = awaitWorkerLease(f, b, f.bTransport)
+                    if (workerFirst) { a.readUsage(); f.settle(a) }
+                    assertEquals(round * 2L + 1, f.aTransport.gets.get())
+                    assertEquals(round * 2L + 1, f.bTransport.gets.get())
+                    assertTrue(workerA.cancel(true))
+                    f.await("only A's background lease released") {
+                        f.receipt("network leases") {
+                            a.backgroundRefreshNetworkInterests() == 0 && b.backgroundRefreshNetworkInterests() == 1
+                        }
+                    }
+                    assertFalse(heldA.cancelled); assertFalse(heldB.cancelled)
+                    f.aTransport.heldPath = null; f.bTransport.heldPath = null
+                    heldA.reply(); heldB.reply()
+                    assertEquals(ListenableWorker.Result.success(), futureResult("B worker completed", workerB))
+                    f.await("both original partitions recorded") {
+                        listOf(targetA, targetB).all { target -> f.appends.count {
+                            it.admission.partition == target.partition && it.admission.event is HistoryEvent.Observed &&
+                                it.result is HistoryAppendOutcome.Stored
+                        } == round + 1 }
+                    }
+                    f.await("A's accepted history interest drained") {
+                        f.receipt("A settlement", a) { a.backgroundRefreshInterests() == 0 && !a.state.value.refresh.refreshing }
+                    }
+                    assertEquals((round + 1) * 2L, f.aTransport.gets.get())
+                    assertEquals((round + 1) * 2L, f.bTransport.gets.get())
+                    assertEquals(workA, unique(targetA).single().id)
+                    assertEquals(workB, unique(targetB).single().id)
+                } finally { workerA.cancel(true); workerB.cancel(true) }
+            }
+            f.stop(observer)
+        } finally { f.cleanup() }
+    }
+
+    private fun awaitWorkerLease(f: AccountSelectionFixture, controller: ConnectionController,
+        transport: NavigationTransport): NavigationTransport.HeldCall {
+        val path = ReadOperation.USAGE.path
+        f.await("held worker owns exact account's history and network") {
+            transport.liveHeldCall(path) != null && f.receipt("owner leases", controller) {
+                controller.backgroundRefreshNetworkInterests() == 1 && controller.backgroundRefreshInterests() == 1
+            }
+        }
+        return requireNotNull(transport.liveHeldCall(path))
+    }
+
+    @Test fun reauthorizationAndRemovalAfterReconstructionCancelOnlyTheOriginalCapturedAccount() {
+        login(); detach()
+        val a = target(); val aWork = unique(a).single().id
+        var bSlot: UUID? = null
+        val usage = transport.usage; val tokens = transport.tokens
+        try {
+            transport.heldPath = "/api/accounts/deviceauth/token"
+            val add = requireNotNull(bounded("begin B") { NativeConnection.beginAddition(context, "Synthetic B", AccountType.CODEX) })
+            val poll = transport.awaitHeld("B is still unadmitted")
+            val raw = CatalogFile(File(root.canonicalFile, "account-catalog"))
+            bSlot = requireNotNull(raw.read().candidate).credentialSlot
+            assertEquals(listOf(aWork), activeWork().map { it.id })
+            transport.heldPath = null
+            poll.reply(TransportResult.Response.bounded(200,
+                """{"authorization_code":"synthetic-b","code_verifier":"synthetic-b-verifier"}""".toByteArray()))
+            val added = bounded("B commits") { add.result() } as AdditionResult.Added
+            val savedB = raw.read().entries.single { it.storage.id == added.id }
+            val targetB = BackgroundRefreshTarget(requireNotNull(savedB.partition))
+            val bWork = unique(targetB).single().id
+            val b = requireNotNull(NativeConnection.entry(context, added.id))
+            bounded("B first selected read finishes") { b.state.first { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing } }
+
+            NativeConnection.resetForTests()
+            transport.advance(900_000)
+            transport.usage = TransportResult.Response.bounded(401, "{}".toByteArray())
+            transport.tokens = TransportResult.Response.bounded(400, """{"error":"invalid_grant"}""".toByteArray())
+            assertEquals(ListenableWorker.Result.success(), run(a, aWork))
+            phase(ConnectionPhase.REAUTH_REQUIRED)
+            assertEquals(WorkInfo.State.CANCELLED, info(aWork).state)
+            assertEquals(added.id, raw.read().selected)
+            assertEquals(bWork, unique(targetB).single().id)
+
+            transport.usage = usage; transport.tokens = tokens
+            owner.usageForeground(observer, true); owner.connect(); phase(ConnectionPhase.OBSERVED)
+            val replacement = target()
+            assertNotEquals(a, replacement)
+            val replacementWork = unique(replacement).single().id
+            detach(); NativeConnection.resetForTests(); phase(ConnectionPhase.RESTORED)
+            owner.signOut(); phase(ConnectionPhase.SIGNED_OUT)
+            assertEquals(WorkInfo.State.CANCELLED, info(replacementWork).state)
+            assertEquals(bWork, unique(targetB).single().id)
+            assertEquals(added.id, raw.read().selected)
+
+            val count = transport.requests.get()
+            assertEquals(ListenableWorker.Result.success(), run(a, aWork))
+            assertEquals(ListenableWorker.Result.success(), run(replacement, replacementWork))
+            assertEquals(count, transport.requests.get())
+            assertEquals(ListenableWorker.Result.success(), run(targetB, bWork))
+            assertEquals(count + 2, transport.requests.get())
+            assertEquals(bWork, unique(targetB).single().id)
+        } finally {
+            transport.heldPath = null
+            NativeConnection.resetForTests()
+            bSlot?.let { slot -> KeystoreCredentialStore(context, slot).let { it.delete(it.openSession()) } }
+        }
     }
 
     @Test fun installedSchedulerComponentsKeepCallerProtectionsAndDefaultProcessWithoutForegroundService() {
@@ -614,7 +1356,8 @@ class PeriodicUsageRefreshTest {
     private fun run(target: BackgroundRefreshTarget, id: UUID? = null) =
         runData(workDataOf(PeriodicUsageRefresh.LIFETIME to target.partition.value.toString()), id)
     private fun runData(input: Data, id: UUID? = null) = futureResult("direct worker result", startData(input, id))
-    private fun start(target: BackgroundRefreshTarget) = startData(workDataOf(PeriodicUsageRefresh.LIFETIME to target.partition.value.toString()))
+    private fun start(target: BackgroundRefreshTarget, id: UUID? = null) =
+        startData(workDataOf(PeriodicUsageRefresh.LIFETIME to target.partition.value.toString()), id)
     private fun startData(input: Data, id: UUID? = null): ListenableFuture<ListenableWorker.Result> {
         lateinit var future: ListenableFuture<ListenableWorker.Result>
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -634,6 +1377,12 @@ class PeriodicUsageRefreshTest {
             found != null
         }
         return requireNotNull(found)
+    }
+    private fun dispatchOsJob(job: JobInfo, work: UUID) {
+        makeDueForOsDispatch(work)
+        val namespace = if (Build.VERSION.SDK_INT >= 34) "--namespace androidx.work.systemjobscheduler " else ""
+        val dispatch = shell("cmd jobscheduler run -f $namespace${app.packageName} ${job.id}")
+        assertTrue("forced OS dispatch: $dispatch", dispatch.contains("Running job"))
     }
     @SuppressLint("RestrictedApi")
     private fun makeDueForOsDispatch(work: UUID) {

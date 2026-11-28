@@ -24,26 +24,39 @@ internal data class CatalogRename(val entry: UUID, val name: String?) {
 }
 internal enum class CleanupDisposition { REMOVE, RETAIN }
 internal data class CatalogDeletion(val entry: UUID?, val operation: UUID,
-    val disposition: CleanupDisposition = CleanupDisposition.REMOVE)
+    val disposition: CleanupDisposition = CleanupDisposition.REMOVE,
+    val cancelPartition: HistoryPartition? = null)
 internal data class CatalogSnapshot(val legacySlot: UUID, val entries: List<CatalogEntry> = emptyList(),
     val selected: UUID? = null, val rename: CatalogRename? = null, val deletions: List<CatalogDeletion> = emptyList(),
     val candidate: AccountStorage? = null) {
+    val physicalDeletions get() = deletions.filter { it.cancelPartition == null }
     override fun toString() = "CatalogSnapshot(redacted)"
 }
 
 /** One process-owner storage lane. A rename intent reserves both keys until sidecar settlement. */
 internal class AccountCatalog private constructor(private val file: CatalogFile, initial: CatalogSnapshot) {
     private var state = initial
-    private enum class Uncertainty { NONE, REQUIRED_IDENTITY, OPTIONAL_RENAME, ADDITION }
+    private enum class Uncertainty { NONE, REQUIRED_IDENTITY, OPTIONAL_METADATA, ADDITION }
     private var uncertainty = Uncertainty.NONE
     private val published = MutableStateFlow(initial)
     val snapshots: StateFlow<CatalogSnapshot> = published
     @Synchronized fun snapshot() = state.copy(entries = state.entries.toList())
 
+    /** An uncertain Add can neither change a confirmed peer binding nor prove a target absent. */
+    @Synchronized fun backgroundSnapshot(partition: HistoryPartition): CatalogSnapshot? = when (uncertainty) {
+        Uncertainty.REQUIRED_IDENTITY -> null
+        Uncertainty.ADDITION -> state.takeIf { it.entries.any { entry -> entry.partition == partition } }
+        else -> state
+    }
+
+    @Synchronized fun confirmBackgroundIdentity() {
+        if (uncertainty == Uncertainty.REQUIRED_IDENTITY) confirmCommit()
+    }
+
     @Synchronized fun adopt(partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
         confirmedAdditionPeer(legacyEntry(), partition)?.let { return it }
         confirmIdentity()
-        check(state.deletions.none { it.entry == legacyEntry()?.storage?.id })
+        check(state.physicalDeletions.none { it.entry == legacyEntry()?.storage?.id })
         val previous = legacyEntry()
         if (previous != null) return reconcile(previous, partition, name)
         val ready = name as? AccountNameRead.Ready
@@ -124,7 +137,7 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     @Synchronized fun reconcile(id: UUID, partition: HistoryPartition?, name: AccountNameRead): CatalogEntry {
         confirmedAdditionPeer(entry(id), partition)?.let { return it }
         confirmIdentity()
-        check(state.deletions.none { it.entry == id })
+        check(state.physicalDeletions.none { it.entry == id })
         return reconcile(requireNotNull(entry(id)), partition, name)
     }
 
@@ -132,7 +145,7 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
 
     @Synchronized fun reserveRename(id: UUID, name: AccountDisplayName?): Boolean {
         confirmCommit()
-        if (state.deletions.any { it.entry == id }) return false
+        if (state.physicalDeletions.any { it.entry == id }) return false
         val entry = state.entries.singleOrNull { it.storage.id == id } ?: return false
         if (state.rename != null || conflicts(id, entry.type, name?.text)) return false
         commit(state.copy(rename = CatalogRename(id, name?.text)))
@@ -146,58 +159,95 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
         if (state.rename == null) { check(entry(id)?.name == pending.name); return }
         check(state.rename == pending)
         val entries = state.entries.map { if (it.storage.id == id) it.copy(name = pending.name, nameAvailable = true) else it }
-        commit(state.copy(entries = entries, rename = null), Uncertainty.OPTIONAL_RENAME)
+        commit(state.copy(entries = entries, rename = null), Uncertainty.OPTIONAL_METADATA)
     }
 
     @Synchronized fun beginDeletion(id: UUID? = legacyEntry()?.storage?.id,
         disposition: CleanupDisposition = CleanupDisposition.REMOVE): CatalogDeletion {
         confirmCommit()
         require(id == null || entry(id) != null)
-        state.deletions.singleOrNull { it.entry == id }?.let { return it }
+        state.physicalDeletions.singleOrNull { it.entry == id }?.let { return it }
         val receipt = CatalogDeletion(id, UUID.randomUUID(), disposition)
         commit(state.copy(deletions = state.deletions + receipt))
         return receipt
     }
 
     /** Retained by one history ticket; only its own attempted removal can authorize a sync retry. */
-    fun deletionSettlement(receipt: CatalogDeletion): () -> Boolean {
-        var attempted = false
-        var applied = false
-        return {
-            synchronized(this) {
-                try { confirmCommit() } catch (_: Exception) { return@synchronized false }
-                if (applied || (attempted && receipt !in state.deletions)) syncDeletion()
-                else {
-                    val pending = receipt in state.deletions
-                    attempted = pending
-                    val complete = completeDeletion(receipt)
-                    // commit re-reads an uncertain replacement before returning failure.
-                    applied = pending && receipt !in state.deletions
-                    complete
-                }
+    fun deletionSettlement(receipt: CatalogDeletion, retainCancellation: Boolean = false,
+        onSettled: (HistoryPartition) -> Unit = {}) = DeletionSettlement(receipt, retainCancellation, onSettled)
+
+    internal inner class DeletionSettlement(private val receipt: CatalogDeletion, private val retainCancellation: Boolean,
+        private val onSettled: (HistoryPartition) -> Unit) {
+        private var attempted = false
+        private var applied = false
+        @Volatile var pendingPartition: HistoryPartition? = null
+            private set
+
+        operator fun invoke(): Boolean = synchronized(this@AccountCatalog) {
+            try { confirmCommit() } catch (_: Exception) { return@synchronized false }
+            val settled = if (applied || (attempted && receipt !in state.deletions)) syncDeletion()
+            else {
+                val pending = receipt in state.deletions
+                attempted = pending
+                if (pending) pendingPartition = uniqueDeletionPartition(receipt)
+                val complete = completeDeletion(receipt, retainCancellation)
+                // commit re-reads an uncertain replacement before returning failure.
+                applied = pending && receipt !in state.deletions
+                complete
             }
+            // Only this ticket consumed the exact binding; a failed sync keeps its intent.
+            if (settled) pendingPartition?.also { partition ->
+                pendingPartition = null
+                if (state.entries.none { it.partition == partition }) onSettled(partition)
+            }
+            settled
         }
     }
+
+    private fun uniqueDeletionPartition(receipt: CatalogDeletion): HistoryPartition? =
+        receipt.entry?.let(::entry)?.partition?.takeIf { partition -> state.entries.count { it.partition == partition } == 1 }
 
     private fun syncDeletion(): Boolean = try { file.sync(); true } catch (_: Exception) { false }
 
     /** Called only with the adapter's captured receipt after BOTH deletion barriers. */
-    @Synchronized fun completeDeletion(receipt: CatalogDeletion?): Boolean = try {
+    @Synchronized fun completeDeletion(receipt: CatalogDeletion?): Boolean = completeDeletion(receipt, retainCancellation = false)
+
+    private fun completeDeletion(receipt: CatalogDeletion?, retainCancellation: Boolean): Boolean = try {
         confirmCommit()
-        if (receipt == null) state.deletions.isEmpty()
-        else if (receipt !in state.deletions) false
+        if (receipt == null) state.physicalDeletions.isEmpty()
+        else if (receipt !in state.physicalDeletions) false
         else {
             val id = receipt.entry
             val entries = settledEntries(receipt)
             val selected = if (state.selected == id && receipt.disposition == CleanupDisposition.REMOVE)
                 entries.firstOrNull()?.storage?.id else state.selected
+            // Publish the removed/unbound entry and the exact cancellation authority in one replacement.
+            val cancellation = if (retainCancellation) uniqueDeletionPartition(receipt)?.let {
+                receipt.copy(cancelPartition = it)
+            } else null
             commit(state.copy(entries = entries,
                 selected = selected,
                 rename = state.rename.takeUnless { it?.entry == id },
-                deletions = state.deletions - receipt))
+                deletions = state.deletions - receipt + listOfNotNull(cancellation)), readback = cancellation != null)
             true
         }
     } catch (_: Exception) { false }
+
+    /** Read only confirmed exact cancellation authority; never infer it from a missing entry. */
+    @Synchronized fun pendingCancellations(): List<CatalogDeletion> {
+        if (state.deletions.none { it.cancelPartition != null } &&
+            published.value.deletions.none { it.cancelPartition != null }) return emptyList()
+        confirmCommit()
+        return state.deletions.filter { it.cancelPartition != null }
+    }
+
+    /** An ACK is metadata-only: it must not erase a peer or a later receipt. */
+    @Synchronized fun acknowledgeCancellation(receipt: CatalogDeletion) {
+        confirmCommit()
+        if (receipt.cancelPartition != null && receipt in state.deletions) {
+            commit(state.copy(deletions = state.deletions - receipt), Uncertainty.OPTIONAL_METADATA, readback = true)
+        }
+    }
 
     private fun settledEntries(receipt: CatalogDeletion): List<CatalogEntry> =
         if (receipt.disposition == CleanupDisposition.REMOVE) state.entries.filterNot { it.storage.id == receipt.entry }
@@ -244,11 +294,11 @@ internal class AccountCatalog private constructor(private val file: CatalogFile,
     private fun confirmedAdditionPeer(peer: CatalogEntry?, observed: HistoryPartition?): CatalogEntry? {
         if (uncertainty != Uncertainty.ADDITION || peer?.partition == null) return null
         if (observed != null && observed != peer.partition) return null
-        return peer.takeUnless { state.deletions.any { deletion -> deletion.entry == it.storage.id } }
+        return peer.takeUnless { state.physicalDeletions.any { deletion -> deletion.entry == it.storage.id } }
     }
 
     private fun confirmIdentity() {
-        if (uncertainty != Uncertainty.OPTIONAL_RENAME) confirmCommit()
+        if (uncertainty != Uncertainty.OPTIONAL_METADATA) confirmCommit()
     }
 
     /** Never admit a write from stale RAM or publish an unsynced replacement. */

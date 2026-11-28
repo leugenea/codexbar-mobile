@@ -606,8 +606,8 @@ class AccountCatalogMigrationTest {
         owner.renameAccount(editor, "Synthetic stale")
         owner.usageForeground(observer, true)
         settled(owner, "retired catalog session rejects commands") { owner.commandsSettled() }
-        settled(owner, "retired catalog session rejects worker") {
-            assertEquals(BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME),
+        settled(owner, "unconfirmed catalog rejects worker without declaring its lifetime stale") {
+            assertEquals(BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STORAGE_UNAVAILABLE),
                 owner.refreshInBackground(target))
         }
         assertEquals(before, catalog().snapshot())
@@ -618,6 +618,7 @@ class AccountCatalogMigrationTest {
         assertEquals(retained, export())
         val next = native(); phase(next, ConnectionPhase.RESTORED)
         assertEquals(before.entries.single().storage, catalog().legacyEntry()!!.storage)
+        assertEquals(target.partition, catalog().legacyEntry()!!.partition)
         assertEquals(before.selected, catalog().snapshot().selected)
         assertNull(catalog().snapshot().rename)
         awaitName(next, "Synthetic legacy")

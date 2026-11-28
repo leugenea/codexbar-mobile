@@ -19,6 +19,7 @@ internal interface CredentialCipher {
 
 internal class AndroidCredentialCipher(private val alias: String) : CredentialCipher {
     private fun store(): KeyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+    internal fun containsKey() = store().containsAlias(alias)
 
     private fun key(allowCreate: Boolean): SecretKey {
         val store = store()

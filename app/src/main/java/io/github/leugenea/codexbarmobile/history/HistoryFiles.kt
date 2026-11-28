@@ -48,6 +48,30 @@ internal class HistoryFiles(val directory: File, private val limits: HistoryStor
             writeBinding(empty)
             return empty
         }
+        return decodeBinding()
+    }
+
+    /** A read-only probe: never creates the lane or initializes/repairs the history fence. */
+    fun confirmedPhase(partition: HistoryPartition): HistoryBindingPhase? = try {
+        if (partition.value == UUID(0, 0) || directory.canonicalFile != directory.absoluteFile) null
+        else exactPhase(partition)
+    } catch (_: Exception) { null }
+
+    private fun exactPhase(partition: HistoryPartition): HistoryBindingPhase? {
+        val artifacts = checkBudget()
+        if (artifacts.none { it.name == control.name } || artifacts.any { it.name == pending.name }) return null
+        val binding = decodeBinding()
+        if (binding.partition != partition) return null
+        return when (binding.phase) {
+            HistoryBindingPhase.ACTIVE -> HistoryBindingPhase.ACTIVE
+            HistoryBindingPhase.EMPTY -> HistoryBindingPhase.EMPTY.takeIf {
+                artifacts.all { it.name == control.name || it.name == "lane" }
+            }
+            else -> null
+        }
+    }
+
+    private fun decodeBinding(): HistoryBinding {
         if (control.length() != 32L) throw HistoryCorruption()
         val payload = ByteArray(32)
         DataInputStream(FileInputStream(control)).use { it.readFully(payload); if (it.read() != -1) throw HistoryCorruption() }
@@ -92,11 +116,12 @@ internal class HistoryFiles(val directory: File, private val limits: HistoryStor
 
     fun containsDatabaseArtifacts(): Boolean = databaseArtifacts.any { File(directory, it).exists() }
 
-    fun checkBudget(extra: Long = 0) {
+    fun checkBudget(extra: Long = 0): Array<File> {
         val files = directory.listFiles() ?: throw IOException()
         if (files.any { !it.isFile || it.canonicalFile != it.absoluteFile }) throw HistoryCorruption()
         if (files.any { it.name !in allowedArtifacts }) throw HistoryCorruption()
         if (files.sumOf { it.length() } + extra > limits.bytes) throw HistoryStorageException(HistoryUnavailable.STORAGE_FULL)
+        return files
     }
 
     internal fun syncDirectory() {

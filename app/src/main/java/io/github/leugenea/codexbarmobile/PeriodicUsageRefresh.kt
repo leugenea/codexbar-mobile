@@ -9,6 +9,7 @@ import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.await
 import androidx.work.workDataOf
 import io.github.leugenea.codexbarmobile.history.HistoryPartition
 import java.util.UUID
@@ -16,19 +17,13 @@ import java.util.concurrent.TimeUnit
 
 /** Only WorkManager persists enrollment; its input contains one opaque local lifetime, no secrets. */
 internal class PeriodicUsageRefresh(private val manager: WorkManager) {
-    fun enrollment(target: BackgroundRefreshTarget?) {
-        if (target == null) manager.cancelAllWorkByTag(TAG)
-        else manager.enqueueUniquePeriodicWork(name(target), ExistingPeriodicWorkPolicy.KEEP, request(target))
+    fun enrollment(target: BackgroundRefreshTarget, enrolled: Boolean) {
+        if (enrolled) manager.enqueueUniquePeriodicWork(name(target), ExistingPeriodicWorkPolicy.KEEP, request(target))
+        else manager.cancelUniqueWork(name(target))
     }
 
-    /** Compatibility runtime boundary: removal never cancels a peer's unique work. */
-    fun entryEnrollment(initial: HistoryPartition?): (BackgroundRefreshTarget?) -> Unit {
-        var continuing = initial?.let(::BackgroundRefreshTarget)
-        return { target ->
-            if (target == null) continuing?.let { manager.cancelUniqueWork(name(it)) }
-            else enrollment(target)
-            continuing = target
-        }
+    suspend fun cancel(target: BackgroundRefreshTarget) {
+        manager.cancelUniqueWork(name(target)).await()
     }
 
     companion object {
@@ -61,7 +56,7 @@ class PeriodicUsageRefreshWorker(context: Context, parameters: WorkerParameters)
     override suspend fun doWork(): Result {
         val target = PeriodicUsageRefresh.target(inputData.getString(PeriodicUsageRefresh.LIFETIME))
             ?: return Result.failure()
-        val outcome = NativeConnection.get(applicationContext).refreshInBackground(
+        val outcome = NativeConnection.refreshInBackground(applicationContext,
             target, minimumSuccessAgeMillis = PeriodicUsageRefresh.RECENT_SUCCESS_MILLIS)
         if (outcome is BackgroundRefreshOutcome.Rejected && outcome.reason == BackgroundRefreshRejection.STALE_LIFETIME) {
             WorkManager.getInstance(applicationContext).cancelUniqueWork(PeriodicUsageRefresh.name(target))

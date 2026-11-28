@@ -4,6 +4,7 @@ import io.github.leugenea.codexbarmobile.*
 import io.github.leugenea.codexbarmobile.auth.SyntheticAuth
 import io.github.leugenea.codexbarmobile.transport.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -13,31 +14,31 @@ import java.util.UUID
 @OptIn(ExperimentalCoroutinesApi::class)
 class PeriodicRefreshAdmissionTest {
     @Test fun dormantRestoreAndForegroundObservationNeverEnrollUntilExplicitActivation() = runTest {
-        val enrolled = mutableListOf<BackgroundRefreshTarget?>()
-        val f = RecordingFixture(this, enrollment = enrolled::add)
+        val enrolled = mutableListOf<BackgroundRefreshTarget>()
+        val f = RecordingFixture(this, enrollment = { enrolled += it })
         try {
             f.settle(); f.visible(true)
             assertTrue(enrolled.isEmpty()); assertTrue(f.gets.isEmpty())
-            f.read(); f.read()
-            assertEquals(listOf(f.target(), f.target()), enrolled)
+            val expected = f.target()
+            f.owner.requestSelectedUsage(enroll = true) { true }
+            f.settle(); f.read()
+            assertEquals(listOf(expected, expected), enrolled)
             f.owner.cancel(); f.settle()
-            assertEquals(2, enrolled.size) // Cancel/STOP are not local account removal.
-            f.owner.signOut(); f.settle()
-            assertNull(enrolled.last())
+            assertEquals(listOf(expected, expected), enrolled)
         } finally { f.finish() }
     }
 
     @Test fun successfulInteractiveLoginEnrollsOnlyItsNewActiveLifetime() = runTest {
-        val enrolled = mutableListOf<BackgroundRefreshTarget?>()
-        val f = RecordingFixture(this, enrollment = enrolled::add)
+        val enrolled = mutableListOf<BackgroundRefreshTarget>()
+        val f = RecordingFixture(this, enrollment = { enrolled += it })
         try {
             f.settle(); f.owner.signOut(); f.settle()
             f.visible(true); f.owner.connect(); f.settle()
             assertEquals(ConnectionPhase.AUTHENTICATING, f.owner.state.value.phase)
             advanceTimeBy(5_000); runCurrent()
-            withTimeout(10_000) { f.owner.commandsSettled(); f.owner.backgroundRefreshTarget() }
+            withTimeout(30_000) { f.owner.state.first { it.phase == ConnectionPhase.OBSERVED && !it.refresh.refreshing } }
             assertEquals(ConnectionPhase.OBSERVED, f.owner.state.value.phase)
-            assertEquals(listOf(f.target()), enrolled.filterNotNull())
+            assertEquals(listOf(f.target()), enrolled)
             assertEquals(2, f.gets.size)
         } finally { f.finish() }
     }
@@ -93,9 +94,8 @@ class PeriodicRefreshAdmissionTest {
         advance(900_000); assertEquals(count + 2, gets.size)
     } }
 
-    @Test fun staleLifetimeIsRejectedBeforeRecentSuccessAndTerminalAuthCancelsEnrollment() = runTest {
-        val enrolled = mutableListOf<BackgroundRefreshTarget?>()
-        val f = RecordingFixture(this, enrollment = enrolled::add)
+    @Test fun staleLifetimeIsRejectedBeforeRecentSuccessAndTerminalAuthRevokesRefreshAuthority() = runTest {
+        val f = RecordingFixture(this)
         try {
             f.settle(); f.read()
             val wrong = BackgroundRefreshTarget(HistoryPartition(UUID.randomUUID()))
@@ -106,9 +106,13 @@ class PeriodicRefreshAdmissionTest {
             f.fake.respond = { call -> if (call.request.url.encodedPath == "/oauth/token")
                 call.reply(SyntheticAuth.response("""{"error":"invalid_grant"}""", 400)) else normal(call) }
             f.advance(900_000)
-            assertTrue(f.periodic(f.target()) is BackgroundRefreshOutcome.Rejected)
-            f.settle(); assertNull(enrolled.last())
+            val expected = f.target()
+            assertTrue(f.periodic(expected) is BackgroundRefreshOutcome.Rejected)
+            f.settle()
             assertEquals(ConnectionPhase.REAUTH_REQUIRED, f.owner.state.value.phase)
+            val count = f.gets.size
+            assertEquals(BackgroundRefreshOutcome.Rejected(BackgroundRefreshRejection.STALE_LIFETIME), f.periodic(expected))
+            assertEquals(count, f.gets.size)
         } finally { f.finish() }
     }
 

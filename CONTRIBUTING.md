@@ -111,9 +111,10 @@ process are checked against the [pinned scheduler contract](docs/background-refr
 Cleartext is explicitly off
 in every app build, with no debug/test override. JVM local-server fixtures do not
 need device cleartext access. The permission enables only the selected auth/usage routes. A fresh process owner
-restores credentials without requests; an explicit action activates foreground reads
-and enrolls ordinary periodic work for that continuing local lifetime. A cold worker
-may activate only its exact previously enrolled lifetime, never a successor login.
+restores credentials without requests. Successful sign-in/committed Add, manual read
+and explicit dashboard selection can enroll the checked continuing local lifetime.
+All saved eligible enrollments survive deselection. A cold worker may activate only
+its exact previously enrolled lifetime, never a selected peer or successor login.
 The real connection/live flow is the default launcher and recreation destination.
 An already activated owner may resume a bounded read cycle on Activity STARTED.
 
