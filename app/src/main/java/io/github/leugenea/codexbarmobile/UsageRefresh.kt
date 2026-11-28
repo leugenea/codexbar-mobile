@@ -77,14 +77,18 @@ internal class UsageRefresh(
         }
     }
 
-    fun foreground(observer: Any, foreground: Boolean) {
+    fun foreground(observer: Any, foreground: Boolean, refreshOnGain: Boolean = true) {
         val wasVisible = visible
         lifecycleManaged = true
         if (foreground) observers.add(observer) else observers.remove(observer)
         if (visible == wasVisible) return
         if (visible) {
             flight?.foreground = true
-            if (activated) { reevaluate(); startTicks(); request() }
+            if (activated) {
+                reevaluate()
+                startTicks()
+                if (refreshOnGain) request()
+            }
         } else {
             stopForeground()
         }

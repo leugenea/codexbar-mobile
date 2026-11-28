@@ -207,8 +207,10 @@ file instead of replaying an old snapshot or adding a rollback journal.
 Each actual selection transition creates a fresh root identity in a `StateFlow`, including
 A → B → equal-query A. MainActivity collects it and registers one exact STARTED lease per
 lifecycle interval. Transfer removes only those captured foreground tokens and acquires
-them on the selected retained controller. A late STOP is idempotent and cannot release a
-peer or a newer registration. No switch calls connect, session retirement or adoption.
+them on the selected retained controller. A transferred lease does not request quotas;
+selection owns that request. A new STARTED interval can independently refresh an activated
+controller. A late STOP is idempotent and cannot release a peer or a newer registration.
+No switch calls connect, session retirement or adoption.
 Accepted rotation, protected writes and admitted recorder work retain their original
 controller, store and native capability. Deselection hides history without pausing or
 rebinding that accepted storage; occasional missed observations remain noncritical.

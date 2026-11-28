@@ -480,8 +480,9 @@ internal class ConnectionController(
     }
 
     /** Observer identities keep one Activity from cancelling another visible Activity. */
-    fun usageForeground(observer: Any, foreground: Boolean, retainStorage: Boolean = false) = command(UsageForegroundCommand(observer, foreground)) {
-        usageRefresh.foreground(observer, foreground)
+    fun usageForeground(observer: Any, foreground: Boolean, retainStorage: Boolean = false,
+        refreshOnGain: Boolean = true) = command(UsageForegroundCommand(observer, foreground)) {
+        usageRefresh.foreground(observer, foreground, refreshOnGain)
         historyRecorder.foreground(usageRefresh.hasForegroundObservers, retainStorage)
         if (!retainStorage) pauseHistoryIfUnobserved()
         if (foreground) resumeHistory()

@@ -66,6 +66,15 @@ class AccountSelectionTest {
     }
 
     @Test fun heldOldUsageCannotDispatchInventoryOrPublishAfterEqualQueryABAReturn() {
+        val returning = AtomicBoolean(false)
+        val committed = CompletableDeferred<Unit>()
+        val completeCommit = CompletableDeferred<Unit>()
+        fixture.afterSelectionCommit = { id ->
+            if (id == fixture.a.storage.id && returning.compareAndSet(true, false)) {
+                committed.complete(Unit)
+                completeCommit.await()
+            }
+        }
         val root = fixture.start(); val selected = root.dashboard()
         val a = fixture.runtime(fixture.a); val b = fixture.runtime(fixture.b)
         fixture.phase(a, ConnectionPhase.RESTORED); fixture.phase(b, ConnectionPhase.RESTORED)
@@ -76,13 +85,27 @@ class AccountSelectionTest {
         fixture.await("original A usage dispatch") { fixture.aTransport.liveHeldCall(ReadOperation.USAGE.path) != null }
         val old = fixture.aTransport.liveHeldCall(ReadOperation.USAGE.path)!!
         val initialRoot = selected.value!!
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         try {
             fixture.select(fixture.b); fixture.phase(b, ConnectionPhase.OBSERVED)
             fixture.await("original A flight cancelled") { old.cancelled }
             assertFalse(initialRoot.isCurrent())
+            fixture.settle(a); assertNull(a.currentHistoryDisplayContext())
             fixture.aTransport.heldPath = null
             fixture.aTransport.usageBody = NavigationTransport.USAGE.replace("12.375", "23.125")
-            fixture.select(fixture.a); fixture.phase(a, ConnectionPhase.OBSERVED)
+            returning.set(true)
+            val selection = scope.async { root.select(fixture.a.storage.id) }
+            fixture.receipt("return committed before the select coroutine resumes") { committed.await() }
+            fixture.await("catalog watcher transferred A's STARTED lease") {
+                selected.value?.id == fixture.a.storage.id && a.currentHistoryDisplayContext() != null
+            }
+            // The foreground command has run. Let any flight it launched settle before explicit admission.
+            fixture.phase(a, ConnectionPhase.OBSERVED)
+            assertFalse(selection.isCompleted)
+            val beforeExplicit = fixture.aTransport.counts()
+            completeCommit.complete(Unit)
+            assertTrue(fixture.receipt("exact return selection admission") { selection.await() })
+            fixture.phase(a, ConnectionPhase.OBSERVED)
             fixture.await("fresh A exact observation") { fixture.appends.any { it.admission.partition == fixture.a.partition && it.admission.id == ObservationId(5) } }
             val beforeLate = a.state.value.refresh.usage.success
             old.reply()
@@ -91,6 +114,8 @@ class AccountSelectionTest {
             assertEquals(BigDecimal("23.125"), a.state.value.refresh.usage.success!!.usage!!.fiveHour.candidates.single().usedPercent.value)
             assertNotSame(initialRoot, selected.value)
             assertSame(original, fixture.ready(a))
+            assertEquals("Route counts before explicit admission (final counts: ${fixture.aTransport.counts()})",
+                mapOf(ReadOperation.USAGE.path to 1L), beforeExplicit)
             assertCounts(fixture.aTransport, usage = 2, inventory = 1)
             assertCounts(fixture.bTransport, usage = 1, inventory = 1)
             val receipts = fixture.appends.filter { it.admission.partition == fixture.a.partition }
@@ -98,7 +123,23 @@ class AccountSelectionTest {
             assertEquals(HistoryEvent.Gap(HistoryGap.BACKGROUND), receipts[0].admission.event)
             assertTrue(receipts[1].admission.event is HistoryEvent.Observed)
             receipts.forEach { assertTrue(it.result is HistoryAppendOutcome.Stored) }
-        } finally { old.reply(); fixture.stop(observer) }
+
+            fixture.stop(observer); fixture.settle(a)
+            assertNull(a.currentHistoryDisplayContext())
+            val resumed = fixture.observer()
+            try {
+                fixture.await("a separate STARTED interval dispatches usage") {
+                    fixture.aTransport.counts()[ReadOperation.USAGE.path] == 3L
+                }
+                fixture.phase(a, ConnectionPhase.OBSERVED)
+                assertCounts(fixture.aTransport, usage = 3, inventory = 2)
+                assertCounts(fixture.bTransport, usage = 1, inventory = 1)
+            } finally { fixture.stop(resumed) }
+        } finally {
+            completeCommit.complete(Unit)
+            fixture.receipt("return selection teardown") { scope.coroutineContext.job.cancelAndJoin() }
+            old.reply(); fixture.stop(observer)
+        }
     }
 
     @Test fun acceptedRotationPersistsOnlyOriginalAAfterDisplayTransfersToB() {
@@ -203,6 +244,39 @@ class AccountSelectionTest {
 
     @Test fun exactEnrolledAInterestSurvivesSelectedBWithoutSelectedLookupOrGlobalCancellation() = workerAcrossSwitch(bFirst = true)
     @Test fun exactEnrolledASettlementCanPrecedeHeldSelectedBWithoutReleasingBInterest() = workerAcrossSwitch(bFirst = false)
+
+    @Test fun selectionRetainsAnActiveWorkerFlightAfterTheWorkerDetaches() {
+        val root = fixture.start(); root.dashboard()
+        val a = fixture.runtime(fixture.a); val b = fixture.runtime(fixture.b)
+        fixture.phase(a, ConnectionPhase.RESTORED); fixture.phase(b, ConnectionPhase.RESTORED)
+        val observer = fixture.observer(); fixture.settle(a)
+        val target = fixture.receipt("B exact continuing lifetime", b) { b.backgroundRefreshTarget() }!!
+        val usage = ReadOperation.USAGE.path
+        fixture.bTransport.heldPath = usage
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val worker = scope.async { root.refreshInBackground(target, 0) }
+        try {
+            fixture.await("B worker usage dispatch") { fixture.bTransport.liveHeldCall(usage) != null }
+            val call = requireNotNull(fixture.bTransport.liveHeldCall(usage))
+            fixture.select(fixture.b)
+            assertSame(b, root.dashboard().value!!.controller)
+            assertCounts(fixture.bTransport, usage = 1, inventory = 0)
+            fixture.receipt("detach only B's exact worker", b) {
+                worker.cancelAndJoin()
+                assertEquals(0, b.backgroundRefreshNetworkInterests())
+            }
+            assertFalse("Transferred foreground interest keeps the joined flight alive", call.cancelled)
+            fixture.bTransport.heldPath = null
+            call.reply()
+            fixture.phase(b, ConnectionPhase.OBSERVED)
+            assertCounts(fixture.bTransport, usage = 1, inventory = 1)
+            assertEquals(0L, fixture.aTransport.requests.get())
+        } finally {
+            fixture.bTransport.releaseHeld()
+            fixture.receipt("joined worker teardown") { scope.coroutineContext.job.cancelAndJoin() }
+            fixture.stop(observer)
+        }
+    }
 
     private fun workerAcrossSwitch(bFirst: Boolean) {
         val root = fixture.start(); root.dashboard()

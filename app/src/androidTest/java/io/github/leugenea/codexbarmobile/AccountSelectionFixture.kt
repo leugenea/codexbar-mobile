@@ -44,6 +44,7 @@ internal class AccountSelectionFixture {
     var decorateCredential: (UUID, CredentialStore) -> CredentialStore = { _, store -> store }
     var enrollment: (BackgroundRefreshTarget, Boolean) -> Unit = { _, _ -> }
     var cancelEnrollment: (suspend (BackgroundRefreshTarget) -> Unit)? = null
+    var afterSelectionCommit: suspend (UUID) -> Unit = {}
     var hooks: (File) -> HistoryStorageHooks = { object : HistoryStorageHooks {} }
     var decorateHistory: (File, HistoryLifetimeStorage) -> HistoryLifetimeStorage = { _, storage -> storage }
     data class AppendReceipt(val directory: File, val admission: HistoryAdmission, val result: HistoryAppendOutcome)
@@ -71,7 +72,7 @@ internal class AccountSelectionFixture {
 
     fun start(): AccountRuntimeOwner {
         owner = AccountRuntimeOwner(context, catalog, transport, aTransport.clock, aTransport::pause,
-            enrollment = enrollment, cancelEnrollment = cancelEnrollment,
+            enrollment = enrollment, cancelEnrollment = cancelEnrollment, afterSelectionCommit = afterSelectionCommit,
             credentials = { app, id -> decorateCredential(id, KeystoreCredentialStore(app, id)) },
             historyStorage = { path ->
                 val storage = decorateHistory(path, SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(path, hooks = hooks(path))))

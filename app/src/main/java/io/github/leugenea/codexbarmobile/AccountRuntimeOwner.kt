@@ -35,6 +35,8 @@ internal class AccountRuntimeOwner(
     private val beforeAdditionDisplay: () -> Unit = {},
     // Compatibility fixtures without an acknowledged scheduler keep the original notification seam.
     private val cancelEnrollment: (suspend (BackgroundRefreshTarget) -> Unit)? = null,
+    // A hosted regression can hold the off-lane caller after durable publication, outside the catalog lock.
+    private val afterSelectionCommit: suspend (UUID) -> Unit = {},
 ) {
     // Retain only application-scoped context. Native fixtures supply a storage-isolating
     // ContextWrapper here, so preserve Context rather than casting it to Application.
@@ -257,7 +259,11 @@ internal class AccountRuntimeOwner(
     suspend fun select(id: UUID): Boolean = scope.async(mutations) {
         if (closing || addition?.address?.id == id) return@async false
         dashboard()
-        val committed = scope.async { catalog?.select(id) == true }
+        val committed = scope.async {
+            val saved = catalog?.select(id) == true
+            if (saved) afterSelectionCommit(id)
+            saved
+        }
         if (!try { committed.await() } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { false }) return@async false
         val activation = display(catalog?.snapshots?.value)
@@ -329,7 +335,9 @@ internal class AccountRuntimeOwner(
             old.dashboardHidden()
         }
         next.controller.dashboardDisplay(next::isCurrent)
-        if (changed) observers.forEach { next.controller.usageForeground(it, true) }
+        // Selection, Add and removal fallback own quota admission; moving an existing
+        // STARTED lease only transfers observation, even when the catalog watcher wins.
+        if (changed) observers.forEach { next.controller.usageForeground(it, true, refreshOnGain = false) }
     }
 
     private fun currentProjection() = selected.value.takeUnless { closing }
