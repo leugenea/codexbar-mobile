@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795857036043,
+  "lastUpdate": 1795862837767,
   "repoUrl": "https://github.com/leugenea/codexbar-mobile",
   "entries": {
     "Code erosion": [
@@ -3802,6 +3802,40 @@ window.BENCHMARK_DATA = {
           {
             "name": "Kotlin erosion",
             "value": 3.142948756473581,
+            "unit": "%"
+          },
+          {
+            "name": "Kotlin CCN > 10",
+            "value": 3,
+            "unit": "functions"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "leugenea@gmail.com",
+            "name": "Luckyanets Eugene",
+            "username": "leugenea"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "efcd7e8d2cc4a489b88db57a73adbade98b122fa",
+          "message": "Request quotas once per dashboard account selection (#267)\n\nRefs #261. Transfer the existing foreground lease without requesting quotas; keep explicit selection and independent foreground starts authoritative. Cover the published-selection ordering and worker overlap.",
+          "timestamp": "2026-11-28T13:46:51+03:00",
+          "tree_id": "5853d2fcc1c92cab0071eabe2ea4e09e8e1033ed",
+          "url": "https://github.com/leugenea/codexbar-mobile/commit/efcd7e8d2cc4a489b88db57a73adbade98b122fa"
+        },
+        "date": 1795862837039,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Kotlin erosion",
+            "value": 3.1376772590097373,
             "unit": "%"
           },
           {
