@@ -3,7 +3,6 @@ package io.github.leugenea.codexbarmobile
 import android.content.Context
 import android.content.ContextWrapper
 import android.system.Os
-import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import io.github.leugenea.codexbarmobile.account.*
 import io.github.leugenea.codexbarmobile.auth.AuthTransport
@@ -36,14 +35,6 @@ internal class AccountSelectionFixture {
     val transport = AuthTransport { request, deadline, terminal ->
         val token = (request as? ProviderHttpRequest.Get)?.bearer?.copyBytes()?.toString(Charsets.UTF_8)
         val target = if (token?.contains("-B-") == true) bTransport else aTransport
-        reselectionTrace?.let { trace ->
-            val account = if (target === aTransport) "A" else "B"
-            when (request.url.encodedPath) {
-                ReadOperation.USAGE.path -> trace.record(account, "transport usage GET")
-                ReadOperation.RESET_INVENTORY.path -> trace.record(account, "transport inventory GET")
-                else -> Unit
-            }
-        }
         target.execute(request, deadline, terminal)
     }
     lateinit var catalog: AccountCatalog
@@ -53,6 +44,7 @@ internal class AccountSelectionFixture {
     var decorateCredential: (UUID, CredentialStore) -> CredentialStore = { _, store -> store }
     var enrollment: (BackgroundRefreshTarget, Boolean) -> Unit = { _, _ -> }
     var cancelEnrollment: (suspend (BackgroundRefreshTarget) -> Unit)? = null
+    var afterSelectionCommit: suspend (UUID) -> Unit = {}
     var hooks: (File) -> HistoryStorageHooks = { object : HistoryStorageHooks {} }
     var decorateHistory: (File, HistoryLifetimeStorage) -> HistoryLifetimeStorage = { _, storage -> storage }
     data class AppendReceipt(val directory: File, val admission: HistoryAdmission, val result: HistoryAppendOutcome)
@@ -62,35 +54,6 @@ internal class AccountSelectionFixture {
     private val originalRootFactory = NativeConnection.rootFactory
     private var installed = false
     private val at = Instant.ofEpochSecond(1_800_000_000)
-
-    @Volatile private var reselectionTrace: ReselectionTrace? = null
-
-    fun observeReselection(label: String, a: ConnectionController, b: ConnectionController) {
-        val trace = ReselectionTrace(label)
-        reselectionTrace = trace
-        receipt("install A/B reselection receipts") {
-            a.observeReselection { trace.record("A", it) }
-            b.observeReselection { trace.record("B", it) }
-        }
-    }
-
-    fun markReselection(account: String, event: String) { reselectionTrace?.record(account, event) }
-    fun dumpReselection() { reselectionTrace?.dump() }
-
-    private class ReselectionTrace(private val label: String) {
-        private val events = mutableListOf<String>()
-        fun record(account: String, event: String) {
-            synchronized(events) {
-                if (events.size < 160) events.add("$account $event")
-            }
-        }
-
-        fun dump() {
-            val snapshot = synchronized(events) { events.toList() }
-            snapshot.forEachIndexed { index, event -> Log.i("CodexBar261", "$label #${index + 1} $event") }
-            if (snapshot.size == 160) Log.i("CodexBar261", "$label trace limit reached")
-        }
-    }
 
     fun prepare() {
         assertTrue(directory.mkdir())
@@ -109,7 +72,7 @@ internal class AccountSelectionFixture {
 
     fun start(): AccountRuntimeOwner {
         owner = AccountRuntimeOwner(context, catalog, transport, aTransport.clock, aTransport::pause,
-            enrollment = enrollment, cancelEnrollment = cancelEnrollment,
+            enrollment = enrollment, cancelEnrollment = cancelEnrollment, afterSelectionCommit = afterSelectionCommit,
             credentials = { app, id -> decorateCredential(id, KeystoreCredentialStore(app, id)) },
             historyStorage = { path ->
                 val storage = decorateHistory(path, SQLiteHistoryLifetimeStorage(SQLiteHistoryStore(path, hooks = hooks(path))))
@@ -126,10 +89,6 @@ internal class AccountSelectionFixture {
         val native = outcome.access
         return HistoryLifetimeOutcome.Bound(object : HistoryRuntimeAccess by native {
             override fun append(admission: HistoryAdmission): HistoryAppendOutcome = native.append(admission).also {
-                reselectionTrace?.let { trace ->
-                    val account = if (admission.partition == a.partition) "A" else "B"
-                    trace.record(account, "append #${admission.id.ordinal} observed=${admission.event is HistoryEvent.Observed} stored=${it is HistoryAppendOutcome.Stored}")
-                }
                 appends += AppendReceipt(path, admission, it)
             }
         })
@@ -168,14 +127,7 @@ internal class AccountSelectionFixture {
     fun settle(controller: ConnectionController) = receipt("commands and restoration", controller) {
         controller.commandsSettled(); controller.historyRestorationSettled()
     }
-    fun select(entry: CatalogEntry): Boolean {
-        val account = if (entry.storage.id == a.storage.id) "A" else "B"
-        markReselection(account, "select invoked")
-        return receipt("durable selection ${entry.name}") { owner.select(entry.storage.id) }.also {
-            markReselection(account, "select returned=$it")
-            assertTrue(it)
-        }
-    }
+    fun select(entry: CatalogEntry) = receipt("durable selection ${entry.name}") { owner.select(entry.storage.id) }.also { assertTrue(it) }
     fun observer() = receipt("STARTED registration") { owner.registerForeground() }
     fun stop(observer: DashboardObserver) = receipt("STOP exact registration") { observer.stop() }
     fun gate() = SelectionGate().also { gates += it }

@@ -30,16 +30,12 @@ class CapturedAccountActionsTest {
     private lateinit var fixture: AccountSelectionFixture
     private val originalBrowser = MainActivity.browserLauncher
     @Before fun prepare() { fixture = AccountSelectionFixture(); fixture.prepare() }
-    @After fun cleanup() {
-        MainActivity.browserLauncher = originalBrowser
-        try { fixture.dumpReselection() } finally { fixture.cleanup() }
-    }
+    @After fun cleanup() { MainActivity.browserLauncher = originalBrowser; fixture.cleanup() }
 
     @Test fun displayedReauthBrowserFailureCancelAndCopyStayOnAWhileBIsSelectedAndRejectSuccessor() {
         val root = fixture.start(); root.dashboard()
         val a = fixture.runtime(fixture.a); val b = fixture.runtime(fixture.b)
         fixture.phase(a, ConnectionPhase.RESTORED); fixture.phase(b, ConnectionPhase.RESTORED)
-        fixture.observeReselection("captured-actions", a, b)
         val oldEditor = requireNotNull(a.accountName.value?.edit)
         fixture.aTransport.usageStatus = 401
         fixture.select(fixture.a); fixture.phase(a, ConnectionPhase.REAUTH_REQUIRED)
@@ -437,7 +433,6 @@ class CapturedAccountActionsTest {
         assertEquals(observations, receipts.size)
         receipts.forEach { assertTrue("B original append ${it.admission.id}: ${it.result}", it.result is HistoryAppendOutcome.Stored) }
         val counts = fixture.bTransport.counts()
-        fixture.markReselection("B", "peerAppend expected=$observations usage=${counts[ReadOperation.USAGE.path]} inventory=${counts[ReadOperation.RESET_INVENTORY.path]}")
         assertEquals(observations.toLong(), counts[ReadOperation.USAGE.path])
         assertEquals(observations.toLong(), counts[ReadOperation.RESET_INVENTORY.path])
     }
